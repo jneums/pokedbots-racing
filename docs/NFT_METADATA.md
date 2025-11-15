@@ -1,0 +1,142 @@
+# NFT Metadata On-Chain Storage
+
+This directory contains scripts and modules for storing and accessing NFT metadata on-chain in the Internet Computer canister.
+
+## Overview
+
+The NFT metadata from `stats.json` (11MB, 533k+ lines) is now stored on-chain using an efficient HashMap-based storage system.
+
+## Files
+
+- **`src/Stats.mo`** - Motoko module for NFT metadata storage and retrieval
+- **`scripts/upload-metadata.js`** - Node.js script to upload metadata in chunks
+- **`src/main.mo`** - Updated with public query methods for accessing metadata
+
+## Usage
+
+### Uploading Metadata
+
+1. First, make sure your canister is deployed:
+```bash
+dfx deploy
+```
+
+2. Set the canister ID (if not using local):
+```bash
+export CANISTER_ID=$(dfx canister id my_mcp_server)
+```
+
+3. Run the upload script:
+```bash
+node scripts/upload-metadata.js
+```
+
+The script will:
+- Load the stats.json file
+- Convert it to the canister format
+- Split into chunks of 100 NFTs each
+- Upload sequentially with progress tracking
+- Verify the upload was successful
+
+### Querying Metadata
+
+#### Get metadata for a single NFT:
+```bash
+dfx canister call my_mcp_server get_nft_metadata '(0)'
+```
+
+#### Get metadata for multiple NFTs:
+```bash
+dfx canister call my_mcp_server get_nft_metadata_batch '(vec {0; 1; 2})'
+```
+
+#### Get paginated results:
+```bash
+dfx canister call my_mcp_server get_nft_metadata_page '(0, 10)'
+```
+
+#### Get total count:
+```bash
+dfx canister call my_mcp_server get_total_nft_count '()'
+```
+
+#### Get all token IDs:
+```bash
+dfx canister call my_mcp_server get_all_token_ids '()'
+```
+
+#### Get specific trait for an NFT:
+```bash
+dfx canister call my_mcp_server get_nft_trait '(0, "Type")'
+dfx canister call my_mcp_server get_nft_trait '(0, "Body")'
+```
+
+## Public Methods
+
+All query methods are public and can be called by anyone:
+
+- `get_nft_metadata(tokenId: Nat)` - Returns metadata for a single NFT as [(Text, Text)]
+- `get_nft_metadata_batch(tokenIds: [Nat])` - Returns metadata for multiple NFTs
+- `get_nft_metadata_page(offset: Nat, limit: Nat)` - Returns paginated results
+- `get_total_nft_count()` - Returns total number of NFTs stored
+- `get_all_token_ids()` - Returns array of all token IDs with metadata
+- `get_nft_trait(tokenId: Nat, traitName: Text)` - Returns specific trait value by name (e.g., "Type", "Body")
+
+## Metadata Structure
+
+Each NFT's metadata is a simple record mapping trait names to their values:
+
+```motoko
+type NFTMetadata = [(Text, Text)]; // Array of (trait_name, trait_value) pairs
+```
+
+Example for a bot:
+```
+[
+  ("Type", "Food"),
+  ("Body", "chocolate waffle"),
+  ("Eyes", "red laser"),
+  ("Mouth", "happy"),
+  ...
+]
+```
+
+The upload script automatically converts from the stats.json format:
+- First element: Trait schema with all possible trait names and values
+- Remaining elements: Individual bot data with trait IDs and value IDs
+- Conversion: IDs are resolved to human-readable names for storage
+
+## Security
+
+- Only the canister owner can upload metadata (`upload_nft_metadata_batch`)
+- All query methods are public for NFT holders and marketplaces to access
+- Data persists across canister upgrades via stable storage
+
+## Performance Considerations
+
+- Chunked uploads prevent timeout issues with large datasets
+- HashMap provides O(1) lookup performance
+- Query methods are efficient and don't modify state
+- Pagination available for large result sets
+
+## Integration with Frontend
+
+Use `@icp-sdk/core/agent` to query from JavaScript:
+
+```javascript
+import { createAgent, createActor } from '@icp-sdk/core/agent';
+
+const agent = await createAgent({ 
+  host: 'https://ic0.app',
+});
+
+const actor = await createActor({
+  canisterId: 'your-canister-id',
+  idlFactory,
+  agent,
+});
+
+// Get metadata for token #123
+const metadata = await actor.get_nft_metadata(123n);
+console.log(metadata);
+```
