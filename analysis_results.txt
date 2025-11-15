@@ -1,0 +1,266 @@
+Total bots: 10000
+Traits: Type, Body, Driver Guy, Arms, Legs, Wings, Background, Gold, Rust, Black, Pink, Blue
+
+================================================================================
+TRAIT FREQUENCY ANALYSIS
+================================================================================
+
+Type:
+  Most common:
+    Industrial: 2009 (20.1%)
+    Animal: 1701 (17.0%)
+    Game: 1654 (16.5%)
+    Murder: 999 (10.0%)
+    Box: 798 (8.0%)
+  Rarest:
+    Ultimate-master: 1 (0.0%)
+    Wild: 5 (0.1%)
+    Golden: 27 (0.3%)
+    Ultimate: 45 (0.4%)
+    Blackhole: 244 (2.4%)
+
+Body:
+  Most common:
+    large controller mixed: 257 (2.6%)
+    mega controller mixed: 201 (2.0%)
+    frog purple: 189 (1.9%)
+    command box multi: 162 (1.6%)
+    balloon mixed: 154 (1.5%)
+  Rarest:
+    master gold: 1 (0.0%)
+    gold pets: 1 (0.0%)
+    double driver: 1 (0.0%)
+    golden king: 1 (0.0%)
+    8 bit master: 1 (0.0%)
+
+Driver Guy:
+  Most common:
+    blue: 989 (9.9%)
+    purple hair: 491 (4.9%)
+    blue visor: 491 (4.9%)
+    diamond eyes: 457 (4.6%)
+    gold hair: 428 (4.3%)
+  Rarest:
+    master gold: 1 (0.0%)
+    golden twins: 1 (0.0%)
+    tri eye gold: 1 (0.0%)
+    gamers: 1 (0.0%)
+    silver tounge: 2 (0.0%)
+
+Arms:
+  Most common:
+    hands down small mixed: 680 (6.8%)
+    hands up mixed: 614 (6.1%)
+    rocket up rings: 593 (5.9%)
+    claws up mixed: 406 (4.1%)
+    rocket up: 377 (3.8%)
+  Rarest:
+    master gold: 1 (0.0%)
+    power arms black king: 1 (0.0%)
+    long golden king: 1 (0.0%)
+    8 bit lazers: 1 (0.0%)
+    power arms rainbow lazers: 2 (0.0%)
+
+Legs:
+  Most common:
+    chunky mixed: 591 (5.9%)
+    power mixed: 496 (5.0%)
+    midi bendy mixed: 448 (4.5%)
+    frog purple: 381 (3.8%)
+    midi mixed: 323 (3.2%)
+  Rarest:
+    master gold: 1 (0.0%)
+    4 power stalks: 1 (0.0%)
+    cactus gold: 1 (0.0%)
+    8 bit power: 1 (0.0%)
+    slender stalks: 2 (0.0%)
+
+Wings:
+  Most common:
+    bear ears rust: 529 (5.3%)
+    antenna mixed: 518 (5.2%)
+    jointed rust: 434 (4.3%)
+    triangle up black: 409 (4.1%)
+    antenna spikes mixed: 377 (3.8%)
+  Rarest:
+    master gold: 1 (0.0%)
+    black double angel: 1 (0.0%)
+    golden triple angel: 1 (0.0%)
+    none: 1 (0.0%)
+    double rainbow: 2 (0.0%)
+
+Background:
+  Most common:
+    grey: 1759 (17.6%)
+    purple: 1615 (16.2%)
+    mid blue: 1233 (12.3%)
+    blue: 1159 (11.6%)
+    light purple: 1009 (10.1%)
+  Rarest:
+    master gold: 1 (0.0%)
+    green: 15 (0.1%)
+    muted yellow: 28 (0.3%)
+    muted red: 33 (0.3%)
+    grey planets: 54 (0.5%)
+
+Gold:
+  Most common:
+    0: 7266 (72.7%)
+    1: 2372 (23.7%)
+    2: 314 (3.1%)
+    5: 26 (0.3%)
+    3: 19 (0.2%)
+  Rarest:
+    6: 1 (0.0%)
+    4: 2 (0.0%)
+    3: 19 (0.2%)
+    5: 26 (0.3%)
+    2: 314 (3.1%)
+
+Rust:
+  Most common:
+    0: 7635 (76.3%)
+    1: 1937 (19.4%)
+    2: 379 (3.8%)
+    3: 47 (0.5%)
+    4: 2 (0.0%)
+
+Black:
+  Most common:
+    0: 7201 (72.0%)
+    1: 2149 (21.5%)
+    2: 517 (5.2%)
+    3: 116 (1.2%)
+    4: 16 (0.2%)
+  Rarest:
+    5: 1 (0.0%)
+    4: 16 (0.2%)
+    3: 116 (1.2%)
+    2: 517 (5.2%)
+    1: 2149 (21.5%)
+
+Pink:
+  Most common:
+    0: 8521 (85.2%)
+    1: 1362 (13.6%)
+    2: 111 (1.1%)
+    3: 6 (0.1%)
+
+Blue:
+  Most common:
+    0: 4307 (43.1%)
+    1: 3923 (39.2%)
+    2: 1539 (15.4%)
+    3: 217 (2.2%)
+    4: 14 (0.1%)
+
+================================================================================
+SPECIAL ATTRIBUTES (Rarity Modifiers)
+================================================================================
+GOLD: 2734 bots (27.34%)
+RUST: 2365 bots (23.65%)
+BLACK: 2799 bots (27.99%)
+PINK: 1479 bots (14.79%)
+BLUE: 5693 bots (56.93%)
+
+================================================================================
+RACING STATS SIMULATION
+================================================================================
+
+Overall Stats Distribution (before faction bonuses):
+  Mean total: 172.0
+  Median total: 169.0
+  Std Dev: 19.7
+  Min total: 117
+  Max total: 242
+
+================================================================================
+RARITY BONUS ANALYSIS
+================================================================================
+
+Bots with NO special attributes (1347 bots):
+  Mean total: 158.9
+  Range: 124 - 192
+
+Bots with GOLD (2734 bots, 27.34%):
+  Mean total: 195.2
+  Range: 153 - 242
+  Bonus over no-special: +36.2
+
+Bots with BLACK (2799 bots, 27.99%):
+  Mean total: 180.2
+  Range: 134 - 242
+
+Bots with BLUE (5693 bots, 56.93%):
+  Mean total: 174.5
+  Range: 121 - 242
+
+Bots with PINK (1479 bots, 14.79%):
+  Mean total: 173.4
+  Range: 125 - 231
+
+Bots with RUST (2365 bots, 23.65%):
+  Mean total: 163.4
+  Range: 117 - 224
+  Penalty vs no-special: 4.4
+
+================================================================================
+TOP 10 BOTS (by total stats)
+================================================================================
+1. Total: 242 | Speed: 60, Power: 61, Accel: 63, Stab: 58
+   Type: Box, Body: battle box gold
+2. Total: 238 | Speed: 59, Power: 60, Accel: 62, Stab: 57
+   Type: Dead, Body: skull lights black
+3. Total: 237 | Speed: 62, Power: 54, Accel: 63, Stab: 58
+   Type: Box, Body: sniper box
+4. Total: 235 | Speed: 60, Power: 57, Accel: 60, Stab: 58
+   Type: Box, Body: command box multi
+5. Total: 234 | Speed: 55, Power: 60, Accel: 62, Stab: 57
+   Type: Dead, Body: skull lights black
+6. Total: 234 | Speed: 62, Power: 61, Accel: 56, Stab: 55
+   Type: Murder, Body: iron spiker
+7. Total: 233 | Speed: 65, Power: 61, Accel: 51, Stab: 56
+   Type: Game, Body: large controller mixed
+8. Total: 233 | Speed: 59, Power: 55, Accel: 62, Stab: 57
+   Type: Dead, Body: alien skull black
+9. Total: 232 | Speed: 61, Power: 61, Accel: 60, Stab: 50
+   Type: Box, Body: battle box black
+10. Total: 232 | Speed: 62, Power: 55, Accel: 57, Stab: 58
+   Type: Murder, Body: gold snatcher
+
+================================================================================
+BOTTOM 10 BOTS (by total stats)
+================================================================================
+1. Total: 125 | Speed: 39, Power: 26, Accel: 30, Stab: 30
+   Type: Blackhole, Body: galaxy traveller
+2. Total: 124 | Speed: 31, Power: 33, Accel: 30, Stab: 30
+   Type: Industrial, Body: bubble egg lights
+3. Total: 124 | Speed: 39, Power: 30, Accel: 30, Stab: 25
+   Type: Industrial, Body: spiky egg silver
+4. Total: 124 | Speed: 31, Power: 31, Accel: 33, Stab: 29
+   Type: Industrial, Body: bubble egg grey
+5. Total: 124 | Speed: 31, Power: 28, Accel: 33, Stab: 32
+   Type: Industrial, Body: bubble egg lights
+6. Total: 123 | Speed: 31, Power: 30, Accel: 30, Stab: 32
+   Type: Industrial, Body: glass egg
+7. Total: 122 | Speed: 31, Power: 35, Accel: 30, Stab: 26
+   Type: Industrial, Body: graffiti egg
+8. Total: 121 | Speed: 35, Power: 30, Accel: 30, Stab: 26
+   Type: Industrial, Body: glass egg
+9. Total: 117 | Speed: 35, Power: 26, Accel: 30, Stab: 26
+   Type: Master, Body: blue diamond
+10. Total: 117 | Speed: 32, Power: 30, Accel: 30, Stab: 25
+   Type: Animal, Body: beast rust
+
+================================================================================
+RECOMMENDATIONS
+================================================================================
+
+GOLD bonus: Expected ~+32, Actual: +36.2
+  ✓ Gold bonus is working well!
+
+BLACK bonus: Expected ~+12, Actual: +21.3
+
+✓ Stats range from 117 to 242 (spread: 125)
+✓ Rarity attributes are making a difference!
+✓ Gold bots (~27.34% rarity) have clear advantage

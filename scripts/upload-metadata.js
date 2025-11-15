@@ -17,7 +17,15 @@ const pemfile = require('pem-file');
 // Configuration
 const CHUNK_SIZE = 25; // Number of NFTs to upload per batch
 const STATS_FILE = path.join(__dirname, '../src/stats.json');
-const NETWORK = process.env.DFX_NETWORK || 'local';
+
+// Parse command line arguments
+const args = process.argv.slice(2);
+const networkArgIndex = args.indexOf('--network');
+const NETWORK = networkArgIndex >= 0 && args[networkArgIndex + 1] 
+  ? args[networkArgIndex + 1] 
+  : process.env.DFX_NETWORK || 'local';
+  
+console.log(`Network: ${NETWORK}`);
 
 /**
  * Load DFX identity from filesystem
@@ -63,12 +71,30 @@ function getCurrentIdentityName() {
 
 // Get canister ID and idlFactory
 function getCanisterInfo() {
-  const canisterIdsPath = path.join(__dirname, '../.dfx/local/canister_ids.json');
-  const canisterIds = JSON.parse(fs.readFileSync(canisterIdsPath, 'utf8'));
-  const canisterId = process.env.CANISTER_ID || canisterIds.my_mcp_server.local;
+  const isLocal = NETWORK === 'local';
+  
+  let canisterId;
+  if (process.env.CANISTER_ID) {
+    canisterId = process.env.CANISTER_ID;
+  } else {
+    // Try to read from canister_ids.json first (for IC)
+    const rootCanisterIdsPath = path.join(__dirname, '../canister_ids.json');
+    if (!isLocal && fs.existsSync(rootCanisterIdsPath)) {
+      const canisterIds = JSON.parse(fs.readFileSync(rootCanisterIdsPath, 'utf8'));
+      canisterId = canisterIds.my_mcp_server.ic;
+    } else {
+      // Fall back to .dfx/local/canister_ids.json for local
+      const localCanisterIdsPath = path.join(__dirname, '../.dfx/local/canister_ids.json');
+      const canisterIds = JSON.parse(fs.readFileSync(localCanisterIdsPath, 'utf8'));
+      canisterId = canisterIds.my_mcp_server.local;
+    }
+  }
   
   // Import the idlFactory from the generated service file
-  const { idlFactory } = require('../.dfx/local/canisters/my_mcp_server/service.did.js');
+  const didPath = isLocal 
+    ? '../.dfx/local/canisters/my_mcp_server/service.did.js'
+    : '../.dfx/ic/canisters/my_mcp_server/service.did.js';
+  const { idlFactory } = require(didPath);
   
   return { canisterId, idlFactory };
 }

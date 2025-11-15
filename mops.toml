@@ -19,6 +19,11 @@ sha2 = "0.1.6"
 ic = "3.2.0"
 mcp-motoko-sdk = "2.0.2"
 account-identifier = "1.0.2"
+timer-tool = "https://github.com/jneums/timerTool#2a60096"
+ovs-fixed = "0.1.4"
+class-plus = "0.0.2"
+stableheapbtreemap = "1.5.0"
+
 
 [dev-dependencies]
 test = "2.1.1"

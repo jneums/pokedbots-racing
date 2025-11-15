@@ -5,6 +5,7 @@ import Json "mo:json";
 
 import Racing "../Racing";
 import ExtIntegration "../ExtIntegration";
+import TimerTool "mo:timer-tool";
 
 module ToolContext {
 
@@ -19,12 +20,16 @@ module ToolContext {
     appContext : McpTypes.AppContext;
     /// Racing stats manager for PokedBots
     racingStatsManager : Racing.RacingStatsManager;
+    /// Race manager for creating and managing races
+    raceManager : Racing.RaceManager;
     /// EXT canister interface for ownership verification
     extCanister : ExtIntegration.ExtCanisterInterface;
     /// EXT canister ID (needed for encoding token identifiers)
     extCanisterId : Principal;
     /// Get cached marketplace listings
     getMarketplaceListings : () -> async [(Nat32, ExtIntegration.Listing, ExtIntegration.Metadata)];
+    /// Timer tool for scheduling actions
+    timerTool : TimerTool.TimerTool;
   };
 
   /// Helper function to create an error response and invoke callback

@@ -98,12 +98,22 @@ module {
     tobj.index;
   };
 
-  public class StatsManager() {
+  public class StatsManager(initStats : Map.Map<Nat, NFTStats>, initSchema : TraitSchema) {
     // Map.Map to store NFT stats by token ID (raw integer values) - stable across upgrades
-    private let stats = Map.new<Nat, NFTStats>();
+    private let stats = initStats;
 
     // Trait schema for decoding
-    private var schema : TraitSchema = [];
+    private var schema : TraitSchema = initSchema;
+
+    // Get the stats map (for stable storage)
+    public func getStatsMap() : Map.Map<Nat, NFTStats> {
+      stats;
+    };
+
+    // Get the schema (for stable storage)
+    public func getSchemaValue() : TraitSchema {
+      schema;
+    };
 
     // Set the trait schema
     public func setSchema(newSchema : TraitSchema) {
