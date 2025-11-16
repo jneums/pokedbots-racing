@@ -90,6 +90,7 @@ module {
     lastDiagnostics : ?Int;
     lastRaced : ?Int;
     upgradeEndsAt : ?Int;
+    listedForSale : Bool; // True if currently listed on marketplace
   };
 
   // ===== RACE TYPES =====
@@ -531,6 +532,7 @@ module {
         lastDiagnostics = null;
         lastRaced = null;
         upgradeEndsAt = null;
+        listedForSale = false;
       };
 
       ignore Map.put(stats, nhash, tokenIndex, racingStats);

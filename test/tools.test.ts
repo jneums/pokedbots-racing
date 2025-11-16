@@ -53,74 +53,74 @@ describe('Tool-Specific Tests', () => {
     await pic?.tearDown();
   });
 
-  describe('get_weather Tool', () => {
-    it('should return weather for a valid location', async () => {
-      serverActor.setIdentity(new AnonymousIdentity());
+      // describe('get_weather Tool', () => {
+      //   it('should return weather for a valid location', async () => {
+      //     serverActor.setIdentity(new AnonymousIdentity());
 
-      const rpcPayload = {
-        jsonrpc: '2.0',
-        method: 'tools/call',
-        params: {
-          name: 'get_weather',
-          arguments: { location: 'New York' }
-        },
-        id: 'test-get-weather',
-      };
-      const body = new TextEncoder().encode(JSON.stringify(rpcPayload));
+      //     const rpcPayload = {
+      //       jsonrpc: '2.0',
+      //       method: 'tools/call',
+      //       params: {
+      //         name: 'get_weather',
+      //         arguments: { location: 'New York' }
+      //       },
+      //       id: 'test-get-weather',
+      //     };
+      //     const body = new TextEncoder().encode(JSON.stringify(rpcPayload));
 
-      const httpResponse = await serverActor.http_request_update({
-        method: 'POST',
-        url: '/mcp',
-        headers: [['Content-Type', 'application/json']],
-        body,
-        certificate_version: [],
-      });
+      //     const httpResponse = await serverActor.http_request_update({
+      //       method: 'POST',
+      //       url: '/mcp',
+      //       headers: [['Content-Type', 'application/json']],
+      //       body,
+      //       certificate_version: [],
+      //     });
 
-      expect(httpResponse.status_code).toBe(200);
-      
-      const responseBody = JSON.parse(
-        new TextDecoder().decode(httpResponse.body as Uint8Array),
-      );
+      //     expect(httpResponse.status_code).toBe(200);
+          
+      //     const responseBody = JSON.parse(
+      //       new TextDecoder().decode(httpResponse.body as Uint8Array),
+      //     );
 
-      expect(responseBody.result.content).toBeDefined();
-      expect(responseBody.result.isError).toBe(false);
-      
-      // Verify the response contains weather information
-      const resultText = responseBody.result.content[0].text;
-      const parsedResult = JSON.parse(resultText);
-      expect(parsedResult.report).toContain('New York');
-      expect(parsedResult.report).toContain('weather');
-    });
+      //     expect(responseBody.result.content).toBeDefined();
+      //     expect(responseBody.result.isError).toBe(false);
+          
+      //     // Verify the response contains weather information
+      //     const resultText = responseBody.result.content[0].text;
+      //     const parsedResult = JSON.parse(resultText);
+      //     expect(parsedResult.report).toContain('New York');
+      //     expect(parsedResult.report).toContain('weather');
+      //   });
 
-    it('should handle missing location parameter', async () => {
-      serverActor.setIdentity(new AnonymousIdentity());
+      //   it('should handle missing location parameter', async () => {
+      //     serverActor.setIdentity(new AnonymousIdentity());
 
-      const rpcPayload = {
-        jsonrpc: '2.0',
-        method: 'tools/call',
-        params: {
-          name: 'get_weather',
-          arguments: {} // Missing location
-        },
-        id: 'test-missing-param',
-      };
-      const body = new TextEncoder().encode(JSON.stringify(rpcPayload));
+      //     const rpcPayload = {
+      //       jsonrpc: '2.0',
+      //       method: 'tools/call',
+      //       params: {
+      //         name: 'get_weather',
+      //         arguments: {} // Missing location
+      //       },
+      //       id: 'test-missing-param',
+      //     };
+      //     const body = new TextEncoder().encode(JSON.stringify(rpcPayload));
 
-      const httpResponse = await serverActor.http_request_update({
-        method: 'POST',
-        url: '/mcp',
-        headers: [['Content-Type', 'application/json']],
-        body,
-        certificate_version: [],
-      });
+      //     const httpResponse = await serverActor.http_request_update({
+      //       method: 'POST',
+      //       url: '/mcp',
+      //       headers: [['Content-Type', 'application/json']],
+      //       body,
+      //       certificate_version: [],
+      //     });
 
-      const responseBody = JSON.parse(
-        new TextDecoder().decode(httpResponse.body as Uint8Array),
-      );
+      //     const responseBody = JSON.parse(
+      //       new TextDecoder().decode(httpResponse.body as Uint8Array),
+      //     );
 
-      // Should return an error response
-      expect(responseBody.result.isError).toBe(true);
-      expect(responseBody.result.content[0].text).toContain('location');
-    });
-  });
+      //     // Should return an error response
+      //     expect(responseBody.result.isError).toBe(true);
+      //     expect(responseBody.result.content[0].text).toContain('location');
+      //   });
+      // });
 });

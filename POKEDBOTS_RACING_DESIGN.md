@@ -1384,7 +1384,6 @@ For an 8-robot race with 150 credit entry fee:
 1. `marketplace_browse_pokedbots` - Browse 1,252+ listings with pagination
 2. `marketplace_purchase_pokedbot` - Purchase with ICRC-2 approval
 3. `garage_list_my_pokedbots` - View owned NFTs with images
-4. `get_weather` - Example tool (for testing)
 
 ### **Phase 2: Robot Stats & Management (PLANNED)**
 - Implement racing stats initialization (deterministic from token index)

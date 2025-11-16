@@ -20,16 +20,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([
-        ("token_index", Json.obj([
-          ("type", Json.str("number")),
-          ("description", Json.str("Optional: Filter to only show races your bot can enter"))
-        ])),
-        ("show_all", Json.obj([
-          ("type", Json.str("boolean")),
-          ("description", Json.str("Optional: Show all races, not just available ones"))
-        ]))
-      ])),
+      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Filter to only show races your bot can enter"))])), ("show_all", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Show all races, not just available ones"))]))])),
     ]);
     outputSchema = null;
   };
@@ -85,18 +76,28 @@ module {
       // Build race list
       var raceArray : [Json.Json] = [];
       for (race in races.vals()) {
-        let statusText = switch (race.status) {
-          case (#Upcoming) { "Open for Entry" };
-          case (#InProgress) { "Racing Now" };
-          case (#Completed) { "Finished" };
-          case (#Cancelled) { "Cancelled" };
+        // Determine actual status based on time and entries
+        let statusText = if (race.status == #Cancelled) {
+          "Cancelled";
+        } else if (race.status == #Completed) {
+          "Finished";
+        } else if (race.status == #InProgress) {
+          "Racing Now";
+        } else if (now >= race.entryDeadline) {
+          "Entry Closed";
+        } else if (race.entries.size() >= race.maxEntries) {
+          "Full";
+        } else {
+          "Open for Entry";
         };
 
         let classText = switch (race.raceClass) {
           case (#Scavenger) { "Scavenger (0-2 wins)" };
           case (#Raider) { "Raider (3-5 wins)" };
           case (#Elite) { "Elite (6-9 wins)" };
-          case (#SilentKlan) { "Silent Klan Invitational (10+ wins, GodClass/Master only)" };
+          case (#SilentKlan) {
+            "Silent Klan Invitational (10+ wins, GodClass/Master only)";
+          };
         };
 
         let terrainText = switch (race.terrain) {

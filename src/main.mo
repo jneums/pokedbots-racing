@@ -8,6 +8,9 @@ import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
 import Int "mo:base/Int";
 import Time "mo:base/Time";
+import Array "mo:base/Array";
+import Iter "mo:base/Iter";
+import Float "mo:base/Float";
 
 import HttpTypes "mo:http-types";
 import Map "mo:map/Map";
@@ -32,10 +35,11 @@ import SrvTypes "mo:mcp-motoko-sdk/server/Types";
 
 // Import tool modules
 import ToolContext "tools/ToolContext";
-import GetWeather "tools/get_weather";
 import GarageListMyPokedBots "tools/garage_list_my_pokedbots";
 import MarketplaceBrowsePokedBots "tools/marketplace_browse_pokedbots";
 import MarketplacePurchasePokedBot "tools/marketplace_purchase_pokedbot";
+import MarketplaceListPokedBot "tools/marketplace_list_pokedbot";
+import MarketplaceUnlistPokedBot "tools/marketplace_unlist_pokedbot";
 import GarageInitializePokedBot "tools/garage_initialize_pokedbot";
 import GarageGetRobotDetails "tools/garage_get_robot_details";
 import GarageRechargeRobot "tools/garage_recharge_robot";
@@ -49,10 +53,58 @@ import Stats "Stats";
 
 // Import Racing modules
 import Racing "Racing";
+import RacingMigration "RacingMigration";
+import RaceCalendar "RaceCalendar";
+import Leaderboard "Leaderboard";
 import ExtIntegration "ExtIntegration";
 import IcpLedger "IcpLedger";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
+
+// (
+//   with migration = func(
+//     old : {
+//       var stable_racing_stats : Map.Map<Nat, RacingMigration.OldPokedBotRacingStats>;
+//     }
+//   ) : {
+//     var stable_racing_stats : Map.Map<Nat, Racing.PokedBotRacingStats>;
+//   } {
+//     // Convert old racing stats to new format by adding listedForSale = false
+//     let newStats = Map.new<Nat, Racing.PokedBotRacingStats>();
+//     for ((tokenIndex, oldStats) in Map.entries(old.stable_racing_stats)) {
+//       let newStat : Racing.PokedBotRacingStats = {
+//         tokenIndex = oldStats.tokenIndex;
+//         ownerPrincipal = oldStats.ownerPrincipal;
+//         faction = oldStats.faction;
+//         speedBonus = oldStats.speedBonus;
+//         powerCoreBonus = oldStats.powerCoreBonus;
+//         accelerationBonus = oldStats.accelerationBonus;
+//         stabilityBonus = oldStats.stabilityBonus;
+//         battery = oldStats.battery;
+//         condition = oldStats.condition;
+//         calibration = oldStats.calibration;
+//         experience = oldStats.experience;
+//         preferredDistance = oldStats.preferredDistance;
+//         preferredTerrain = oldStats.preferredTerrain;
+//         racesEntered = oldStats.racesEntered;
+//         wins = oldStats.wins;
+//         places = oldStats.places;
+//         shows = oldStats.shows;
+//         totalScrapEarned = oldStats.totalScrapEarned;
+//         factionReputation = oldStats.factionReputation;
+//         activatedAt = oldStats.activatedAt;
+//         lastRecharged = oldStats.lastRecharged;
+//         lastRepaired = oldStats.lastRepaired;
+//         lastDiagnostics = oldStats.lastDiagnostics;
+//         lastRaced = oldStats.lastRaced;
+//         upgradeEndsAt = oldStats.upgradeEndsAt;
+//         listedForSale = false; // New field defaults to false
+//       };
+//       ignore Map.put(newStats, Map.nhash, tokenIndex, newStat);
+//     };
+//     { var stable_racing_stats = newStats };
+//   }
+// )
 
 shared ({ caller = deployer }) persistent actor class McpServer(
   args : ?{
@@ -74,11 +126,22 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   var stable_trait_schema : Stats.TraitSchema = [];
 
   // Stable state for racing stats
-  let stable_racing_stats = Map.new<Nat, Racing.PokedBotRacingStats>();
+  var stable_racing_stats = Map.new<Nat, Racing.PokedBotRacingStats>();
   let stable_active_upgrades = Map.new<Nat, Racing.UpgradeSession>();
 
   // Stable state for races
   let stable_races = Map.new<Nat, Racing.Race>();
+
+  // Stable state for calendar events
+  let stable_events = Map.new<Nat, RaceCalendar.ScheduledEvent>();
+
+  // Stable state for leaderboards
+  let stable_monthly_boards = Map.new<Nat, Map.Map<Nat, Leaderboard.LeaderboardEntry>>();
+  let stable_season_boards = Map.new<Nat, Map.Map<Nat, Leaderboard.LeaderboardEntry>>();
+  let stable_alltime_board = Map.new<Nat, Leaderboard.LeaderboardEntry>();
+  let stable_faction_boards = Map.new<Text, Map.Map<Nat, Leaderboard.LeaderboardEntry>>();
+  var stable_current_season_id : Nat = 1;
+  var stable_current_month_id : Nat = 202411; // YYYYMM format
 
   // Stable state for decay tracking
   var stable_last_decay_time : Int = 0;
@@ -97,12 +160,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   // --- TT Setup ---
   private func reportTTExecution(execInfo : TT.ExecutionReport) : Bool {
-    // Log execution for debugging
+    Debug.print("CANISTER: TimerTool Execution: " # debug_show (execInfo));
     false;
   };
+
   private func reportTTError(errInfo : TT.ErrorReport) : ?Nat {
-    // MEMORY FIX: Don't log full error reports (can be large)
-    // D.print("CANISTER: TT Error: " # debug_show (errInfo));
+    Debug.print("CANISTER: TimerTool Error: " # debug_show (errInfo));
     null;
   };
 
@@ -122,7 +185,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         };
       }
     );
-    onInitialize = null;
+    onInitialize = ?(
+      func(newClass : TT.TimerTool) : async* () {
+        Debug.print("Initializing TimerTool");
+        newClass.initialize<system>();
+      }
+    );
     onStorageChange = func(state : TT.State) { tt_migration_state := state };
   });
 
@@ -160,6 +228,17 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   transient let raceManager = Racing.RaceManager(
     stable_races,
     racingStatsManager,
+  );
+
+  // Event calendar manager
+  transient let eventCalendar = RaceCalendar.EventCalendar(stable_events);
+
+  // Leaderboard manager
+  transient let leaderboardManager = Leaderboard.LeaderboardManager(
+    stable_monthly_boards,
+    stable_season_boards,
+    stable_alltime_board,
+    stable_faction_boards,
   );
 
   // Marketplace listings cache (refreshed periodically)
@@ -313,6 +392,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                       experience = stats.experience + 5;
                       factionReputation = stats.factionReputation + 2; // Small reputation gain
                       upgradeEndsAt = null;
+                      listedForSale = false;
                     };
                   };
                   case (#PowerCore) {
@@ -322,6 +402,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                       experience = stats.experience + 5;
                       factionReputation = stats.factionReputation + 2;
                       upgradeEndsAt = null;
+                      listedForSale = false;
                     };
                   };
                   case (#Thruster) {
@@ -331,6 +412,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                       experience = stats.experience + 5;
                       factionReputation = stats.factionReputation + 2;
                       upgradeEndsAt = null;
+                      listedForSale = false;
                     };
                   };
                   case (#Gyro) {
@@ -340,6 +422,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                       experience = stats.experience + 10;
                       factionReputation = stats.factionReputation + 3; // Gyro worth more rep
                       upgradeEndsAt = null;
+                      listedForSale = false;
                     };
                   };
                 };
@@ -541,8 +624,22 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           case (?race) {
             // Check if race has enough entries
             if (race.entries.size() < 2) {
-              Debug.print("Race cancelled - not enough entries");
+              Debug.print("Race cancelled - not enough entries, issuing refunds");
               ignore raceManager.updateRaceStatus(raceId, #Cancelled);
+
+              // Refund all entry fees
+              for (entry in race.entries.vals()) {
+                let refundActionId = tt().setActionASync<system>(
+                  Int.abs(Time.now() + 1_000_000_000), // 1 second delay
+                  {
+                    actionType = "prize_distribution";
+                    params = to_candid ((raceId, entry.owner, entry.entryFee));
+                  },
+                  PRIZE_DISTRIBUTION_TIMEOUT,
+                );
+                Debug.print("Scheduled refund " # debug_show (refundActionId) # " of " # debug_show (entry.entryFee) # " to " # Principal.toText(entry.owner));
+              };
+
               return actionId;
             };
 
@@ -615,6 +712,19 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                         factionReputation = stats.factionReputation + (if (result.position == 1) { 10 } else if (result.position <= 3) { 5 } else { 2 });
                       };
                       racingStatsManager.updateStats(result.tokenIndex, updatedStats);
+
+                      // Record result in leaderboard (default 1.0x multiplier for now)
+                      leaderboardManager.recordRaceResult(
+                        result.tokenIndex,
+                        result.owner,
+                        result.position,
+                        results.size(),
+                        result.prizeAmount,
+                        1.0, // TODO: Get multiplier from event metadata
+                        stats.faction,
+                        race.raceClass,
+                        Time.now()
+                      );
                     };
                     case (null) {};
                   };
@@ -677,10 +787,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   // Import tool configurations from separate modules
   transient let tools : [McpTypes.Tool] = [
-    GetWeather.config(),
     GarageListMyPokedBots.config(),
     MarketplaceBrowsePokedBots.config(),
     MarketplacePurchasePokedBot.config(),
+    MarketplaceListPokedBot.config(),
+    MarketplaceUnlistPokedBot.config(),
     GarageInitializePokedBot.config(),
     GarageGetRobotDetails.config(),
     GarageRechargeRobot.config(),
@@ -705,10 +816,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
     tools = tools;
     toolImplementations = [
-      ("get_weather", GetWeather.handle(toolContext)),
       ("garage_list_my_pokedbots", GarageListMyPokedBots.handler(toolContext)),
       ("browse_pokedbots", MarketplaceBrowsePokedBots.handle(toolContext)),
       ("purchase_pokedbot", MarketplacePurchasePokedBot.handle(toolContext)),
+      ("list_pokedbot", MarketplaceListPokedBot.handle(toolContext)),
+      ("unlist_pokedbot", MarketplaceUnlistPokedBot.handle(toolContext)),
       ("garage_initialize_pokedbot", GarageInitializePokedBot.handle(toolContext)),
       ("garage_get_robot_details", GarageGetRobotDetails.handle(toolContext)),
       ("garage_recharge_robot", GarageRechargeRobot.handle(toolContext)),
@@ -1097,13 +1209,156 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     tt().forceReleaseLock();
   };
 
-  // --- CANISTER LIFECYCLE MANAGEMENT ---
+  // Manual trigger to process overdue timer actions
+  public shared func process_overdue_timers() : async Text {
+    let diagnostics = tt().getTimerDiagnostics();
+    let message = "Overdue actions: " # debug_show (diagnostics.overdueActions) #
+    "\nProcessing timer tick...";
+    Debug.print(message);
+
+    // Force timer-tool to check and process overdue actions
+    // This is a workaround for IC system timer not firing after upgrades
+    ignore tt().getActionsByFilter(#All);
+
+    message;
+  };
+
+  // ===== CALENDAR MANAGEMENT FUNCTIONS =====
+
+  // Schedule next Weekly League race (every Sunday at 20:00 UTC)
+  public shared ({ caller }) func scheduleNextWeeklyLeague() : async RaceCalendar.ScheduledEvent {
+    if (caller != owner) {
+      Debug.trap("Only owner can schedule events");
+    };
+
+    let now = Time.now();
+    let nextSunday = RaceCalendar.getNextWeeklyOccurrence(0, 20, 0, now); // Sunday, 20:00, 0 min
+    eventCalendar.createWeeklyLeagueEvent(nextSunday, now);
+  };
+
+  // Schedule next N Daily Sprint races (every 6 hours)
+  public shared ({ caller }) func scheduleDailySprints(count : Nat) : async [RaceCalendar.ScheduledEvent] {
+    if (caller != owner) {
+      Debug.trap("Only owner can schedule events");
+    };
+
+    var events : [RaceCalendar.ScheduledEvent] = [];
+    var now = Time.now();
+
+    for (i in Iter.range(0, count - 1)) {
+      let nextSprint = RaceCalendar.getNextDailySprintTime(now);
+      let event = eventCalendar.createDailySprintEvent(nextSprint, now);
+      events := Array.append(events, [event]);
+      now := nextSprint + 1_000_000; // Move 1ms past this event to get next one
+    };
+
+    events;
+  };
+
+  // ===== LEADERBOARD QUERY FUNCTIONS =====
+
+  // Get leaderboard by type
+  public query func getLeaderboard(
+    lbType : Leaderboard.LeaderboardType,
+    limit : Nat,
+  ) : async [Leaderboard.LeaderboardEntry] {
+    leaderboardManager.getLeaderboard(lbType, ?limit, null);
+  };
+
+  // Get leaderboard entry for a specific bot
+  public query func getMyRanking(
+    lbType : Leaderboard.LeaderboardType,
+    tokenIndex : Nat,
+  ) : async ?Leaderboard.LeaderboardEntry {
+    leaderboardManager.getEntryForBot(lbType, tokenIndex);
+  };
+
+  // Get upcoming scheduled events
+  public query func getUpcomingEvents(daysAhead : Nat) : async [RaceCalendar.ScheduledEvent] {
+    let now = Time.now();
+    eventCalendar.getUpcomingEvents(now, daysAhead);
+  };
+
+  // Get all events
+  public query func getAllScheduledEvents() : async [RaceCalendar.ScheduledEvent] {
+    eventCalendar.getAllEvents();
+  };
+
+  // Get event details by ID
+  public query func getEventDetails(eventId : Nat) : async ?RaceCalendar.ScheduledEvent {
+    eventCalendar.getEvent(eventId);
+  };
+
+  // Admin: Set current season/month
+  public shared ({ caller }) func setCurrentSeason(seasonId : Nat) : async () {
+    if (caller != owner) {
+      Debug.trap("Only owner can set season");
+    };
+    leaderboardManager.setCurrentSeason(seasonId);
+    stable_current_season_id := seasonId;
+  };
+
+  public shared ({ caller }) func setCurrentMonth(monthId : Nat) : async () {
+    if (caller != owner) {
+      Debug.trap("Only owner can set month");
+    };
+    leaderboardManager.setCurrentMonth(monthId);
+    stable_current_month_id := monthId;
+  };
+
+  // Admin: Start new season (resets season leaderboard)
+  public shared ({ caller }) func startNewSeason(seasonId : Nat) : async () {
+    if (caller != owner) {
+      Debug.trap("Only owner can start new season");
+    };
+    leaderboardManager.startNewSeason(seasonId);
+    stable_current_season_id := seasonId;
+  };
+
+  // Admin: Reset monthly leaderboard
+  public shared ({ caller }) func resetMonthlyLeaderboard(monthId : Nat) : async () {
+    if (caller != owner) {
+      Debug.trap("Only owner can reset monthly leaderboard");
+    };
+    leaderboardManager.resetMonthlyLeaderboard(monthId);
+    stable_current_month_id := monthId;
+  };
+
+  // ===== DEBUG/ADMIN FUNCTIONS =====
+
+  // Manually cancel specific races by ID
+  public shared ({ caller }) func cancel_races_by_ids(raceIds : [Nat]) : async [(Nat, Text)] {
+    if (caller != owner) {
+      Debug.trap("Only owner can cancel races");
+    };
+
+    var cancelledRaces : [(Nat, Text)] = [];
+    
+    for (raceId in raceIds.vals()) {
+      switch (raceManager.getRace(raceId)) {
+        case (?race) {
+          if (race.status == #Upcoming) {
+            ignore raceManager.updateRaceStatus(raceId, #Cancelled);
+            cancelledRaces := Array.append(cancelledRaces, [(raceId, race.name)]);
+          };
+        };
+        case (null) { /* Race doesn't exist */ };
+      };
+    };
+    
+    cancelledRaces;
+  };  // --- CANISTER LIFECYCLE MANAGEMENT ---
 
   system func preupgrade() {
     stable_http_assets := HttpAssets.preupgrade(http_assets);
   };
   system func postupgrade() {
     HttpAssets.postupgrade(http_assets);
+    
+    // Restore leaderboard state
+    leaderboardManager.setCurrentSeason(stable_current_season_id);
+    leaderboardManager.setCurrentMonth(stable_current_month_id);
+    
     initializeDecayTimer<system>();
     initializeRaceCreationTimer<system>();
   };

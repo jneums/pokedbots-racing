@@ -23,16 +23,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([
-        ("race_id", Json.obj([
-          ("type", Json.str("number")),
-          ("description", Json.str("The race ID to enter"))
-        ])),
-        ("token_index", Json.obj([
-          ("type", Json.str("number")),
-          ("description", Json.str("Your PokedBot's token index"))
-        ]))
-      ])),
+      ("properties", Json.obj([("race_id", Json.obj([("type", Json.str("number")), ("description", Json.str("The race ID to enter"))])), ("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Your PokedBot's token index"))]))])),
       ("required", Json.arr([Json.str("race_id"), Json.str("token_index")])),
     ]);
     outputSchema = null;
@@ -130,6 +121,11 @@ module {
         case (null) {};
       };
 
+      // Check if bot is listed for sale
+      if (botStats.listedForSale) {
+        return ToolContext.makeError("Bot is listed for sale on the marketplace. Unlist it before racing.", cb);
+      };
+
       // Check bot condition
       if (botStats.condition < 70) {
         return ToolContext.makeError("Bot condition too low (need ≥70). Use garage_repair_robot first.", cb);
@@ -163,7 +159,7 @@ module {
       let icpLedger = actor ("ryjl3-tyaaa-aaaaa-aaaba-cai") : actor {
         icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
       };
-      
+
       try {
         let transferResult = await icpLedger.icrc2_transfer_from({
           from = { owner = user; subaccount = null };
