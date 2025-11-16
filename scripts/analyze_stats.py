@@ -8,7 +8,7 @@ import statistics
 from collections import Counter, defaultdict
 
 # Load the stats.json file
-with open("src/stats.json", "r") as f:
+with open("data/stats.json", "r") as f:
     data = json.load(f)
 
 # First element is the schema (nested list structure)

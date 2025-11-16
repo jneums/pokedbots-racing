@@ -30,6 +30,30 @@ module ToolContext {
     getMarketplaceListings : () -> async [(Nat32, ExtIntegration.Listing, ExtIntegration.Metadata)];
     /// Timer tool for scheduling actions
     timerTool : TimerTool.TimerTool;
+    /// Get NFT metadata for faction/stats derivation
+    getNFTMetadata : (Nat) -> ?[(Text, Text)];
+    /// Get robot racing stats (initialized bots only)
+    getStats : (Nat) -> ?Racing.PokedBotRacingStats;
+    /// Get current stats (base + bonuses) for an initialized bot
+    getCurrentStats : (Racing.PokedBotRacingStats) -> {
+      speed : Nat;
+      powerCore : Nat;
+      acceleration : Nat;
+      stability : Nat;
+    };
+    /// Derive stats from NFT metadata
+    deriveStatsFromMetadata : ([(Text, Text)], Racing.FactionType) -> {
+      speed : Nat;
+      powerCore : Nat;
+      acceleration : Nat;
+      stability : Nat;
+    };
+    /// Derive faction from NFT metadata
+    deriveFactionFromMetadata : ([(Text, Text)]) -> Racing.FactionType;
+    /// Check if a bot is in any active race
+    isInActiveRace : (Nat) -> Bool;
+    /// Add a sponsor to a race
+    addSponsor : (raceId : Nat, sponsor : Principal, amount : Nat, message : ?Text) -> ?Racing.Race;
   };
 
   /// Helper function to create an error response and invoke callback

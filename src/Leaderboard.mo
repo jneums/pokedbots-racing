@@ -4,6 +4,7 @@ import Float "mo:base/Float";
 import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Principal "mo:base/Principal";
+import Time "mo:base/Time";
 import Map "mo:map/Map";
 import { nhash } "mo:map/Map";
 import Racing "./Racing";
@@ -12,43 +13,84 @@ module {
   public type RaceClass = Racing.RaceClass;
   public type FactionType = Racing.FactionType;
 
+  // ===== TIME-BASED SEASON/MONTH CALCULATION =====
+
+  // Calculate month ID (YYYYMM) from nanosecond timestamp
+  public func getMonthIdFromTime(timestamp : Int) : Nat {
+    let NANOS_PER_SECOND : Int = 1_000_000_000;
+    let SECONDS_PER_DAY : Int = 86400;
+    
+    let seconds = timestamp / NANOS_PER_SECOND;
+    let days = seconds / SECONDS_PER_DAY;
+    
+    // January 1, 1970 was a Thursday
+    // Calculate approximate year and month
+    let yearsSince1970 = Int.abs(days / 365);
+    let year = 1970 + yearsSince1970;
+    
+    // Calculate day of year (approximate)
+    let dayOfYear = Int.abs(days % 365);
+    
+    // Approximate month (30.44 days per month average)
+    let month = Int.abs((dayOfYear * 12) / 365) + 1;
+    let monthClamped = if (month > 12) { 12 } else { month };
+    
+    (year * 100) + monthClamped; // YYYYMM format
+  };
+
+  // Calculate season ID from timestamp
+  // Seasons are 3 months: Winter (1-3), Spring (4-6), Summer (7-9), Fall (10-12)
+  public func getSeasonIdFromTime(timestamp : Int) : Nat {
+    let monthId = getMonthIdFromTime(timestamp);
+    let month = monthId % 100;
+    let year = monthId / 100;
+    
+    let seasonInYear = if (month <= 3) { 1 } // Winter
+                       else if (month <= 6) { 2 } // Spring
+                       else if (month <= 9) { 3 } // Summer
+                       else { 4 }; // Fall
+    
+    // Season ID format: YYYYS (e.g., 20251 = 2025 Winter, 20254 = 2025 Fall)
+    (year * 10) + seasonInYear;
+  };
+
   // ===== LEADERBOARD TYPES =====
 
   public type LeaderboardType = {
-    #Monthly: Nat; // Month identifier (YYYYMM)
-    #Season: Nat; // Season ID
+    #Monthly : Nat; // Month identifier (YYYYMM)
+    #Season : Nat; // Season ID
     #AllTime;
-    #Faction: FactionType;
-    #Division: RaceClass;
+    #Faction : FactionType;
+    #Division : RaceClass;
   };
 
   public type TrendDirection = {
-    #Up: Nat; // Positions gained
-    #Down: Nat; // Positions lost
+    #Up : Nat; // Positions gained
+    #Down : Nat; // Positions lost
     #Stable;
     #New; // First appearance
   };
 
   public type LeaderboardEntry = {
-    tokenIndex: Nat;
-    owner: Principal;
-    points: Nat;
-    wins: Nat;
-    podiums: Nat; // Top 3 finishes
-    races: Nat;
-    winRate: Float; // wins / races
-    avgPosition: Float;
-    totalEarnings: Nat; // ICP e8s
-    bestFinish: Nat; // Best position ever
-    currentStreak: Int; // Positive for wins, negative for losses
-    rank: Nat;
-    previousRank: ?Nat;
-    trend: TrendDirection;
-    lastRaceTime: Int;
+    tokenIndex : Nat;
+    owner : Principal;
+    points : Nat;
+    wins : Nat;
+    podiums : Nat; // Top 3 finishes
+    races : Nat;
+    winRate : Float; // wins / races
+    avgPosition : Float;
+    totalEarnings : Nat; // ICP e8s
+    bestFinish : Nat; // Best position ever
+    currentStreak : Int; // Positive for wins, negative for losses
+    rank : Nat;
+    previousRank : ?Nat;
+    trend : TrendDirection;
+    lastRaceTime : Int;
   };
 
   // Points awarded by position
-  public func getPointsForPosition(position: Nat, multiplier: Float) : Nat {
+  public func getPointsForPosition(position : Nat, multiplier : Float) : Nat {
     let basePoints = switch (position) {
       case (1) { 25 };
       case (2) { 18 };
@@ -67,19 +109,29 @@ module {
   // ===== LEADERBOARD MANAGER =====
 
   public class LeaderboardManager(
-    initMonthlyBoards: Map.Map<Nat, Map.Map<Nat, LeaderboardEntry>>, // monthId -> (tokenIndex -> entry)
-    initSeasonBoards: Map.Map<Nat, Map.Map<Nat, LeaderboardEntry>>, // seasonId -> (tokenIndex -> entry)
-    initAllTimeBoard: Map.Map<Nat, LeaderboardEntry>, // tokenIndex -> entry
-    initFactionBoards: Map.Map<Text, Map.Map<Nat, LeaderboardEntry>>, // factionName -> (tokenIndex -> entry)
+    initMonthlyBoards : Map.Map<Nat, Map.Map<Nat, LeaderboardEntry>>, // monthId -> (tokenIndex -> entry)
+    initSeasonBoards : Map.Map<Nat, Map.Map<Nat, LeaderboardEntry>>, // seasonId -> (tokenIndex -> entry)
+    initAllTimeBoard : Map.Map<Nat, LeaderboardEntry>, // tokenIndex -> entry
+    initFactionBoards : Map.Map<Text, Map.Map<Nat, LeaderboardEntry>>, // factionName -> (tokenIndex -> entry)
   ) {
     private let monthlyBoards = initMonthlyBoards;
     private let seasonBoards = initSeasonBoards;
     private let allTimeBoard = initAllTimeBoard;
     private let factionBoards = initFactionBoards;
 
-    // Current active season
+    // Current active season (calculated from time)
     private var currentSeasonId : Nat = 1;
     private var currentMonthId : Nat = 202411; // YYYYMM format
+
+    // Update current season/month based on timestamp
+    public func updateCurrentPeriods(timestamp : Int) {
+      currentSeasonId := getSeasonIdFromTime(timestamp);
+      currentMonthId := getMonthIdFromTime(timestamp);
+    };
+
+    // Get current season/month IDs
+    public func getCurrentSeasonId() : Nat { currentSeasonId };
+    public func getCurrentMonthId() : Nat { currentMonthId };
 
     // Get maps for stable storage
     public func getMonthlyBoards() : Map.Map<Nat, Map.Map<Nat, LeaderboardEntry>> {
@@ -98,17 +150,17 @@ module {
       factionBoards;
     };
 
-    // Set current season/month (for admin)
-    public func setCurrentSeason(seasonId: Nat) {
+    // Deprecated: kept for backward compatibility
+    public func setCurrentSeason(seasonId : Nat) {
       currentSeasonId := seasonId;
     };
 
-    public func setCurrentMonth(monthId: Nat) {
+    public func setCurrentMonth(monthId : Nat) {
       currentMonthId := monthId;
     };
 
     // Get or create a leaderboard for a specific type
-    private func getOrCreateBoard(lbType: LeaderboardType) : Map.Map<Nat, LeaderboardEntry> {
+    private func getOrCreateBoard(lbType : LeaderboardType) : Map.Map<Nat, LeaderboardEntry> {
       switch (lbType) {
         case (#Monthly(monthId)) {
           switch (Map.get(monthlyBoards, nhash, monthId)) {
@@ -152,7 +204,7 @@ module {
     };
 
     // Helper to convert faction to text key
-    private func factionToText(faction: FactionType) : Text {
+    private func factionToText(faction : FactionType) : Text {
       switch (faction) {
         case (#BattleBot) { "BattleBot" };
         case (#EntertainmentBot) { "EntertainmentBot" };
@@ -164,15 +216,15 @@ module {
 
     // Record race result for leaderboard
     public func recordRaceResult(
-      tokenIndex: Nat,
-      owner: Principal,
-      position: Nat,
-      _totalRacers: Nat,
-      earnings: Nat,
-      pointsMultiplier: Float,
-      faction: FactionType,
-      _division: RaceClass,
-      raceTime: Int
+      tokenIndex : Nat,
+      owner : Principal,
+      position : Nat,
+      _totalRacers : Nat,
+      earnings : Nat,
+      pointsMultiplier : Float,
+      faction : FactionType,
+      _division : RaceClass,
+      raceTime : Int,
     ) {
       let points = getPointsForPosition(position, pointsMultiplier);
       let isWin = position == 1;
@@ -189,7 +241,7 @@ module {
         position,
         earnings,
         faction,
-        raceTime
+        raceTime,
       );
 
       // Update season leaderboard
@@ -203,7 +255,7 @@ module {
         position,
         earnings,
         faction,
-        raceTime
+        raceTime,
       );
 
       // Update all-time leaderboard
@@ -217,7 +269,7 @@ module {
         position,
         earnings,
         faction,
-        raceTime
+        raceTime,
       );
 
       // Update faction leaderboard
@@ -231,27 +283,27 @@ module {
         position,
         earnings,
         faction,
-        raceTime
+        raceTime,
       );
     };
 
     // Update a single leaderboard entry
     private func updateLeaderboardEntry(
-      lbType: LeaderboardType,
-      tokenIndex: Nat,
-      owner: Principal,
-      points: Nat,
-      isWin: Bool,
-      isPodium: Bool,
-      position: Nat,
-      earnings: Nat,
-      _faction: FactionType,
-      raceTime: Int
+      lbType : LeaderboardType,
+      tokenIndex : Nat,
+      owner : Principal,
+      points : Nat,
+      isWin : Bool,
+      isPodium : Bool,
+      position : Nat,
+      earnings : Nat,
+      _faction : FactionType,
+      raceTime : Int,
     ) {
       let board = getOrCreateBoard(lbType);
-      
+
       let existing = Map.get(board, nhash, tokenIndex);
-      
+
       let entry = switch (existing) {
         case (?e) {
           // Update existing entry
@@ -260,12 +312,12 @@ module {
           let newRaces = e.races + 1;
           let newPoints = e.points + points;
           let newEarnings = e.totalEarnings + earnings;
-          
+
           // Calculate new averages
           let totalPositions = (e.avgPosition * Float.fromInt(e.races)) + Float.fromInt(position);
           let newAvgPosition = totalPositions / Float.fromInt(newRaces);
           let newWinRate = Float.fromInt(newWins) / Float.fromInt(newRaces);
-          
+
           // Calculate streak
           let newStreak = if (isWin) {
             if (e.currentStreak >= 0) { e.currentStreak + 1 } else { 1 };
@@ -315,9 +367,9 @@ module {
 
     // Get leaderboard (sorted and ranked)
     public func getLeaderboard(
-      lbType: LeaderboardType,
-      limit: ?Nat,
-      division: ?RaceClass
+      lbType : LeaderboardType,
+      limit : ?Nat,
+      division : ?RaceClass,
     ) : [LeaderboardEntry] {
       let board = getOrCreateBoard(lbType);
       var entries = Iter.toArray(Map.vals(board));
@@ -339,11 +391,11 @@ module {
           if (a.points != b.points) {
             Nat.compare(b.points, a.points) // Descending
           } else if (a.wins != b.wins) {
-            Nat.compare(b.wins, a.wins)
+            Nat.compare(b.wins, a.wins);
           } else {
-            Float.compare(b.winRate, a.winRate)
-          }
-        }
+            Float.compare(b.winRate, a.winRate);
+          };
+        },
       );
 
       // Assign ranks and calculate trends
@@ -369,7 +421,7 @@ module {
             rank = newRank;
             trend = trend;
           };
-        }
+        },
       );
 
       // Update ranks in storage
@@ -391,17 +443,17 @@ module {
     };
 
     // Get entry for specific bot
-    public func getEntryForBot(lbType: LeaderboardType, tokenIndex: Nat) : ?LeaderboardEntry {
+    public func getEntryForBot(lbType : LeaderboardType, tokenIndex : Nat) : ?LeaderboardEntry {
       let board = getOrCreateBoard(lbType);
       Map.get(board, nhash, tokenIndex);
     };
 
     // Get rank for specific bot
-    public func getRankForBot(lbType: LeaderboardType, tokenIndex: Nat) : ?Nat {
+    public func getRankForBot(lbType : LeaderboardType, tokenIndex : Nat) : ?Nat {
       let leaderboard = getLeaderboard(lbType, null, null);
       let found = Array.find<LeaderboardEntry>(
         leaderboard,
-        func(e) { e.tokenIndex == tokenIndex }
+        func(e) { e.tokenIndex == tokenIndex },
       );
       switch (found) {
         case (?entry) { ?entry.rank };
@@ -410,23 +462,23 @@ module {
     };
 
     // Get top N qualifiers for championship
-    public func getTopQualifiers(seasonId: Nat, division: RaceClass, count: Nat) : [Nat] {
+    public func getTopQualifiers(seasonId : Nat, division : RaceClass, count : Nat) : [Nat] {
       let leaderboard = getLeaderboard(#Season(seasonId), ?count, ?division);
       Array.map<LeaderboardEntry, Nat>(
         leaderboard,
-        func(e) { e.tokenIndex }
+        func(e) { e.tokenIndex },
       );
     };
 
     // Reset monthly leaderboard (called at start of new month)
-    public func resetMonthlyLeaderboard(newMonthId: Nat) {
+    public func resetMonthlyLeaderboard(newMonthId : Nat) {
       currentMonthId := newMonthId;
       let newBoard = Map.new<Nat, LeaderboardEntry>();
       ignore Map.put(monthlyBoards, nhash, newMonthId, newBoard);
     };
 
     // Start new season
-    public func startNewSeason(newSeasonId: Nat) {
+    public func startNewSeason(newSeasonId : Nat) {
       currentSeasonId := newSeasonId;
       let newBoard = Map.new<Nat, LeaderboardEntry>();
       ignore Map.put(seasonBoards, nhash, newSeasonId, newBoard);

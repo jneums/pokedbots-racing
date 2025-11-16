@@ -13,7 +13,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_list_my_pokedbots";
     title = ?"List My PokedBots";
-    description = ?"List all PokedBots in your garage subaccount";
+    description = ?"List all PokedBots in your garage subaccount with detailed stats, racing status, and overall ratings";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -53,12 +53,115 @@ module {
             for (tokenIndex in tokens.vals()) {
               let tokenId = ExtIntegration.encodeTokenIdentifier(tokenIndex, ctx.extCanisterId);
               let imageUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId;
+
+              // Get racing stats if initialized
+              let robotStats = ctx.getStats(Nat32.toNat(tokenIndex));
+
               msg #= "🏎️ PokedBot #" # Nat32.toText(tokenIndex) # "\n";
-              msg #= "   Token ID: " # tokenId # "\n";
-              msg #= "   Image: " # imageUrl # "\n\n";
+
+              // Show stats and rating
+              switch (robotStats) {
+                case (?stats) {
+                  // Get current stats (base + bonuses)
+                  let currentStats = ctx.getCurrentStats(stats);
+                  let totalStats = currentStats.speed + currentStats.powerCore + currentStats.acceleration + currentStats.stability;
+                  let rating = totalStats / 4;
+
+                  msg #= "   ⚡ Rating: " # Nat32.toText(Nat32.fromNat(rating)) # "/100";
+
+                  // Show faction
+                  let factionEmoji = switch (stats.faction) {
+                    case (#BattleBot) { " | 🏆 BattleBot" };
+                    case (#EntertainmentBot) { " | 🎭 EntertainmentBot" };
+                    case (#WildBot) { " | 🌿 WildBot" };
+                    case (#GodClass) { " | 👑 GodClass" };
+                    case (#Master) { " | ⭐ Master" };
+                  };
+                  msg #= factionEmoji # "\n";
+
+                  // Show stats
+                  msg #= "   📊 Stats: SPD " # Nat32.toText(Nat32.fromNat(currentStats.speed));
+                  msg #= " | PWR " # Nat32.toText(Nat32.fromNat(currentStats.powerCore));
+                  msg #= " | ACC " # Nat32.toText(Nat32.fromNat(currentStats.acceleration));
+                  msg #= " | STB " # Nat32.toText(Nat32.fromNat(currentStats.stability)) # "\n";
+
+                  // Show condition
+                  msg #= "   🔋 Battery: " # Nat32.toText(Nat32.fromNat(stats.battery)) # "%";
+                  msg #= " | 🔧 Condition: " # Nat32.toText(Nat32.fromNat(stats.condition)) # "%\n";
+
+                  // Show racing record
+                  if (stats.racesEntered > 0) {
+                    msg #= "   🏁 Record: " # Nat32.toText(Nat32.fromNat(stats.racesEntered)) # " races";
+                    msg #= " | " # Nat32.toText(Nat32.fromNat(stats.wins)) # " wins";
+                    if (stats.racesEntered > 0) {
+                      let winRate = (stats.wins * 100) / stats.racesEntered;
+                      msg #= " (" # Nat32.toText(Nat32.fromNat(winRate)) # "% win rate)";
+                    };
+                    msg #= "\n";
+                  } else {
+                    msg #= "   🏁 Record: No races yet\n";
+                  };
+
+                  // Show terrain/distance preferences
+                  msg #= "   🎯 Prefers: " # (
+                    switch (stats.faction) {
+                      case (#BattleBot) { "ScrapHeaps" };
+                      case (#EntertainmentBot) { "MetalRoads" };
+                      case (#WildBot) { "WastelandSand" };
+                      case (#GodClass) { "All terrains" };
+                      case (#Master) { "MetalRoads" };
+                    }
+                  );
+
+                  // Distance preference based on power vs speed
+                  let distancePref = if (currentStats.powerCore > currentStats.speed) {
+                    " terrain, LongTrek";
+                  } else {
+                    " terrain, MediumHaul";
+                  };
+                  msg #= distancePref # "\n";
+                };
+                case (null) {
+                  // Not initialized for racing yet - show base stats from metadata
+                  switch (ctx.getNFTMetadata(Nat32.toNat(tokenIndex))) {
+                    case (?metadata) {
+                      // Derive faction and stats from metadata
+                      let faction = ctx.deriveFactionFromMetadata(metadata);
+                      let baseStats = ctx.deriveStatsFromMetadata(metadata, faction);
+
+                      let totalStats = baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability;
+                      let rating = totalStats / 4;
+
+                      msg #= "   ⚡ Base: " # Nat32.toText(Nat32.fromNat(rating)) # "/100";
+
+                      let factionEmoji = switch (faction) {
+                        case (#BattleBot) { " | 🏆 BattleBot" };
+                        case (#EntertainmentBot) { " | 🎭 EntertainmentBot" };
+                        case (#WildBot) { " | 🌿 WildBot" };
+                        case (#GodClass) { " | 👑 GodClass" };
+                        case (#Master) { " | ⭐ Master" };
+                      };
+                      msg #= factionEmoji # " | ⚠️ Not initialized\n";
+
+                      msg #= "   📊 Potential Stats: SPD " # Nat32.toText(Nat32.fromNat(baseStats.speed));
+                      msg #= " | PWR " # Nat32.toText(Nat32.fromNat(baseStats.powerCore));
+                      msg #= " | ACC " # Nat32.toText(Nat32.fromNat(baseStats.acceleration));
+                      msg #= " | STB " # Nat32.toText(Nat32.fromNat(baseStats.stability)) # "\n";
+                      msg #= "   💡 Initialize this bot to start racing!\n";
+                    };
+                    case (null) {
+                      msg #= "   ⚠️ Not initialized for racing\n";
+                    };
+                  };
+                };
+              };
+
+              msg #= "   🖼️ Image: " # imageUrl # "\n\n";
             };
 
-            msg #= "Garage ID: " # garageAccountId;
+            msg #= "Garage ID: " # garageAccountId # "\n\n";
+            msg #= "💡 Use garage_get_robot_details for full bot info\n";
+            msg #= "💡 Use marketplace_browse_pokedbots to compare with available bots";
             msg;
           };
         };

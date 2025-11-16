@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "pokedbots-racing-dev": {
+      "type": "http",
+      "url": "https://3od6b-qiaaa-aaaai-q37ma-cai.icp0.io/mcp",
+      "headers": {
+        "x-api-key": "7ed1214bc3d28becd20c6793a3822ec70c0e87fda9cd927394d4422ee314ec6c"
+      }
+    }
+  }
+}

@@ -40,6 +40,7 @@ import MarketplaceBrowsePokedBots "tools/marketplace_browse_pokedbots";
 import MarketplacePurchasePokedBot "tools/marketplace_purchase_pokedbot";
 import MarketplaceListPokedBot "tools/marketplace_list_pokedbot";
 import MarketplaceUnlistPokedBot "tools/marketplace_unlist_pokedbot";
+import GarageTransferPokedBot "tools/garage_transfer_pokedbot";
 import GarageInitializePokedBot "tools/garage_initialize_pokedbot";
 import GarageGetRobotDetails "tools/garage_get_robot_details";
 import GarageRechargeRobot "tools/garage_recharge_robot";
@@ -47,13 +48,13 @@ import GarageRepairRobot "tools/garage_repair_robot";
 import GarageUpgradeRobot "tools/garage_upgrade_robot";
 import RacingListRaces "tools/racing_list_races";
 import RacingEnterRace "tools/racing_enter_race";
+import RacingSponsorRace "tools/racing_sponsor_race";
 
 // Import Stats module for NFT metadata
 import Stats "Stats";
 
 // Import Racing modules
 import Racing "Racing";
-import RacingMigration "RacingMigration";
 import RaceCalendar "RaceCalendar";
 import Leaderboard "Leaderboard";
 import ExtIntegration "ExtIntegration";
@@ -64,45 +65,53 @@ import Star "mo:star/star";
 // (
 //   with migration = func(
 //     old : {
-//       var stable_racing_stats : Map.Map<Nat, RacingMigration.OldPokedBotRacingStats>;
+//       var stable_races : Map.Map<Nat, {
+//         raceId : Nat;
+//         name : Text;
+//         distance : Nat;
+//         terrain : Racing.Terrain;
+//         raceClass : Racing.RaceClass;
+//         entryFee : Nat;
+//         maxEntries : Nat;
+//         startTime : Int;
+//         duration : Nat;
+//         entryDeadline : Int;
+//         createdAt : Int;
+//         entries : [Racing.RaceEntry];
+//         status : Racing.RaceStatus;
+//         results : ?[Racing.RaceResult];
+//         prizePool : Nat;
+//         silentKlanTax : Nat;
+//       }>;
 //     }
 //   ) : {
-//     var stable_racing_stats : Map.Map<Nat, Racing.PokedBotRacingStats>;
+//     var stable_races : Map.Map<Nat, Racing.Race>;
 //   } {
-//     // Convert old racing stats to new format by adding listedForSale = false
-//     let newStats = Map.new<Nat, Racing.PokedBotRacingStats>();
-//     for ((tokenIndex, oldStats) in Map.entries(old.stable_racing_stats)) {
-//       let newStat : Racing.PokedBotRacingStats = {
-//         tokenIndex = oldStats.tokenIndex;
-//         ownerPrincipal = oldStats.ownerPrincipal;
-//         faction = oldStats.faction;
-//         speedBonus = oldStats.speedBonus;
-//         powerCoreBonus = oldStats.powerCoreBonus;
-//         accelerationBonus = oldStats.accelerationBonus;
-//         stabilityBonus = oldStats.stabilityBonus;
-//         battery = oldStats.battery;
-//         condition = oldStats.condition;
-//         calibration = oldStats.calibration;
-//         experience = oldStats.experience;
-//         preferredDistance = oldStats.preferredDistance;
-//         preferredTerrain = oldStats.preferredTerrain;
-//         racesEntered = oldStats.racesEntered;
-//         wins = oldStats.wins;
-//         places = oldStats.places;
-//         shows = oldStats.shows;
-//         totalScrapEarned = oldStats.totalScrapEarned;
-//         factionReputation = oldStats.factionReputation;
-//         activatedAt = oldStats.activatedAt;
-//         lastRecharged = oldStats.lastRecharged;
-//         lastRepaired = oldStats.lastRepaired;
-//         lastDiagnostics = oldStats.lastDiagnostics;
-//         lastRaced = oldStats.lastRaced;
-//         upgradeEndsAt = oldStats.upgradeEndsAt;
-//         listedForSale = false; // New field defaults to false
+//     // Convert old races to new format by adding sponsors = []
+//     let newRaces = Map.new<Nat, Racing.Race>();
+//     for ((raceId, oldRace) in Map.entries(old.stable_races)) {
+//       let newRace : Racing.Race = {
+//         raceId = oldRace.raceId;
+//         name = oldRace.name;
+//         distance = oldRace.distance;
+//         terrain = oldRace.terrain;
+//         raceClass = oldRace.raceClass;
+//         entryFee = oldRace.entryFee;
+//         maxEntries = oldRace.maxEntries;
+//         startTime = oldRace.startTime;
+//         duration = oldRace.duration;
+//         entryDeadline = oldRace.entryDeadline;
+//         createdAt = oldRace.createdAt;
+//         entries = oldRace.entries;
+//         status = oldRace.status;
+//         results = oldRace.results;
+//         prizePool = oldRace.prizePool;
+//         silentKlanTax = oldRace.silentKlanTax;
+//         sponsors = []; // New field defaults to empty array
 //       };
-//       ignore Map.put(newStats, Map.nhash, tokenIndex, newStat);
+//       ignore Map.put(newRaces, Map.nhash, raceId, newRace);
 //     };
-//     { var stable_racing_stats = newStats };
+//     { var stable_races = newRaces };
 //   }
 // )
 
@@ -140,8 +149,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   let stable_season_boards = Map.new<Nat, Map.Map<Nat, Leaderboard.LeaderboardEntry>>();
   let stable_alltime_board = Map.new<Nat, Leaderboard.LeaderboardEntry>();
   let stable_faction_boards = Map.new<Text, Map.Map<Nat, Leaderboard.LeaderboardEntry>>();
+
+  // Deprecated: Season/Month IDs are now calculated from Time.now()
+  // Kept for stable variable compatibility during upgrades
   var stable_current_season_id : Nat = 1;
-  var stable_current_month_id : Nat = 202411; // YYYYMM format
+  var stable_current_month_id : Nat = 202411;
 
   // Stable state for decay tracking
   var stable_last_decay_time : Int = 0;
@@ -450,9 +462,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     actionId;
   };
 
-  // Handle daily decay (self-rescheduling timer)
+  // Handle hourly decay (self-rescheduling timer)
   func handleDailyDecay<system>(actionId : TT.ActionId, action : TT.Action) : TT.ActionId {
-    Debug.print("Daily decay handler triggered");
+    Debug.print("Hourly decay handler triggered");
 
     let now = Time.now();
     let botsDecayed = racingStatsManager.applyDecayToAll(now);
@@ -460,8 +472,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     Debug.print("Applied decay to " # debug_show (botsDecayed) # " bots");
 
-    // Schedule next decay in 24 hours
-    let nextDecayTime = now + (24 * 60 * 60 * 1_000_000_000); // 24 hours in nanoseconds
+    // Schedule next decay in 1 hour
+    let nextDecayTime = now + (60 * 60 * 1_000_000_000); // 1 hour in nanoseconds
     ignore tt().setActionSync<system>(
       Int.abs(nextDecayTime),
       {
@@ -480,78 +492,102 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     let now = Time.now();
 
-    // Create 3 races with varying start times and classes
-    let racesToCreate = 3;
-    var raceCount = 0;
+    // First, ensure we have upcoming calendar events scheduled
+    ensureCalendarScheduled<system>(now);
 
-    while (raceCount < racesToCreate) {
-      // Use different seeds for each race
-      let seed = Nat32.fromNat(Int.abs((now + raceCount * 1000000) % 1000000));
+    // Get events that need races created (within next 7 days, no races yet)
+    let upcomingEvents = eventCalendar.getUpcomingEvents(now, 7);
 
-      let distances = [5, 10, 15, 20, 30];
-      let distance = distances[Nat32.toNat(seed % 5)];
+    for (event in upcomingEvents.vals()) {
+      // Create races for events that don't have them yet
+      if (event.raceIds.size() == 0) {
+        var createdRaceIds : [Nat] = [];
 
-      let terrain = switch (Nat32.toNat((seed / 5) % 3)) {
-        case (0) { #ScrapHeaps };
-        case (1) { #WastelandSand };
-        case (_) { #MetalRoads };
-      };
+        // Create races based on event divisions
+        for (division in event.metadata.divisions.vals()) {
+          let seed = Nat32.fromNat(Int.abs((event.scheduledTime + createdRaceIds.size() * 1000000) % 1000000));
 
-      // Ensure variety: first race is always Scavenger/Raider, second is Raider/Elite, third is Elite/SilentKlan
-      let raceClass = switch (raceCount) {
-        case (0) {
-          // Lower tier (Scavenger or Raider)
-          if (Nat32.toNat(seed % 2) == 0) { #Scavenger } else { #Raider };
+          // Distance and terrain based on event type
+          let (distance, terrain) = switch (event.eventType) {
+            case (#WeeklyLeague) {
+              // League races: longer distances (15-30km) with varied terrain
+              let leagueDistances = [15, 20, 25, 30];
+              let dist = leagueDistances[Nat32.toNat(seed % 4)];
+
+              let terr = switch (Nat32.toNat((seed / 4) % 3)) {
+                case (0) { #WastelandSand }; // Favor endurance
+                case (1) { #MetalRoads }; // High speed
+                case (_) { #ScrapHeaps }; // Technical
+              };
+              (dist, terr);
+            };
+            case (#MonthlyCup) {
+              // Cup races: epic distances (25-40km) with challenging terrain
+              let cupDistances = [25, 30, 35, 40];
+              let dist = cupDistances[Nat32.toNat(seed % 4)];
+
+              let terr = switch (Nat32.toNat((seed / 4) % 3)) {
+                case (0) { #WastelandSand };
+                case (1) { #MetalRoads };
+                case (_) { #ScrapHeaps };
+              };
+              (dist, terr);
+            };
+            case (#DailySprint) {
+              // Sprint races: short distances (5-10km) with varied terrain
+              let sprintDistances = [5, 7, 10];
+              let dist = sprintDistances[Nat32.toNat(seed % 3)];
+
+              let terr = switch (Nat32.toNat((seed / 3) % 3)) {
+                case (0) { #ScrapHeaps };
+                case (1) { #WastelandSand };
+                case (_) { #MetalRoads };
+              };
+              (dist, terr);
+            };
+            case (#SpecialEvent(_)) {
+              // Special events: full variety
+              let distances = [10, 15, 20, 25, 30];
+              let dist = distances[Nat32.toNat(seed % 5)];
+
+              let terr = switch (Nat32.toNat((seed / 5) % 3)) {
+                case (0) { #ScrapHeaps };
+                case (1) { #WastelandSand };
+                case (_) { #MetalRoads };
+              };
+              (dist, terr);
+            };
+          };
+
+          let race = raceManager.createRace(
+            distance,
+            terrain,
+            division,
+            event.metadata.entryFee,
+            event.metadata.maxEntries,
+            event.scheduledTime,
+          );
+
+          createdRaceIds := Array.append(createdRaceIds, [race.raceId]);
+
+          Debug.print("Created race " # Nat.toText(race.raceId) # " for " # event.metadata.name # ": " # race.name);
+
+          // Schedule race start
+          ignore tt().setActionSync<system>(
+            Int.abs(event.scheduledTime),
+            {
+              actionType = "race_start";
+              params = to_candid (race.raceId);
+            },
+          );
         };
-        case (1) {
-          // Mid tier (Raider or Elite)
-          if (Nat32.toNat(seed % 2) == 0) { #Raider } else { #Elite };
-        };
-        case (_) {
-          // Upper tier (Elite or SilentKlan)
-          if (Nat32.toNat(seed % 2) == 0) { #Elite } else { #SilentKlan };
-        };
+
+        // Update event with race IDs
+        ignore eventCalendar.addRacesToEvent(event.eventId, createdRaceIds);
       };
-
-      let entryFee = switch (raceClass) {
-        case (#Scavenger) { 5000000 }; // 0.05 ICP
-        case (#Raider) { 10000000 }; // 0.1 ICP
-        case (#Elite) { 20000000 }; // 0.2 ICP
-        case (#SilentKlan) { 50000000 }; // 0.5 ICP
-      };
-
-      let maxEntries = 8 + Nat32.toNat(seed % 5); // 8-12 entries
-
-      // Race starts in 15-90 minutes (varied start times)
-      let minMinutes = 15 + (raceCount * 15); // 15, 30, 45 minutes minimum
-      let randomMinutes = Nat32.toNat(seed % 30); // Add 0-30 random minutes
-      let totalMinutes = minMinutes + randomMinutes;
-      let startTime = now + (totalMinutes * 60 * 1_000_000_000);
-
-      let race = raceManager.createRace(
-        distance,
-        terrain,
-        raceClass,
-        entryFee,
-        maxEntries,
-        startTime,
-      );
-
-      Debug.print("Created race: " # race.name # " (starts in " # Nat.toText(totalMinutes) # " min, duration: " # Nat.toText(race.duration) # "s)");
-
-      // Schedule race start for start time
-      ignore tt().setActionSync<system>(
-        Int.abs(startTime),
-        {
-          actionType = "race_start";
-          params = to_candid (race.raceId);
-        },
-      );
-
-      raceCount += 1;
     };
 
-    // Schedule next race creation batch in 1 hour
+    // Schedule next race creation check in 1 hour
     let nextCreationTime = now + (60 * 60 * 1_000_000_000);
     ignore tt().setActionSync<system>(
       Int.abs(nextCreationTime),
@@ -562,6 +598,57 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     );
 
     actionId;
+  };
+
+  // Ensure calendar has events scheduled (Weekly League + Daily Sprints)
+  func ensureCalendarScheduled<system>(now : Int) {
+    let WEEK_NS : Int = 7 * 24 * 60 * 60 * 1_000_000_000;
+    let upcomingEvents = eventCalendar.getUpcomingEvents(now, 14); // Next 2 weeks
+
+    // Check for Weekly League races in next 2 weeks
+    let weeklyLeagues = Array.filter<RaceCalendar.ScheduledEvent>(
+      upcomingEvents,
+      func(e) {
+        switch (e.eventType) {
+          case (#WeeklyLeague) { true };
+          case (_) { false };
+        };
+      },
+    );
+
+    // Schedule next 2 Weekly Leagues if less than 2 scheduled
+    if (weeklyLeagues.size() < 2) {
+      var scheduleTime = now;
+      for (i in Iter.range(0, 1 - weeklyLeagues.size())) {
+        let nextSunday = RaceCalendar.getNextWeeklyOccurrence(0, 20, 0, scheduleTime);
+        ignore eventCalendar.createWeeklyLeagueEvent(nextSunday, now);
+        Debug.print("Auto-scheduled Weekly League for timestamp: " # debug_show (nextSunday));
+        scheduleTime := nextSunday + 1_000_000_000; // Move past this event
+      };
+    };
+
+    // Check for Daily Sprints in next 48 hours
+    let HOURS_48_NS : Int = 48 * 60 * 60 * 1_000_000_000;
+    let sprintsIn48h = Array.filter<RaceCalendar.ScheduledEvent>(
+      eventCalendar.getUpcomingEvents(now, 2), // Next 2 days
+      func(e) {
+        switch (e.eventType) {
+          case (#DailySprint) { true };
+          case (_) { false };
+        };
+      },
+    );
+
+    // Schedule Daily Sprints to ensure at least 8 in next 48 hours (one every 6 hours)
+    if (sprintsIn48h.size() < 8) {
+      var scheduleTime = now;
+      for (i in Iter.range(0, 7 - sprintsIn48h.size())) {
+        let nextSprint = RaceCalendar.getNextDailySprintTime(scheduleTime);
+        ignore eventCalendar.createDailySprintEvent(nextSprint, now);
+        Debug.print("Auto-scheduled Daily Sprint for timestamp: " # debug_show (nextSprint));
+        scheduleTime := nextSprint + 1_000_000_000;
+      };
+    };
   };
 
   // Handle prize distribution asynchronously
@@ -640,6 +727,19 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                 Debug.print("Scheduled refund " # debug_show (refundActionId) # " of " # debug_show (entry.entryFee) # " to " # Principal.toText(entry.owner));
               };
 
+              // Refund all sponsors
+              for (sponsor in race.sponsors.vals()) {
+                let sponsorRefundActionId = tt().setActionASync<system>(
+                  Int.abs(Time.now() + 1_000_000_000), // 1 second delay
+                  {
+                    actionType = "prize_distribution";
+                    params = to_candid ((raceId, sponsor.sponsor, sponsor.amount));
+                  },
+                  PRIZE_DISTRIBUTION_TIMEOUT,
+                );
+                Debug.print("Scheduled sponsor refund " # debug_show (sponsorRefundActionId) # " of " # debug_show (sponsor.amount) # " to " # Principal.toText(sponsor.sponsor));
+              };
+
               return actionId;
             };
 
@@ -713,6 +813,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                       };
                       racingStatsManager.updateStats(result.tokenIndex, updatedStats);
 
+                      // Update leaderboard periods based on current time
+                      let now = Time.now();
+                      leaderboardManager.updateCurrentPeriods(now);
+
                       // Record result in leaderboard (default 1.0x multiplier for now)
                       leaderboardManager.recordRaceResult(
                         result.tokenIndex,
@@ -723,7 +827,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                         1.0, // TODO: Get multiplier from event metadata
                         stats.faction,
                         race.raceClass,
-                        Time.now()
+                        now,
                       );
                     };
                     case (null) {};
@@ -783,6 +887,13 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     extCanisterId = extCanisterId;
     getMarketplaceListings = getMarketplaceListings;
     timerTool = tt();
+    getNFTMetadata = statsManager.getNFTMetadata;
+    getStats = racingStatsManager.getStats;
+    getCurrentStats = racingStatsManager.getCurrentStats;
+    deriveStatsFromMetadata = Racing.deriveStatsFromMetadata;
+    deriveFactionFromMetadata = Racing.deriveFactionFromMetadata;
+    isInActiveRace = raceManager.isInActiveRace;
+    addSponsor = raceManager.addSponsor;
   };
 
   // Import tool configurations from separate modules
@@ -792,6 +903,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     MarketplacePurchasePokedBot.config(),
     MarketplaceListPokedBot.config(),
     MarketplaceUnlistPokedBot.config(),
+    GarageTransferPokedBot.config(),
     GarageInitializePokedBot.config(),
     GarageGetRobotDetails.config(),
     GarageRechargeRobot.config(),
@@ -799,6 +911,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     GarageUpgradeRobot.config(),
     RacingListRaces.config(),
     RacingEnterRace.config(),
+    RacingSponsorRace.config(),
   ];
 
   // --- 2. CONFIGURE THE SDK ---
@@ -821,6 +934,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       ("purchase_pokedbot", MarketplacePurchasePokedBot.handle(toolContext)),
       ("list_pokedbot", MarketplaceListPokedBot.handle(toolContext)),
       ("unlist_pokedbot", MarketplaceUnlistPokedBot.handle(toolContext)),
+      ("transfer_pokedbot", GarageTransferPokedBot.handle(toolContext)),
       ("garage_initialize_pokedbot", GarageInitializePokedBot.handle(toolContext)),
       ("garage_get_robot_details", GarageGetRobotDetails.handle(toolContext)),
       ("garage_recharge_robot", GarageRechargeRobot.handle(toolContext)),
@@ -828,6 +942,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       ("garage_upgrade_robot", GarageUpgradeRobot.handle(toolContext)),
       ("racing_list_races", RacingListRaces.handle(toolContext)),
       ("racing_enter_race", RacingEnterRace.handle(toolContext)),
+      ("racing_sponsor_race", RacingSponsorRace.handle(toolContext)),
     ];
     beacon = beaconContext;
   };
@@ -1223,42 +1338,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     message;
   };
 
-  // ===== CALENDAR MANAGEMENT FUNCTIONS =====
-
-  // Schedule next Weekly League race (every Sunday at 20:00 UTC)
-  public shared ({ caller }) func scheduleNextWeeklyLeague() : async RaceCalendar.ScheduledEvent {
-    if (caller != owner) {
-      Debug.trap("Only owner can schedule events");
-    };
-
-    let now = Time.now();
-    let nextSunday = RaceCalendar.getNextWeeklyOccurrence(0, 20, 0, now); // Sunday, 20:00, 0 min
-    eventCalendar.createWeeklyLeagueEvent(nextSunday, now);
-  };
-
-  // Schedule next N Daily Sprint races (every 6 hours)
-  public shared ({ caller }) func scheduleDailySprints(count : Nat) : async [RaceCalendar.ScheduledEvent] {
-    if (caller != owner) {
-      Debug.trap("Only owner can schedule events");
-    };
-
-    var events : [RaceCalendar.ScheduledEvent] = [];
-    var now = Time.now();
-
-    for (i in Iter.range(0, count - 1)) {
-      let nextSprint = RaceCalendar.getNextDailySprintTime(now);
-      let event = eventCalendar.createDailySprintEvent(nextSprint, now);
-      events := Array.append(events, [event]);
-      now := nextSprint + 1_000_000; // Move 1ms past this event to get next one
-    };
-
-    events;
-  };
+  // ===== CALENDAR & EVENT MANAGEMENT =====
+  // All event scheduling and race creation is handled automatically by the timer system
+  // via ensureCalendarScheduled() and handleRaceCreation()
 
   // ===== LEADERBOARD QUERY FUNCTIONS =====
 
   // Get leaderboard by type
-  public query func getLeaderboard(
+  public query func get_leaderboard(
     lbType : Leaderboard.LeaderboardType,
     limit : Nat,
   ) : async [Leaderboard.LeaderboardEntry] {
@@ -1266,7 +1353,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   };
 
   // Get leaderboard entry for a specific bot
-  public query func getMyRanking(
+  public query func get_my_ranking(
     lbType : Leaderboard.LeaderboardType,
     tokenIndex : Nat,
   ) : async ?Leaderboard.LeaderboardEntry {
@@ -1274,54 +1361,19 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   };
 
   // Get upcoming scheduled events
-  public query func getUpcomingEvents(daysAhead : Nat) : async [RaceCalendar.ScheduledEvent] {
+  public query func get_upcoming_events(daysAhead : Nat) : async [RaceCalendar.ScheduledEvent] {
     let now = Time.now();
     eventCalendar.getUpcomingEvents(now, daysAhead);
   };
 
   // Get all events
-  public query func getAllScheduledEvents() : async [RaceCalendar.ScheduledEvent] {
+  public query func get_all_scheduled_events() : async [RaceCalendar.ScheduledEvent] {
     eventCalendar.getAllEvents();
   };
 
   // Get event details by ID
-  public query func getEventDetails(eventId : Nat) : async ?RaceCalendar.ScheduledEvent {
+  public query func get_event_details(eventId : Nat) : async ?RaceCalendar.ScheduledEvent {
     eventCalendar.getEvent(eventId);
-  };
-
-  // Admin: Set current season/month
-  public shared ({ caller }) func setCurrentSeason(seasonId : Nat) : async () {
-    if (caller != owner) {
-      Debug.trap("Only owner can set season");
-    };
-    leaderboardManager.setCurrentSeason(seasonId);
-    stable_current_season_id := seasonId;
-  };
-
-  public shared ({ caller }) func setCurrentMonth(monthId : Nat) : async () {
-    if (caller != owner) {
-      Debug.trap("Only owner can set month");
-    };
-    leaderboardManager.setCurrentMonth(monthId);
-    stable_current_month_id := monthId;
-  };
-
-  // Admin: Start new season (resets season leaderboard)
-  public shared ({ caller }) func startNewSeason(seasonId : Nat) : async () {
-    if (caller != owner) {
-      Debug.trap("Only owner can start new season");
-    };
-    leaderboardManager.startNewSeason(seasonId);
-    stable_current_season_id := seasonId;
-  };
-
-  // Admin: Reset monthly leaderboard
-  public shared ({ caller }) func resetMonthlyLeaderboard(monthId : Nat) : async () {
-    if (caller != owner) {
-      Debug.trap("Only owner can reset monthly leaderboard");
-    };
-    leaderboardManager.resetMonthlyLeaderboard(monthId);
-    stable_current_month_id := monthId;
   };
 
   // ===== DEBUG/ADMIN FUNCTIONS =====
@@ -1333,7 +1385,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
 
     var cancelledRaces : [(Nat, Text)] = [];
-    
+
     for (raceId in raceIds.vals()) {
       switch (raceManager.getRace(raceId)) {
         case (?race) {
@@ -1345,20 +1397,23 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         case (null) { /* Race doesn't exist */ };
       };
     };
-    
+
     cancelledRaces;
-  };  // --- CANISTER LIFECYCLE MANAGEMENT ---
+  }; // --- CANISTER LIFECYCLE MANAGEMENT ---
 
   system func preupgrade() {
     stable_http_assets := HttpAssets.preupgrade(http_assets);
+
+    // Save the trait schema from statsManager to stable storage before upgrade
+    stable_trait_schema := statsManager.getSchemaValue();
   };
   system func postupgrade() {
     HttpAssets.postupgrade(http_assets);
-    
-    // Restore leaderboard state
-    leaderboardManager.setCurrentSeason(stable_current_season_id);
-    leaderboardManager.setCurrentMonth(stable_current_month_id);
-    
+
+    // Update leaderboard periods based on current time
+    let now = Time.now();
+    leaderboardManager.updateCurrentPeriods(now);
+
     initializeDecayTimer<system>();
     initializeRaceCreationTimer<system>();
   };
@@ -1371,18 +1426,18 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       // No decay timer exists, schedule the first one
       let now = Time.now();
       let firstDecayTime = if (stable_last_decay_time == 0) {
-        // First install, schedule decay in 24 hours
-        Int.abs(now + (24 * 60 * 60 * 1_000_000_000));
+        // First install, schedule decay in 1 hour
+        Int.abs(now + (60 * 60 * 1_000_000_000));
       } else {
         // After upgrade, schedule based on last decay
         let timeSinceLastDecay = now - stable_last_decay_time;
-        let dayInNs = 24 * 60 * 60 * 1_000_000_000;
-        if (timeSinceLastDecay >= dayInNs) {
+        let hourInNs = 60 * 60 * 1_000_000_000;
+        if (timeSinceLastDecay >= hourInNs) {
           // Overdue, schedule immediately
           Int.abs(now + 60_000_000_000); // 1 minute from now
         } else {
-          // Schedule at next 24-hour mark
-          Int.abs(stable_last_decay_time + dayInNs);
+          // Schedule at next 1-hour mark
+          Int.abs(stable_last_decay_time + hourInNs);
         };
       };
 

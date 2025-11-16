@@ -16,7 +16,7 @@ const pemfile = require('pem-file');
 
 // Configuration
 const CHUNK_SIZE = 25; // Number of NFTs to upload per batch
-const STATS_FILE = path.join(__dirname, '../src/stats.json');
+const STATS_FILE = path.join(__dirname, '../data/stats.json');
 
 // Parse command line arguments
 const args = process.argv.slice(2);

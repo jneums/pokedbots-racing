@@ -117,6 +117,13 @@ module {
     prizeAmount : Nat; // ICP e8s won
   };
 
+  public type Sponsor = {
+    sponsor : Principal;
+    amount : Nat; // ICP e8s contributed
+    message : ?Text; // Optional sponsor message
+    timestamp : Int; // When they sponsored
+  };
+
   public type Race = {
     raceId : Nat;
     name : Text; // Thematic wasteland name
@@ -134,8 +141,9 @@ module {
     status : RaceStatus;
     results : ?[RaceResult]; // Only set after completion
 
-    prizePool : Nat; // Total ICP collected
+    prizePool : Nat; // Total ICP collected (entry fees + sponsorships)
     silentKlanTax : Nat; // 5% taken
+    sponsors : [Sponsor]; // Race sponsors
   };
 
   // ===== UPGRADE TYPES =====
@@ -652,20 +660,20 @@ module {
             case (_) { 1.0 };
           };
 
-          // Base decay amounts
-          let conditionLoss = Nat.min(stats.condition, Int.abs(Float.toInt(5.0 * decayMultiplier)));
-          let calibrationLoss = Nat.min(stats.calibration, Int.abs(Float.toInt(3.0 * decayMultiplier)));
+          // Base decay amounts (adjusted for hourly decay - 1/24th of daily amounts)
+          let conditionLoss = Nat.min(stats.condition, Int.abs(Float.toInt(0.21 * decayMultiplier))); // ~5 per day
+          let calibrationLoss = Nat.min(stats.calibration, Int.abs(Float.toInt(0.125 * decayMultiplier))); // ~3 per day
 
-          // Check if bot hasn't been recharged in 48 hours (extra condition penalty)
+          // Check if bot hasn't been recharged in 48 hours (extra condition penalty - 1 point per hour when overdue)
           let extraConditionLoss = switch (stats.lastRecharged) {
             case (?lastTime) {
               let hoursSinceRecharge = (now - lastTime) / 3_600_000_000_000; // Convert ns to hours
-              if (hoursSinceRecharge > 48) { 5 } else { 0 };
+              if (hoursSinceRecharge > 48) { 1 } else { 0 }; // 1 per hour = 24 per day when overdue
             };
             case (null) {
               // Never recharged, apply penalty if bot is old
               let hoursSinceActivation = (now - stats.activatedAt) / 3_600_000_000_000;
-              if (hoursSinceActivation > 48) { 5 } else { 0 };
+              if (hoursSinceActivation > 48) { 1 } else { 0 };
             };
           };
 
@@ -684,7 +692,7 @@ module {
       };
     };
 
-    // Apply decay to all bots (called by 24-hour timer)
+    // Apply decay to all bots (called by hourly timer)
     public func applyDecayToAll(now : Int) : Nat {
       let allBots = Map.entries(stats);
       var decayedCount : Nat = 0;
@@ -850,6 +858,7 @@ module {
         results = null;
         prizePool = 0;
         silentKlanTax = 0;
+        sponsors = [];
       };
 
       ignore Map.put(races, nhash, raceId, race);
@@ -878,6 +887,34 @@ module {
           };
         },
       );
+    };
+
+    // Check if a bot is in any active race (Upcoming or InProgress)
+    public func isInActiveRace(tokenIndex : Nat) : Bool {
+      let allRaces = getAllRaces();
+      let activeRace = Array.find<Race>(
+        allRaces,
+        func(r) {
+          // Only check races that are active (Upcoming or InProgress)
+          let isActive = switch (r.status) {
+            case (#Upcoming) { true };
+            case (#InProgress) { true };
+            case (_) { false };
+          };
+          
+          if (not isActive) { return false };
+          
+          // Check if bot is in this race's entries
+          let hasEntry = Array.find<RaceEntry>(
+            r.entries,
+            func(e) { e.tokenIndex == tokenIndex },
+          );
+          
+          Option.isSome(hasEntry);
+        },
+      );
+      
+      Option.isSome(activeRace);
     };
 
     // Get races a bot can enter
@@ -983,6 +1020,40 @@ module {
             results = ?results;
             status = #Completed;
           };
+          ignore Map.put(races, nhash, raceId, updatedRace);
+          ?updatedRace;
+        };
+        case (null) { null };
+      };
+    };
+
+    // Add a sponsor to a race
+    public func addSponsor(raceId : Nat, sponsor : Principal, amount : Nat, message : ?Text) : ?Race {
+      switch (getRace(raceId)) {
+        case (?race) {
+          // Only allow sponsoring Upcoming races
+          if (race.status != #Upcoming) {
+            return null;
+          };
+
+          let sponsorEntry : Sponsor = {
+            sponsor = sponsor;
+            amount = amount;
+            message = message;
+            timestamp = Time.now();
+          };
+
+          let newSponsors = Array.append<Sponsor>(race.sponsors, [sponsorEntry]);
+          let newPrizePool = race.prizePool + amount;
+          let newTax = (newPrizePool * 5) / 100; // Recalculate 5% tax
+
+          let updatedRace = {
+            race with
+            sponsors = newSponsors;
+            prizePool = newPrizePool;
+            silentKlanTax = newTax;
+          };
+
           ignore Map.put(races, nhash, raceId, updatedRace);
           ?updatedRace;
         };

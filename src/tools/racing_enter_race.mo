@@ -165,7 +165,7 @@ module {
           from = { owner = user; subaccount = null };
           to = { owner = ctx.canisterPrincipal; subaccount = null };
           amount = race.entryFee;
-          fee = ?TRANSFER_FEE;
+          fee = null;
           memo = null;
           created_at_time = null;
           spender_subaccount = null;
