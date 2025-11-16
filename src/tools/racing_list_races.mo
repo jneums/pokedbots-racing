@@ -69,11 +69,13 @@ module {
           // Filter by bot's eligibility when token_index is provided
           switch (ctx.racingStatsManager.getStats(tokenIndex)) {
             case (?botStats) {
-              // Verify ownership
+              // Check ownership - if transferred, show all races instead of bot-specific
               if (not Principal.equal(botStats.ownerPrincipal, user)) {
-                return ToolContext.makeError("You do not own this PokedBot", cb);
+                // Bot was transferred - show all races instead
+                ctx.raceManager.getUpcomingRaces();
+              } else {
+                ctx.raceManager.getAvailableRacesForBot(botStats, now);
               };
-              ctx.raceManager.getAvailableRacesForBot(botStats, now);
             };
             case (null) {
               return ToolContext.makeError("Bot not initialized for racing", cb);

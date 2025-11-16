@@ -1,6 +1,7 @@
 import Result "mo:base/Result";
 import Principal "mo:base/Principal";
 import Nat "mo:base/Nat";
+import Nat32 "mo:base/Nat32";
 import Int "mo:base/Int";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
@@ -12,6 +13,7 @@ import Json "mo:json";
 import ToolContext "ToolContext";
 import Racing "../Racing";
 import IcpLedger "../IcpLedger";
+import ExtIntegration "../ExtIntegration";
 
 module {
   // Recharge cost: 0.1 ICP + 0.0001 ICP fee (reduced for testing)
@@ -54,17 +56,31 @@ module {
         case (?idx) { idx };
       };
 
+      // Verify ownership via EXT (source of truth)
+      let garageSubaccount = ExtIntegration.deriveGarageSubaccount(user);
+      let garageAccountId = ExtIntegration.principalToAccountIdentifier(ctx.canisterPrincipal, ?garageSubaccount);
+      let ownerResult = try {
+        await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId));
+      } catch (_) {
+        return ToolContext.makeError("Failed to verify ownership", cb);
+      };
+      switch (ownerResult) {
+        case (#err(_)) {
+          return ToolContext.makeError("This PokedBot does not exist.", cb);
+        };
+        case (#ok(currentOwner)) {
+          if (currentOwner != garageAccountId) {
+            return ToolContext.makeError("You do not own this PokedBot.", cb);
+          };
+        };
+      };
+
       // Get racing stats
       let racingStats = switch (ctx.racingStatsManager.getStats(tokenIndex)) {
         case (null) {
           return ToolContext.makeError("This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first.", cb);
         };
         case (?stats) { stats };
-      };
-
-      // Verify ownership
-      if (not Principal.equal(racingStats.ownerPrincipal, user)) {
-        return ToolContext.makeError("You do not own this PokedBot.", cb);
       };
 
       // Check cooldown

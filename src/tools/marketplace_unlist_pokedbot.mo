@@ -46,26 +46,24 @@ module {
         };
       };
 
-      // Check if bot is initialized for racing
-      let botStats = switch (context.racingStatsManager.getStats(Nat32.toNat(tokenIndex))) {
-        case (null) {
-          return ToolContext.makeError("Bot not initialized for racing.", cb);
-        };
-        case (?stats) { stats };
-      };
-
-      // Verify ownership
-      if (not Principal.equal(botStats.ownerPrincipal, userPrincipal)) {
-        return ToolContext.makeError("You don't own this PokedBot", cb);
-      };
-
-      // Check if bot is actually listed
-      if (not botStats.listedForSale) {
-        return ToolContext.makeError("Bot is not currently listed for sale", cb);
-      };
-
-      // Derive garage subaccount
+      // Verify ownership via EXT (source of truth) - must own the bot to unlist it
       let garageSubaccount = ExtIntegration.deriveGarageSubaccount(userPrincipal);
+      let garageAccountId = ExtIntegration.principalToAccountIdentifier(context.canisterPrincipal, ?garageSubaccount);
+      let ownerResult = try {
+        await context.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(tokenIndex, context.extCanisterId));
+      } catch (_) {
+        return ToolContext.makeError("Failed to verify ownership", cb);
+      };
+      switch (ownerResult) {
+        case (#err(_)) {
+          return ToolContext.makeError("This PokedBot does not exist.", cb);
+        };
+        case (#ok(currentOwner)) {
+          if (currentOwner != garageAccountId) {
+            return ToolContext.makeError("You do not own this PokedBot.", cb);
+          };
+        };
+      };
 
       // Unlist the token (set price to null)
       let tokenIdentifier = ExtIntegration.encodeTokenIdentifier(
@@ -92,7 +90,19 @@ module {
           return ToolContext.makeError(errorMsg, cb);
         };
         case (#ok(_)) {
-          // Success - update bot stats to mark as not listed
+          // Success - get bot stats to update listing status
+          let botStats = switch (context.racingStatsManager.getStats(Nat32.toNat(tokenIndex))) {
+            case (?stats) { stats };
+            case (null) {
+              // Bot not initialized - that's okay, just confirm unlisting
+              let message = "✅ Listing Removed!\n\n" #
+              "PokedBot #" # Nat32.toText(tokenIndex) # " is no longer for sale.\n\n" #
+              "Status: UNLISTED";
+              return ToolContext.makeTextSuccess(message, cb);
+            };
+          };
+
+          // Update bot stats to mark as not listed
           let updatedStats = {
             botStats with
             listedForSale = false;

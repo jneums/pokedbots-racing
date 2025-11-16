@@ -1,6 +1,7 @@
 import Result "mo:base/Result";
 import Principal "mo:base/Principal";
 import Nat "mo:base/Nat";
+import Nat32 "mo:base/Nat32";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
 
@@ -10,6 +11,7 @@ import Json "mo:json";
 import ToolContext "ToolContext";
 import Racing "../Racing";
 import WastelandFlavor "WastelandFlavor";
+import ExtIntegration "../ExtIntegration";
 
 module {
   public func config() : McpTypes.Tool = {
@@ -47,6 +49,25 @@ module {
         case (?idx) { idx };
       };
 
+      // Verify ownership via EXT (source of truth)
+      let garageSubaccount = ExtIntegration.deriveGarageSubaccount(user);
+      let garageAccountId = ExtIntegration.principalToAccountIdentifier(ctx.canisterPrincipal, ?garageSubaccount);
+      let ownerResult = try {
+        await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId));
+      } catch (_) {
+        return ToolContext.makeError("Failed to verify ownership", cb);
+      };
+      switch (ownerResult) {
+        case (#err(_)) {
+          return ToolContext.makeError("This PokedBot does not exist.", cb);
+        };
+        case (#ok(currentOwner)) {
+          if (currentOwner != garageAccountId) {
+            return ToolContext.makeError("You do not own this PokedBot.", cb);
+          };
+        };
+      };
+
       // Get racing stats
       let racingStats = switch (ctx.racingStatsManager.getStats(tokenIndex)) {
         case (null) {
@@ -55,15 +76,26 @@ module {
         case (?stats) { stats };
       };
 
-      // Verify ownership
-      if (not Principal.equal(racingStats.ownerPrincipal, user)) {
-        return ToolContext.makeError("You do not own this PokedBot.", cb);
-      };
-
       // Calculate overall rating
       let overallRating = ctx.racingStatsManager.calculateOverallRating(racingStats);
       let status = ctx.racingStatsManager.getBotStatus(racingStats);
       let canRace = ctx.racingStatsManager.canRace(racingStats);
+
+      // Determine race class bracket
+      let raceClass = if (racingStats.wins <= 2) {
+        "Scavenger (0-2 wins)";
+      } else if (racingStats.wins >= 3 and racingStats.wins <= 5) {
+        "Raider (3-5 wins)";
+      } else if (racingStats.wins >= 6 and racingStats.wins <= 9) {
+        "Elite (6-9 wins)";
+      } else {
+        // 10+ wins
+        switch (racingStats.faction) {
+          case (#GodClass) { "SilentKlan (10+ wins, God Class)" };
+          case (#Master) { "SilentKlan (10+ wins, Master)" };
+          case (_) { "Elite+ (10+ wins, locked from SilentKlan)" };
+        };
+      };
 
       // Get wasteland flavor text
       let factionGreeting = WastelandFlavor.getFactionGreeting(racingStats.faction);
@@ -125,14 +157,19 @@ module {
       let currentStats = ctx.racingStatsManager.getCurrentStats(racingStats);
       let baseStats = ctx.racingStatsManager.getBaseStats(tokenIndex);
 
+      // Generate image URLs
+      let tokenId = ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId);
+      let thumbnailUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId # "&type=thumbnail";
+      let fullImageUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId;
+
       // Build JSON response
       let response = Json.obj([
         ("message", Json.str(factionGreeting)),
         ("token_index", Json.int(tokenIndex)),
-        ("racing_license", Json.str("REGISTERED")),
+        ("race_class", Json.str(raceClass)),
         ("owner", Json.str(Principal.toText(user))),
         ("faction", Json.str(factionText)),
-        ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("powerCore", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability)), ("base_speed", Json.int(baseStats.speed)), ("base_powerCore", Json.int(baseStats.powerCore)), ("base_acceleration", Json.int(baseStats.acceleration)), ("base_stability", Json.int(baseStats.stability)), ("speed_bonus", Json.int(racingStats.speedBonus)), ("powerCore_bonus", Json.int(racingStats.powerCoreBonus)), ("acceleration_bonus", Json.int(racingStats.accelerationBonus)), ("stability_bonus", Json.int(racingStats.stabilityBonus))])),
+        ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability)), ("base_speed", Json.int(baseStats.speed)), ("base_power_core", Json.int(baseStats.powerCore)), ("base_acceleration", Json.int(baseStats.acceleration)), ("base_stability", Json.int(baseStats.stability)), ("speed_bonus", Json.int(racingStats.speedBonus)), ("power_core_bonus", Json.int(racingStats.powerCoreBonus)), ("acceleration_bonus", Json.int(racingStats.accelerationBonus)), ("stability_bonus", Json.int(racingStats.stabilityBonus))])),
         ("condition", Json.obj([("battery", Json.int(racingStats.battery)), ("condition", Json.int(racingStats.condition)), ("calibration", Json.int(racingStats.calibration)), ("status", Json.str(status)), ("status_message", Json.str(statusFlavor))])),
         ("career", Json.obj([("races_entered", Json.int(racingStats.racesEntered)), ("wins", Json.int(racingStats.wins)), ("places", Json.int(racingStats.places)), ("shows", Json.int(racingStats.shows)), ("total_scrap_earned", Json.int(racingStats.totalScrapEarned)), ("faction_reputation", Json.int(racingStats.factionReputation)), ("reputation_tier", Json.str(reputationTier))])),
         ("overall_rating", Json.int(overallRating)),
@@ -140,6 +177,8 @@ module {
         ("preferred_distance", Json.str(distanceText)),
         ("preferred_terrain", Json.str(terrainText)),
         ("experience", Json.int(racingStats.experience)),
+        ("thumbnail", Json.str(thumbnailUrl)),
+        ("image", Json.str(fullImageUrl)),
         (
           "active_upgrade",
           switch (upgradeInfo) {

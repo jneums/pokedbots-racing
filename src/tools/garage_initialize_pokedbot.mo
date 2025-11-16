@@ -50,13 +50,41 @@ module {
 
       let tokenIndexNat32 = Nat32.fromNat(tokenIndex);
 
-      // Check if already registered
-      if (ctx.racingStatsManager.isInitialized(tokenIndex)) {
-        return ToolContext.makeError("This PokedBot already has a racing license. Use garage_get_robot_details to view its stats.", cb);
+      // Check if already registered by this user
+      switch (ctx.racingStatsManager.getStats(tokenIndex)) {
+        case (?existingStats) {
+          // If already initialized by the same user, just return their stats
+          if (Principal.equal(existingStats.ownerPrincipal, user)) {
+            return ToolContext.makeError("This PokedBot already has a racing license. Use garage_get_robot_details to view its stats.", cb);
+          };
+          // If owned by someone else, allow re-initialization for the new owner
+          // (This handles the transfer case)
+        };
+        case (null) {
+          // Not yet initialized - proceed with initialization
+        };
       };
 
-      // TODO: Verify ownership via EXT canister before initializing
-      // For now, we allow initialization without ownership check
+      // Verify ownership via EXT canister before initializing
+      let garageSubaccount = ExtIntegration.deriveGarageSubaccount(user);
+      let garageAccountId = ExtIntegration.principalToAccountIdentifier(ctx.canisterPrincipal, ?garageSubaccount);
+
+      let ownerResult = try {
+        await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(tokenIndexNat32, ctx.extCanisterId));
+      } catch (_) {
+        return ToolContext.makeError("Failed to verify ownership", cb);
+      };
+
+      switch (ownerResult) {
+        case (#err(_)) {
+          return ToolContext.makeError("This PokedBot does not exist.", cb);
+        };
+        case (#ok(currentOwner)) {
+          if (currentOwner != garageAccountId) {
+            return ToolContext.makeError("You do not own this PokedBot. It must be in your garage to initialize.", cb);
+          };
+        };
+      };
 
       // Initialize racing stats (faction will be derived from metadata automatically)
       let racingStats = ctx.racingStatsManager.initializeBot(
@@ -101,7 +129,7 @@ module {
       let response = Json.obj([
         ("token_index", Json.int(tokenIndex)),
         ("faction", Json.str(factionText)),
-        ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("powerCore", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability))])),
+        ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability))])),
         ("battery", Json.int(racingStats.battery)),
         ("condition", Json.int(racingStats.condition)),
         ("calibration", Json.int(racingStats.calibration)),

@@ -24,53 +24,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([
-        ("after", Json.obj([
-          ("type", Json.str("number")), 
-          ("description", Json.str("Show listings after this token index (pagination)"))
-        ])),
-        ("faction", Json.obj([
-          ("type", Json.str("string")),
-          ("description", Json.str("Filter by faction: BattleBot, EntertainmentBot, WildBot, GodClass, or Master")),
-          ("enum", Json.arr([
-            Json.str("BattleBot"),
-            Json.str("EntertainmentBot"),
-            Json.str("WildBot"),
-            Json.str("GodClass"),
-            Json.str("Master")
-          ]))
-        ])),
-        ("minRating", Json.obj([
-          ("type", Json.str("number")),
-          ("description", Json.str("Minimum overall rating (30-100)"))
-        ])),
-        ("maxPrice", Json.obj([
-          ("type", Json.str("number")),
-          ("description", Json.str("Maximum price in ICP"))
-        ])),
-        ("minWins", Json.obj([
-          ("type", Json.str("number")),
-          ("description", Json.str("Minimum number of race wins"))
-        ])),
-        ("minWinRate", Json.obj([
-          ("type", Json.str("number")),
-          ("description", Json.str("Minimum win rate percentage (0-100)"))
-        ])),
-        ("sortBy", Json.obj([
-          ("type", Json.str("string")),
-          ("description", Json.str("Sort results by: price, rating, winRate, or wins (default: price)")),
-          ("enum", Json.arr([
-            Json.str("price"),
-            Json.str("rating"),
-            Json.str("winRate"),
-            Json.str("wins")
-          ]))
-        ])),
-        ("sortDesc", Json.obj([
-          ("type", Json.str("boolean")),
-          ("description", Json.str("Sort descending (highest first). Default varies by sortBy."))
-        ]))
-      ])),
+      ("properties", Json.obj([("after", Json.obj([("type", Json.str("number")), ("description", Json.str("Show listings after this token index (pagination)"))])), ("faction", Json.obj([("type", Json.str("string")), ("description", Json.str("Filter by faction: BattleBot, EntertainmentBot, WildBot, GodClass, or Master")), ("enum", Json.arr([Json.str("BattleBot"), Json.str("EntertainmentBot"), Json.str("WildBot"), Json.str("GodClass"), Json.str("Master")]))])), ("minRating", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum overall rating (30-100)"))])), ("maxPrice", Json.obj([("type", Json.str("number")), ("description", Json.str("Maximum price in ICP"))])), ("minWins", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum number of race wins"))])), ("minWinRate", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum win rate percentage (0-100)"))])), ("sortBy", Json.obj([("type", Json.str("string")), ("description", Json.str("Sort results by: price, rating, winRate, or wins (default: price)")), ("enum", Json.arr([Json.str("price"), Json.str("rating"), Json.str("winRate"), Json.str("wins")]))])), ("sortDesc", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Sort descending (highest first). Default varies by sortBy."))]))])),
     ]);
     outputSchema = null;
   };
@@ -121,22 +75,22 @@ module {
 
       // Enrich listings with racing stats
       type EnrichedListing = {
-        tokenIndex: Nat32;
-        listing: ExtIntegration.Listing;
-        metadata: ExtIntegration.Metadata;
-        stats: ?{
-          faction: Text;
-          baseSpeed: Nat;
-          basePowerCore: Nat;
-          baseAcceleration: Nat;
-          baseStability: Nat;
-          overallRating: Nat;
-          racesEntered: Nat;
-          wins: Nat;
-          podiums: Nat;
-          winRate: Float;
-          preferredTerrain: Text;
-          preferredDistance: Text;
+        tokenIndex : Nat32;
+        listing : ExtIntegration.Listing;
+        metadata : ExtIntegration.Metadata;
+        stats : ?{
+          faction : Text;
+          baseSpeed : Nat;
+          basePowerCore : Nat;
+          baseAcceleration : Nat;
+          baseStability : Nat;
+          overallRating : Nat;
+          racesEntered : Nat;
+          wins : Nat;
+          podiums : Nat;
+          winRate : Float;
+          preferredTerrain : Text;
+          preferredDistance : Text;
         };
       };
 
@@ -146,7 +100,7 @@ module {
         // Always get base stats from metadata
         let baseStats = context.racingStatsManager.getBaseStats(Nat32.toNat(tokenIndex));
         let racingStats = context.racingStatsManager.getStats(Nat32.toNat(tokenIndex));
-        
+
         let statsInfo = switch (racingStats) {
           case (?stats) {
             // Bot has racing history
@@ -195,7 +149,7 @@ module {
           case (null) {
             // No racing history yet - show base stats with derived info from metadata
             let nftMetadata = context.getNFTMetadata(Nat32.toNat(tokenIndex));
-            
+
             // Derive faction from actual NFT metadata
             let derivedFaction = switch (nftMetadata) {
               case (?meta) {
@@ -241,7 +195,7 @@ module {
             // Calculate simple rating from base stats average
             let avgStat = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
             let derivedRating = avgStat; // Base rating is just the average
-            
+
             // Debug: log to see actual stat values
             // Debug.print("Token " # Nat32.toText(tokenIndex) # " base stats: SPD=" # Nat.toText(baseStats.speed) # " PWR=" # Nat.toText(baseStats.powerCore) # " ACC=" # Nat.toText(baseStats.acceleration) # " STB=" # Nat.toText(baseStats.stability) # " AVG=" # Nat.toText(avgStat));
 
@@ -253,19 +207,73 @@ module {
               case (#Master) { "Master" };
             };
 
-            // Derive terrain preference from faction
-            let terrainText = switch (derivedFaction) {
-              case (#BattleBot) { "ScrapHeaps" };
-              case (#EntertainmentBot) { "MetalRoads" };
-              case (#WildBot) { "WastelandSand" };
-              case (#GodClass) { "MetalRoads" };
-              case (#Master) { "MetalRoads" };
+            // Derive terrain preference from Background trait in metadata
+            let terrainText = switch (nftMetadata) {
+              case (?meta) {
+                // Look for Background trait
+                let background = Array.find<(Text, Text)>(
+                  meta,
+                  func(trait) { Text.toLowercase(trait.0) == "background" },
+                );
+                
+                switch (background) {
+                  case (?(_, value)) {
+                    let bg = Text.toLowercase(value);
+                    
+                    // Map background colors to terrain types
+                    // Warm/sandy/earthy → WastelandSand
+                    if (Text.contains(bg, #text "brown") or 
+                        Text.contains(bg, #text "red") or
+                        Text.contains(bg, #text "yellow") or
+                        Text.contains(bg, #text "bones")) {
+                      "WastelandSand"
+                    }
+                    // Cool/tech/metallic → MetalRoads
+                    else if (Text.contains(bg, #text "blue") or 
+                             Text.contains(bg, #text "purple") or 
+                             Text.contains(bg, #text "grey") or
+                             Text.contains(bg, #text "gray") or
+                             Text.contains(bg, #text "teal")) {
+                      "MetalRoads"
+                    }
+                    // Dark/space/natural → ScrapHeaps
+                    else if (Text.contains(bg, #text "black") or 
+                             Text.contains(bg, #text "green") or 
+                             Text.contains(bg, #text "planet") or
+                             Text.contains(bg, #text "stars") or
+                             Text.contains(bg, #text "gold")) {
+                      "ScrapHeaps"
+                    }
+                    // Fallback
+                    else {
+                      let choice = Nat32.toNat(tokenIndex) % 3;
+                      if (choice == 0) { "ScrapHeaps" }
+                      else if (choice == 1) { "MetalRoads" }
+                      else { "WastelandSand" }
+                    }
+                  };
+                  case null {
+                    // Fallback: use token index for variety
+                    let choice = Nat32.toNat(tokenIndex) % 3;
+                    if (choice == 0) { "ScrapHeaps" }
+                    else if (choice == 1) { "MetalRoads" }
+                    else { "WastelandSand" }
+                  };
+                };
+              };
+              case null {
+                // No metadata available, use token index
+                let choice = Nat32.toNat(tokenIndex) % 3;
+                if (choice == 0) { "ScrapHeaps" }
+                else if (choice == 1) { "MetalRoads" }
+                else { "WastelandSand" }
+              };
             };
 
-            // Derive distance preference from stats
-            let distanceText = if (baseStats.powerCore > 70 and baseStats.speed < 60) {
+            // Derive distance preference from stats (lowered thresholds for more variety)
+            let distanceText = if (baseStats.powerCore > 55 and baseStats.speed < 50) {
               "LongTrek";
-            } else if (baseStats.speed > 70 and baseStats.powerCore < 60) {
+            } else if (baseStats.speed > 55 and baseStats.powerCore < 50) {
               "ShortSprint";
             } else {
               "MediumHaul";
@@ -288,12 +296,7 @@ module {
           };
         };
 
-        enrichedListings := Array.append(enrichedListings, [{
-          tokenIndex = tokenIndex;
-          listing = listing;
-          metadata = metadata;
-          stats = statsInfo;
-        }]);
+        enrichedListings := Array.append(enrichedListings, [{ tokenIndex = tokenIndex; listing = listing; metadata = metadata; stats = statsInfo }]);
       };
 
       // Apply filters
@@ -309,7 +312,7 @@ module {
                 case (?s) { s.faction == faction };
                 case (null) { false };
               };
-            }
+            },
           );
         };
         case (null) {};
@@ -325,7 +328,7 @@ module {
                 case (?s) { s.overallRating >= rating };
                 case (null) { false };
               };
-            }
+            },
           );
         };
         case (null) {};
@@ -339,7 +342,7 @@ module {
             let maxPriceE8s = Nat64.fromNat(Int.abs(priceInt));
             filteredListings := Array.filter<EnrichedListing>(
               filteredListings,
-              func(l) { l.listing.price <= maxPriceE8s }
+              func(l) { l.listing.price <= maxPriceE8s },
             );
           };
         };
@@ -356,7 +359,7 @@ module {
                 case (?s) { s.wins >= wins };
                 case (null) { false };
               };
-            }
+            },
           );
         };
         case (null) {};
@@ -372,7 +375,7 @@ module {
                 case (?s) { s.winRate >= rate };
                 case (null) { false };
               };
-            }
+            },
           );
         };
         case (null) {};
@@ -392,7 +395,9 @@ module {
             };
             case ("rating") {
               switch (a.stats, b.stats) {
-                case (?statsA, ?statsB) { Nat.compare(statsA.overallRating, statsB.overallRating) };
+                case (?statsA, ?statsB) {
+                  Nat.compare(statsA.overallRating, statsB.overallRating);
+                };
                 case (?_, null) { #greater };
                 case (null, ?_) { #less };
                 case (null, null) { #equal };
@@ -400,7 +405,9 @@ module {
             };
             case ("winRate") {
               switch (a.stats, b.stats) {
-                case (?statsA, ?statsB) { Float.compare(statsA.winRate, statsB.winRate) };
+                case (?statsA, ?statsB) {
+                  Float.compare(statsA.winRate, statsB.winRate);
+                };
                 case (?_, null) { #greater };
                 case (null, ?_) { #less };
                 case (null, null) { #equal };
@@ -408,7 +415,9 @@ module {
             };
             case ("wins") {
               switch (a.stats, b.stats) {
-                case (?statsA, ?statsB) { Nat.compare(statsA.wins, statsB.wins) };
+                case (?statsA, ?statsB) {
+                  Nat.compare(statsA.wins, statsB.wins);
+                };
                 case (?_, null) { #greater };
                 case (null, ?_) { #less };
                 case (null, null) { #equal };
@@ -454,6 +463,7 @@ module {
       };
 
       // Format page results
+      let extCanisterId = context.extCanisterId;
       let pageListings = Array.tabulate<Text>(
         endIdx - startIdx,
         func(i) {
@@ -461,12 +471,17 @@ module {
           let listing = sortedListings[idx];
           let priceIcp = Float.fromInt(Nat64.toNat(listing.listing.price)) / 100_000_000.0;
 
+          let tokenId = ExtIntegration.encodeTokenIdentifier(listing.tokenIndex, extCanisterId);
+          let imageUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId # "&type=thumbnail";
+
           var details = "🤖 Token #" # Nat32.toText(listing.tokenIndex) # "\n";
           details #= "   💰 Price: " # Float.format(#fix 2, priceIcp) # " ICP\n";
 
           switch (listing.stats) {
             case (?stats) {
-              let ratingLabel = if (stats.racesEntered > 0) { "Rating" } else { "Base" };
+              let ratingLabel = if (stats.racesEntered > 0) { "Rating" } else {
+                "Base";
+              };
               details #= "   ⚡ " # ratingLabel # ": " # Nat.toText(stats.overallRating) # "/100";
               details #= " | 🏆 " # stats.faction # "\n";
               details #= "   📊 Stats: SPD " # Nat.toText(stats.baseSpeed);
@@ -489,20 +504,45 @@ module {
             };
           };
 
+          details #= "\n   🖼️  Image: " # imageUrl;
+
           details;
         },
       );
 
       var message = "🏪 PokedBots Marketplace";
-      
+
       // Show active filters
       var filters : [Text] = [];
-      switch (factionFilter) { case (?f) { filters := Array.append(filters, ["Faction:" # f]) }; case (null) {} };
-      switch (minRating) { case (?r) { filters := Array.append(filters, ["MinRating:" # Nat.toText(r)]) }; case (null) {} };
-      switch (maxPrice) { case (?p) { filters := Array.append(filters, ["MaxPrice:" # Float.format(#fix 2, p) # "ICP"]) }; case (null) {} };
-      switch (minWins) { case (?w) { filters := Array.append(filters, ["MinWins:" # Nat.toText(w)]) }; case (null) {} };
-      switch (minWinRate) { case (?r) { filters := Array.append(filters, ["MinWinRate:" # Float.format(#fix 0, r) # "%"]) }; case (null) {} };
-      
+      switch (factionFilter) {
+        case (?f) { filters := Array.append(filters, ["Faction:" # f]) };
+        case (null) {};
+      };
+      switch (minRating) {
+        case (?r) {
+          filters := Array.append(filters, ["MinRating:" # Nat.toText(r)]);
+        };
+        case (null) {};
+      };
+      switch (maxPrice) {
+        case (?p) {
+          filters := Array.append(filters, ["MaxPrice:" # Float.format(#fix 2, p) # "ICP"]);
+        };
+        case (null) {};
+      };
+      switch (minWins) {
+        case (?w) {
+          filters := Array.append(filters, ["MinWins:" # Nat.toText(w)]);
+        };
+        case (null) {};
+      };
+      switch (minWinRate) {
+        case (?r) {
+          filters := Array.append(filters, ["MinWinRate:" # Float.format(#fix 0, r) # "%"]);
+        };
+        case (null) {};
+      };
+
       if (filters.size() > 0) {
         message #= " [" # Text.join(", ", filters.vals()) # "]";
       };

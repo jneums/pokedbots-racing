@@ -195,54 +195,10 @@ module {
       };
     };
 
-    // Base stats derived from Type trait (30-50 range)
-    let typeValue = switch (getTrait("type")) {
-      case (?"industrial") { 45 };
-      case (?"food") { 35 };
-      case (?"retro") { 40 };
-      case (?"sports") { 42 };
-      case _ { 38 }; // default
-    };
-
-    // Body trait affects power core (30-50 range)
-    let bodyHash = switch (getTrait("body")) {
-      case (?body) { hashText(body) % 21 + 30 }; // 30-50
-      case null { 40 };
-    };
-
-    // Arms trait affects speed (30-50 range)
-    let armsHash = switch (getTrait("arms")) {
-      case (?arms) { hashText(arms) % 21 + 30 }; // 30-50
-      case null { 40 };
-    };
-
-    // Legs trait affects acceleration (30-50 range)
-    let legsHash = switch (getTrait("legs")) {
-      case (?legs) { hashText(legs) % 21 + 30 }; // 30-50
-      case null { 40 };
-    };
-
-    // Driver Guy affects stability (30-50 range)
-    let driverHash = switch (getTrait("driver guy")) {
-      case (?driver) { hashText(driver) % 21 + 30 }; // 30-50
-      case null { 40 };
-    };
-
-    // Wings give bonus to speed
-    let wingsBonus = switch (getTrait("wings")) {
-      case (?wings) {
-        if (Text.contains(wings, #text "triangle") or Text.contains(wings, #text "rocket")) {
-          5;
-        } else { 0 };
-      };
-      case null { 0 };
-    };
-
     // Helper to check if a numeric trait value is > 0
     func hasAttribute(name : Text) : Bool {
       switch (getTrait(name)) {
         case (?value) {
-          // Parse the number - any value > 0 means the attribute is present
           switch (Nat.fromText(value)) {
             case (?n) { n > 0 };
             case null { false };
@@ -252,19 +208,56 @@ module {
       };
     };
 
+    // Get trait values
+    let body = getTrait("body");
+    let arms = getTrait("arms");
+    let legs = getTrait("legs");
+    let wings = getTrait("wings");
+    let driver = getTrait("driver guy");
+
     // Special attribute bonuses (Gold, Rust, Black, Pink, Blue)
-    // These are stored as counts (0-6) in the metadata
     let goldBonus = if (hasAttribute("gold")) { 8 } else { 0 }; // +8 to all stats
     let rustPenalty = if (hasAttribute("rust")) { -5 } else { 0 }; // -5 to power/stability
     let blackBonus = if (hasAttribute("black")) { 6 } else { 0 }; // +6 to speed/acceleration
     let pinkBonus = if (hasAttribute("pink")) { 4 } else { 0 }; // +4 to stability
     let blueBonus = if (hasAttribute("blue")) { 5 } else { 0 }; // +5 to power core
 
-    // Calculate base stats from traits
-    let baseSpeed = Nat.min(100, armsHash + wingsBonus + goldBonus + blackBonus);
-    let basePowerCore = Nat.min(100, Int.abs(bodyHash + goldBonus + blueBonus + rustPenalty));
-    let baseAcceleration = Nat.min(100, legsHash + goldBonus + blackBonus);
-    let baseStability = Nat.min(100, Int.abs(driverHash + goldBonus + pinkBonus + rustPenalty));
+    // Calculate composite stats using multi-trait formulas
+    // Speed = Legs (40%) + Wings (30%) + Body (20% inverse) + Arms (10%)
+    let legsSpeedScore = categorizeLegsForSpeed(legs);
+    let wingsSpeedScore = categorizeWingsForSpeed(wings);
+    let bodySpeedScore = categorizeBodyForSpeed(body); // Lighter = faster
+    let armsSpeedScore = categorizeArmsForSpeed(arms);
+
+    let rawSpeed = Float.fromInt(legsSpeedScore) * 0.40 + Float.fromInt(wingsSpeedScore) * 0.30 + Float.fromInt(bodySpeedScore) * 0.20 + Float.fromInt(armsSpeedScore) * 0.10;
+    let baseSpeed = Nat.min(100, Int.abs(Float.toInt(rawSpeed)) + goldBonus + blackBonus);
+
+    // Power Core = Body (50%) + Arms (25%) + Legs (15%) + Wings (10%)
+    let bodyPowerScore = categorizeBodyForPower(body);
+    let armsPowerScore = categorizeArmsForPower(arms);
+    let legsPowerScore = categorizeLegsForPower(legs);
+    let wingsPowerScore = categorizeWingsForPower(wings);
+
+    let rawPower = Float.fromInt(bodyPowerScore) * 0.50 + Float.fromInt(armsPowerScore) * 0.25 + Float.fromInt(legsPowerScore) * 0.15 + Float.fromInt(wingsPowerScore) * 0.10;
+    let basePowerCore = Nat.min(100, Int.abs(Float.toInt(rawPower) + goldBonus + blueBonus + rustPenalty));
+
+    // Acceleration = Legs (50%) + Arms (20%) + Wings (20%) + Body (10% inverse)
+    let legsAccelScore = categorizeLegsForAccel(legs);
+    let armsAccelScore = categorizeArmsForAccel(arms);
+    let wingsAccelScore = categorizeWingsForAccel(wings);
+    let bodyAccelScore = categorizeBodyForAccel(body); // Lighter = faster acceleration
+
+    let rawAccel = Float.fromInt(legsAccelScore) * 0.50 + Float.fromInt(armsAccelScore) * 0.20 + Float.fromInt(wingsAccelScore) * 0.20 + Float.fromInt(bodyAccelScore) * 0.10;
+    let baseAcceleration = Nat.min(100, Int.abs(Float.toInt(rawAccel)) + goldBonus + blackBonus);
+
+    // Stability = Driver (40%) + Body (30%) + Legs (20%) + Arms (10%)
+    let driverStabilityScore = categorizeDriverForStability(driver);
+    let bodyStabilityScore = categorizeBodyForStability(body);
+    let legsStabilityScore = categorizeLegsForStability(legs);
+    let armsStabilityScore = categorizeArmsForStability(arms);
+
+    let rawStability = Float.fromInt(driverStabilityScore) * 0.40 + Float.fromInt(bodyStabilityScore) * 0.30 + Float.fromInt(legsStabilityScore) * 0.20 + Float.fromInt(armsStabilityScore) * 0.10;
+    let baseStability = Nat.min(100, Int.abs(Float.toInt(rawStability) + goldBonus + pinkBonus + rustPenalty));
 
     // Apply faction bonuses
     let speed = applyFactionBonus(baseSpeed, faction, #Speed);
@@ -273,6 +266,692 @@ module {
     let stability = applyFactionBonus(baseStability, faction, #Stability);
 
     { speed; powerCore; acceleration; stability };
+  };
+
+  // ===== SPEED CATEGORIZATION FUNCTIONS =====
+
+  // Legs contribution to speed (40% weight) - Locomotion is primary speed factor
+  private func categorizeLegsForSpeed(legs : ?Text) : Nat {
+    switch (legs) {
+      case (?l) {
+        let lower = Text.toLowercase(l);
+        // Legendary (70-80)
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "ultimate terminator")) {
+          75 + (hashText(l) % 6);
+        }
+        // High speed (60-75): Rockets, super legs, power walkers
+        else if (
+          Text.contains(lower, #text "rocket") or
+          Text.contains(lower, #text "super") or
+          Text.contains(lower, #text "ultimate") or
+          Text.contains(lower, #text "power walker")
+        ) {
+          65 + (hashText(l) % 11);
+        }
+        // Medium-high (50-65): Power, strong, chunky
+        else if (
+          Text.contains(lower, #text "power") or
+          Text.contains(lower, #text "strong") or
+          Text.contains(lower, #text "chunky") or
+          Text.contains(lower, #text "spiky")
+        ) {
+          55 + (hashText(l) % 11);
+        }
+        // Medium (40-55): Midi, bendy, cables, bird claw, flat, bone
+        else if (
+          Text.contains(lower, #text "midi") or
+          Text.contains(lower, #text "bendy") or
+          Text.contains(lower, #text "cable") or
+          Text.contains(lower, #text "bird claw") or
+          Text.contains(lower, #text "frog") or
+          Text.contains(lower, #text "8 bit") or
+          Text.contains(lower, #text "flat") or
+          Text.contains(lower, #text "bone") or
+          Text.contains(lower, #text "big") or
+          Text.contains(lower, #text "cactus") or
+          Text.contains(lower, #text "mech") or
+          Text.contains(lower, #text "chocolate")
+        ) {
+          45 + (hashText(l) % 11);
+        }
+        // Low (30-50): Small, burnt, rust, inflatable, slender
+        else {
+          35 + (hashText(l) % 16);
+        };
+      };
+      case null { 45 }; // Default
+    };
+  };
+
+  // Wings contribution to speed (30% weight) - Jets and engines provide thrust
+  private func categorizeWingsForSpeed(wings : ?Text) : Nat {
+    switch (wings) {
+      case (?w) {
+        let lower = Text.toLowercase(w);
+        // Legendary
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "ultimate")) {
+          75 + (hashText(w) % 6);
+        }
+        // High speed (60-75): Massive engines, rockets, triangle fins
+        else if (
+          Text.contains(lower, #text "massive engine") or
+          Text.contains(lower, #text "rocket") or
+          Text.contains(lower, #text "jet") or
+          Text.contains(lower, #text "triangle up")
+        ) {
+          65 + (hashText(w) % 11);
+        }
+        // Medium-high (50-65): Power cells, large wings
+        else if (
+          Text.contains(lower, #text "power cell") or
+          Text.contains(lower, #text "butterfly double") or
+          Text.contains(lower, #text "angel wings")
+        ) {
+          55 + (hashText(w) % 11);
+        }
+        // Medium (40-55): Standard wings, 8-bit, antenna, large wings
+        else if (
+          Text.contains(lower, #text "8 bit") or
+          Text.contains(lower, #text "bear") or
+          Text.contains(lower, #text "horn") or
+          Text.contains(lower, #text "decal") or
+          Text.contains(lower, #text "antenna") or
+          Text.contains(lower, #text "jointed") or
+          Text.contains(lower, #text "large") or
+          Text.contains(lower, #text "ear muff") or
+          Text.contains(lower, #text "connector") or
+          Text.contains(lower, #text "chain saw") or
+          Text.contains(lower, #text "game face")
+        ) {
+          45 + (hashText(w) % 11);
+        }
+        // Low (30-45): Blank, burnt, decorative, inflatable
+        else if (
+          Text.contains(lower, #text "blank") or
+          Text.contains(lower, #text "none") or
+          Text.contains(lower, #text "inflatable") or
+          Text.contains(lower, #text "lolly pop") or
+          Text.contains(lower, #text "straw")
+        ) {
+          32 + (hashText(w) % 9);
+        } else {
+          40 + (hashText(w) % 11);
+        };
+      };
+      case null { 35 }; // No wings = low speed
+    };
+  };
+
+  // Body contribution to speed (20% weight, INVERSE) - Heavy bodies are slower
+  private func categorizeBodyForSpeed(body : ?Text) : Nat {
+    switch (body) {
+      case (?b) {
+        let lower = Text.toLowercase(b);
+        // Light/Fast (60-75): Eggs, bubbles, balloons, small food
+        if (
+          Text.contains(lower, #text "egg") or
+          Text.contains(lower, #text "bubble") or
+          Text.contains(lower, #text "balloon") or
+          Text.contains(lower, #text "glass") or
+          Text.contains(lower, #text "gummy") or
+          Text.contains(lower, #text "bee") or
+          Text.contains(lower, #text "bird") or
+          Text.contains(lower, #text "donut") or
+          Text.contains(lower, #text "smarties")
+        ) {
+          65 + (hashText(b) % 11);
+        }
+        // Medium (45-60): Game systems, animals, standard bodies
+        else if (
+          Text.contains(lower, #text "game boy") or
+          Text.contains(lower, #text "n 64") or
+          Text.contains(lower, #text "ipod") or
+          Text.contains(lower, #text "8 bit") or
+          Text.contains(lower, #text "frog") or
+          Text.contains(lower, #text "rabbit") or
+          Text.contains(lower, #text "round head") or
+          Text.contains(lower, #text "pig") or
+          Text.contains(lower, #text "cat") or
+          Text.contains(lower, #text "pizza") or
+          Text.contains(lower, #text "cheese") or
+          Text.contains(lower, #text "waffle")
+        ) {
+          50 + (hashText(b) % 11);
+        }
+        // Heavy/Slow (30-45): Mega, large, tower, beast
+        else if (
+          Text.contains(lower, #text "mega") or
+          Text.contains(lower, #text "large") or
+          Text.contains(lower, #text "tower") or
+          Text.contains(lower, #text "beast") or
+          Text.contains(lower, #text "massive")
+        ) {
+          35 + (hashText(b) % 11);
+        } else {
+          45 + (hashText(b) % 11);
+        };
+      };
+      case null { 50 };
+    };
+  };
+
+  // Arms contribution to speed (10% weight) - Minor thrust/propulsion
+  private func categorizeArmsForSpeed(arms : ?Text) : Nat {
+    switch (arms) {
+      case (?a) {
+        let lower = Text.toLowercase(a);
+        // Legendary
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "golden king") or Text.contains(lower, #text "murder arms gold")) {
+          75 + (hashText(a) % 6);
+        }
+        // High (60-75): Rockets, jets, lasers
+        else if (
+          Text.contains(lower, #text "rocket") or
+          Text.contains(lower, #text "jet") or
+          Text.contains(lower, #text "lazer") or
+          Text.contains(lower, #text "rainbow")
+        ) {
+          65 + (hashText(a) % 11);
+        }
+        // Medium-high (50-65): Power arms, tech, weapons, long arms
+        else if (
+          Text.contains(lower, #text "power arms") or
+          Text.contains(lower, #text "8 bit") or
+          Text.contains(lower, #text "connector") or
+          Text.contains(lower, #text "cable") or
+          Text.contains(lower, #text "wire") or
+          Text.contains(lower, #text "chainsaw") or
+          Text.contains(lower, #text "claw") or
+          Text.contains(lower, #text "snipper") or
+          Text.contains(lower, #text "gripper") or
+          Text.contains(lower, #text "long arms") or
+          Text.contains(lower, #text "power lift") or
+          Text.contains(lower, #text "mechanic")
+        ) {
+          50 + (hashText(a) % 11);
+        }
+        // Medium (40-50): Hands up, mixed hands
+        else if (Text.contains(lower, #text "hands up") or Text.contains(lower, #text "double arms")) {
+          45 + (hashText(a) % 6);
+        }
+        // Low (30-45): Hands down, fingers, bone
+        else {
+          35 + (hashText(a) % 11);
+        };
+      };
+      case null { 45 };
+    };
+  };
+
+  // ===== POWER CORE CATEGORIZATION FUNCTIONS =====
+
+  // Body contribution to power (50% weight) - Main chassis houses power core
+  private func categorizeBodyForPower(body : ?Text) : Nat {
+    switch (body) {
+      case (?b) {
+        let lower = Text.toLowercase(b);
+        // High power (60-80): Large, mega, ultimate, master
+        if (
+          Text.contains(lower, #text "mega") or
+          Text.contains(lower, #text "large") or
+          Text.contains(lower, #text "ultimate") or
+          Text.contains(lower, #text "master") or
+          Text.contains(lower, #text "super") or
+          Text.contains(lower, #text "tower") or
+          Text.contains(lower, #text "beast") or
+          Text.contains(lower, #text "golden")
+        ) {
+          65 + (hashText(b) % 16);
+        }
+        // Medium-high (50-65): Controllers, boxes, industrial
+        else if (
+          Text.contains(lower, #text "controller") or
+          Text.contains(lower, #text "battle box") or
+          Text.contains(lower, #text "command box") or
+          Text.contains(lower, #text "iron") or
+          Text.contains(lower, #text "copper")
+        ) {
+          55 + (hashText(b) % 11);
+        }
+        // Medium (40-55): Standard bodies
+        else if (
+          Text.contains(lower, #text "egg") or
+          Text.contains(lower, #text "game boy") or
+          Text.contains(lower, #text "frog") or
+          Text.contains(lower, #text "bee body")
+        ) {
+          45 + (hashText(b) % 11);
+        }
+        // Low (30-45): Small, mini, bubble
+        else {
+          35 + (hashText(b) % 11);
+        };
+      };
+      case null { 50 };
+    };
+  };
+
+  // Arms contribution to power (25% weight) - Power arms draw significant energy
+  private func categorizeArmsForPower(arms : ?Text) : Nat {
+    switch (arms) {
+      case (?a) {
+        let lower = Text.toLowercase(a);
+        // High power (60-75): Power arms, ultimate, massive
+        if (
+          Text.contains(lower, #text "power arms") or
+          Text.contains(lower, #text "ultimate") or
+          Text.contains(lower, #text "master") or
+          Text.contains(lower, #text "massive") or
+          Text.contains(lower, #text "rainbow lazer") or
+          Text.contains(lower, #text "double arms")
+        ) {
+          65 + (hashText(a) % 11);
+        }
+        // Medium (45-60): Rockets, tech arms
+        else if (
+          Text.contains(lower, #text "rocket") or
+          Text.contains(lower, #text "8 bit") or
+          Text.contains(lower, #text "connector") or
+          Text.contains(lower, #text "cable") or
+          Text.contains(lower, #text "lazer")
+        ) {
+          50 + (hashText(a) % 11);
+        }
+        // Low (30-45): Basic hands
+        else {
+          35 + (hashText(a) % 11);
+        };
+      };
+      case null { 45 };
+    };
+  };
+
+  // Legs contribution to power (15% weight)
+  private func categorizeLegsForPower(legs : ?Text) : Nat {
+    switch (legs) {
+      case (?l) {
+        let lower = Text.toLowercase(l);
+        // High (55-70): Power, strong, chunky
+        if (
+          Text.contains(lower, #text "power") or
+          Text.contains(lower, #text "strong") or
+          Text.contains(lower, #text "chunky") or
+          Text.contains(lower, #text "ultimate") or
+          Text.contains(lower, #text "super")
+        ) {
+          60 + (hashText(l) % 11);
+        }
+        // Medium (40-55)
+        else if (
+          Text.contains(lower, #text "midi") or
+          Text.contains(lower, #text "8 bit") or
+          Text.contains(lower, #text "cable")
+        ) {
+          45 + (hashText(l) % 11);
+        }
+        // Low (30-45)
+        else {
+          35 + (hashText(l) % 11);
+        };
+      };
+      case null { 45 };
+    };
+  };
+
+  // Wings contribution to power (10% weight)
+  private func categorizeWingsForPower(wings : ?Text) : Nat {
+    switch (wings) {
+      case (?w) {
+        let lower = Text.toLowercase(w);
+        // High (55-70): Massive engines, power cells
+        if (
+          Text.contains(lower, #text "massive engine") or
+          Text.contains(lower, #text "power cell") or
+          Text.contains(lower, #text "ultimate") or
+          Text.contains(lower, #text "golden")
+        ) {
+          60 + (hashText(w) % 11);
+        }
+        // Medium (40-55)
+        else if (
+          Text.contains(lower, #text "rocket") or
+          Text.contains(lower, #text "8 bit") or
+          Text.contains(lower, #text "angel")
+        ) {
+          45 + (hashText(w) % 11);
+        }
+        // Low (30-45)
+        else {
+          35 + (hashText(w) % 11);
+        };
+      };
+      case null { 40 };
+    };
+  };
+
+  // ===== ACCELERATION CATEGORIZATION FUNCTIONS =====
+
+  // Legs contribution to acceleration (50% weight) - Quick response and agility
+  private func categorizeLegsForAccel(legs : ?Text) : Nat {
+    switch (legs) {
+      case (?l) {
+        let lower = Text.toLowercase(l);
+        // High accel (60-80): Super fast, spiky, spring-like
+        if (
+          Text.contains(lower, #text "super fast") or
+          Text.contains(lower, #text "super leg") or
+          Text.contains(lower, #text "spiky") or
+          Text.contains(lower, #text "bird claw") or
+          Text.contains(lower, #text "frog") or
+          Text.contains(lower, #text "ultimate")
+        ) {
+          65 + (hashText(l) % 16);
+        }
+        // Medium (45-60): Bendy, midi, agile
+        else if (
+          Text.contains(lower, #text "bendy") or
+          Text.contains(lower, #text "midi") or
+          Text.contains(lower, #text "cable") or
+          Text.contains(lower, #text "power") or
+          Text.contains(lower, #text "8 bit")
+        ) {
+          50 + (hashText(l) % 11);
+        }
+        // Low (30-45): Chunky, large, heavy
+        else if (
+          Text.contains(lower, #text "chunky") or
+          Text.contains(lower, #text "large") or
+          Text.contains(lower, #text "burnt") or
+          Text.contains(lower, #text "rust") or
+          Text.contains(lower, #text "inflatable")
+        ) {
+          35 + (hashText(l) % 11);
+        } else {
+          45 + (hashText(l) % 11);
+        };
+      };
+      case null { 45 };
+    };
+  };
+
+  // Arms contribution to acceleration (20% weight)
+  private func categorizeArmsForAccel(arms : ?Text) : Nat {
+    switch (arms) {
+      case (?a) {
+        let lower = Text.toLowercase(a);
+        // High (55-70): Lasers, rockets, quick thrust
+        if (
+          Text.contains(lower, #text "lazer") or
+          Text.contains(lower, #text "rainbow") or
+          Text.contains(lower, #text "rocket up") or
+          Text.contains(lower, #text "power jet") or
+          Text.contains(lower, #text "chainsaw")
+        ) {
+          60 + (hashText(a) % 11);
+        }
+        // Medium (40-55)
+        else if (
+          Text.contains(lower, #text "claw") or
+          Text.contains(lower, #text "power arms") or
+          Text.contains(lower, #text "8 bit")
+        ) {
+          45 + (hashText(a) % 11);
+        }
+        // Low (30-45)
+        else {
+          35 + (hashText(a) % 11);
+        };
+      };
+      case null { 45 };
+    };
+  };
+
+  // Wings contribution to acceleration (20% weight)
+  private func categorizeWingsForAccel(wings : ?Text) : Nat {
+    switch (wings) {
+      case (?w) {
+        let lower = Text.toLowercase(w);
+        // High (55-70): Rockets, engines, quick thrust
+        if (
+          Text.contains(lower, #text "rocket") or
+          Text.contains(lower, #text "massive engine") or
+          Text.contains(lower, #text "power cell") or
+          Text.contains(lower, #text "triangle up")
+        ) {
+          60 + (hashText(w) % 11);
+        }
+        // Medium (40-55)
+        else if (
+          Text.contains(lower, #text "butterfly") or
+          Text.contains(lower, #text "angel") or
+          Text.contains(lower, #text "8 bit")
+        ) {
+          45 + (hashText(w) % 11);
+        }
+        // Low (30-45)
+        else {
+          35 + (hashText(w) % 11);
+        };
+      };
+      case null { 40 };
+    };
+  };
+
+  // Body contribution to acceleration (10% weight, INVERSE) - Lighter = faster accel
+  private func categorizeBodyForAccel(body : ?Text) : Nat {
+    switch (body) {
+      case (?b) {
+        let lower = Text.toLowercase(b);
+        // Light/agile (60-75)
+        if (
+          Text.contains(lower, #text "egg") or
+          Text.contains(lower, #text "bubble") or
+          Text.contains(lower, #text "balloon") or
+          Text.contains(lower, #text "mini") or
+          Text.contains(lower, #text "small")
+        ) {
+          65 + (hashText(b) % 11);
+        }
+        // Medium (45-60)
+        else if (
+          Text.contains(lower, #text "game boy") or
+          Text.contains(lower, #text "ipod") or
+          Text.contains(lower, #text "frog")
+        ) {
+          50 + (hashText(b) % 11);
+        }
+        // Heavy (30-45)
+        else if (
+          Text.contains(lower, #text "mega") or
+          Text.contains(lower, #text "tower") or
+          Text.contains(lower, #text "beast") or
+          Text.contains(lower, #text "massive")
+        ) {
+          35 + (hashText(b) % 11);
+        } else {
+          45 + (hashText(b) % 11);
+        };
+      };
+      case null { 50 };
+    };
+  };
+
+  // ===== STABILITY CATEGORIZATION FUNCTIONS =====
+
+  // Driver contribution to stability (40% weight) - Skill is primary factor
+  private func categorizeDriverForStability(driver : ?Text) : Nat {
+    switch (driver) {
+      case (?d) {
+        let lower = Text.toLowercase(d);
+        // High stability (60-80): Professional gear, focused
+        if (
+          Text.contains(lower, #text "metal goggles") or
+          Text.contains(lower, #text "helmet") or
+          Text.contains(lower, #text "visor") or
+          Text.contains(lower, #text "ultimate") or
+          Text.contains(lower, #text "master") or
+          Text.contains(lower, #text "diamond eyes")
+        ) {
+          65 + (hashText(d) % 16);
+        }
+        // Medium-high (50-65): Gaming focus
+        else if (
+          Text.contains(lower, #text "headphones") or
+          Text.contains(lower, #text "game boy") or
+          Text.contains(lower, #text "pixel") or
+          Text.contains(lower, #text "snes") or
+          Text.contains(lower, #text "gamer")
+        ) {
+          55 + (hashText(d) % 11);
+        }
+        // Medium (40-55): Standard drivers, colored, hair styles
+        else if (
+          Text.contains(lower, #text "blue") or
+          Text.contains(lower, #text "green") or
+          Text.contains(lower, #text "yellow") or
+          Text.contains(lower, #text "purple") or
+          Text.contains(lower, #text "tounge") or
+          Text.contains(lower, #text "rabbit") or
+          Text.contains(lower, #text "hair") or
+          Text.contains(lower, #text "metal open") or
+          Text.contains(lower, #text "red") or
+          Text.contains(lower, #text "calculator") or
+          Text.contains(lower, #text "gold colour") or
+          Text.contains(lower, #text "circuits") or
+          Text.contains(lower, #text "tri eye") or
+          Text.contains(lower, #text "twin")
+        ) {
+          45 + (hashText(d) % 11);
+        }
+        // Low (30-45): Impaired, distracted
+        else if (
+          Text.contains(lower, #text "dead eyes") or
+          Text.contains(lower, #text "eyes closed") or
+          Text.contains(lower, #text "big eyes") or
+          Text.contains(lower, #text "glitch")
+        ) {
+          35 + (hashText(d) % 11);
+        } else {
+          45 + (hashText(d) % 11);
+        };
+      };
+      case null { 45 };
+    };
+  };
+
+  // Body contribution to stability (30% weight) - Wide/low = stable
+  private func categorizeBodyForStability(body : ?Text) : Nat {
+    switch (body) {
+      case (?b) {
+        let lower = Text.toLowercase(b);
+        // High stability (60-75): Wide, boxy, stable bases
+        if (
+          Text.contains(lower, #text "battle box") or
+          Text.contains(lower, #text "command box") or
+          Text.contains(lower, #text "mega controller") or
+          Text.contains(lower, #text "beast") or
+          Text.contains(lower, #text "iron") or
+          Text.contains(lower, #text "ultimate")
+        ) {
+          65 + (hashText(b) % 11);
+        }
+        // Medium (45-60)
+        else if (
+          Text.contains(lower, #text "egg") or
+          Text.contains(lower, #text "round") or
+          Text.contains(lower, #text "frog") or
+          Text.contains(lower, #text "rabbit")
+        ) {
+          50 + (hashText(b) % 11);
+        }
+        // Low (30-45): Wobbly, tall, unbalanced
+        else if (
+          Text.contains(lower, #text "balloon") or
+          Text.contains(lower, #text "bubble") or
+          Text.contains(lower, #text "tower") or
+          Text.contains(lower, #text "spiky egg") or
+          Text.contains(lower, #text "one tooth")
+        ) {
+          35 + (hashText(b) % 11);
+        } else {
+          45 + (hashText(b) % 11);
+        };
+      };
+      case null { 50 };
+    };
+  };
+
+  // Legs contribution to stability (20% weight) - Strong stance
+  private func categorizeLegsForStability(legs : ?Text) : Nat {
+    switch (legs) {
+      case (?l) {
+        let lower = Text.toLowercase(l);
+        // High (55-70): Strong, stable stance
+        if (
+          Text.contains(lower, #text "strong") or
+          Text.contains(lower, #text "power") or
+          Text.contains(lower, #text "chunky") or
+          Text.contains(lower, #text "industrial") or
+          Text.contains(lower, #text "bird claw") or
+          Text.contains(lower, #text "ultimate")
+        ) {
+          60 + (hashText(l) % 11);
+        }
+        // Medium (40-55)
+        else if (
+          Text.contains(lower, #text "midi") or
+          Text.contains(lower, #text "8 bit") or
+          Text.contains(lower, #text "cable") or
+          Text.contains(lower, #text "bendy")
+        ) {
+          45 + (hashText(l) % 11);
+        }
+        // Low (30-45): Unstable
+        else if (
+          Text.contains(lower, #text "small") or
+          Text.contains(lower, #text "balloon") or
+          Text.contains(lower, #text "inflatable") or
+          Text.contains(lower, #text "burnt") or
+          Text.contains(lower, #text "slender")
+        ) {
+          35 + (hashText(l) % 11);
+        } else {
+          45 + (hashText(l) % 11);
+        };
+      };
+      case null { 45 };
+    };
+  };
+
+  // Arms contribution to stability (10% weight) - Balance assistance
+  private func categorizeArmsForStability(arms : ?Text) : Nat {
+    switch (arms) {
+      case (?a) {
+        let lower = Text.toLowercase(a);
+        // High (50-65): Grippers, stabilizers
+        if (
+          Text.contains(lower, #text "power arms") or
+          Text.contains(lower, #text "gripper") or
+          Text.contains(lower, #text "claw") or
+          Text.contains(lower, #text "strong")
+        ) {
+          55 + (hashText(a) % 11);
+        }
+        // Medium (40-55)
+        else if (
+          Text.contains(lower, #text "8 bit") or
+          Text.contains(lower, #text "connector") or
+          Text.contains(lower, #text "hands up")
+        ) {
+          45 + (hashText(a) % 11);
+        }
+        // Low (30-45)
+        else {
+          35 + (hashText(a) % 11);
+        };
+      };
+      case null { 45 };
+    };
   };
 
   // Derive faction from Type metadata trait
@@ -385,25 +1064,84 @@ module {
     Nat.min(100, Int.abs(result)); // Cap at 100
   };
 
-  // Derive preferred distance from stats
+  // Derive preferred distance from stats (lowered thresholds for more variety)
   public func derivePreferredDistance(powerCore : Nat, speed : Nat) : Distance {
-    if (powerCore > 70 and speed < 60) {
+    if (powerCore > 55 and speed < 50) {
       #LongTrek // High endurance, moderate speed
-    } else if (speed > 70 and powerCore < 60) {
+    } else if (speed > 55 and powerCore < 50) {
       #ShortSprint // High speed, lower endurance
     } else {
       #MediumHaul // Balanced
     };
   };
 
-  // Derive preferred terrain from faction
-  public func derivePreferredTerrain(faction : FactionType) : Terrain {
-    switch (faction) {
-      case (#BattleBot) { #ScrapHeaps }; // Built from junk, excel in junk
-      case (#EntertainmentBot) { #MetalRoads }; // Prefer smooth surfaces for show
-      case (#WildBot) { #WastelandSand }; // Chaotic, unpredictable terrain
-      case (#GodClass) { #MetalRoads }; // Superior on quality surfaces
-      case (#Master) { #MetalRoads }; // Precision engineering
+  // Derive preferred terrain from NFT metadata (Background trait)
+  public func derivePreferredTerrain(metadata : [(Text, Text)]) : Terrain {
+    // Look for Background trait to determine terrain preference
+    let background = Array.find<(Text, Text)>(
+      metadata,
+      func(trait) { Text.toLowercase(trait.0) == "background" },
+    );
+
+    switch (background) {
+      case (?(_, value)) {
+        let bg = Text.toLowercase(value);
+
+        // Map background colors to terrain types based on actual PokedBots backgrounds
+        // All 26 values: grey, purple, mid blue, blue, light purple, dark purple, dark brown,
+        // light blue, dark grey, dark blue, teal, grey blue, light grey, muted purple,
+        // black stars, bones, brown, dark red grey, dark planets, grey planets, red,
+        // black, muted yellow, muted red, green, master gold
+
+        // Warm/sandy/earthy colors → WastelandSand (desert)
+        if (
+          Text.contains(bg, #text "brown") or
+          Text.contains(bg, #text "red") or
+          Text.contains(bg, #text "yellow") or
+          Text.contains(bg, #text "bones")
+        ) {
+          #WastelandSand;
+        };
+        // Cool/tech/metallic colors → MetalRoads (highways/cities)
+        else if (
+          Text.contains(bg, #text "blue") or
+          Text.contains(bg, #text "purple") or
+          Text.contains(bg, #text "grey") or
+          Text.contains(bg, #text "gray") or
+          Text.contains(bg, #text "teal")
+        ) {
+          #MetalRoads;
+        };
+        // Dark/space/natural colors → ScrapHeaps (junkyards)
+        else if (
+          Text.contains(bg, #text "black") or
+          Text.contains(bg, #text "green") or
+          Text.contains(bg, #text "planet") or
+          Text.contains(bg, #text "stars") or
+          Text.contains(bg, #text "gold")
+        ) {
+          #ScrapHeaps;
+        };
+        // Fallback (shouldn't happen with 26 known values)
+        else {
+          let hash = hashText(bg);
+          let choice = hash % 3;
+          if (choice == 0) { #ScrapHeaps } else if (choice == 1) { #MetalRoads } else {
+            #WastelandSand;
+          };
+        };
+      };
+      case null {
+        // Fallback: hash all metadata keys for deterministic variety
+        var combinedHash : Nat = 0;
+        for ((key, value) in metadata.vals()) {
+          combinedHash := (combinedHash + hashText(key) + hashText(value)) % 1000000;
+        };
+        let choice = combinedHash % 3;
+        if (choice == 0) { #ScrapHeaps } else if (choice == 1) { #MetalRoads } else {
+          #WastelandSand;
+        };
+      };
     };
   };
 
@@ -523,7 +1261,17 @@ module {
 
         // Preferences
         preferredDistance = derivePreferredDistance(baseStats.powerCore, baseStats.speed);
-        preferredTerrain = derivePreferredTerrain(faction);
+        preferredTerrain = switch (metadata) {
+          case (?traits) { derivePreferredTerrain(traits) };
+          case null {
+            // Fallback: derive from token index hash
+            let hash = hashNat(tokenIndex);
+            let choice = hash % 3;
+            if (choice == 0) { #ScrapHeaps } else if (choice == 1) {
+              #MetalRoads;
+            } else { #WastelandSand };
+          };
+        };
 
         // Career stats (all zero)
         racesEntered = 0;
@@ -901,19 +1649,19 @@ module {
             case (#InProgress) { true };
             case (_) { false };
           };
-          
+
           if (not isActive) { return false };
-          
+
           // Check if bot is in this race's entries
           let hasEntry = Array.find<RaceEntry>(
             r.entries,
             func(e) { e.tokenIndex == tokenIndex },
           );
-          
+
           Option.isSome(hasEntry);
         },
       );
-      
+
       Option.isSome(activeRace);
     };
 

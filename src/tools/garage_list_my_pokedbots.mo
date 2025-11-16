@@ -52,7 +52,7 @@ module {
 
             for (tokenIndex in tokens.vals()) {
               let tokenId = ExtIntegration.encodeTokenIdentifier(tokenIndex, ctx.extCanisterId);
-              let imageUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId;
+              let thumbnailUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId # "&type=thumbnail";
 
               // Get racing stats if initialized
               let robotStats = ctx.getStats(Nat32.toNat(tokenIndex));
@@ -101,6 +101,25 @@ module {
                   } else {
                     msg #= "   🏁 Record: No races yet\n";
                   };
+
+                  // Show race class bracket
+                  let raceClassText = if (stats.wins <= 2) {
+                    "🥉 Scavenger (0-2 wins)";
+                  } else if (stats.wins >= 3 and stats.wins <= 5) {
+                    "🥈 Raider (3-5 wins)";
+                  } else if (stats.wins >= 6 and stats.wins <= 9) {
+                    "🥇 Elite (6-9 wins)";
+                  } else {
+                    // 10+ wins
+                    switch (stats.faction) {
+                      case (#GodClass) { "💀 SilentKlan (10+, God Class)" };
+                      case (#Master) { "💀 SilentKlan (10+, Master)" };
+                      case (_) {
+                        "🏆 Elite+ (10+ wins, locked from SilentKlan)";
+                      };
+                    };
+                  };
+                  msg #= "   🏆 Class: " # raceClassText # "\n";
 
                   // Show terrain/distance preferences
                   msg #= "   🎯 Prefers: " # (
@@ -156,7 +175,7 @@ module {
                 };
               };
 
-              msg #= "   🖼️ Image: " # imageUrl # "\n\n";
+              msg #= "   🖼️  Thumbnail: " # thumbnailUrl # "\n\n";
             };
 
             msg #= "Garage ID: " # garageAccountId # "\n\n";
