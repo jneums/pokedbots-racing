@@ -141,37 +141,29 @@ module {
                   msg #= distancePref # "\n";
                 };
                 case (null) {
-                  // Not initialized for racing yet - show base stats from metadata
-                  switch (ctx.getNFTMetadata(Nat32.toNat(tokenIndex))) {
-                    case (?metadata) {
-                      // Derive faction and stats from metadata
-                      let faction = ctx.deriveFactionFromMetadata(metadata);
-                      let baseStats = ctx.deriveStatsFromMetadata(metadata, faction);
+                  // Not initialized for racing yet - show base stats from racingStatsManager
+                  let baseStats = ctx.racingStatsManager.getBaseStats(Nat32.toNat(tokenIndex));
+                  let faction = ctx.racingStatsManager.getFaction(Nat32.toNat(tokenIndex));
 
-                      let totalStats = baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability;
-                      let rating = totalStats / 4;
+                  let totalStats = baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability;
+                  let rating = totalStats / 4;
 
-                      msg #= "   ⚡ Base: " # Nat32.toText(Nat32.fromNat(rating)) # "/100";
+                  msg #= "   ⚡ Base: " # Nat32.toText(Nat32.fromNat(rating)) # "/100";
 
-                      let factionEmoji = switch (faction) {
-                        case (#BattleBot) { " | 🏆 BattleBot" };
-                        case (#EntertainmentBot) { " | 🎭 EntertainmentBot" };
-                        case (#WildBot) { " | 🌿 WildBot" };
-                        case (#GodClass) { " | 👑 GodClass" };
-                        case (#Master) { " | ⭐ Master" };
-                      };
-                      msg #= factionEmoji # " | ⚠️ Not initialized\n";
-
-                      msg #= "   📊 Potential Stats: SPD " # Nat32.toText(Nat32.fromNat(baseStats.speed));
-                      msg #= " | PWR " # Nat32.toText(Nat32.fromNat(baseStats.powerCore));
-                      msg #= " | ACC " # Nat32.toText(Nat32.fromNat(baseStats.acceleration));
-                      msg #= " | STB " # Nat32.toText(Nat32.fromNat(baseStats.stability)) # "\n";
-                      msg #= "   💡 Initialize this bot to start racing!\n";
-                    };
-                    case (null) {
-                      msg #= "   ⚠️ Not initialized for racing\n";
-                    };
+                  let factionEmoji = switch (faction) {
+                    case (#BattleBot) { " | 🏆 BattleBot" };
+                    case (#EntertainmentBot) { " | 🎭 EntertainmentBot" };
+                    case (#WildBot) { " | 🌿 WildBot" };
+                    case (#GodClass) { " | 👑 GodClass" };
+                    case (#Master) { " | ⭐ Master" };
                   };
+                  msg #= factionEmoji # " | ⚠️ Not initialized\n";
+
+                  msg #= "   📊 Potential Stats: SPD " # Nat32.toText(Nat32.fromNat(baseStats.speed));
+                  msg #= " | PWR " # Nat32.toText(Nat32.fromNat(baseStats.powerCore));
+                  msg #= " | ACC " # Nat32.toText(Nat32.fromNat(baseStats.acceleration));
+                  msg #= " | STB " # Nat32.toText(Nat32.fromNat(baseStats.stability)) # "\n";
+                  msg #= "   💡 Initialize this bot to start racing!\n";
                 };
               };
 

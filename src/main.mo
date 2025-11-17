@@ -11,6 +11,7 @@ import Time "mo:base/Time";
 import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Float "mo:base/Float";
+import Error "mo:base/Error";
 
 import HttpTypes "mo:http-types";
 import Map "mo:map/Map";
@@ -62,59 +63,6 @@ import IcpLedger "IcpLedger";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
 
-// (
-//   with migration = func(
-//     old : {
-//       var stable_races : Map.Map<Nat, {
-//         raceId : Nat;
-//         name : Text;
-//         distance : Nat;
-//         terrain : Racing.Terrain;
-//         raceClass : Racing.RaceClass;
-//         entryFee : Nat;
-//         maxEntries : Nat;
-//         startTime : Int;
-//         duration : Nat;
-//         entryDeadline : Int;
-//         createdAt : Int;
-//         entries : [Racing.RaceEntry];
-//         status : Racing.RaceStatus;
-//         results : ?[Racing.RaceResult];
-//         prizePool : Nat;
-//         silentKlanTax : Nat;
-//       }>;
-//     }
-//   ) : {
-//     var stable_races : Map.Map<Nat, Racing.Race>;
-//   } {
-//     // Convert old races to new format by adding sponsors = []
-//     let newRaces = Map.new<Nat, Racing.Race>();
-//     for ((raceId, oldRace) in Map.entries(old.stable_races)) {
-//       let newRace : Racing.Race = {
-//         raceId = oldRace.raceId;
-//         name = oldRace.name;
-//         distance = oldRace.distance;
-//         terrain = oldRace.terrain;
-//         raceClass = oldRace.raceClass;
-//         entryFee = oldRace.entryFee;
-//         maxEntries = oldRace.maxEntries;
-//         startTime = oldRace.startTime;
-//         duration = oldRace.duration;
-//         entryDeadline = oldRace.entryDeadline;
-//         createdAt = oldRace.createdAt;
-//         entries = oldRace.entries;
-//         status = oldRace.status;
-//         results = oldRace.results;
-//         prizePool = oldRace.prizePool;
-//         silentKlanTax = oldRace.silentKlanTax;
-//         sponsors = []; // New field defaults to empty array
-//       };
-//       ignore Map.put(newRaces, Map.nhash, raceId, newRace);
-//     };
-//     { var stable_races = newRaces };
-//   }
-// )
-
 shared ({ caller = deployer }) persistent actor class McpServer(
   args : ?{
     owner : ?Principal;
@@ -133,6 +81,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   // Stable state for NFT metadata
   let stable_nft_stats = Map.new<Nat, Stats.NFTStats>();
   var stable_trait_schema : Stats.TraitSchema = [];
+
+  // Stable state for pre-computed base stats (speed, power, accel, stability, faction)
+  let stable_base_stats = Map.new<Nat, { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat; faction : Racing.FactionType }>();
 
   // Stable state for racing stats
   var stable_racing_stats = Map.new<Nat, Racing.PokedBotRacingStats>();
@@ -233,6 +184,15 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       getNFTMetadata = func(tokenId : Nat) : ?[(Text, Text)] {
         statsManager.getNFTMetadata(tokenId);
       };
+      getPrecomputedStats = func(tokenId : Nat) : ?{
+        speed : Nat;
+        powerCore : Nat;
+        acceleration : Nat;
+        stability : Nat;
+        faction : Racing.FactionType;
+      } {
+        Map.get(stable_base_stats, Map.nhash, tokenId);
+      };
     },
   );
 
@@ -253,13 +213,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     stable_faction_boards,
   );
 
-  // Marketplace listings cache (refreshed periodically)
-  type CachedListings = {
-    listings : [(Nat32, ExtIntegration.Listing, ExtIntegration.Metadata)];
-    timestamp : Int;
-  };
-  var marketplaceCache : ?CachedListings = null;
-  let CACHE_TTL_SECONDS : Int = 300; // 5 minutes
+  // Marketplace listings cache removed to save memory
+  // Fetch listings on-demand instead of caching
+  let CACHE_TTL_SECONDS : Int = 300; // 5 minutes (unused, kept for compatibility)
 
   let issuerUrl = "https://bfggx-7yaaa-aaaai-q32gq-cai.icp0.io";
   let allowanceUrl = "https://prometheusprotocol.org/connections";
@@ -337,27 +293,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   // Function to get marketplace listings with caching
   func getMarketplaceListings() : async [(Nat32, ExtIntegration.Listing, ExtIntegration.Metadata)] {
-    let now = Time.now();
-
-    switch (marketplaceCache) {
-      case (?cache) {
-        // Check if cache is still valid
-        let age = (now - cache.timestamp) / 1_000_000_000; // Convert to seconds
-        if (age < CACHE_TTL_SECONDS) {
-          return cache.listings;
-        };
-      };
-      case (null) {};
-    };
-
-    // Cache expired or doesn't exist, fetch fresh data
-    let listings = await extCanister.listings();
-    marketplaceCache := ?{
-      listings = listings;
-      timestamp = now;
-    };
-
-    return listings;
+    // Fetch fresh data every time - no caching to save memory
+    // The EXT canister call is fast enough for our use case
+    await extCanister.listings();
   };
 
   // Handle completed upgrades
@@ -890,8 +828,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     getNFTMetadata = statsManager.getNFTMetadata;
     getStats = racingStatsManager.getStats;
     getCurrentStats = racingStatsManager.getCurrentStats;
-    deriveStatsFromMetadata = Racing.deriveStatsFromMetadata;
-    deriveFactionFromMetadata = Racing.deriveFactionFromMetadata;
     isInActiveRace = raceManager.isInActiveRace;
     addSponsor = raceManager.addSponsor;
   };
@@ -1139,6 +1075,52 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   /// Debug: Preview what stats would be derived for a token index
   /// Shows both metadata-based and fallback stats for comparison
+  // Test stat derivation with error handling
+  public query func test_derive_stats(tokenIndex : Nat) : async {
+    #ok : {
+      speed : Nat;
+      powerCore : Nat;
+      acceleration : Nat;
+      stability : Nat;
+      faction : Text;
+    };
+    #err : Text;
+  } {
+    try {
+      let metadata = statsManager.getNFTMetadata(tokenIndex);
+
+      let faction = switch (metadata) {
+        case (?traits) { Racing.deriveFactionFromMetadata(traits) };
+        case null {
+          return #err("No metadata found for token " # Nat.toText(tokenIndex));
+        };
+      };
+
+      let stats = switch (metadata) {
+        case (?traits) { Racing.deriveStatsFromMetadata(traits, faction) };
+        case null { return #err("No metadata for stats derivation") };
+      };
+
+      let factionText = switch (faction) {
+        case (#BattleBot) { "BattleBot" };
+        case (#EntertainmentBot) { "EntertainmentBot" };
+        case (#WildBot) { "WildBot" };
+        case (#GodClass) { "GodClass" };
+        case (#Master) { "Master" };
+      };
+
+      #ok({
+        speed = stats.speed;
+        powerCore = stats.powerCore;
+        acceleration = stats.acceleration;
+        stability = stats.stability;
+        faction = factionText;
+      });
+    } catch (e) {
+      #err("Error deriving stats: " # Error.message(e));
+    };
+  };
+
   public query func debug_preview_stats(tokenIndex : Nat) : async {
     hasMetadata : Bool;
     metadata : ?Stats.NFTMetadata;
@@ -1276,6 +1258,76 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   /// Get a decoded trait value by trait name (for display)
   public query func get_nft_trait(tokenId : Nat, traitName : Text) : async ?Text {
     statsManager.getTraitValueByName(tokenId, traitName);
+  };
+
+  // ===== PRE-COMPUTED BASE STATS UPLOAD =====
+
+  /// Upload a batch of pre-computed base stats
+  public shared (msg) func upload_base_stats_batch(
+    batch : [(Nat, { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat; faction : Text })]
+  ) : async () {
+    if (msg.caller != owner) {
+      Debug.trap("Only the owner can upload base stats");
+    };
+
+    for ((tokenId, stats) in batch.vals()) {
+      // Convert faction text to FactionType
+      let factionType : Racing.FactionType = switch (stats.faction) {
+        case ("BattleBot") { #BattleBot };
+        case ("EntertainmentBot") { #EntertainmentBot };
+        case ("WildBot") { #WildBot };
+        case ("GodClass") { #GodClass };
+        case ("Master") { #Master };
+        case (_) { #BattleBot }; // Default
+      };
+
+      ignore Map.put(
+        stable_base_stats,
+        Map.nhash,
+        tokenId,
+        {
+          speed = stats.speed;
+          powerCore = stats.powerCore;
+          acceleration = stats.acceleration;
+          stability = stats.stability;
+          faction = factionType;
+        },
+      );
+    };
+  };
+
+  /// Get total count of pre-computed base stats
+  public query func get_base_stats_count() : async Nat {
+    Map.size(stable_base_stats);
+  };
+
+  /// Get a specific pre-computed base stat
+  public query func get_base_stat(tokenId : Nat) : async ?{
+    speed : Nat;
+    powerCore : Nat;
+    acceleration : Nat;
+    stability : Nat;
+    faction : Text;
+  } {
+    switch (Map.get(stable_base_stats, Map.nhash, tokenId)) {
+      case (null) { null };
+      case (?stats) {
+        let factionText = switch (stats.faction) {
+          case (#BattleBot) { "BattleBot" };
+          case (#EntertainmentBot) { "EntertainmentBot" };
+          case (#WildBot) { "WildBot" };
+          case (#GodClass) { "GodClass" };
+          case (#Master) { "Master" };
+        };
+        ?{
+          speed = stats.speed;
+          powerCore = stats.powerCore;
+          acceleration = stats.acceleration;
+          stability = stats.stability;
+          faction = factionText;
+        };
+      };
+    };
   };
 
   // Tracing functions

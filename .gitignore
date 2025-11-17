@@ -2,3 +2,4 @@
 .dfx
 .env
 node_modules
+.local

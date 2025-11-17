@@ -41,15 +41,6 @@ module ToolContext {
       acceleration : Nat;
       stability : Nat;
     };
-    /// Derive stats from NFT metadata
-    deriveStatsFromMetadata : ([(Text, Text)], Racing.FactionType) -> {
-      speed : Nat;
-      powerCore : Nat;
-      acceleration : Nat;
-      stability : Nat;
-    };
-    /// Derive faction from NFT metadata
-    deriveFactionFromMetadata : ([(Text, Text)]) -> Racing.FactionType;
     /// Check if a bot is in any active race
     isInActiveRace : (Nat) -> Bool;
     /// Add a sponsor to a race

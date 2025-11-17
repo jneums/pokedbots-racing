@@ -208,6 +208,15 @@ module {
       };
     };
 
+    // Safe float to int conversion
+    func safeFloatToInt(f : Float) : Int {
+      if (Float.isNaN(f) or f > 2147483647.0 or f < -2147483648.0) {
+        0;
+      } else {
+        Float.toInt(f);
+      };
+    };
+
     // Get trait values
     let body = getTrait("body");
     let arms = getTrait("arms");
@@ -230,7 +239,7 @@ module {
     let armsSpeedScore = categorizeArmsForSpeed(arms);
 
     let rawSpeed = Float.fromInt(legsSpeedScore) * 0.40 + Float.fromInt(wingsSpeedScore) * 0.30 + Float.fromInt(bodySpeedScore) * 0.20 + Float.fromInt(armsSpeedScore) * 0.10;
-    let baseSpeed = Nat.min(100, Int.abs(Float.toInt(rawSpeed)) + goldBonus + blackBonus);
+    let baseSpeed = Nat.min(100, Int.abs(safeFloatToInt(rawSpeed)) + goldBonus + blackBonus);
 
     // Power Core = Body (50%) + Arms (25%) + Legs (15%) + Wings (10%)
     let bodyPowerScore = categorizeBodyForPower(body);
@@ -239,7 +248,7 @@ module {
     let wingsPowerScore = categorizeWingsForPower(wings);
 
     let rawPower = Float.fromInt(bodyPowerScore) * 0.50 + Float.fromInt(armsPowerScore) * 0.25 + Float.fromInt(legsPowerScore) * 0.15 + Float.fromInt(wingsPowerScore) * 0.10;
-    let basePowerCore = Nat.min(100, Int.abs(Float.toInt(rawPower) + goldBonus + blueBonus + rustPenalty));
+    let basePowerCore = Nat.min(100, Int.abs(safeFloatToInt(rawPower) + goldBonus + blueBonus + rustPenalty));
 
     // Acceleration = Legs (50%) + Arms (20%) + Wings (20%) + Body (10% inverse)
     let legsAccelScore = categorizeLegsForAccel(legs);
@@ -248,7 +257,7 @@ module {
     let bodyAccelScore = categorizeBodyForAccel(body); // Lighter = faster acceleration
 
     let rawAccel = Float.fromInt(legsAccelScore) * 0.50 + Float.fromInt(armsAccelScore) * 0.20 + Float.fromInt(wingsAccelScore) * 0.20 + Float.fromInt(bodyAccelScore) * 0.10;
-    let baseAcceleration = Nat.min(100, Int.abs(Float.toInt(rawAccel)) + goldBonus + blackBonus);
+    let baseAcceleration = Nat.min(100, Int.abs(safeFloatToInt(rawAccel)) + goldBonus + blackBonus);
 
     // Stability = Driver (40%) + Body (30%) + Legs (20%) + Arms (10%)
     let driverStabilityScore = categorizeDriverForStability(driver);
@@ -257,7 +266,7 @@ module {
     let armsStabilityScore = categorizeArmsForStability(arms);
 
     let rawStability = Float.fromInt(driverStabilityScore) * 0.40 + Float.fromInt(bodyStabilityScore) * 0.30 + Float.fromInt(legsStabilityScore) * 0.20 + Float.fromInt(armsStabilityScore) * 0.10;
-    let baseStability = Nat.min(100, Int.abs(Float.toInt(rawStability) + goldBonus + pinkBonus + rustPenalty));
+    let baseStability = Nat.min(100, Int.abs(safeFloatToInt(rawStability) + goldBonus + pinkBonus + rustPenalty));
 
     // Apply faction bonuses
     let speed = applyFactionBonus(baseSpeed, faction, #Speed);
@@ -275,29 +284,34 @@ module {
     switch (legs) {
       case (?l) {
         let lower = Text.toLowercase(l);
-        // Legendary (70-80)
-        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "ultimate terminator")) {
+        // Legendary (75-80): Only 1-of-1s
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "power stalks") or Text.contains(lower, #text "8 bit power") or Text.contains(lower, #text "cactus gold")) {
           75 + (hashText(l) % 6);
         }
-        // High speed (60-75): Rockets, super legs, power walkers
-        else if (
-          Text.contains(lower, #text "rocket") or
-          Text.contains(lower, #text "super") or
-          Text.contains(lower, #text "ultimate") or
-          Text.contains(lower, #text "power walker")
-        ) {
-          65 + (hashText(l) % 11);
+        // High (65-70): Ultimate terminator only (127 bots is rare enough)
+        else if (Text.contains(lower, #text "ultimate terminator")) {
+          67 + (hashText(l) % 4);
         }
-        // Medium-high (50-65): Power, strong, chunky
+        // Medium-high (54-58): Other ultimate variants, super legs
+        else if (
+          Text.contains(lower, #text "ultimate") or
+          Text.contains(lower, #text "super")
+        ) {
+          55 + (hashText(l) % 4);
+        }
+        // Medium (48-54): Power, strong, chunky, industrial, rockets
         else if (
           Text.contains(lower, #text "power") or
           Text.contains(lower, #text "strong") or
           Text.contains(lower, #text "chunky") or
-          Text.contains(lower, #text "spiky")
+          Text.contains(lower, #text "spiky") or
+          Text.contains(lower, #text "spike") or
+          Text.contains(lower, #text "industrial") or
+          Text.contains(lower, #text "rocket")
         ) {
-          55 + (hashText(l) % 11);
+          50 + (hashText(l) % 5);
         }
-        // Medium (40-55): Midi, bendy, cables, bird claw, flat, bone
+        // Medium-low (42-48): Midi, bendy, cables, bird claw, flat, bone, balloon
         else if (
           Text.contains(lower, #text "midi") or
           Text.contains(lower, #text "bendy") or
@@ -310,13 +324,14 @@ module {
           Text.contains(lower, #text "big") or
           Text.contains(lower, #text "cactus") or
           Text.contains(lower, #text "mech") or
-          Text.contains(lower, #text "chocolate")
+          Text.contains(lower, #text "chocolate") or
+          Text.contains(lower, #text "balloon")
         ) {
-          45 + (hashText(l) % 11);
+          44 + (hashText(l) % 5);
         }
-        // Low (30-50): Small, burnt, rust, inflatable, slender
+        // Low (35-42): Small, burnt, rust, inflatable, slender, mini
         else {
-          35 + (hashText(l) % 16);
+          37 + (hashText(l) % 6);
         };
       };
       case null { 45 }; // Default
@@ -328,54 +343,79 @@ module {
     switch (wings) {
       case (?w) {
         let lower = Text.toLowercase(w);
-        // Legendary
-        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "ultimate")) {
+        // Legendary: Only 1-of-1s
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "golden triple") or Text.contains(lower, #text "black double angel") or Text.contains(lower, #text "wings: none")) {
           75 + (hashText(w) % 6);
         }
-        // High speed (60-75): Massive engines, rockets, triangle fins
+        // High (65-70): Terminator variants only
+        else if (Text.contains(lower, #text "terminator")) {
+          67 + (hashText(w) % 4);
+        }
+        // Medium-high (55-58): Massive engines, rockets, jets, engine wings
         else if (
           Text.contains(lower, #text "massive engine") or
           Text.contains(lower, #text "rocket") or
           Text.contains(lower, #text "jet") or
-          Text.contains(lower, #text "triangle up")
+          Text.contains(lower, #text "engine wings")
         ) {
-          65 + (hashText(w) % 11);
+          56 + (hashText(w) % 3);
         }
-        // Medium-high (50-65): Power cells, large wings
+        // Medium (48-54): Power cells, triangle up, butterfly double, large angel wings
         else if (
           Text.contains(lower, #text "power cell") or
+          Text.contains(lower, #text "triangle up") or
           Text.contains(lower, #text "butterfly double") or
-          Text.contains(lower, #text "angel wings")
+          Text.contains(lower, #text "wings double") or
+          (Text.contains(lower, #text "large") and Text.contains(lower, #text "angel"))
         ) {
-          55 + (hashText(w) % 11);
+          50 + (hashText(w) % 5);
         }
-        // Medium (40-55): Standard wings, 8-bit, antenna, large wings
+        // Medium-low (42-48): Angel wings, butterfly, standard wings
         else if (
-          Text.contains(lower, #text "8 bit") or
+          Text.contains(lower, #text "angel wings") or
+          Text.contains(lower, #text "angel") or
+          Text.contains(lower, #text "butterfly") or
           Text.contains(lower, #text "bear") or
-          Text.contains(lower, #text "horn") or
-          Text.contains(lower, #text "decal") or
           Text.contains(lower, #text "antenna") or
           Text.contains(lower, #text "jointed") or
-          Text.contains(lower, #text "large") or
-          Text.contains(lower, #text "ear muff") or
+          Text.contains(lower, #text "ear muff")
+        ) {
+          44 + (hashText(w) % 5);
+        }
+        // Low (36-42): Decorative, small wings, bird, bee, bone
+        else if (
+          Text.contains(lower, #text "8 bit") or
+          Text.contains(lower, #text "horn") or
+          Text.contains(lower, #text "decal") or
           Text.contains(lower, #text "connector") or
           Text.contains(lower, #text "chain saw") or
-          Text.contains(lower, #text "game face")
+          Text.contains(lower, #text "game face") or
+          Text.contains(lower, #text "bird") or
+          Text.contains(lower, #text "bee") or
+          Text.contains(lower, #text "bone") or
+          Text.contains(lower, #text "antler") or
+          Text.contains(lower, #text "geo wing") or
+          Text.contains(lower, #text "headphone") or
+          Text.contains(lower, #text "game motoko") or
+          Text.contains(lower, #text "rainbow") or
+          Text.contains(lower, #text "wire")
         ) {
-          45 + (hashText(w) % 11);
+          38 + (hashText(w) % 5);
         }
-        // Low (30-45): Blank, burnt, decorative, inflatable
+        // Very low (30-36): Blank, inflatable, waffer
         else if (
           Text.contains(lower, #text "blank") or
           Text.contains(lower, #text "none") or
           Text.contains(lower, #text "inflatable") or
+          Text.contains(lower, #text "inflateable") or
+          Text.contains(lower, #text "infaltable") or
           Text.contains(lower, #text "lolly pop") or
-          Text.contains(lower, #text "straw")
+          Text.contains(lower, #text "straw") or
+          Text.contains(lower, #text "waffer")
         ) {
-          32 + (hashText(w) % 9);
+          32 + (hashText(w) % 5);
         } else {
-          40 + (hashText(w) % 11);
+          40 + (hashText(w) % 5);
         };
       };
       case null { 35 }; // No wings = low speed
@@ -440,43 +480,79 @@ module {
     switch (arms) {
       case (?a) {
         let lower = Text.toLowercase(a);
-        // Legendary
-        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "golden king") or Text.contains(lower, #text "murder arms gold")) {
+        // Legendary (75-80): Only 1-of-1s
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "golden king") or Text.contains(lower, #text "black king") or Text.contains(lower, #text "8 bit lazers")) {
           75 + (hashText(a) % 6);
         }
-        // High (60-75): Rockets, jets, lasers
+        // High (60-70): Ultimate variants, murder arms gold
+        else if (
+          Text.contains(lower, #text "ultimate") or
+          Text.contains(lower, #text "murder arms gold")
+        ) {
+          65 + (hashText(a) % 6);
+        }
+        // Medium-high (52-58): Rainbow, rockets with gold/special, power arms rainbow/gold
+        else if (
+          Text.contains(lower, #text "rainbow") or
+          (Text.contains(lower, #text "rocket") and Text.contains(lower, #text "gold")) or
+          (Text.contains(lower, #text "power arms") and (Text.contains(lower, #text "rainbow") or Text.contains(lower, #text "gold")))
+        ) {
+          54 + (hashText(a) % 5);
+        }
+        // Medium (46-54): Rockets, jets, lasers, power arms, chainsaws, claws
         else if (
           Text.contains(lower, #text "rocket") or
           Text.contains(lower, #text "jet") or
           Text.contains(lower, #text "lazer") or
-          Text.contains(lower, #text "rainbow")
-        ) {
-          65 + (hashText(a) % 11);
-        }
-        // Medium-high (50-65): Power arms, tech, weapons, long arms
-        else if (
           Text.contains(lower, #text "power arms") or
+          Text.contains(lower, #text "chainsaw") or
+          Text.contains(lower, #text "circular saw") or
+          Text.contains(lower, #text "power lift") or
+          Text.contains(lower, #text "claw") or
+          Text.contains(lower, #text "snipper") or
+          Text.contains(lower, #text "gripper")
+        ) {
+          49 + (hashText(a) % 6);
+        }
+        // Medium-low (40-48): Connectors, cables, long arms, mech parts
+        else if (
           Text.contains(lower, #text "8 bit") or
           Text.contains(lower, #text "connector") or
           Text.contains(lower, #text "cable") or
           Text.contains(lower, #text "wire") or
-          Text.contains(lower, #text "chainsaw") or
-          Text.contains(lower, #text "claw") or
-          Text.contains(lower, #text "snipper") or
-          Text.contains(lower, #text "gripper") or
           Text.contains(lower, #text "long arms") or
-          Text.contains(lower, #text "power lift") or
-          Text.contains(lower, #text "mechanic")
+          Text.contains(lower, #text "mechanic") or
+          Text.contains(lower, #text "large arms") or
+          Text.contains(lower, #text "shoulder") or
+          Text.contains(lower, #text "controller") or
+          Text.contains(lower, #text "murder hands") or
+          Text.contains(lower, #text "mech") or
+          Text.contains(lower, #text "long beny") or
+          Text.contains(lower, #text "golden spikes")
         ) {
-          50 + (hashText(a) % 11);
+          43 + (hashText(a) % 6);
         }
-        // Medium (40-50): Hands up, mixed hands
-        else if (Text.contains(lower, #text "hands up") or Text.contains(lower, #text "double arms")) {
-          45 + (hashText(a) % 6);
+        // Low (35-42): Hands up, mixed hands, large hands down
+        else if (
+          Text.contains(lower, #text "hands up") or
+          Text.contains(lower, #text "double arms") or
+          Text.contains(lower, #text "hands down large") or
+          Text.contains(lower, #text "large hands")
+        ) {
+          38 + (hashText(a) % 5);
         }
-        // Low (30-45): Hands down, fingers, bone
+        // Very low (32-37): Small hands down, 3 fingers, bone
+        else if (
+          Text.contains(lower, #text "hands down small") or
+          Text.contains(lower, #text "small hands") or
+          Text.contains(lower, #text "3 finger") or
+          Text.contains(lower, #text "bone")
+        ) {
+          34 + (hashText(a) % 4);
+        }
+        // Minimal (30-34): Standard hands down (DEFAULT for basic arms)
         else {
-          35 + (hashText(a) % 11);
+          31 + (hashText(a) % 4);
         };
       };
       case null { 45 };
@@ -490,41 +566,33 @@ module {
     switch (body) {
       case (?b) {
         let lower = Text.toLowercase(b);
-        // High power (60-80): Large, mega, ultimate, master
-        if (
-          Text.contains(lower, #text "mega") or
-          Text.contains(lower, #text "large") or
-          Text.contains(lower, #text "ultimate") or
-          Text.contains(lower, #text "master") or
-          Text.contains(lower, #text "super") or
-          Text.contains(lower, #text "tower") or
-          Text.contains(lower, #text "beast") or
-          Text.contains(lower, #text "golden")
-        ) {
-          65 + (hashText(b) % 16);
+        // Legendary (75-80): Only 1-of-1s
+        if (Text.contains(lower, #text "8 bit master") or Text.contains(lower, #text "double driver") or Text.contains(lower, #text "gold pets") or Text.contains(lower, #text "golden king") or Text.contains(lower, #text "master gold")) {
+          75 + (hashText(b) % 6);
         }
-        // Medium-high (50-65): Controllers, boxes, industrial
-        else if (
-          Text.contains(lower, #text "controller") or
-          Text.contains(lower, #text "battle box") or
-          Text.contains(lower, #text "command box") or
-          Text.contains(lower, #text "iron") or
-          Text.contains(lower, #text "copper")
-        ) {
-          55 + (hashText(b) % 11);
+        // High (67-70): Ultimate variants
+        else if (Text.contains(lower, #text "ultimate")) {
+          67 + (hashText(b) % 4);
         }
-        // Medium (40-55): Standard bodies
-        else if (
-          Text.contains(lower, #text "egg") or
-          Text.contains(lower, #text "game boy") or
-          Text.contains(lower, #text "frog") or
-          Text.contains(lower, #text "bee body")
-        ) {
-          45 + (hashText(b) % 11);
+        // Medium-High (55-58): Large, mega (non-controller), beast, tower, super
+        else if ((Text.contains(lower, #text "large") and not Text.contains(lower, #text "controller")) or (Text.contains(lower, #text "mega") and not Text.contains(lower, #text "controller")) or Text.contains(lower, #text "beast") or Text.contains(lower, #text "tower") or Text.contains(lower, #text "super")) {
+          55 + (hashText(b) % 4);
         }
-        // Low (30-45): Small, mini, bubble
+        // Medium (49-54): Controllers, battle/command boxes
+        else if (Text.contains(lower, #text "controller") or Text.contains(lower, #text "battle box") or Text.contains(lower, #text "command box")) {
+          49 + (hashText(b) % 6);
+        }
+        // Medium-Low (43-48): Eggs, frogs, bee body, industrial materials
+        else if (Text.contains(lower, #text "egg") or Text.contains(lower, #text "frog") or Text.contains(lower, #text "bee body") or Text.contains(lower, #text "iron") or Text.contains(lower, #text "copper") or Text.contains(lower, #text "game boy")) {
+          43 + (hashText(b) % 6);
+        }
+        // Low (37-42): Balloon, rabbit, standard heads
+        else if (Text.contains(lower, #text "balloon") or Text.contains(lower, #text "rabbit") or Text.contains(lower, #text "head") or Text.contains(lower, #text "round") or Text.contains(lower, #text "bee pink")) {
+          37 + (hashText(b) % 6);
+        }
+        // Very Low (31-36): Small, mini, tiny
         else {
-          35 + (hashText(b) % 11);
+          31 + (hashText(b) % 6);
         };
       };
       case null { 50 };
@@ -536,30 +604,33 @@ module {
     switch (arms) {
       case (?a) {
         let lower = Text.toLowercase(a);
-        // High power (60-75): Power arms, ultimate, massive
-        if (
-          Text.contains(lower, #text "power arms") or
-          Text.contains(lower, #text "ultimate") or
-          Text.contains(lower, #text "master") or
-          Text.contains(lower, #text "massive") or
-          Text.contains(lower, #text "rainbow lazer") or
-          Text.contains(lower, #text "double arms")
-        ) {
-          65 + (hashText(a) % 11);
+        // Legendary (75-80): Only 1-of-1s
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "golden king") or Text.contains(lower, #text "black king") or Text.contains(lower, #text "8 bit lazers")) {
+          75 + (hashText(a) % 6);
         }
-        // Medium (45-60): Rockets, tech arms
-        else if (
-          Text.contains(lower, #text "rocket") or
-          Text.contains(lower, #text "8 bit") or
-          Text.contains(lower, #text "connector") or
-          Text.contains(lower, #text "cable") or
-          Text.contains(lower, #text "lazer")
-        ) {
-          50 + (hashText(a) % 11);
+        // High (67-70): Ultimate, murder arms gold
+        else if (Text.contains(lower, #text "ultimate") or Text.contains(lower, #text "murder arms gold")) {
+          67 + (hashText(a) % 4);
         }
-        // Low (30-45): Basic hands
+        // Medium-High (55-58): Power arms, rainbow lazers
+        else if (Text.contains(lower, #text "power arms") or Text.contains(lower, #text "rainbow lazer")) {
+          55 + (hashText(a) % 4);
+        }
+        // Medium (49-54): Rockets, claws, massive, lazers (non-rainbow)
+        else if ((Text.contains(lower, #text "rocket") or Text.contains(lower, #text "claw") or Text.contains(lower, #text "massive") or Text.contains(lower, #text "lazer")) and not Text.contains(lower, #text "rainbow")) {
+          49 + (hashText(a) % 6);
+        }
+        // Medium-Low (43-48): Connectors, cables, mech, 8 bit
+        else if (Text.contains(lower, #text "connector") or Text.contains(lower, #text "cable") or Text.contains(lower, #text "mech") or Text.contains(lower, #text "8 bit")) {
+          43 + (hashText(a) % 6);
+        }
+        // Low (37-42): Hands up variants, large hands
+        else if (Text.contains(lower, #text "hands up") or Text.contains(lower, #text "large hand")) {
+          37 + (hashText(a) % 6);
+        }
+        // Very Low (31-36): Basic hands down, small
         else {
-          35 + (hashText(a) % 11);
+          31 + (hashText(a) % 6);
         };
       };
       case null { 45 };
@@ -571,27 +642,29 @@ module {
     switch (legs) {
       case (?l) {
         let lower = Text.toLowercase(l);
-        // High (55-70): Power, strong, chunky
-        if (
-          Text.contains(lower, #text "power") or
-          Text.contains(lower, #text "strong") or
-          Text.contains(lower, #text "chunky") or
-          Text.contains(lower, #text "ultimate") or
-          Text.contains(lower, #text "super")
-        ) {
-          60 + (hashText(l) % 11);
+        // Legendary (75-80): Only 1-of-1s
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "golden twin") or Text.contains(lower, #text "tri eye gold") or Text.contains(lower, #text "gamers")) {
+          75 + (hashText(l) % 6);
         }
-        // Medium (40-55)
-        else if (
-          Text.contains(lower, #text "midi") or
-          Text.contains(lower, #text "8 bit") or
-          Text.contains(lower, #text "cable")
-        ) {
-          45 + (hashText(l) % 11);
+        // High (67-70): Ultimate variants
+        else if (Text.contains(lower, #text "ultimate")) {
+          67 + (hashText(l) % 4);
         }
-        // Low (30-45)
+        // Medium-High (55-58): Strong, chunky, super
+        else if (Text.contains(lower, #text "strong") or Text.contains(lower, #text "chunky") or Text.contains(lower, #text "super")) {
+          55 + (hashText(l) % 4);
+        }
+        // Medium (49-54): Industrial, rockets, cables, bendy
+        else if (Text.contains(lower, #text "industrial") or Text.contains(lower, #text "rocket") or Text.contains(lower, #text "cable") or Text.contains(lower, #text "bendy")) {
+          49 + (hashText(l) % 6);
+        }
+        // Medium-Low (43-48): Midi, balloon, 8 bit
+        else if (Text.contains(lower, #text "midi") or Text.contains(lower, #text "balloon") or Text.contains(lower, #text "8 bit")) {
+          43 + (hashText(l) % 6);
+        }
+        // Low (37-42): Small, burnt, mini
         else {
-          35 + (hashText(l) % 11);
+          37 + (hashText(l) % 6);
         };
       };
       case null { 45 };
@@ -603,26 +676,33 @@ module {
     switch (wings) {
       case (?w) {
         let lower = Text.toLowercase(w);
-        // High (55-70): Massive engines, power cells
-        if (
-          Text.contains(lower, #text "massive engine") or
-          Text.contains(lower, #text "power cell") or
-          Text.contains(lower, #text "ultimate") or
-          Text.contains(lower, #text "golden")
-        ) {
-          60 + (hashText(w) % 11);
+        // Legendary (75-80): Only 1-of-1s
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "golden triple") or Text.contains(lower, #text "black double angel")) {
+          75 + (hashText(w) % 6);
         }
-        // Medium (40-55)
-        else if (
-          Text.contains(lower, #text "rocket") or
-          Text.contains(lower, #text "8 bit") or
-          Text.contains(lower, #text "angel")
-        ) {
-          45 + (hashText(w) % 11);
+        // High (67-70): Massive engines, power cells
+        else if (Text.contains(lower, #text "massive engine") or Text.contains(lower, #text "power cell")) {
+          67 + (hashText(w) % 4);
         }
-        // Low (30-45)
+        // Medium-High (55-58): Rockets, jets, ultimates
+        else if (Text.contains(lower, #text "rocket") or Text.contains(lower, #text "jet") or Text.contains(lower, #text "ultimate") or Text.contains(lower, #text "engine wing")) {
+          55 + (hashText(w) % 4);
+        }
+        // Medium (49-54): Terminator, triangle up, double wings
+        else if (Text.contains(lower, #text "terminator") or Text.contains(lower, #text "triangle up") or Text.contains(lower, #text "double")) {
+          49 + (hashText(w) % 6);
+        }
+        // Medium-Low (43-48): Angels, butterfly, antennas
+        else if (Text.contains(lower, #text "angel") or Text.contains(lower, #text "butterfly") or Text.contains(lower, #text "antenna") or Text.contains(lower, #text "bear")) {
+          43 + (hashText(w) % 6);
+        }
+        // Low (37-42): 8 bit, decorative
+        else if (Text.contains(lower, #text "8 bit") or Text.contains(lower, #text "bird") or Text.contains(lower, #text "bee") or Text.contains(lower, #text "bone")) {
+          37 + (hashText(w) % 6);
+        }
+        // Very Low (31-36): Blank, inflatable
         else {
-          35 + (hashText(w) % 11);
+          31 + (hashText(w) % 6);
         };
       };
       case null { 40 };
@@ -636,38 +716,33 @@ module {
     switch (legs) {
       case (?l) {
         let lower = Text.toLowercase(l);
-        // High accel (60-80): Super fast, spiky, spring-like
-        if (
-          Text.contains(lower, #text "super fast") or
-          Text.contains(lower, #text "super leg") or
-          Text.contains(lower, #text "spiky") or
-          Text.contains(lower, #text "bird claw") or
-          Text.contains(lower, #text "frog") or
-          Text.contains(lower, #text "ultimate")
-        ) {
-          65 + (hashText(l) % 16);
+        // Legendary (75-80): Only 1-of-1s
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "4 power stalks") or Text.contains(lower, #text "8 bit power") or Text.contains(lower, #text "cactus gold")) {
+          75 + (hashText(l) % 6);
         }
-        // Medium (45-60): Bendy, midi, agile
-        else if (
-          Text.contains(lower, #text "bendy") or
-          Text.contains(lower, #text "midi") or
-          Text.contains(lower, #text "cable") or
-          Text.contains(lower, #text "power") or
-          Text.contains(lower, #text "8 bit")
-        ) {
-          50 + (hashText(l) % 11);
+        // High (67-70): Ultimate, super fast
+        else if (Text.contains(lower, #text "ultimate") or Text.contains(lower, #text "super fast")) {
+          67 + (hashText(l) % 4);
         }
-        // Low (30-45): Chunky, large, heavy
-        else if (
-          Text.contains(lower, #text "chunky") or
-          Text.contains(lower, #text "large") or
-          Text.contains(lower, #text "burnt") or
-          Text.contains(lower, #text "rust") or
-          Text.contains(lower, #text "inflatable")
-        ) {
-          35 + (hashText(l) % 11);
-        } else {
-          45 + (hashText(l) % 11);
+        // Medium-High (55-58): Super legs, spiky, bird claw, frog
+        else if (Text.contains(lower, #text "super leg") or Text.contains(lower, #text "spiky") or Text.contains(lower, #text "bird claw") or Text.contains(lower, #text "frog")) {
+          55 + (hashText(l) % 4);
+        }
+        // Medium (49-54): Bendy, midi, cables - agile movement
+        else if (Text.contains(lower, #text "bendy") or Text.contains(lower, #text "midi") or Text.contains(lower, #text "cable")) {
+          49 + (hashText(l) % 6);
+        }
+        // Medium-Low (43-48): Power, 8 bit, rockets
+        else if (Text.contains(lower, #text "power") or Text.contains(lower, #text "8 bit") or Text.contains(lower, #text "rocket")) {
+          43 + (hashText(l) % 6);
+        }
+        // Low (37-42): Chunky, large, heavy legs (slow acceleration)
+        else if (Text.contains(lower, #text "chunky") or Text.contains(lower, #text "large") or Text.contains(lower, #text "burnt") or Text.contains(lower, #text "rust")) {
+          37 + (hashText(l) % 6);
+        }
+        // Very Low (31-36): Small, balloon, inflatable
+        else {
+          31 + (hashText(l) % 6);
         };
       };
       case null { 45 };
@@ -679,27 +754,33 @@ module {
     switch (arms) {
       case (?a) {
         let lower = Text.toLowercase(a);
-        // High (55-70): Lasers, rockets, quick thrust
-        if (
-          Text.contains(lower, #text "lazer") or
-          Text.contains(lower, #text "rainbow") or
-          Text.contains(lower, #text "rocket up") or
-          Text.contains(lower, #text "power jet") or
-          Text.contains(lower, #text "chainsaw")
-        ) {
-          60 + (hashText(a) % 11);
+        // Legendary (75-80): Only 1-of-1s
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "golden king") or Text.contains(lower, #text "black king") or Text.contains(lower, #text "8 bit lazers")) {
+          75 + (hashText(a) % 6);
         }
-        // Medium (40-55)
-        else if (
-          Text.contains(lower, #text "claw") or
-          Text.contains(lower, #text "power arms") or
-          Text.contains(lower, #text "8 bit")
-        ) {
-          45 + (hashText(a) % 11);
+        // High (67-70): Ultimate, murder arms gold
+        else if (Text.contains(lower, #text "ultimate") or Text.contains(lower, #text "murder arms gold")) {
+          67 + (hashText(a) % 4);
         }
-        // Low (30-45)
+        // Medium-High (55-58): Rainbow lazers, power jets - quick thrust
+        else if (Text.contains(lower, #text "rainbow lazer") or Text.contains(lower, #text "power jet")) {
+          55 + (hashText(a) % 4);
+        }
+        // Medium (49-54): Rockets, lazers, chainsaws
+        else if ((Text.contains(lower, #text "rocket") or Text.contains(lower, #text "lazer") or Text.contains(lower, #text "chainsaw")) and not Text.contains(lower, #text "rainbow")) {
+          49 + (hashText(a) % 6);
+        }
+        // Medium-Low (43-48): Claws, power arms, connectors
+        else if (Text.contains(lower, #text "claw") or Text.contains(lower, #text "power arms") or Text.contains(lower, #text "connector") or Text.contains(lower, #text "8 bit")) {
+          43 + (hashText(a) % 6);
+        }
+        // Low (37-42): Hands up variants
+        else if (Text.contains(lower, #text "hands up") or Text.contains(lower, #text "large hand")) {
+          37 + (hashText(a) % 6);
+        }
+        // Very Low (31-36): Basic hands
         else {
-          35 + (hashText(a) % 11);
+          31 + (hashText(a) % 6);
         };
       };
       case null { 45 };
@@ -711,26 +792,33 @@ module {
     switch (wings) {
       case (?w) {
         let lower = Text.toLowercase(w);
-        // High (55-70): Rockets, engines, quick thrust
-        if (
-          Text.contains(lower, #text "rocket") or
-          Text.contains(lower, #text "massive engine") or
-          Text.contains(lower, #text "power cell") or
-          Text.contains(lower, #text "triangle up")
-        ) {
-          60 + (hashText(w) % 11);
+        // Legendary (75-80): Only 1-of-1s
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "golden triple") or Text.contains(lower, #text "black double angel")) {
+          75 + (hashText(w) % 6);
         }
-        // Medium (40-55)
-        else if (
-          Text.contains(lower, #text "butterfly") or
-          Text.contains(lower, #text "angel") or
-          Text.contains(lower, #text "8 bit")
-        ) {
-          45 + (hashText(w) % 11);
+        // High (67-70): Massive engines, power cells - highest thrust
+        else if (Text.contains(lower, #text "massive engine") or Text.contains(lower, #text "power cell")) {
+          67 + (hashText(w) % 4);
         }
-        // Low (30-45)
+        // Medium-High (55-58): Rockets, jets, triangle up - quick acceleration
+        else if (Text.contains(lower, #text "rocket") or Text.contains(lower, #text "jet") or Text.contains(lower, #text "triangle up")) {
+          55 + (hashText(w) % 4);
+        }
+        // Medium (49-54): Ultimates, terminators, double wings
+        else if (Text.contains(lower, #text "ultimate") or Text.contains(lower, #text "terminator") or Text.contains(lower, #text "double")) {
+          49 + (hashText(w) % 6);
+        }
+        // Medium-Low (43-48): Butterfly, angels, antennas - moderate flap acceleration
+        else if (Text.contains(lower, #text "butterfly") or Text.contains(lower, #text "angel") or Text.contains(lower, #text "antenna") or Text.contains(lower, #text "bear")) {
+          43 + (hashText(w) % 6);
+        }
+        // Low (37-42): 8 bit, bird, decorative
+        else if (Text.contains(lower, #text "8 bit") or Text.contains(lower, #text "bird") or Text.contains(lower, #text "bee") or Text.contains(lower, #text "bone")) {
+          37 + (hashText(w) % 6);
+        }
+        // Very Low (31-36): Blank, inflatable - no thrust
         else {
-          35 + (hashText(w) % 11);
+          31 + (hashText(w) % 6);
         };
       };
       case null { 40 };
@@ -742,34 +830,37 @@ module {
     switch (body) {
       case (?b) {
         let lower = Text.toLowercase(b);
-        // Light/agile (60-75)
-        if (
-          Text.contains(lower, #text "egg") or
-          Text.contains(lower, #text "bubble") or
-          Text.contains(lower, #text "balloon") or
-          Text.contains(lower, #text "mini") or
-          Text.contains(lower, #text "small")
-        ) {
-          65 + (hashText(b) % 11);
+        // Legendary (75-80): Only 1-of-1s (but inverse - light bodies score high)
+        if (Text.contains(lower, #text "8 bit master") or Text.contains(lower, #text "double driver") or Text.contains(lower, #text "gold pets") or Text.contains(lower, #text "golden king") or Text.contains(lower, #text "master gold")) {
+          75 + (hashText(b) % 6);
         }
-        // Medium (45-60)
-        else if (
-          Text.contains(lower, #text "game boy") or
-          Text.contains(lower, #text "ipod") or
-          Text.contains(lower, #text "frog")
-        ) {
-          50 + (hashText(b) % 11);
+        // High (67-70): Eggs, balloons - very light for quick acceleration
+        else if (Text.contains(lower, #text "egg") or Text.contains(lower, #text "balloon") or Text.contains(lower, #text "bubble")) {
+          67 + (hashText(b) % 4);
         }
-        // Heavy (30-45)
-        else if (
-          Text.contains(lower, #text "mega") or
-          Text.contains(lower, #text "tower") or
-          Text.contains(lower, #text "beast") or
-          Text.contains(lower, #text "massive")
-        ) {
-          35 + (hashText(b) % 11);
-        } else {
-          45 + (hashText(b) % 11);
+        // Medium-High (55-58): Small, mini, game boy - light bodies
+        else if (Text.contains(lower, #text "small") or Text.contains(lower, #text "mini") or Text.contains(lower, #text "game boy")) {
+          55 + (hashText(b) % 4);
+        }
+        // Medium (49-54): Frogs, bee bodies, rabbits - moderate weight
+        else if (Text.contains(lower, #text "frog") or Text.contains(lower, #text "bee body") or Text.contains(lower, #text "rabbit") or Text.contains(lower, #text "head")) {
+          49 + (hashText(b) % 6);
+        }
+        // Medium-Low (43-48): Controllers, boxes - medium weight slows acceleration
+        else if (Text.contains(lower, #text "controller") or Text.contains(lower, #text "battle box") or Text.contains(lower, #text "command box")) {
+          43 + (hashText(b) % 6);
+        }
+        // Low (37-42): Large, mega (non-controller), beast - heavy
+        else if ((Text.contains(lower, #text "large") and not Text.contains(lower, #text "controller")) or (Text.contains(lower, #text "mega") and not Text.contains(lower, #text "controller")) or Text.contains(lower, #text "beast") or Text.contains(lower, #text "tower")) {
+          37 + (hashText(b) % 6);
+        }
+        // Very Low (31-36): Ultimate, super - heaviest bodies slow acceleration
+        else if (Text.contains(lower, #text "ultimate") or Text.contains(lower, #text "super")) {
+          31 + (hashText(b) % 6);
+        }
+        // Default Medium (45-50)
+        else {
+          45 + (hashText(b) % 6);
         };
       };
       case null { 50 };
@@ -783,56 +874,33 @@ module {
     switch (driver) {
       case (?d) {
         let lower = Text.toLowercase(d);
-        // High stability (60-80): Professional gear, focused
-        if (
-          Text.contains(lower, #text "metal goggles") or
-          Text.contains(lower, #text "helmet") or
-          Text.contains(lower, #text "visor") or
-          Text.contains(lower, #text "ultimate") or
-          Text.contains(lower, #text "master") or
-          Text.contains(lower, #text "diamond eyes")
-        ) {
-          65 + (hashText(d) % 16);
+        // Legendary (75-80): Only 1-of-1s
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "golden twin") or Text.contains(lower, #text "tri eye gold") or Text.contains(lower, #text "gamers")) {
+          75 + (hashText(d) % 6);
         }
-        // Medium-high (50-65): Gaming focus
-        else if (
-          Text.contains(lower, #text "headphones") or
-          Text.contains(lower, #text "game boy") or
-          Text.contains(lower, #text "pixel") or
-          Text.contains(lower, #text "snes") or
-          Text.contains(lower, #text "gamer")
-        ) {
-          55 + (hashText(d) % 11);
+        // High (67-70): Ultimate, helmets, visors - best focus
+        else if (Text.contains(lower, #text "ultimate") or Text.contains(lower, #text "helmet") or Text.contains(lower, #text "visor")) {
+          67 + (hashText(d) % 4);
         }
-        // Medium (40-55): Standard drivers, colored, hair styles
-        else if (
-          Text.contains(lower, #text "blue") or
-          Text.contains(lower, #text "green") or
-          Text.contains(lower, #text "yellow") or
-          Text.contains(lower, #text "purple") or
-          Text.contains(lower, #text "tounge") or
-          Text.contains(lower, #text "rabbit") or
-          Text.contains(lower, #text "hair") or
-          Text.contains(lower, #text "metal open") or
-          Text.contains(lower, #text "red") or
-          Text.contains(lower, #text "calculator") or
-          Text.contains(lower, #text "gold colour") or
-          Text.contains(lower, #text "circuits") or
-          Text.contains(lower, #text "tri eye") or
-          Text.contains(lower, #text "twin")
-        ) {
-          45 + (hashText(d) % 11);
+        // Medium-High (55-58): Metal goggles, diamond eyes - professional gear
+        else if (Text.contains(lower, #text "metal goggles") or Text.contains(lower, #text "diamond eyes")) {
+          55 + (hashText(d) % 4);
         }
-        // Low (30-45): Impaired, distracted
-        else if (
-          Text.contains(lower, #text "dead eyes") or
-          Text.contains(lower, #text "eyes closed") or
-          Text.contains(lower, #text "big eyes") or
-          Text.contains(lower, #text "glitch")
-        ) {
-          35 + (hashText(d) % 11);
-        } else {
-          45 + (hashText(d) % 11);
+        // Medium (49-54): Headphones, game boy, pixels - gaming focus
+        else if (Text.contains(lower, #text "headphones") or Text.contains(lower, #text "game boy") or Text.contains(lower, #text "pixel") or Text.contains(lower, #text "snes") or Text.contains(lower, #text "gamer")) {
+          49 + (hashText(d) % 6);
+        }
+        // Medium-Low (43-48): Standard colors, hair, tounge, rabbits
+        else if (Text.contains(lower, #text "blue") or Text.contains(lower, #text "green") or Text.contains(lower, #text "yellow") or Text.contains(lower, #text "purple") or Text.contains(lower, #text "tounge") or Text.contains(lower, #text "rabbit") or Text.contains(lower, #text "hair") or Text.contains(lower, #text "red") or Text.contains(lower, #text "gold")) {
+          43 + (hashText(d) % 6);
+        }
+        // Low (37-42): Eyes closed, dead eyes, big eyes - impaired vision
+        else if (Text.contains(lower, #text "eyes closed") or Text.contains(lower, #text "dead eyes") or Text.contains(lower, #text "big eyes") or Text.contains(lower, #text "glitch")) {
+          37 + (hashText(d) % 6);
+        }
+        // Very Low (31-36): Remaining
+        else {
+          31 + (hashText(d) % 6);
         };
       };
       case null { 45 };
@@ -844,37 +912,33 @@ module {
     switch (body) {
       case (?b) {
         let lower = Text.toLowercase(b);
-        // High stability (60-75): Wide, boxy, stable bases
-        if (
-          Text.contains(lower, #text "battle box") or
-          Text.contains(lower, #text "command box") or
-          Text.contains(lower, #text "mega controller") or
-          Text.contains(lower, #text "beast") or
-          Text.contains(lower, #text "iron") or
-          Text.contains(lower, #text "ultimate")
-        ) {
-          65 + (hashText(b) % 11);
+        // Legendary (75-80): Only 1-of-1s
+        if (Text.contains(lower, #text "8 bit master") or Text.contains(lower, #text "double driver") or Text.contains(lower, #text "gold pets") or Text.contains(lower, #text "golden king") or Text.contains(lower, #text "master gold")) {
+          75 + (hashText(b) % 6);
         }
-        // Medium (45-60)
-        else if (
-          Text.contains(lower, #text "egg") or
-          Text.contains(lower, #text "round") or
-          Text.contains(lower, #text "frog") or
-          Text.contains(lower, #text "rabbit")
-        ) {
-          50 + (hashText(b) % 11);
+        // High (67-70): Ultimate - most stable design
+        else if (Text.contains(lower, #text "ultimate")) {
+          67 + (hashText(b) % 4);
         }
-        // Low (30-45): Wobbly, tall, unbalanced
-        else if (
-          Text.contains(lower, #text "balloon") or
-          Text.contains(lower, #text "bubble") or
-          Text.contains(lower, #text "tower") or
-          Text.contains(lower, #text "spiky egg") or
-          Text.contains(lower, #text "one tooth")
-        ) {
-          35 + (hashText(b) % 11);
-        } else {
-          45 + (hashText(b) % 11);
+        // Medium-High (55-58): Battle/command boxes, mega controllers - wide stable bases
+        else if (Text.contains(lower, #text "battle box") or Text.contains(lower, #text "command box") or Text.contains(lower, #text "mega controller") or Text.contains(lower, #text "beast")) {
+          55 + (hashText(b) % 4);
+        }
+        // Medium (49-54): Controllers, eggs, round - moderate stability
+        else if (Text.contains(lower, #text "controller") or Text.contains(lower, #text "egg") or Text.contains(lower, #text "round") or Text.contains(lower, #text "iron")) {
+          49 + (hashText(b) % 6);
+        }
+        // Medium-Low (43-48): Frogs, rabbits, bee bodies - decent balance
+        else if (Text.contains(lower, #text "frog") or Text.contains(lower, #text "rabbit") or Text.contains(lower, #text "bee body") or Text.contains(lower, #text "game boy")) {
+          43 + (hashText(b) % 6);
+        }
+        // Low (37-42): Balloon, bubble, tower - wobbly/unstable
+        else if (Text.contains(lower, #text "balloon") or Text.contains(lower, #text "bubble") or Text.contains(lower, #text "tower") or Text.contains(lower, #text "spiky egg")) {
+          37 + (hashText(b) % 6);
+        }
+        // Very Low (31-36): Small, mini - unstable
+        else {
+          31 + (hashText(b) % 6);
         };
       };
       case null { 50 };
@@ -886,37 +950,33 @@ module {
     switch (legs) {
       case (?l) {
         let lower = Text.toLowercase(l);
-        // High (55-70): Strong, stable stance
-        if (
-          Text.contains(lower, #text "strong") or
-          Text.contains(lower, #text "power") or
-          Text.contains(lower, #text "chunky") or
-          Text.contains(lower, #text "industrial") or
-          Text.contains(lower, #text "bird claw") or
-          Text.contains(lower, #text "ultimate")
-        ) {
-          60 + (hashText(l) % 11);
+        // Legendary (75-80): Only 1-of-1s
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "4 power stalks") or Text.contains(lower, #text "8 bit power") or Text.contains(lower, #text "cactus gold")) {
+          75 + (hashText(l) % 6);
         }
-        // Medium (40-55)
-        else if (
-          Text.contains(lower, #text "midi") or
-          Text.contains(lower, #text "8 bit") or
-          Text.contains(lower, #text "cable") or
-          Text.contains(lower, #text "bendy")
-        ) {
-          45 + (hashText(l) % 11);
+        // High (67-70): Ultimate - best stability
+        else if (Text.contains(lower, #text "ultimate")) {
+          67 + (hashText(l) % 4);
         }
-        // Low (30-45): Unstable
-        else if (
-          Text.contains(lower, #text "small") or
-          Text.contains(lower, #text "balloon") or
-          Text.contains(lower, #text "inflatable") or
-          Text.contains(lower, #text "burnt") or
-          Text.contains(lower, #text "slender")
-        ) {
-          35 + (hashText(l) % 11);
-        } else {
-          45 + (hashText(l) % 11);
+        // Medium-High (55-58): Strong, chunky, industrial - stable stance
+        else if (Text.contains(lower, #text "strong") or Text.contains(lower, #text "chunky") or Text.contains(lower, #text "industrial") or Text.contains(lower, #text "bird claw")) {
+          55 + (hashText(l) % 4);
+        }
+        // Medium (49-54): Power, super, rockets - decent stability
+        else if (Text.contains(lower, #text "power") or Text.contains(lower, #text "super") or Text.contains(lower, #text "rocket")) {
+          49 + (hashText(l) % 6);
+        }
+        // Medium-Low (43-48): Midi, cables, bendy, 8 bit - moderate stability
+        else if (Text.contains(lower, #text "midi") or Text.contains(lower, #text "cable") or Text.contains(lower, #text "bendy") or Text.contains(lower, #text "8 bit")) {
+          43 + (hashText(l) % 6);
+        }
+        // Low (37-42): Small, balloon, burnt - unstable
+        else if (Text.contains(lower, #text "small") or Text.contains(lower, #text "balloon") or Text.contains(lower, #text "burnt") or Text.contains(lower, #text "inflatable")) {
+          37 + (hashText(l) % 6);
+        }
+        // Very Low (31-36): Remaining unstable types
+        else {
+          31 + (hashText(l) % 6);
         };
       };
       case null { 45 };
@@ -928,26 +988,33 @@ module {
     switch (arms) {
       case (?a) {
         let lower = Text.toLowercase(a);
-        // High (50-65): Grippers, stabilizers
-        if (
-          Text.contains(lower, #text "power arms") or
-          Text.contains(lower, #text "gripper") or
-          Text.contains(lower, #text "claw") or
-          Text.contains(lower, #text "strong")
-        ) {
-          55 + (hashText(a) % 11);
+        // Legendary (75-80): Only 1-of-1s
+        if (Text.contains(lower, #text "master gold") or Text.contains(lower, #text "golden king") or Text.contains(lower, #text "black king") or Text.contains(lower, #text "8 bit lazers")) {
+          75 + (hashText(a) % 6);
         }
-        // Medium (40-55)
-        else if (
-          Text.contains(lower, #text "8 bit") or
-          Text.contains(lower, #text "connector") or
-          Text.contains(lower, #text "hands up")
-        ) {
-          45 + (hashText(a) % 11);
+        // High (67-70): Ultimate, murder arms gold
+        else if (Text.contains(lower, #text "ultimate") or Text.contains(lower, #text "murder arms gold")) {
+          67 + (hashText(a) % 4);
         }
-        // Low (30-45)
+        // Medium-High (55-58): Power arms, grippers, claws - balance assistance
+        else if (Text.contains(lower, #text "power arms") or Text.contains(lower, #text "gripper") or Text.contains(lower, #text "claw") or Text.contains(lower, #text "strong")) {
+          55 + (hashText(a) % 4);
+        }
+        // Medium (49-54): Connectors, cables, rockets - moderate balance help
+        else if (Text.contains(lower, #text "connector") or Text.contains(lower, #text "cable") or Text.contains(lower, #text "rocket") or Text.contains(lower, #text "mech")) {
+          49 + (hashText(a) % 6);
+        }
+        // Medium-Low (43-48): 8 bit, hands up - some stability
+        else if (Text.contains(lower, #text "8 bit") or Text.contains(lower, #text "hands up") or Text.contains(lower, #text "large hand")) {
+          43 + (hashText(a) % 6);
+        }
+        // Low (37-42): Hands down variants
+        else if (Text.contains(lower, #text "hands down")) {
+          37 + (hashText(a) % 6);
+        }
+        // Very Low (31-36): Basic arms - minimal balance help
         else {
-          35 + (hashText(a) % 11);
+          31 + (hashText(a) % 6);
         };
       };
       case null { 45 };
@@ -1159,7 +1226,16 @@ module {
   public class RacingStatsManager(
     initStats : Map.Map<Nat, PokedBotRacingStats>,
     initActiveUpgrades : Map.Map<Nat, UpgradeSession>,
-    statsManager : { getNFTMetadata : (Nat) -> ?[(Text, Text)] },
+    statsManager : {
+      getNFTMetadata : (Nat) -> ?[(Text, Text)];
+      getPrecomputedStats : (Nat) -> ?{
+        speed : Nat;
+        powerCore : Nat;
+        acceleration : Nat;
+        stability : Nat;
+        faction : FactionType;
+      };
+    },
   ) {
     // Map.Map to store racing stats by token index - stable across upgrades
     private let stats = initStats;
@@ -1326,25 +1402,62 @@ module {
       acceleration : Nat;
       stability : Nat;
     } {
-      // Get metadata from statsManager
-      let metadata = statsManager.getNFTMetadata(tokenIndex);
-
-      switch (metadata) {
-        case (?traits) {
-          // Get faction (needed for stat derivation)
-          let faction = deriveFactionFromMetadata(traits);
-          deriveStatsFromMetadata(traits, faction);
+      // First, try to get precomputed stats (fast, no string operations!)
+      switch (statsManager.getPrecomputedStats(tokenIndex)) {
+        case (?precomputed) {
+          return {
+            speed = precomputed.speed;
+            powerCore = precomputed.powerCore;
+            acceleration = precomputed.acceleration;
+            stability = precomputed.stability;
+          };
         };
-        case null {
-          // Fallback to token index derivation
-          let mod = tokenIndex % 100;
-          let faction = if (mod < 5) { #GodClass } else if (mod < 15) {
-            #Master;
-          } else if (mod < 35) {
-            #WildBot;
-          } else if (mod < 60) { #EntertainmentBot } else { #BattleBot };
+        case (null) {
+          // Fallback: derive from metadata (slow, for backwards compatibility)
+          let metadata = statsManager.getNFTMetadata(tokenIndex);
 
-          deriveStatsFromTokenIndex(tokenIndex, faction);
+          switch (metadata) {
+            case (?traits) {
+              // Get faction (needed for stat derivation)
+              let faction = deriveFactionFromMetadata(traits);
+              deriveStatsFromMetadata(traits, faction);
+            };
+            case null {
+              // Double fallback: token index derivation
+              let mod = tokenIndex % 100;
+              let faction = if (mod < 5) { #GodClass } else if (mod < 15) {
+                #Master;
+              } else if (mod < 35) {
+                #WildBot;
+              } else if (mod < 60) { #EntertainmentBot } else { #BattleBot };
+
+              deriveStatsFromTokenIndex(tokenIndex, faction);
+            };
+          };
+        };
+      };
+    };
+
+    // Get faction from precomputed stats or derive from metadata
+    public func getFaction(tokenIndex : Nat) : FactionType {
+      // First, try precomputed stats
+      switch (statsManager.getPrecomputedStats(tokenIndex)) {
+        case (?precomputed) { precomputed.faction };
+        case (null) {
+          // Fallback: derive from metadata
+          let metadata = statsManager.getNFTMetadata(tokenIndex);
+          switch (metadata) {
+            case (?traits) { deriveFactionFromMetadata(traits) };
+            case (null) {
+              // Double fallback: derive from token index
+              let mod = tokenIndex % 100;
+              if (mod < 5) { #GodClass } else if (mod < 15) {
+                #Master;
+              } else if (mod < 35) {
+                #WildBot;
+              } else if (mod < 60) { #EntertainmentBot } else { #BattleBot };
+            };
+          };
         };
       };
     };
