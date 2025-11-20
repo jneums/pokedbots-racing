@@ -1167,8 +1167,8 @@ module {
           Text.contains(bg, #text "yellow") or
           Text.contains(bg, #text "bones")
         ) {
-          #WastelandSand;
-        };
+          #WastelandSand
+        }
         // Cool/tech/metallic colors → MetalRoads (highways/cities)
         else if (
           Text.contains(bg, #text "blue") or
@@ -1177,8 +1177,8 @@ module {
           Text.contains(bg, #text "gray") or
           Text.contains(bg, #text "teal")
         ) {
-          #MetalRoads;
-        };
+          #MetalRoads
+        }
         // Dark/space/natural colors → ScrapHeaps (junkyards)
         else if (
           Text.contains(bg, #text "black") or
@@ -1187,16 +1187,16 @@ module {
           Text.contains(bg, #text "stars") or
           Text.contains(bg, #text "gold")
         ) {
-          #ScrapHeaps;
-        };
+          #ScrapHeaps
+        }
         // Fallback (shouldn't happen with 26 known values)
         else {
           let hash = hashText(bg);
           let choice = hash % 3;
           if (choice == 0) { #ScrapHeaps } else if (choice == 1) { #MetalRoads } else {
-            #WastelandSand;
-          };
-        };
+            #WastelandSand
+          }
+        }
       };
       case null {
         // Fallback: hash all metadata keys for deterministic variety

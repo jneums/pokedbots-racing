@@ -54,8 +54,10 @@ import RacingSponsorRace "tools/racing_sponsor_race";
 // Import Stats module for NFT metadata
 import Stats "Stats";
 
-// Import Racing modules
-import Racing "Racing";
+// Import Racing modules (new architecture)
+import RacingSimulator "RacingSimulator";
+import PokedBotsGarage "PokedBotsGarage";
+// import Racing "Racing"; // REMOVED: No longer needed after migration to new architecture
 import RaceCalendar "RaceCalendar";
 import Leaderboard "Leaderboard";
 import ExtIntegration "ExtIntegration";
@@ -63,6 +65,125 @@ import IcpLedger "IcpLedger";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
 
+// MIGRATION FUNCTION - COMMENTED OUT (Already applied during initial deployment)
+// Keep for reference in case we need to understand the upgrade path
+/*
+(
+  with migration = func(
+    old_state : {
+      stable_races : Map.Map<Nat, {
+        raceId : Nat;
+        name : Text;
+        distance : Nat;
+        terrain : RacingSimulator.Terrain;
+        raceClass : RacingSimulator.RaceClass;
+        entryFee : Nat;
+        maxEntries : Nat;
+        startTime : Int;
+        duration : Nat;
+        entryDeadline : Int;
+        createdAt : Int;
+        entries : [{
+          tokenIndex : Nat;  // OLD: tokenIndex
+          owner : Principal;
+          entryFee : Nat;
+          enteredAt : Int;
+        }];
+        status : RacingSimulator.RaceStatus;
+        results : ?[{  // OLD: RaceResult with tokenIndex
+          tokenIndex : Nat;
+          owner : Principal;
+          position : Nat;
+          finalTime : Float;
+          prizeAmount : Nat;
+        }];
+        prizePool : Nat;
+        silentKlanTax : Nat;  // OLD: was called silentKlanTax, now platformTax
+        sponsors : [RacingSimulator.Sponsor];
+      }>;
+      stable_current_season_id : Nat;
+      stable_current_month_id : Nat;
+      stable_timer_state : TT.State;
+    }
+  ) : {
+    stable_races : Map.Map<Nat, RacingSimulator.Race>;
+  } {
+    // Migrate races: convert tokenIndex to nftId (Text) in entries and results
+    let new_races = Map.new<Nat, RacingSimulator.Race>();
+    
+    for ((raceId, oldRace) in Map.entries(old_state.stable_races)) {
+      // Convert old entries to new entries (tokenIndex -> nftId)
+      let newEntries = Array.map<
+        { tokenIndex : Nat; owner : Principal; entryFee : Nat; enteredAt : Int },
+        RacingSimulator.RaceEntry
+      >(
+        oldRace.entries,
+        func(oldEntry) : RacingSimulator.RaceEntry {
+          {
+            nftId = Nat.toText(oldEntry.tokenIndex);  // Convert Nat to Text
+            owner = oldEntry.owner;
+            entryFee = oldEntry.entryFee;
+            enteredAt = oldEntry.enteredAt;
+          }
+        }
+      );
+      
+      // Convert old results to new results (tokenIndex -> nftId)
+      let newResults : ?[RacingSimulator.RaceResult] = switch (oldRace.results) {
+        case (null) { null };
+        case (?oldResults) {
+          ?Array.map<
+            { tokenIndex : Nat; owner : Principal; position : Nat; finalTime : Float; prizeAmount : Nat },
+            RacingSimulator.RaceResult
+          >(
+            oldResults,
+            func(oldResult) : RacingSimulator.RaceResult {
+              {
+                nftId = Nat.toText(oldResult.tokenIndex);  // Convert Nat to Text
+                owner = oldResult.owner;
+                position = oldResult.position;
+                finalTime = oldResult.finalTime;
+                prizeAmount = oldResult.prizeAmount;
+              }
+            }
+          );
+        };
+      };
+      
+      // Create new race with converted entries and results
+      // Note: silentKlanTax is renamed to platformTax
+      let newRace : RacingSimulator.Race = {
+        raceId = oldRace.raceId;
+        name = oldRace.name;
+        distance = oldRace.distance;
+        terrain = oldRace.terrain;
+        raceClass = oldRace.raceClass;
+        entryFee = oldRace.entryFee;
+        maxEntries = oldRace.maxEntries;
+        startTime = oldRace.startTime;
+        duration = oldRace.duration;
+        entryDeadline = oldRace.entryDeadline;
+        createdAt = oldRace.createdAt;
+        entries = newEntries;
+        status = oldRace.status;
+        results = newResults;
+        prizePool = oldRace.prizePool;
+        platformTax = oldRace.silentKlanTax;  // Rename: silentKlanTax -> platformTax
+        sponsors = oldRace.sponsors;
+      };
+      
+      Map.set(new_races, Map.nhash, raceId, newRace);
+    };
+    
+    // Note: stable_current_season_id, stable_current_month_id, and stable_timer_state
+    // are intentionally discarded as they're no longer used in the new architecture
+    
+    {
+      stable_races = new_races;
+    }
+  }
+)
+*/
 shared ({ caller = deployer }) persistent actor class McpServer(
   args : ?{
     owner : ?Principal;
@@ -83,14 +204,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   var stable_trait_schema : Stats.TraitSchema = [];
 
   // Stable state for pre-computed base stats (speed, power, accel, stability, faction)
-  let stable_base_stats = Map.new<Nat, { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat; faction : Racing.FactionType }>();
+  let stable_base_stats = Map.new<Nat, { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat; faction : PokedBotsGarage.FactionType }>();
 
-  // Stable state for racing stats
-  var stable_racing_stats = Map.new<Nat, Racing.PokedBotRacingStats>();
-  let stable_active_upgrades = Map.new<Nat, Racing.UpgradeSession>();
+  // Stable state for racing stats (PokedBots-specific)
+  var stable_racing_stats = Map.new<Nat, PokedBotsGarage.PokedBotRacingStats>();
+  let stable_active_upgrades = Map.new<Nat, PokedBotsGarage.UpgradeSession>();
 
-  // Stable state for races
-  let stable_races = Map.new<Nat, Racing.Race>();
+  // Stable state for races (generic racing)
+  let stable_races = Map.new<Nat, RacingSimulator.Race>();
 
   // Stable state for calendar events
   let stable_events = Map.new<Nat, RaceCalendar.ScheduledEvent>();
@@ -101,16 +222,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   let stable_alltime_board = Map.new<Nat, Leaderboard.LeaderboardEntry>();
   let stable_faction_boards = Map.new<Text, Map.Map<Nat, Leaderboard.LeaderboardEntry>>();
 
-  // Deprecated: Season/Month IDs are now calculated from Time.now()
-  // Kept for stable variable compatibility during upgrades
-  var stable_current_season_id : Nat = 1;
-  var stable_current_month_id : Nat = 202411;
-
   // Stable state for decay tracking
   var stable_last_decay_time : Int = 0;
-
-  // Stable state for timer tool
-  var stable_timer_state = TT.initialState();
 
   // Constants
   let TRANSFER_FEE : Nat = 10_000; // 0.0001 ICP
@@ -176,8 +289,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   let extCanisterId = Principal.fromText("bzsui-sqaaa-aaaah-qce2a-cai");
   transient let extCanister = ExtIntegration.getExtCanister(extCanisterId);
 
-  // Racing stats manager (pass statsManager for metadata access)
-  transient let racingStatsManager = Racing.RacingStatsManager(
+  // PokedBots Garage Manager (collection-specific logic)
+  transient let garageManager = PokedBotsGarage.PokedBotsGarageManager(
     stable_racing_stats,
     stable_active_upgrades,
     {
@@ -189,18 +302,36 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         powerCore : Nat;
         acceleration : Nat;
         stability : Nat;
-        faction : Racing.FactionType;
+        faction : PokedBotsGarage.FactionType;
       } {
-        Map.get(stable_base_stats, Map.nhash, tokenId);
+        switch (Map.get(stable_base_stats, Map.nhash, tokenId)) {
+          case (?stats) {
+            let factionType : PokedBotsGarage.FactionType = switch (stats.faction) {
+              case (#BattleBot) { #BattleBot };
+              case (#EntertainmentBot) { #EntertainmentBot };
+              case (#WildBot) { #WildBot };
+              case (#GodClass) { #GodClass };
+              case (#Master) { #Master };
+            };
+            ?{
+              speed = stats.speed;
+              powerCore = stats.powerCore;
+              acceleration = stats.acceleration;
+              stability = stats.stability;
+              faction = factionType;
+            };
+          };
+          case (null) { null };
+        };
       };
     },
   );
 
-  // Race manager
-  transient let raceManager = Racing.RaceManager(
-    stable_races,
-    racingStatsManager,
-  );
+  // Racing Simulator (generic racing engine)
+  transient let raceSimulator = RacingSimulator.RaceSimulator();
+
+  // Race Manager (uses generic racing logic)
+  transient let raceManager = RacingSimulator.RaceManager(stable_races);
 
   // Event calendar manager
   transient let eventCalendar = RaceCalendar.EventCalendar(stable_events);
@@ -310,12 +441,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         Debug.print("Processing upgrade completion for token " # debug_show (tokenIndex));
 
         // Get the active upgrade session
-        switch (racingStatsManager.getActiveUpgrade(tokenIndex)) {
+        switch (garageManager.getActiveUpgrade(tokenIndex)) {
           case (?session) {
             Debug.print("Found active upgrade session: " # debug_show (session.upgradeType));
 
             // Get current stats
-            switch (racingStatsManager.getStats(tokenIndex)) {
+            switch (garageManager.getStats(tokenIndex)) {
               case (?stats) {
                 // Generate random stat increase (1-3 for most, 1-2 for stability)
                 let seed = Nat32.fromNat(tokenIndex + Int.abs(Time.now()));
@@ -325,7 +456,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                 };
 
                 // Apply faction modifiers to the increase
-                let increase = racingStatsManager.applyFactionModifier(
+                let increase = garageManager.applyFactionModifier(
                   stats.faction,
                   baseIncrease,
                   seed,
@@ -340,7 +471,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                       stats with
                       speedBonus = stats.speedBonus + increase;
                       experience = stats.experience + 5;
-                      factionReputation = stats.factionReputation + 2; // Small reputation gain
+                      factionReputation = stats.factionReputation + 2;
                       upgradeEndsAt = null;
                       listedForSale = false;
                     };
@@ -370,15 +501,15 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                       stats with
                       stabilityBonus = stats.stabilityBonus + increase;
                       experience = stats.experience + 10;
-                      factionReputation = stats.factionReputation + 3; // Gyro worth more rep
+                      factionReputation = stats.factionReputation + 3;
                       upgradeEndsAt = null;
                       listedForSale = false;
                     };
                   };
                 };
 
-                racingStatsManager.updateStats(tokenIndex, updatedStats);
-                racingStatsManager.clearUpgrade(tokenIndex);
+                garageManager.updateStats(tokenIndex, updatedStats);
+                garageManager.clearUpgrade(tokenIndex);
 
                 Debug.print("Upgrade completed successfully");
               };
@@ -405,7 +536,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     Debug.print("Hourly decay handler triggered");
 
     let now = Time.now();
-    let botsDecayed = racingStatsManager.applyDecayToAll(now);
+    let botsDecayed = garageManager.applyDecayToAll(now);
     stable_last_decay_time := now;
 
     Debug.print("Applied decay to " # debug_show (botsDecayed) # " bots");
@@ -504,6 +635,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             event.metadata.entryFee,
             event.metadata.maxEntries,
             event.scheduledTime,
+            raceSimulator,
           );
 
           createdRaceIds := Array.append(createdRaceIds, [race.raceId]);
@@ -540,7 +672,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   // Ensure calendar has events scheduled (Weekly League + Daily Sprints)
   func ensureCalendarScheduled<system>(now : Int) {
-    let WEEK_NS : Int = 7 * 24 * 60 * 60 * 1_000_000_000;
     let upcomingEvents = eventCalendar.getUpcomingEvents(now, 14); // Next 2 weeks
 
     // Check for Weekly League races in next 2 weeks
@@ -566,7 +697,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
 
     // Check for Daily Sprints in next 48 hours
-    let HOURS_48_NS : Int = 48 * 60 * 60 * 1_000_000_000;
     let sprintsIn48h = Array.filter<RaceCalendar.ScheduledEvent>(
       eventCalendar.getUpcomingEvents(now, 2), // Next 2 days
       func(e) {
@@ -721,52 +851,75 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
         switch (raceManager.getRace(raceId)) {
           case (?race) {
-            // Simulate the race
-            switch (raceManager.simulateRace(raceId)) {
+            // Convert race entries to RacingParticipants
+            var participants : [RacingSimulator.RacingParticipant] = [];
+
+            for (entry in race.entries.vals()) {
+              // Get bot stats from garage manager
+              switch (garageManager.getRacingStats(entry.nftId)) {
+                case (?stats) {
+                  let participant : RacingSimulator.RacingParticipant = {
+                    nftId = entry.nftId;
+                    owner = entry.owner;
+                    stats = stats;
+                  };
+                  participants := Array.append(participants, [participant]);
+                };
+                case (null) {
+                  Debug.print("Warning: No stats found for NFT " # entry.nftId);
+                };
+              };
+            };
+
+            // Simulate the race using generic simulator
+            switch (raceSimulator.simulateRace(race, participants)) {
               case (?results) {
                 Debug.print("Race simulated, " # debug_show (results.size()) # " racers");
 
                 // Update race with results
                 ignore raceManager.setRaceResults(raceId, results);
 
-                // Update bot stats (synchronously)
+                // Update bot stats using garage manager
                 for (result in results.vals()) {
-                  switch (racingStatsManager.getStats(result.tokenIndex)) {
-                    case (?stats) {
-                      let updatedStats = {
-                        stats with
-                        racesEntered = stats.racesEntered + 1;
-                        wins = if (result.position == 1) {
-                          stats.wins + 1;
-                        } else { stats.wins };
-                        places = if (result.position == 2) { stats.places + 1 } else {
-                          stats.places;
+                  // Record race result in garage
+                  garageManager.recordRaceResult(
+                    result.nftId,
+                    result.position,
+                    results.size(),
+                    result.prizeAmount,
+                  );
+
+                  // Apply race costs (battery drain)
+                  garageManager.applyRaceCosts(result.nftId);
+
+                  // Update leaderboard (convert nftId back to tokenIndex)
+                  switch (Nat.fromText(result.nftId)) {
+                    case (?tokenIndex) {
+                      switch (garageManager.getStats(tokenIndex)) {
+                        case (?botStats) {
+                          let now = Time.now();
+                          leaderboardManager.updateCurrentPeriods(now);
+
+                          // Convert faction type for leaderboard
+                          let leaderboardFaction : PokedBotsGarage.FactionType = botStats.faction;
+
+                          // Convert race class
+                          let leaderboardClass : RacingSimulator.RaceClass = race.raceClass;
+
+                          leaderboardManager.recordRaceResult(
+                            tokenIndex,
+                            result.owner,
+                            result.position,
+                            results.size(),
+                            result.prizeAmount,
+                            1.0,
+                            leaderboardFaction,
+                            leaderboardClass,
+                            now,
+                          );
                         };
-                        shows = if (result.position == 3) { stats.shows + 1 } else {
-                          stats.shows;
-                        };
-                        totalScrapEarned = stats.totalScrapEarned + result.prizeAmount;
-                        experience = stats.experience + (if (result.position == 1) { 20 } else if (result.position <= 3) { 10 } else { 5 });
-                        factionReputation = stats.factionReputation + (if (result.position == 1) { 10 } else if (result.position <= 3) { 5 } else { 2 });
+                        case (null) {};
                       };
-                      racingStatsManager.updateStats(result.tokenIndex, updatedStats);
-
-                      // Update leaderboard periods based on current time
-                      let now = Time.now();
-                      leaderboardManager.updateCurrentPeriods(now);
-
-                      // Record result in leaderboard (default 1.0x multiplier for now)
-                      leaderboardManager.recordRaceResult(
-                        result.tokenIndex,
-                        result.owner,
-                        result.position,
-                        results.size(),
-                        result.prizeAmount,
-                        1.0, // TODO: Get multiplier from event metadata
-                        stats.faction,
-                        race.raceClass,
-                        now,
-                      );
                     };
                     case (null) {};
                   };
@@ -819,16 +972,37 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     canisterPrincipal = Principal.fromActor(self);
     owner = owner;
     appContext = appContext;
-    racingStatsManager = racingStatsManager;
+    garageManager = garageManager;
     raceManager = raceManager;
     extCanister = extCanister;
     extCanisterId = extCanisterId;
     getMarketplaceListings = getMarketplaceListings;
     timerTool = tt();
     getNFTMetadata = statsManager.getNFTMetadata;
-    getStats = racingStatsManager.getStats;
-    getCurrentStats = racingStatsManager.getCurrentStats;
-    isInActiveRace = raceManager.isInActiveRace;
+    getStats = garageManager.getStats;
+    getCurrentStats = garageManager.getCurrentStats;
+    isInActiveRace = func(tokenIndex : Nat) : Bool {
+      // Check if bot is in any active race
+      let allRaces = raceManager.getAllRaces();
+      let nftId = Nat.toText(tokenIndex);
+      let activeRace = Array.find<RacingSimulator.Race>(
+        allRaces,
+        func(r) {
+          let isActive = switch (r.status) {
+            case (#Upcoming) { true };
+            case (#InProgress) { true };
+            case (_) { false };
+          };
+          if (not isActive) { return false };
+          let hasEntry = Array.find<RacingSimulator.RaceEntry>(
+            r.entries,
+            func(e) { e.nftId == nftId },
+          );
+          Option.isSome(hasEntry);
+        },
+      );
+      Option.isSome(activeRace);
+    };
     addSponsor = raceManager.addSponsor;
   };
 
@@ -1075,67 +1249,15 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   /// Debug: Preview what stats would be derived for a token index
   /// Shows both metadata-based and fallback stats for comparison
-  // Test stat derivation with error handling
-  public query func test_derive_stats(tokenIndex : Nat) : async {
-    #ok : {
+  // DEBUG: Get stored stats (using garage manager)
+  public query func debug_preview_stats(tokenIndex : Nat) : async {
+    hasPrecomputedStats : Bool;
+    precomputedStats : ?{
       speed : Nat;
       powerCore : Nat;
       acceleration : Nat;
       stability : Nat;
       faction : Text;
-    };
-    #err : Text;
-  } {
-    try {
-      let metadata = statsManager.getNFTMetadata(tokenIndex);
-
-      let faction = switch (metadata) {
-        case (?traits) { Racing.deriveFactionFromMetadata(traits) };
-        case null {
-          return #err("No metadata found for token " # Nat.toText(tokenIndex));
-        };
-      };
-
-      let stats = switch (metadata) {
-        case (?traits) { Racing.deriveStatsFromMetadata(traits, faction) };
-        case null { return #err("No metadata for stats derivation") };
-      };
-
-      let factionText = switch (faction) {
-        case (#BattleBot) { "BattleBot" };
-        case (#EntertainmentBot) { "EntertainmentBot" };
-        case (#WildBot) { "WildBot" };
-        case (#GodClass) { "GodClass" };
-        case (#Master) { "Master" };
-      };
-
-      #ok({
-        speed = stats.speed;
-        powerCore = stats.powerCore;
-        acceleration = stats.acceleration;
-        stability = stats.stability;
-        faction = factionText;
-      });
-    } catch (e) {
-      #err("Error deriving stats: " # Error.message(e));
-    };
-  };
-
-  public query func debug_preview_stats(tokenIndex : Nat) : async {
-    hasMetadata : Bool;
-    metadata : ?Stats.NFTMetadata;
-    derivedFaction : Text;
-    statsFromMetadata : ?{
-      speed : Nat;
-      powerCore : Nat;
-      acceleration : Nat;
-      stability : Nat;
-    };
-    statsFromTokenIndex : {
-      speed : Nat;
-      powerCore : Nat;
-      acceleration : Nat;
-      stability : Nat;
     };
     currentStoredStats : ?{
       faction : Text;
@@ -1153,46 +1275,29 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       stabilityBonus : Nat;
     };
   } {
-    let metadata = statsManager.getNFTMetadata(tokenIndex);
-
-    // Derive faction
-    let faction = switch (metadata) {
-      case (?traits) { Racing.deriveFactionFromMetadata(traits) };
-      case null {
-        let mod = tokenIndex % 100;
-        if (mod < 5) { #GodClass } else if (mod < 15) { #Master } else if (mod < 35) {
-          #WildBot;
-        } else if (mod < 60) { #EntertainmentBot } else { #BattleBot };
-      };
-    };
-
-    let factionText = switch (faction) {
-      case (#BattleBot) { "BattleBot" };
-      case (#EntertainmentBot) { "EntertainmentBot" };
-      case (#WildBot) { "WildBot" };
-      case (#GodClass) { "GodClass" };
-      case (#Master) { "Master" };
-    };
-
-    // Get metadata-based stats if available
-    let metadataStats = switch (metadata) {
-      case (?traits) {
-        let stats = Racing.deriveStatsFromMetadata(traits, faction);
+    // Get precomputed stats
+    let precomputed = switch (Map.get(stable_base_stats, Map.nhash, tokenIndex)) {
+      case (?stats) {
+        let factionText = switch (stats.faction) {
+          case (#BattleBot) { "BattleBot" };
+          case (#EntertainmentBot) { "EntertainmentBot" };
+          case (#WildBot) { "WildBot" };
+          case (#GodClass) { "GodClass" };
+          case (#Master) { "Master" };
+        };
         ?{
           speed = stats.speed;
           powerCore = stats.powerCore;
           acceleration = stats.acceleration;
           stability = stats.stability;
+          faction = factionText;
         };
       };
       case null { null };
     };
 
-    // Get fallback token-index based stats
-    let tokenStats = Racing.deriveStatsFromTokenIndex(tokenIndex, faction);
-
     // Get currently stored stats if bot is initialized
-    let storedStats = switch (racingStatsManager.getStats(tokenIndex)) {
+    let storedStats = switch (garageManager.getStats(tokenIndex)) {
       case (?stored) {
         let storedFaction = switch (stored.faction) {
           case (#BattleBot) { "BattleBot" };
@@ -1203,8 +1308,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         };
 
         // Get current stats (base + bonuses)
-        let current = racingStatsManager.getCurrentStats(stored);
-        let base = racingStatsManager.getBaseStats(tokenIndex);
+        let current = garageManager.getCurrentStats(stored);
+        let base = garageManager.getBaseStats(tokenIndex);
 
         ?{
           faction = storedFaction;
@@ -1226,16 +1331,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
 
     {
-      hasMetadata = Option.isSome(metadata);
-      metadata = metadata;
-      derivedFaction = factionText;
-      statsFromMetadata = metadataStats;
-      statsFromTokenIndex = {
-        speed = tokenStats.speed;
-        powerCore = tokenStats.powerCore;
-        acceleration = tokenStats.acceleration;
-        stability = tokenStats.stability;
-      };
+      hasPrecomputedStats = Option.isSome(precomputed);
+      precomputedStats = precomputed;
       currentStoredStats = storedStats;
     };
   };
@@ -1272,7 +1369,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     for ((tokenId, stats) in batch.vals()) {
       // Convert faction text to FactionType
-      let factionType : Racing.FactionType = switch (stats.faction) {
+      let factionType : PokedBotsGarage.FactionType = switch (stats.faction) {
         case ("BattleBot") { #BattleBot };
         case ("EntertainmentBot") { #EntertainmentBot };
         case ("WildBot") { #WildBot };
@@ -1353,11 +1450,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   // Cancellation functions
   public shared func cancel_actions_by_filter(filter : TT.ActionFilter) : async TT.CancellationResult {
-    tt().cancelActionsByFilter(filter);
+    tt().cancelActionsByFilter<system>(filter);
   };
 
   public shared func cancel_actions_by_ids(ids : [Nat]) : async TT.CancellationResult {
-    tt().cancelActionsByIds(ids);
+    tt().cancelActionsByIds<system>(ids);
   };
 
   public query func get_actions_by_filter(filter : TT.ActionFilter) : async [TT.ActionDetail] {
@@ -1365,7 +1462,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   };
 
   public shared func emergency_clear_all_timers() : async Nat {
-    tt().emergencyClearAllTimers();
+    tt().emergencyClearAllTimers<system>();
   };
 
   public shared func force_system_timer_cancel() : async Bool {
@@ -1388,6 +1485,17 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     ignore tt().getActionsByFilter(#All);
 
     message;
+  };
+
+  // Manual trigger to initialize race creation timer
+  public shared ({ caller }) func initialize_race_timer() : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can initialize race timer";
+    };
+
+    initializeRaceCreationTimer<system>();
+    let existingTimers = tt().getActionsByFilter(#ByType("race_create"));
+    "Race creation timer initialized. Active timers: " # debug_show (existingTimers.size());
   };
 
   // ===== CALENDAR & EVENT MANAGEMENT =====

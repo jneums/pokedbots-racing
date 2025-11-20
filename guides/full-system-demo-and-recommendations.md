@@ -1,3 +1,9 @@
+---
+title: Full System Demo & Recommendations
+description: Complete walkthrough of the racing system with strategic recommendations
+order: 2
+---
+
 # PokedBots Racing: Complete System Demo & Recommendations 🏁
 
 *Your Ultimate Guide to Dominating the Wasteland - November 16, 2025*

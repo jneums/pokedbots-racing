@@ -179,13 +179,13 @@ module {
                     switch (settleResult) {
                       case (#ok(())) {
                         // Update bot stats to mark as not listed (if it was initialized for racing)
-                        switch (context.racingStatsManager.getStats(Nat32.toNat(tokenIndex))) {
+                        switch (context.garageManager.getStats(Nat32.toNat(tokenIndex))) {
                           case (?stats) {
                             let updatedStats = {
                               stats with
                               listedForSale = false;
                             };
-                            context.racingStatsManager.updateStats(Nat32.toNat(tokenIndex), updatedStats);
+                            context.garageManager.updateStats(Nat32.toNat(tokenIndex), updatedStats);
                           };
                           case (null) {
                             /* Bot not initialized yet, that's fine */

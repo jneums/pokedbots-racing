@@ -1,3 +1,9 @@
+---
+title: "Comprehensive Stats Design"
+description: "Multi-trait stat derivation system for more realistic robot performance"
+order: 4
+---
+
 # Comprehensive Stat Derivation Design
 
 ## Current Problem

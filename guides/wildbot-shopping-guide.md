@@ -1,3 +1,9 @@
+---
+title: WildBot Shopping Guide
+description: Find the best WildBot deals and learn what makes a great racing bot
+order: 4
+---
+
 # WildBot Shopping Guide 🐾
 *Your Complete Guide to Wasteland's Stability Masters - Updated November 16, 2025*
 

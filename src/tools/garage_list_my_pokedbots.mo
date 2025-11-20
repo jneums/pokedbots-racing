@@ -141,23 +141,13 @@ module {
                   msg #= distancePref # "\n";
                 };
                 case (null) {
-                  // Not initialized for racing yet - show base stats from racingStatsManager
-                  let baseStats = ctx.racingStatsManager.getBaseStats(Nat32.toNat(tokenIndex));
-                  let faction = ctx.racingStatsManager.getFaction(Nat32.toNat(tokenIndex));
+                  // Not initialized for racing yet - show base stats from garageManager
+                  let baseStats = ctx.garageManager.getBaseStats(Nat32.toNat(tokenIndex));
 
                   let totalStats = baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability;
                   let rating = totalStats / 4;
 
-                  msg #= "   ⚡ Base: " # Nat32.toText(Nat32.fromNat(rating)) # "/100";
-
-                  let factionEmoji = switch (faction) {
-                    case (#BattleBot) { " | 🏆 BattleBot" };
-                    case (#EntertainmentBot) { " | 🎭 EntertainmentBot" };
-                    case (#WildBot) { " | 🌿 WildBot" };
-                    case (#GodClass) { " | 👑 GodClass" };
-                    case (#Master) { " | ⭐ Master" };
-                  };
-                  msg #= factionEmoji # " | ⚠️ Not initialized\n";
+                  msg #= "   ⚡ Base: " # Nat32.toText(Nat32.fromNat(rating)) # "/100 | ⚠️ Not initialized\n";
 
                   msg #= "   📊 Potential Stats: SPD " # Nat32.toText(Nat32.fromNat(baseStats.speed));
                   msg #= " | PWR " # Nat32.toText(Nat32.fromNat(baseStats.powerCore));

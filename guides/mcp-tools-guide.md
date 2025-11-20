@@ -1,3 +1,9 @@
+---
+title: MCP Tools Guide
+description: Complete reference for the Model Context Protocol tools and AI agent integration
+order: 6
+---
+
 # PokedBots Racing MCP Tools Guide 🤖🏁
 
 *Complete Guide to Using the Model Context Protocol Server - November 16, 2025*

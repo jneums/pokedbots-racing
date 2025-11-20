@@ -98,13 +98,13 @@ module {
 
       for ((tokenIndex, listing, metadata) in listingsResult.vals()) {
         // Always get base stats from metadata
-        let baseStats = context.racingStatsManager.getBaseStats(Nat32.toNat(tokenIndex));
-        let racingStats = context.racingStatsManager.getStats(Nat32.toNat(tokenIndex));
+        let baseStats = context.garageManager.getBaseStats(Nat32.toNat(tokenIndex));
+        let racingStats = context.garageManager.getStats(Nat32.toNat(tokenIndex));
 
         let statsInfo = switch (racingStats) {
           case (?stats) {
             // Bot has racing history
-            let rating = context.racingStatsManager.calculateOverallRating(stats);
+            let rating = context.garageManager.calculateOverallRating(stats);
             let winRate = if (stats.racesEntered > 0) {
               Float.fromInt(stats.wins) / Float.fromInt(stats.racesEntered) * 100.0;
             } else { 0.0 };

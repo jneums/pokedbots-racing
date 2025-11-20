@@ -9,7 +9,7 @@ import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
 import Json "mo:json";
 import ToolContext "ToolContext";
-import Racing "../Racing";
+import PokedBotsGarage "../PokedBotsGarage";
 import ExtIntegration "../ExtIntegration";
 
 module {
@@ -51,7 +51,7 @@ module {
       let tokenIndexNat32 = Nat32.fromNat(tokenIndex);
 
       // Check if already registered by this user
-      switch (ctx.racingStatsManager.getStats(tokenIndex)) {
+      switch (ctx.garageManager.getStats(tokenIndex)) {
         case (?existingStats) {
           // If already initialized by the same user, just return their stats
           if (Principal.equal(existingStats.ownerPrincipal, user)) {
@@ -87,7 +87,7 @@ module {
       };
 
       // Initialize racing stats (faction will be derived from metadata automatically)
-      let racingStats = ctx.racingStatsManager.initializeBot(
+      let racingStats = ctx.garageManager.initializeBot(
         tokenIndex,
         user,
         null, // Let it auto-derive faction from metadata
@@ -123,7 +123,7 @@ module {
       };
 
       // Get current stats (base + bonuses)
-      let currentStats = ctx.racingStatsManager.getCurrentStats(racingStats);
+      let currentStats = ctx.garageManager.getCurrentStats(racingStats);
 
       // Build JSON response
       let response = Json.obj([

@@ -1,3 +1,9 @@
+---
+title: "Marketplace Improvements"
+description: "Enhancement proposals for the EXT-based PokedBots marketplace"
+order: 6
+---
+
 # Marketplace Improvements
 
 ## Current State

@@ -1,3 +1,9 @@
+---
+title: Beginner's Racing Guide
+description: Your first steps in the wasteland - learn the game, pick your first bot, and start racing
+order: 1
+---
+
 # Beginner's Guide to PokedBots Racing 🏁
 *Your First Steps in the Wasteland - November 16, 2025*
 

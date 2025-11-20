@@ -3,7 +3,8 @@ import Result "mo:base/Result";
 import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import Json "mo:json";
 
-import Racing "../Racing";
+import PokedBotsGarage "../PokedBotsGarage";
+import RacingSimulator "../RacingSimulator";
 import ExtIntegration "../ExtIntegration";
 import TimerTool "mo:timer-tool";
 
@@ -18,10 +19,10 @@ module ToolContext {
     owner : Principal;
     /// The application context from the MCP SDK
     appContext : McpTypes.AppContext;
-    /// Racing stats manager for PokedBots
-    racingStatsManager : Racing.RacingStatsManager;
-    /// Race manager for creating and managing races
-    raceManager : Racing.RaceManager;
+    /// Garage manager for PokedBots (collection-specific logic)
+    garageManager : PokedBotsGarage.PokedBotsGarageManager;
+    /// Race manager (generic racing simulator)
+    raceManager : RacingSimulator.RaceManager;
     /// EXT canister interface for ownership verification
     extCanister : ExtIntegration.ExtCanisterInterface;
     /// EXT canister ID (needed for encoding token identifiers)
@@ -33,9 +34,9 @@ module ToolContext {
     /// Get NFT metadata for faction/stats derivation
     getNFTMetadata : (Nat) -> ?[(Text, Text)];
     /// Get robot racing stats (initialized bots only)
-    getStats : (Nat) -> ?Racing.PokedBotRacingStats;
+    getStats : (Nat) -> ?PokedBotsGarage.PokedBotRacingStats;
     /// Get current stats (base + bonuses) for an initialized bot
-    getCurrentStats : (Racing.PokedBotRacingStats) -> {
+    getCurrentStats : (PokedBotsGarage.PokedBotRacingStats) -> {
       speed : Nat;
       powerCore : Nat;
       acceleration : Nat;
@@ -44,7 +45,7 @@ module ToolContext {
     /// Check if a bot is in any active race
     isInActiveRace : (Nat) -> Bool;
     /// Add a sponsor to a race
-    addSponsor : (raceId : Nat, sponsor : Principal, amount : Nat, message : ?Text) -> ?Racing.Race;
+    addSponsor : (raceId : Nat, sponsor : Principal, amount : Nat, message : ?Text) -> ?RacingSimulator.Race;
   };
 
   /// Helper function to create an error response and invoke callback

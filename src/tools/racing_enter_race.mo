@@ -13,7 +13,7 @@ import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
 import Json "mo:json";
 import ToolContext "ToolContext";
-import Racing "../Racing";
+import PokedBotsGarage "../PokedBotsGarage";
 import IcpLedger "../IcpLedger";
 import ExtIntegration "../ExtIntegration";
 
@@ -89,7 +89,7 @@ module {
       };
 
       // Get bot stats
-      let botStats = switch (ctx.racingStatsManager.getStats(tokenIndex)) {
+      let botStats = switch (ctx.garageManager.getStats(tokenIndex)) {
         case (null) {
           return ToolContext.makeError("This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first.", cb);
         };
@@ -117,6 +117,9 @@ module {
         return ToolContext.makeError("Entry deadline has passed", cb);
       };
 
+      // Convert tokenIndex to nftId text
+      let nftId = Nat.toText(tokenIndex);
+
       // Check if race is full
       if (race.entries.size() >= race.maxEntries) {
         return ToolContext.makeError("Race is full", cb);
@@ -124,7 +127,7 @@ module {
 
       // Check if already entered
       for (entry in race.entries.vals()) {
-        if (entry.tokenIndex == tokenIndex) {
+        if (entry.nftId == nftId) {
           return ToolContext.makeError("Bot already entered in this race", cb);
         };
       };
@@ -204,7 +207,7 @@ module {
           };
           case (#Ok(_blockIndex)) {
             // Payment successful, enter the race
-            switch (ctx.raceManager.enterRace(raceId, tokenIndex, user, now)) {
+            switch (ctx.raceManager.enterRace(raceId, nftId, user, now)) {
               case (?updatedRace) {
                 // Drain battery
                 let updatedStats = {
@@ -212,7 +215,7 @@ module {
                   battery = Nat.sub(botStats.battery, 10);
                   lastRaced = ?now;
                 };
-                ctx.racingStatsManager.updateStats(tokenIndex, updatedStats);
+                ctx.garageManager.updateStats(tokenIndex, updatedStats);
 
                 let classText = switch (race.raceClass) {
                   case (#Scavenger) { "Scavenger" };

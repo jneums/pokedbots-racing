@@ -1,3 +1,9 @@
+---
+title: "Marketplace Integration"
+description: "NFT marketplace integration with ICRC-2 approval-based ICP payments"
+order: 7
+---
+
 # PokedBots Wasteland Racing - Marketplace Integration
 
 ## Overview

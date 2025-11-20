@@ -1,3 +1,9 @@
+---
+title: "PokedBots Racing Design"
+description: "Complete design specification for the on-chain racing simulation system built on the Internet Computer"
+order: 1
+---
+
 # PokedBots Racing Simulation MCP Server - Design Document
 
 **Version:** 2.0  

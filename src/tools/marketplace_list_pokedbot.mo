@@ -67,7 +67,7 @@ module {
       let priceE8s = Nat64.fromNat(Int.abs(Float.toInt(Float.nearest(priceIcp * 100_000_000.0))));
 
       // Check if bot is initialized for racing
-      let botStats = switch (context.racingStatsManager.getStats(Nat32.toNat(tokenIndex))) {
+      let botStats = switch (context.garageManager.getStats(Nat32.toNat(tokenIndex))) {
         case (null) {
           return ToolContext.makeError("Bot not initialized for racing. Use garage_initialize_pokedbot first.", cb);
         };
@@ -138,7 +138,7 @@ module {
             botStats with
             listedForSale = true;
           };
-          context.racingStatsManager.updateStats(Nat32.toNat(tokenIndex), updatedStats);
+          context.garageManager.updateStats(Nat32.toNat(tokenIndex), updatedStats);
 
           // Build response
           let message = "✅ Listing Created!\n\n" #

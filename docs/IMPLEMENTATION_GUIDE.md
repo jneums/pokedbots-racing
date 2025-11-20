@@ -1,3 +1,9 @@
+---
+title: "Implementation Guide"
+description: "Phased implementation approach for the racing calendar system"
+order: 3
+---
+
 # Racing Calendar Implementation Guide
 
 ## Quick Start - Minimum Viable Calendar

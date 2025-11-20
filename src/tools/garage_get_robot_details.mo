@@ -9,7 +9,7 @@ import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
 import Json "mo:json";
 import ToolContext "ToolContext";
-import Racing "../Racing";
+import PokedBotsGarage "../PokedBotsGarage";
 import WastelandFlavor "WastelandFlavor";
 import ExtIntegration "../ExtIntegration";
 
@@ -69,7 +69,7 @@ module {
       };
 
       // Get racing stats
-      let racingStats = switch (ctx.racingStatsManager.getStats(tokenIndex)) {
+      let racingStats = switch (ctx.garageManager.getStats(tokenIndex)) {
         case (null) {
           return ToolContext.makeError("This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first.", cb);
         };
@@ -77,9 +77,9 @@ module {
       };
 
       // Calculate overall rating
-      let overallRating = ctx.racingStatsManager.calculateOverallRating(racingStats);
-      let status = ctx.racingStatsManager.getBotStatus(racingStats);
-      let canRace = ctx.racingStatsManager.canRace(racingStats);
+      let overallRating = ctx.garageManager.calculateOverallRating(racingStats);
+      let status = ctx.garageManager.getBotStatus(racingStats);
+      let canRace = ctx.garageManager.canRace(Nat.toText(tokenIndex));
 
       // Determine race class bracket
       let raceClass = if (racingStats.wins <= 2) {
@@ -125,7 +125,7 @@ module {
 
       // Check for active upgrade
       let now = Time.now();
-      let upgradeInfo = switch (ctx.racingStatsManager.getActiveUpgrade(tokenIndex)) {
+      let upgradeInfo = switch (ctx.garageManager.getActiveUpgrade(tokenIndex)) {
         case null { null };
         case (?session) {
           if (session.endsAt > now) {
@@ -154,8 +154,8 @@ module {
       };
 
       // Get current and base stats
-      let currentStats = ctx.racingStatsManager.getCurrentStats(racingStats);
-      let baseStats = ctx.racingStatsManager.getBaseStats(tokenIndex);
+      let currentStats = ctx.garageManager.getCurrentStats(racingStats);
+      let baseStats = ctx.garageManager.getBaseStats(tokenIndex);
 
       // Generate image URLs
       let tokenId = ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId);

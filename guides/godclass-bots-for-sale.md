@@ -1,3 +1,9 @@
+---
+title: GodClass Bots For Sale
+description: Premium legendary bots available for purchase - the ultimate racing machines
+order: 5
+---
+
 # GodClass PokedBots - Available for Purchase 🏆
 
 *The Rarest Faction: Only 2.7% of all bots with +15 to ALL stats!*

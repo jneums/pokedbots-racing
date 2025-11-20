@@ -1,3 +1,9 @@
+---
+title: "NFT Metadata Storage"
+description: "On-chain NFT metadata storage using efficient HashMap-based system"
+order: 8
+---
+
 # NFT Metadata On-Chain Storage
 
 This directory contains scripts and modules for storing and accessing NFT metadata on-chain in the Internet Computer canister.

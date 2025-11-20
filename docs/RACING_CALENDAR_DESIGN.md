@@ -1,3 +1,9 @@
+---
+title: "Racing Calendar Design"
+description: "Structured racing season system with multiple event types, leaderboards, and championship tournaments"
+order: 2
+---
+
 # Racing Calendar System Design
 
 ## Overview

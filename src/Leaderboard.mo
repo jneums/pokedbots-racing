@@ -4,14 +4,14 @@ import Float "mo:base/Float";
 import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Principal "mo:base/Principal";
-import Time "mo:base/Time";
 import Map "mo:map/Map";
 import { nhash } "mo:map/Map";
-import Racing "./Racing";
+import PokedBotsGarage "./PokedBotsGarage";
+import RacingSimulator "./RacingSimulator";
 
 module {
-  public type RaceClass = Racing.RaceClass;
-  public type FactionType = Racing.FactionType;
+  public type RaceClass = RacingSimulator.RaceClass;
+  public type FactionType = PokedBotsGarage.FactionType;
 
   // ===== TIME-BASED SEASON/MONTH CALCULATION =====
 
@@ -406,9 +406,9 @@ module {
           let trend = switch (entry.previousRank) {
             case (?prevRank) {
               if (newRank < prevRank) {
-                #Up(prevRank - newRank);
+                #Up(Int.abs(prevRank - newRank));
               } else if (newRank > prevRank) {
-                #Down(newRank - prevRank);
+                #Down(Int.abs(newRank - prevRank));
               } else {
                 #Stable;
               };

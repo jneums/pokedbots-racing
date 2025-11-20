@@ -3,6 +3,13 @@
     "my_mcp_server": {
       "main": "src/main.mo",
       "type": "motoko"
+    },
+    "website": {      
+      "build": [
+        "cd website && npm run build"
+      ],
+      "source": ["website/out"],
+      "type": "assets"
     }
   },
   "defaults": {

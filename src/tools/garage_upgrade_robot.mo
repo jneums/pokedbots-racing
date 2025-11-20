@@ -11,7 +11,7 @@ import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
 import Json "mo:json";
 import ToolContext "ToolContext";
-import Racing "../Racing";
+import PokedBotsGarage "../PokedBotsGarage";
 import IcpLedger "../IcpLedger";
 import TimerTool "mo:timer-tool";
 import ExtIntegration "../ExtIntegration";
@@ -78,7 +78,7 @@ module {
       };
 
       // Get racing stats
-      let racingStats = switch (ctx.racingStatsManager.getStats(tokenIndex)) {
+      let racingStats = switch (ctx.garageManager.getStats(tokenIndex)) {
         case (null) {
           return ToolContext.makeError("This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first.", cb);
         };
@@ -123,7 +123,7 @@ module {
             let endsAt = now + UPGRADE_DURATION;
 
             // Parse upgrade type
-            let upgradeType : Racing.UpgradeType = switch (upgradeTypeStr) {
+            let upgradeType : PokedBotsGarage.UpgradeType = switch (upgradeTypeStr) {
               case "velocity" { #Velocity };
               case "power_core" { #PowerCore };
               case "thruster" { #Thruster };
@@ -135,7 +135,7 @@ module {
             let upgradeFlavor = WastelandFlavor.getUpgradeFlavor(upgradeType, racingStats.faction);
 
             // Track the upgrade session
-            ctx.racingStatsManager.startUpgrade(tokenIndex, upgradeType, now, endsAt);
+            ctx.garageManager.startUpgrade(tokenIndex, upgradeType, now, endsAt);
 
             // Schedule timer to complete the upgrade
             let actionId = ctx.timerTool.setActionSync<system>(
@@ -152,7 +152,7 @@ module {
               upgradeEndsAt = ?endsAt;
             };
 
-            ctx.racingStatsManager.updateStats(tokenIndex, updatedStats);
+            ctx.garageManager.updateStats(tokenIndex, updatedStats);
 
             let expectedGain = switch (racingStats.faction) {
               case (#GodClass) { "1-3 points (20% chance for 2x bonus!)" };

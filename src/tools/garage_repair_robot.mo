@@ -10,7 +10,7 @@ import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
 import Json "mo:json";
 import ToolContext "ToolContext";
-import Racing "../Racing";
+import PokedBotsGarage "../PokedBotsGarage";
 import IcpLedger "../IcpLedger";
 import ExtIntegration "../ExtIntegration";
 
@@ -72,7 +72,7 @@ module {
       };
 
       // Get racing stats
-      let racingStats = switch (ctx.racingStatsManager.getStats(tokenIndex)) {
+      let racingStats = switch (ctx.garageManager.getStats(tokenIndex)) {
         case (null) {
           return ToolContext.makeError("This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first.", cb);
         };
@@ -116,7 +116,7 @@ module {
               lastRepaired = ?now;
             };
 
-            ctx.racingStatsManager.updateStats(tokenIndex, updatedStats);
+            ctx.garageManager.updateStats(tokenIndex, updatedStats);
 
             let response = Json.obj([
               ("token_index", Json.int(tokenIndex)),

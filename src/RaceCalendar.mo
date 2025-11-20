@@ -1,4 +1,3 @@
-import Time "mo:base/Time";
 import Int "mo:base/Int";
 import Nat "mo:base/Nat";
 import Array "mo:base/Array";
@@ -6,12 +5,11 @@ import Iter "mo:base/Iter";
 import Text "mo:base/Text";
 import Map "mo:map/Map";
 import { nhash } "mo:map/Map";
-import Racing "./Racing";
+import RacingSimulator "./RacingSimulator";
 
 module {
-  public type RaceClass = Racing.RaceClass;
-  public type Terrain = Racing.Terrain;
-  public type FactionType = Racing.FactionType;
+  public type RaceClass = RacingSimulator.RaceClass;
+  public type Terrain = RacingSimulator.Terrain;
 
   // ===== EVENT TYPES =====
 
@@ -73,8 +71,6 @@ module {
 
     // Current time of day
     let secondsToday = Int.abs(currentSeconds % SECONDS_PER_DAY);
-    let currentHour = secondsToday / SECONDS_PER_HOUR;
-    let currentMinute = (secondsToday % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE;
 
     // Calculate target seconds of day
     let targetSecondsOfDay = (targetHour * SECONDS_PER_HOUR) + (targetMinute * SECONDS_PER_MINUTE);
@@ -126,16 +122,16 @@ module {
     let SECONDS_PER_DAY : Int = 86400;
 
     // Approximate days since epoch for start of month
-    // This is a placeholder - needs proper calendar math
-    let daysSinceEpoch = ((year - 1970) * 365) + ((month - 1) * 30);
+    // This is a placeholder - needs proper calendar math  
+    let daysSinceEpoch = (Nat.sub(year, 1970) * 365) + Nat.sub(month, 1) * 30;
     let firstOfMonthSeconds = daysSinceEpoch * SECONDS_PER_DAY;
 
     // Find first Saturday (day 6 in our week system where Sunday = 0)
     let firstDayOfWeek = Int.abs((daysSinceEpoch + 4) % 7);
     let daysUntilSaturday = if (firstDayOfWeek <= 6) {
-      6 - firstDayOfWeek;
+      Nat.sub(6, firstDayOfWeek);
     } else {
-      13 - firstDayOfWeek;
+      Nat.sub(13, firstDayOfWeek);
     };
 
     let firstSaturdaySeconds = firstOfMonthSeconds + (daysUntilSaturday * SECONDS_PER_DAY) +

@@ -1,3 +1,9 @@
+---
+title: "Calendar Quick Reference"
+description: "Quick reference guide for the deployed racing calendar and leaderboard system"
+order: 5
+---
+
 # Racing Calendar - Quick Reference
 
 ## Phase 1 Implementation Complete! ✅

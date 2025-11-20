@@ -62,7 +62,7 @@ module {
       };
 
       // Check if bot is initialized for racing
-      let botStats = switch (context.racingStatsManager.getStats(Nat32.toNat(tokenIndex))) {
+      let botStats = switch (context.garageManager.getStats(Nat32.toNat(tokenIndex))) {
         case (null) {
           return ToolContext.makeError("Bot not initialized for racing. Use garage_initialize_pokedbot first.", cb);
         };
@@ -158,7 +158,7 @@ module {
             listedForSale = false; // Clear listing status
           };
 
-          context.racingStatsManager.updateStats(Nat32.toNat(tokenIndex), transferredStats);
+          context.garageManager.updateStats(Nat32.toNat(tokenIndex), transferredStats);
 
           // Build response with bot stats info
           let statsInfo = "Career Stats: " #

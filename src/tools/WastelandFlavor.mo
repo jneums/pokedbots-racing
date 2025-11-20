@@ -1,8 +1,8 @@
-import Racing "../Racing";
+import PokedBotsGarage "../PokedBotsGarage";
 
 module {
   // Get faction-specific flavor text for various events
-  public func getFactionGreeting(faction : Racing.FactionType) : Text {
+  public func getFactionGreeting(faction : PokedBotsGarage.FactionType) : Text {
     switch (faction) {
       case (#BattleBot) { "⚔️ **BATTLE PROTOCOLS ACTIVE**" };
       case (#EntertainmentBot) { "🎭 **SHOWTIME SUBROUTINES ENGAGED**" };
@@ -12,7 +12,7 @@ module {
     };
   };
 
-  public func getStatusFlavor(status : Text, faction : Racing.FactionType) : Text {
+  public func getStatusFlavor(status : Text, faction : PokedBotsGarage.FactionType) : Text {
     if (status == "Critical Malfunction") {
       switch (faction) {
         case (#BattleBot) {
@@ -106,7 +106,7 @@ module {
     };
   };
 
-  public func getUpgradeFlavor(upgradeType : Racing.UpgradeType, faction : Racing.FactionType) : Text {
+  public func getUpgradeFlavor(upgradeType : PokedBotsGarage.UpgradeType, faction : PokedBotsGarage.FactionType) : Text {
     let baseText = switch (upgradeType) {
       case (#Velocity) { "⚡ **VELOCITY MODULE**" };
       case (#PowerCore) { "🔋 **POWER CORE**" };
@@ -145,7 +145,7 @@ module {
     };
   };
 
-  public func getDecayMessage(faction : Racing.FactionType) : Text {
+  public func getDecayMessage(faction : PokedBotsGarage.FactionType) : Text {
     switch (faction) {
       case (#BattleBot) {
         "⚠️ Battle wear detected - your BattleBot's systems are degrading from neglect";

@@ -10,7 +10,8 @@ import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
 import Json "mo:json";
 import ToolContext "ToolContext";
-import Racing "../Racing";
+import RacingSimulator "../RacingSimulator";
+import PokedBotsGarage "../PokedBotsGarage";
 
 module {
   public func config() : McpTypes.Tool = {
@@ -63,29 +64,26 @@ module {
 
       let pageSize = 5;
 
-      // Get races based on token_index filter
-      let allRaces = switch (tokenIndexOpt) {
+      // Get all upcoming races (bot eligibility filtering happens below)
+      var allRaces = ctx.raceManager.getUpcomingRaces();
+
+      // If token_index provided, verify bot exists and store stats for eligibility check
+      let botStats : ?PokedBotsGarage.PokedBotRacingStats = switch (tokenIndexOpt) {
         case (?tokenIndex) {
-          // Filter by bot's eligibility when token_index is provided
-          switch (ctx.racingStatsManager.getStats(tokenIndex)) {
-            case (?botStats) {
-              // Check ownership - if transferred, show all races instead of bot-specific
-              if (not Principal.equal(botStats.ownerPrincipal, user)) {
-                // Bot was transferred - show all races instead
-                ctx.raceManager.getUpcomingRaces();
-              } else {
-                ctx.raceManager.getAvailableRacesForBot(botStats, now);
+          switch (ctx.garageManager.getStats(tokenIndex)) {
+            case (?stats) {
+              // Check ownership
+              if (not Principal.equal(stats.ownerPrincipal, user)) {
+                return ToolContext.makeError("You don't own this bot", cb);
               };
+              ?stats;
             };
             case (null) {
               return ToolContext.makeError("Bot not initialized for racing", cb);
             };
           };
         };
-        case (null) {
-          // Default: show all upcoming races when no token_index provided
-          ctx.raceManager.getUpcomingRaces();
-        };
+        case (null) { null };
       };
 
       if (allRaces.size() == 0) {
@@ -98,7 +96,7 @@ module {
       // Filter by race class
       filteredRaces := switch (raceClassFilter) {
         case (?className) {
-          Array.filter<Racing.Race>(filteredRaces, func(r) {
+          Array.filter<RacingSimulator.Race>(filteredRaces, func(r) {
             let classMatch = switch (r.raceClass, className) {
               case (#Scavenger, "Scavenger") { true };
               case (#Raider, "Raider") { true };
@@ -115,7 +113,7 @@ module {
       // Filter by terrain
       filteredRaces := switch (terrainFilter) {
         case (?terrainType) {
-          Array.filter<Racing.Race>(filteredRaces, func(r) {
+          Array.filter<RacingSimulator.Race>(filteredRaces, func(r) {
             let terrainMatch = switch (r.terrain, terrainType) {
               case (#ScrapHeaps, "ScrapHeaps") { true };
               case (#WastelandSand, "WastelandSand") { true };
@@ -131,7 +129,7 @@ module {
       // Filter by status
       filteredRaces := switch (statusFilter) {
         case (?status) {
-          Array.filter<Racing.Race>(filteredRaces, func(r) {
+          Array.filter<RacingSimulator.Race>(filteredRaces, func(r) {
             let isOpen = r.status == #Upcoming and now < r.entryDeadline and r.entries.size() < r.maxEntries;
             let isFull = r.status == #Upcoming and r.entries.size() >= r.maxEntries;
             let isClosed = r.status == #Upcoming and now >= r.entryDeadline;
@@ -150,14 +148,14 @@ module {
       // Filter by distance range
       filteredRaces := switch (minDistanceOpt) {
         case (?minDist) {
-          Array.filter<Racing.Race>(filteredRaces, func(r) { r.distance >= minDist });
+          Array.filter<RacingSimulator.Race>(filteredRaces, func(r) { r.distance >= minDist });
         };
         case (null) { filteredRaces };
       };
       
       filteredRaces := switch (maxDistanceOpt) {
         case (?maxDist) {
-          Array.filter<Racing.Race>(filteredRaces, func(r) { r.distance <= maxDist });
+          Array.filter<RacingSimulator.Race>(filteredRaces, func(r) { r.distance <= maxDist });
         };
         case (null) { filteredRaces };
       };
@@ -165,7 +163,7 @@ module {
       // Filter by spots available
       filteredRaces := switch (hasSpotsOpt) {
         case (?hasSpots) {
-          Array.filter<Racing.Race>(filteredRaces, func(r) {
+          Array.filter<RacingSimulator.Race>(filteredRaces, func(r) {
             let spotsAvailable = r.entries.size() < r.maxEntries;
             if (hasSpots) { spotsAvailable } else { not spotsAvailable };
           });
@@ -180,28 +178,28 @@ module {
       // Apply sorting
       let sortedRaces = switch (sortByOpt) {
         case (?"prize_pool") {
-          Array.sort<Racing.Race>(filteredRaces, func(a, b) {
+          Array.sort<RacingSimulator.Race>(filteredRaces, func(a, b) {
             if (a.prizePool > b.prizePool) { #less }
             else if (a.prizePool < b.prizePool) { #greater }
             else { #equal };
           });
         };
         case (?"entry_fee") {
-          Array.sort<Racing.Race>(filteredRaces, func(a, b) {
+          Array.sort<RacingSimulator.Race>(filteredRaces, func(a, b) {
             if (a.entryFee < b.entryFee) { #less }
             else if (a.entryFee > b.entryFee) { #greater }
             else { #equal };
           });
         };
         case (?"distance") {
-          Array.sort<Racing.Race>(filteredRaces, func(a, b) {
+          Array.sort<RacingSimulator.Race>(filteredRaces, func(a, b) {
             if (a.distance < b.distance) { #less }
             else if (a.distance > b.distance) { #greater }
             else { #equal };
           });
         };
         case (?"start_time") {
-          Array.sort<Racing.Race>(filteredRaces, func(a, b) {
+          Array.sort<RacingSimulator.Race>(filteredRaces, func(a, b) {
             if (a.startTime < b.startTime) { #less }
             else if (a.startTime > b.startTime) { #greater }
             else { #equal };
@@ -209,7 +207,7 @@ module {
         };
         case (_) {
           // Default: sort by start time (soonest first)
-          Array.sort<Racing.Race>(filteredRaces, func(a, b) {
+          Array.sort<RacingSimulator.Race>(filteredRaces, func(a, b) {
             if (a.startTime < b.startTime) { #less }
             else if (a.startTime > b.startTime) { #greater }
             else { #equal };
@@ -235,7 +233,7 @@ module {
       let totalRaces = sortedRaces.size();
       let endIdx = Nat.min(startIdx + pageSize, totalRaces);
 
-      var races : [Racing.Race] = [];
+      var races : [RacingSimulator.Race] = [];
       if (startIdx < totalRaces) {
         races := Array.subArray(sortedRaces, startIdx, endIdx - startIdx);
       };

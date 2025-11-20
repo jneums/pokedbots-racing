@@ -91,7 +91,7 @@ module {
         };
         case (#ok(_)) {
           // Success - get bot stats to update listing status
-          let botStats = switch (context.racingStatsManager.getStats(Nat32.toNat(tokenIndex))) {
+          let botStats = switch (context.garageManager.getStats(Nat32.toNat(tokenIndex))) {
             case (?stats) { stats };
             case (null) {
               // Bot not initialized - that's okay, just confirm unlisting
@@ -107,7 +107,7 @@ module {
             botStats with
             listedForSale = false;
           };
-          context.racingStatsManager.updateStats(Nat32.toNat(tokenIndex), updatedStats);
+          context.garageManager.updateStats(Nat32.toNat(tokenIndex), updatedStats);
 
           // Build response
           let message = "✅ Listing Removed!\n\n" #

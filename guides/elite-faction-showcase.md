@@ -1,3 +1,9 @@
+---
+title: Elite Faction Showcase
+description: Deep dive into the Elite faction - premium performance bots with exceptional stats
+order: 3
+---
+
 # Elite Faction Showcase: GodClass vs Master 👑
 
 *The Ultimate Wasteland Racers - November 16, 2025*
