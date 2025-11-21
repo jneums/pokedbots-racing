@@ -1,26 +1,53 @@
 ---
-title: "PokedBots Racing Design"
-description: "Complete design specification for the on-chain racing simulation system built on the Internet Computer"
-order: 1
+title: "System Architecture (Legacy)"
+description: "⚠️ DEPRECATED: See new split documentation instead"
+order: 99
 ---
 
-# PokedBots Racing Simulation MCP Server - Design Document
+# ⚠️ LEGACY DOCUMENT - NO LONGER MAINTAINED
 
-**Version:** 2.0  
-**Date:** November 15, 2025  
-**Status:** Phase 1 Complete - Marketplace Integration Live
+**This document has been split into focused sections. Please use the new documentation:**
+
+- 📖 [Overview](./OVERVIEW.md) - Start here!
+- 🏗️ [Architecture](./ARCHITECTURE.md) - Design decisions
+- 🔧 [Garage System](./GARAGE_SYSTEM.md) - Bot management
+- ⚡ [Upgrade System](./UPGRADE_SYSTEM.md) - Scrapyard & parts
+- 🏁 [Racing System](./RACING_SYSTEM.md) - Races & prizes
+- 🛒 [Marketplace](./MARKETPLACE.md) - Buy & trade
+- 🛠️ [MCP Tools](./MCP_TOOLS.md) - API reference
+- 📚 [Technical Reference](./TECHNICAL_REFERENCE.md) - Deep dive
 
 ---
 
-## 1. Executive Summary
+# PokedBots Racing - System Architecture (LEGACY)
 
-This document specifies the design of an on-chain robot racing simulation system built as an MCP (Model Context Protocol) server on the Internet Computer. Set 500 years in the future in the eastern wastelands surrounding Delta City, the system allows users to browse, purchase, and manage a garage of NFT robots from the existing PokedBots marketplace.
+**Version:** 3.0  
+**Date:** November 20, 2025  
+**Status:** Fully Operational - Racing System Live
 
-**Phase 1 (COMPLETE):** Marketplace integration with ICRC-2 approval-based purchasing, EXT NFT ownership verification, and subaccount-based garage management. Users can browse 1,252+ PokedBots listings, purchase them using ICP via two-step payment routing, and view their owned collection with image URLs.
+---
 
-**Future Phases:** Racing mechanics, robot maintenance/upgrades, and wasteland competition. Stats will be derived deterministically from NFT metadata when racing is implemented, creating a play-and-earn gaming experience accessible to AI agents.
+## Overview
 
-**Current Deployment:** Canister `3od6b-qiaaa-aaaai-q37ma-cai` on IC mainnet
+This document provides a comprehensive technical overview of the PokedBots Racing system - an on-chain racing simulation built as an MCP (Model Context Protocol) server on the Internet Computer.
+
+**What You Can Do:**
+- Browse and purchase PokedBots from the integrated marketplace
+- Initialize bots for wasteland racing
+- Upgrade bot stats (Velocity, PowerCore, Thruster, Gyro)
+- Maintain bots (recharge, repair)
+- Compete in scheduled races (Daily Sprints, Weekly Leagues)
+- Earn ICP prizes and climb leaderboards
+- Sponsor races to boost prize pools
+
+**Technical Highlights:**
+- Collection-agnostic racing engine via RacingStatsProvider interface
+- PokedBots-specific logic cleanly separated for stats, factions, and upgrades
+- Automated race scheduling with calendar system
+- Real-time leaderboard rankings and statistics
+- Full MCP tool suite for AI agent integration (15 tools)
+
+**Deployment:** Canister `3od6b-qiaaa-aaaai-q37ma-cai` on IC mainnet
 
 ### The World of PokedBots
 
@@ -38,29 +65,42 @@ Delta City, controlled by the powerful and enigmatic Silent Klan, serves as the 
 
 ## 2. Key Architectural Decisions
 
-### 2.1 Marketplace Integration vs. Mint-First Approach
-**Decision**: Integrate with existing PokedBots marketplace for purchasing, then add racing later
+### 2.1 Generic Racing Simulator with Collection-Specific Adapters
+**Decision**: Split racing logic into collection-agnostic simulator and collection-specific garage modules
+
+**Rationale**:
+- **RacingSimulator**: Generic racing engine that works with any NFT collection via RacingStatsProvider interface
+- **PokedBotsGarage**: PokedBots-specific logic (factions, upgrades, stat derivation)
+- Enables future expansion to other NFT collections without duplicating race simulation logic
+- Clear separation of concerns: racing mechanics vs. collection-specific features
+- Stats stored separately from NFT metadata - upgrades don't pollute on-chain NFT data
+- Each collection can have unique mechanics (factions, special abilities) while sharing core racing
+
+### 2.2 Marketplace Integration
+**Decision**: Integrate with existing PokedBots marketplace for purchasing
 
 **Rationale**:
 - Users can browse and purchase PokedBots in-game without leaving MCP interface
 - Leverages existing NFT marketplace liquidity (1,252+ listings)
 - No wallet-switching friction - pay with ICP directly via ICRC-2
 - Garage system manages purchased NFTs with subaccount architecture
-- Future racing stats will be stored separately and won't pollute NFT metadata
+- Racing stats stored separately in racing canister, not in NFT metadata
 
-**Implementation (Phase 1 - COMPLETE)**:
-- `marketplace_browse_pokedbots`: Cached listing with pagination (5-min TTL)
-- `marketplace_purchase_pokedbot`: ICRC-2 approval-based purchase with two-step payment routing
-- `garage_list_my_pokedbots`: View owned NFTs with image URLs
-- Subaccount-based garage: Each user gets unique "GARG" + principal bytes subaccount
-- EXT AccountIdentifier encoding: CRC32 + SHA224 hash for compatibility
-- Payment flow: User → Garage Subaccount → Marketplace (via lock/settle)
+**Implementation (COMPLETE)**:
+- ✅ `marketplace_browse_pokedbots`: Cached listing with pagination (5-min TTL)
+- ✅ `marketplace_purchase_pokedbot`: ICRC-2 approval-based purchase with two-step payment flow
+- ✅ EXT AccountIdentifier encoding (CRC32 + SHA224)
+- ✅ Base16 hex decoding for marketplace payment addresses
+- ✅ Garage subaccount system ("GARG" + principal bytes)
+- ✅ Garage list tool with image URL display
+- ✅ Racing stats initialization (deterministic from token index via precomputed-stats.json)
+- ✅ Ownership verified before every operation via `bearer()` calls
+- ✅ Full upgrade system (Velocity, PowerCore, Thruster, Gyro)
+- ✅ Maintenance system (recharge, repair)
+- ✅ Race entry and prize distribution
+- ✅ Sponsorship system for augmenting prize pools
 
-**Future Implementation (Phase 2+)**:
-- Racing stats initialized on first race entry (deterministic from token index)
-- Ownership verified before every operation via `bearer()` calls
-
-### 2.2 ICRC-2 Approval-Based Payments with Subaccount Routing
+### 2.3 ICRC-2 Approval-Based Payments with Subaccount Routing
 **Decision**: Use ICRC-2 `transfer_from` with subaccount-based payment routing
 
 **Rationale**:
@@ -69,19 +109,18 @@ Delta City, controlled by the powerful and enigmatic Silent Klan, serves as the 
 - **Non-custodial**: Funds flow through garage subaccount but never locked
 - **Trade-off**: 0.0001 ICP fee per operation vs. gasless after deposit
 
-**Implementation (Phase 1 - COMPLETE)**:
-- User approves racing canister with `icrc2_approve` (150M e8s covers multiple purchases)
+**Implementation (COMPLETE)**:
+- User approves racing canister with `icrc2_approve` (150M e8s covers multiple operations)
 - Purchase flow uses two-step payment:
   1. `icrc2_transfer_from(user → garage_subaccount, amount + fee)`
   2. `transfer(garage_subaccount → marketplace, amount)` using hex-decoded payment address
 - Garage subaccount format: "GARG" + principal bytes (32 bytes total)
 - EXT AccountIdentifier: CRC32 + SHA224 hash, hex-encoded for marketplace
 - Marketplace settlement: `lock()` reserves NFT, `settle()` completes transfer after payment
-
-**Future Implementation (Phase 2+)**:
-- Race entries pull exact cost via `icrc2_transfer_from`
-- Prizes sent back directly via `icrc2_transfer`
-- Subaccounts used for pending prize escrow
+- ✅ Race entries: Exact cost pulled via `icrc2_transfer_from` for entry fees
+- ✅ Upgrades & Maintenance: Direct pulls for repair (5 ICP), recharge (10 ICP), upgrades (20 ICP)
+- ✅ Prizes: Sent back directly to users via `icrc2_transfer`
+- ✅ Sponsorships: Pulled via `icrc2_transfer_from` and added to prize pools
 
 **Comparison to Final Score**:
 | Aspect | Final Score | PokedBots Racing |
@@ -96,23 +135,31 @@ Delta City, controlled by the powerful and enigmatic Silent Klan, serves as the 
 
 ## 3. Core Architecture
 
-### 3.1 Single Canister Design
-Following the proven pattern from the Final Score prediction market, the entire system is contained in a single canister, currently implementing:
+### 3.1 Modular Architecture with Single Canister Deployment
+The system uses a modular architecture split across multiple Motoko modules, all deployed in a single canister:
 
-**Phase 1 (COMPLETE):**
-- **EXT NFT marketplace integration** (browse, purchase, ownership verification)
-- **ICRC-2 payment integration** (approval-based transfers via subaccounts)
-- **Garage management** (subaccount-based NFT ownership)
-- **Marketplace caching** (5-minute TTL, pagination)
-- **Image URL display** (raw.icp0.io integration)
+**Core Modules:**
+- ✅ **RacingSimulator**: Generic racing engine with RacingStatsProvider interface
+- ✅ **PokedBotsGarage**: PokedBots-specific stats, factions, upgrades, maintenance
+- ✅ **RaceCalendar**: Automated race scheduling (daily/weekly/monthly)
+- ✅ **Leaderboard**: Rankings, achievements, career statistics
+- ✅ **ExtIntegration**: EXT NFT marketplace integration (browse, purchase, ownership)
+- ✅ **IcpLedger**: ICRC-2 payment integration (approval-based transfers)
+- ✅ **Stats**: Precomputed base stats for all 10,000 PokedBots
 
-**Future Phases:**
-- Racing stats storage (separate from NFT metadata)
-- Maintenance and upgrade mechanics
-- Race simulation engine
-- Race entry fees and prize distribution
+**Implemented Features:**
+- ✅ EXT NFT marketplace integration (browse, purchase, ownership verification)
+- ✅ ICRC-2 payment integration (approval-based transfers via subaccounts)
+- ✅ Garage management (subaccount-based NFT ownership)
+- ✅ Marketplace caching (5-minute TTL, pagination)
+- ✅ Image URL display (raw.icp0.io integration)
+- ✅ Racing stats storage (separate from NFT metadata)
+- ✅ Maintenance and upgrade mechanics (recharge, repair, 4 upgrade types)
+- ✅ Race simulation engine with faction bonuses and terrain effects
+- ✅ Race entry fees and prize distribution
+- ✅ Sponsorship system for augmenting prize pools
 
-### 3.2 EXT NFT Marketplace Pattern (Phase 1 Implementation)
+### 3.2 EXT NFT Marketplace Pattern (COMPLETE)
 - **Robots are purchased from the existing PokedBots marketplace** via in-game tools
 - Racing canister integrates with marketplace canister (`bzsui-sqaaa-aaaah-qce2a-cai`)
 - Each user has a garage subaccount ("GARG" + principal bytes) that receives purchased NFTs
@@ -121,16 +168,16 @@ Following the proven pattern from the Final Score prediction market, the entire 
 - Ownership verification: `bearer(tokenId)` checks current owner
 - NFTs remain tradeable in EXT ecosystem - racing canister never locks transfers
 
-**Future Implementation (Phase 2+)**:
-- Racing stats initialization: Deterministically seeded from EXT token index on first race
-- Stats storage: Upgrades, battery, condition, race history in racing canister
-- Ownership sync: Stats transfer when NFT ownership changes
-- Faction derivation: From EXT metadata or token index ranges
+**Racing Stats Implementation (COMPLETE)**:
+- ✅ Racing stats initialization: Uses precomputed-stats.json (deterministically generated from token index)
+- ✅ Stats storage: Upgrades, battery, condition, race history in racing canister
+- ✅ Ownership sync: Stats linked to current NFT owner, verified before operations
+- ✅ Faction derivation: From precomputed stats based on token index ranges
 
-### 3.3 ICRC-2 Payment System with Subaccount Routing (Phase 1 Implementation)
+### 3.3 ICRC-2 Payment System with Subaccount Routing (COMPLETE)
 We use ICRC-2 approval-based payments routed through garage subaccounts:
 
-**Current Implementation:**
+**Implementation (COMPLETE)**:
 - **No deposit/withdraw flow** - users keep ICP in their own wallets
 - Purchase flow: `icrc2_transfer_from(user → garage)` then `transfer(garage → marketplace)`
 - Agent approves racing canister with `icrc2_approve` (150M e8s recommended)
@@ -138,13 +185,12 @@ We use ICRC-2 approval-based payments routed through garage subaccounts:
 - **Payment details**: NFT price + 10,000 e8s transfer fee pulled from user
 - **EXT compatibility**: Marketplace payment address decoded from hex to blob
 - **Two-step settlement**: lock() reserves NFT, settle() completes after payment verified
-
-**Future Implementation (Phase 2+)**:
-- Race entries: `icrc2_transfer_from` for exact entry fee amount
-- Maintenance/upgrades: Direct pulls for repair/upgrade costs
-- Prize winnings: `icrc2_transfer` directly to user's wallet
+- ✅ Race entries: `icrc2_transfer_from` for exact entry fee amount (50-500 ICP based on class)
+- ✅ Maintenance/upgrades: Direct pulls for repair (5 ICP), recharge (10 ICP), upgrades (20 ICP)
+- ✅ Prize winnings: `icrc2_transfer` directly to user's wallet
+- ✅ Sponsorships: `icrc2_transfer_from` to pull sponsorship amounts into race prize pools
 - **Trade-off**: 0.0001 ICP fee per transaction vs. complexity of virtual balance
-- **Benefit**: Simpler UX, no funds locked in canister, better for occasional users
+- **Benefit**: Simpler UX, no funds locked in canister, better for occasional users and AI agents
 
 ---
 
@@ -246,47 +292,445 @@ If a robot is not maintained:
 - Below 50 Condition: -10% to all race performance
 - Below 25 Condition: Cannot enter races (critical malfunction)
 
-### 3.4 Upgrade System
+### 3.4 Unified Upgrade System
 
-Upgrading improves robot stats over time by installing scavenged parts from the wastelands:
+Upgrading improves robot stats over time through a **unified crafting system** that accepts both **ICP payments** and **scrap parts** as upgrade materials.
 
-#### **Upgrade Types** (cost paid via ICRC-2 transfer + time)
-1. **Velocity Module** (Cost: 20 credits + 0.01 fee, Duration: 12 hours)
-   - +1-3 Speed (max 100)
-   - -15 Battery
-   - +5 XP
-   - Parts source: Ancient vehicle components
-   - Payment: Direct ICRC-2 transfer_from to canister
+#### **How Upgrades Work**
 
-2. **Power Core Enhancement** (Cost: 20 credits + 0.01 fee, Duration: 12 hours)
-   - +1-3 Power Core (max 100)
-   - -15 Battery
-   - +5 XP
-   - Parts source: Solar panel arrays from old earth tech
-   - Payment: Direct ICRC-2 transfer_from to canister
+Every upgrade requires **materials** which can be obtained through:
+1. **Direct Purchase**: Pay 20 ICP to get instant upgrade materials
+2. **Scrap NFTs**: Browse any EXT collection, purchase NFTs, scrap them for parts
+3. **Hybrid**: Combine scrap parts + ICP for partial discounts
 
-3. **Thruster Calibration** (Cost: 20 credits + 0.01 fee, Duration: 12 hours)
-   - +1-3 Acceleration (max 100)
-   - -15 Battery
-   - +5 XP
-   - Parts source: Rocket parts from abandoned space program sites
-   - Payment: Direct ICRC-2 transfer_from to canister
+**Material Types:**
+- **Speed Chip** → Velocity upgrades
+- **Power Core Fragment** → Power Core upgrades  
+- **Thruster Kit** → Thruster upgrades
+- **Gyro Module** → Gyro upgrades
+- **Universal Part** → Any upgrade type
 
-4. **Gyro Stabilization** (Cost: 25 credits + 0.01 fee, Duration: 24 hours)
-   - +1-2 Stability (max 100)
-   - -10 Battery
-   - +10 XP
-   - Parts source: Ancient robotics labs in Delta City
-   - Payment: Direct ICRC-2 transfer_from to canister
+#### **Obtaining Materials**
 
-#### **Upgrade Constraints**
-- Robot must have Battery > 30
-- Robot must have Condition > 50
-- Only one upgrade active per robot at a time
-- Upgrade effectiveness scales with Calibration level
-- Stat gains are probabilistic (better base stats = harder to improve)
-- God Class robots: +20% chance for double stat gains
-- Wild Bots: Upgrades more unstable (±2 variance instead of ±1)
+**Method 1: Direct ICP Purchase** (Current Implementation)
+```
+20 ICP → 3 Specific Parts (e.g., 3 Speed Chips)
+20 ICP → 5 Universal Parts
+```
+- Instant delivery via ICRC-2 transfer_from
+- No waiting, materials added to inventory immediately
+
+**Method 2: EXT Scrapyard System** (Planned)
+
+The scrapyard functions as a **universal EXT NFT buyer** - browse any EXT collection's marketplace, purchase NFTs, and scrap them for parts.
+
+**Scrapyard Architecture:**
+1. **Multi-Collection Browser**: `scrapyard_browse_collection(canister_id)` 
+   - Works like `marketplace_browse_pokedbots` but for ANY EXT canister
+   - Returns listings with metadata, price, rarity data
+   - Cached per collection (5-min TTL)
+
+2. **Smart Valuation System**: Prevents self-dealing exploits
+   - **Purchase Price**: What you actually paid for the NFT
+   - **Rarity Index**: Preloaded rarity scores for popular collections (1-100 scale)
+   - **Floor Price Oracle**: Collection floor price from trusted sources
+   - **Anti-Gaming Formula**: 
+     ```
+     scrap_value = min(
+       purchase_price * 0.5,  // Max 50% of purchase price
+       (rarity_index / 20) * floor_price,  // Rarity-adjusted floor
+       100 ICP  // Hard cap to prevent exploits
+     )
+     ```
+   - Takes minimum of all three to prevent manipulation
+
+3. **Scrap Purchase Flow**: `scrapyard_purchase_and_scrap(canister_id, token_index)`
+   - Same ICRC-2 approval-based purchase as PokedBots marketplace
+   - NFT transferred to scrapyard subaccount (locked forever)
+   - Purchase price recorded on-chain for valuation
+   - Parts credited based on smart valuation
+   - Transaction logged with all valuation inputs for transparency
+
+**Rarity Registry** (On-Chain Data):
+```motoko
+// Preloaded rarity data for popular collections
+stable var collectionRegistry: Map<Principal, CollectionData> = Map.new();
+
+type CollectionData = {
+  name: Text;  // "ICPunks", "Motoko Day Drop", etc.
+  totalSupply: Nat;
+  floorPrice: Nat;  // In e8s, updated periodically
+  rarityScores: Map<TokenIndex, Nat>;  // 1-100 scale per token
+  partAffinity: ?PartType;  // Collection theme → preferred part type
+};
+```
+
+**Part Conversion Examples:**
+```
+// High-value rare NFT
+ICPunk #1234 (rarity 95, floor 100 ICP, purchase 120 ICP)
+→ scrap_value = min(60, 475, 100) = 60 ICP worth
+→ 60 ICP / 4 = 15 Universal Parts
+
+// Mid-tier NFT
+MotokoDayDrop #567 (rarity 50, floor 5 ICP, purchase 6 ICP)  
+→ scrap_value = min(3, 12.5, 100) = 3 ICP worth
+→ 3 ICP / 4 = ~1 Universal Part (rounded up)
+
+// Self-dealing attempt (BLOCKED)
+Unknown NFT (rarity 10, floor 0.1 ICP, purchase 1000 ICP from alt account)
+→ scrap_value = min(500, 0.5, 100) = 0.5 ICP worth  
+→ 0.5 ICP / 4 = 0 parts (minimum threshold)
+```
+
+**Collection Affinity** (Optional Enhancement):
+Some collections have thematic bonuses:
+```
+ICPunks → +20% Gyro Modules (stability/reliability theme)
+Motoko Bots → +20% Power Cores (motoko = power theme)  
+IC Drip → +20% Speed Chips (fashion = fast theme)
+Default → Universal Parts (no affinity)
+```
+
+**Scrapyard MCP Tools:**
+
+1. **`scrapyard_browse_collection`** (Planned)
+   ```json
+   Input: {
+     "canister_id": "oeee4-qaaaa-aaaak-qaaeq-cai",
+     "after": 42
+   }
+   Output: {
+     "collection_name": "ICPunks",
+     "listings": [
+       {
+         "token_index": 1234,
+         "price": "100.00 ICP",
+         "rarity_score": 95,
+         "estimated_parts": "~15 Universal Parts",
+         "scrap_value": "~60 ICP equivalent",
+         "seller": "abc123..."
+       }
+     ]
+   }
+   ```
+
+2. **`scrapyard_purchase_and_scrap`** (Planned)
+   ```json
+   Input: {
+     "canister_id": "oeee4-qaaaa-aaaak-qaaeq-cai",
+     "token_index": 1234
+   }
+   Output: {
+     "success": true,
+     "token_index": 1234,
+     "collection": "ICPunks",
+     "purchase_price": "100.00 ICP",
+     "rarity_score": 95,
+     "floor_price": "100.00 ICP (calculated from live listings)",
+     "scrap_value": "60.00 ICP",
+     "parts_received": [
+       "15 Universal Parts"
+     ],
+     "message": "ICPunk #1234 scrapped for parts",
+     "wasteland_lore": "Salvaged premium circuits from old-world punk tech"
+   }
+   ```
+
+3. **`scrapyard_view_parts_inventory`** (Planned)
+   ```json
+   Output: {
+     "speedChips": 5,
+     "powerCores": 3,
+     "thrusterKits": 8,
+     "gyroModules": 2,
+     "universalParts": 24,
+     "total_scrap_value": "347 ICP equivalent",
+     "nfts_scrapped": 12
+   }
+   ```
+
+**Collection Registry Management:**
+
+Admin tools to maintain collection data:
+- `scrapyard_add_collection(canister_id, name, rarity_data, part_affinity)`
+- `scrapyard_update_rarity_scores(canister_id, rarity_data)`
+- Manual curation ensures quality and prevents spam collections
+
+**Floor Price**: Calculated in real-time from live marketplace listings - no oracle needed! When browsing a collection, we already have all the current prices.
+
+**Anti-Gaming Measures:**
+
+1. **Purchase Price Cap**: Max 50% of purchase price counts
+2. **Rarity Floor Cross-Check**: Can't exceed rarity-adjusted floor
+3. **Hard Cap**: 100 ICP maximum scrap value per NFT
+4. **Transparency**: All valuation inputs logged on-chain
+5. **Minimum Threshold**: NFTs worth <0.5 ICP get 0 parts
+6. **Known Collections Only**: Unknown collections get base rate (1 universal part per 20 ICP purchase)
+
+**Advantages Over Simple Burn:**
+- ✅ Leverages existing EXT marketplace infrastructure
+- ✅ No need to build separate scrap listings - use real market data
+- ✅ Purchase price creates objective value anchor
+- ✅ Rarity scores add fairness for rare vs. common NFTs
+- ✅ Multi-collection support out of the box
+- ✅ Creates real deflationary pressure (NFTs locked in scrapyard)
+- ✅ Marketing: "Your dead NFTs have value in PokedBots Racing!"
+
+**Method 3: Hybrid Discounts** (Planned)
+```
+1 Speed Chip + 10 ICP → Velocity Upgrade (50% discount)
+2 Speed Chips + 5 ICP → Velocity Upgrade (75% discount)
+1 Universal Part → 5 ICP discount on any upgrade
+```
+
+#### **Crafting Upgrades**
+
+Once you have materials, craft upgrades using **progressive cost scaling** - each successive upgrade to the same stat costs more:
+
+**Progressive Cost Curve:**
+```
+Upgrade #1:  3 specific parts → +1-3 to stat
+Upgrade #2:  5 specific parts → +1-2 to stat
+Upgrade #3:  8 specific parts → +1-2 to stat
+Upgrade #4: 12 specific parts → +0-1 to stat
+Upgrade #5: 18 specific parts → +0-1 to stat
+Upgrade #6: 25 specific parts → +0-1 to stat (diminishing returns)
+Upgrade #7+: Exponentially expensive, minimal gains
+```
+
+**Universal Parts Conversion:**
+- Universal parts can substitute at 1.5x rate
+- Example: Upgrade #2 needs 5 specific OR 8 universal parts
+- Hybrid allowed: 3 specific + 3 universal = enough for upgrade #2
+
+**Per-Stat Tracking:**
+Each robot tracks upgrade count per stat independently:
+```motoko
+type UpgradeHistory = {
+  velocityUpgrades: Nat;     // Times speed upgraded
+  powerCoreUpgrades: Nat;    // Times power upgraded
+  thrusterUpgrades: Nat;     // Times accel upgraded
+  gyroUpgrades: Nat;         // Times stability upgraded
+};
+```
+
+**Practical Stat Caps:**
+
+Due to cost scaling and diminishing returns, realistic maximum gains:
+```
+Starting stat: 50
+After 3 upgrades: ~55-58 (+5-8 total)
+After 6 upgrades: ~60-65 (+10-15 total)
+After 10 upgrades: ~65-70 (+15-20 total, if you're insanely wealthy)
+
+Theoretical max: 100
+Practical max: ~75-80 (cost becomes prohibitive)
+```
+
+**Cost Examples:**
+
+*Speed Upgrades for a 60 Speed Bot:*
+```
+Upgrade 1: 3 Speed Chips  → 63 Speed (cost: ~20 ICP equivalent)
+Upgrade 2: 5 Speed Chips  → 65 Speed (cost: ~35 ICP equivalent)  
+Upgrade 3: 8 Speed Chips  → 67 Speed (cost: ~55 ICP equivalent)
+Upgrade 4: 12 Speed Chips → 68 Speed (cost: ~80 ICP equivalent)
+Upgrade 5: 18 Speed Chips → 69 Speed (cost: ~120 ICP equivalent)
+
+Total to reach 69: 46 Speed Chips (~310 ICP equivalent)
+Next upgrade would cost 25 parts for maybe +1...
+```
+
+**Why This Works:**
+- ✅ First few upgrades are affordable (3-8 parts)
+- ✅ Dedicated players can reach competitive levels (5-6 upgrades)
+- ✅ Whales can push further but at massive cost (10+ upgrades)
+- ✅ Impossible to reach 100 without spending thousands of ICP
+- ✅ Creates natural stat distribution curve
+- ✅ Preserves value of naturally high-stat bots
+- ✅ Makes faction bonuses more valuable (free stats!)
+
+**Alternative Path: Prestige Upgrades**
+```
+10 Universal Parts → Prestige Upgrade
+  - Bypasses normal cost curve
+  - Flat +3-5 to chosen stat (doesn't count toward upgrade history)
+  - Limited to 1 prestige upgrade per stat per bot
+  - Cannot exceed stat cap (100)
+```
+
+**Upgrade Process:**
+1. **Check Requirements**: 
+   - Bot has Battery ≥ 30, Condition ≥ 50
+   - User has enough parts (based on stat's upgrade count)
+   - Stat not already at cap (100)
+
+2. **Consume Materials**: Parts deducted from inventory
+
+3. **Installation Time**: 12 hours (upgrade in progress)
+
+4. **Completion**: 
+   - Stat gain applied (probabilistic, weighted by current stat)
+   - Battery depleted (-15)
+   - XP awarded (+5)
+   - Upgrade counter incremented for that stat
+
+**Stat Gain Probability:**
+
+Higher stats are harder to improve (diminishing returns):
+```motoko
+// Pseudocode for stat gain
+let currentStat = robot.speed;
+let upgradeCount = robot.upgradeHistory.velocityUpgrades;
+
+let baseGain = match upgradeCount {
+  0 => 3;  // First upgrade: +1 to +3
+  1 => 2;  // Second: +1 to +2
+  2 => 2;  // Third: +1 to +2
+  _ => 1;  // Fourth+: +0 to +1
+};
+
+// Difficulty modifier based on current stat
+let difficulty = if (currentStat < 60) { 1.0 }
+                else if (currentStat < 70) { 0.8 }
+                else if (currentStat < 80) { 0.6 }
+                else if (currentStat < 90) { 0.4 }
+                else { 0.2 };  // 90+ is very hard
+
+let actualGain = floor(random(0, baseGain) * difficulty);
+let newStat = min(currentStat + actualGain, 100);
+```
+
+**Example Upgrade Journey:**
+
+*Bot #4247 (WildBot, 65 SPD starting)*
+```
+Upgrade 1: 3 chips  → 68 SPD (+3, lucky!)
+Upgrade 2: 5 chips  → 70 SPD (+2)
+Upgrade 3: 8 chips  → 72 SPD (+2)
+Upgrade 4: 12 chips → 72 SPD (+0, unlucky at high stat)
+Upgrade 5: 18 chips → 73 SPD (+1)
+Upgrade 6: 25 chips → 74 SPD (+1)
+
+Total: 71 chips consumed for +9 speed
+Cost: ~470 ICP equivalent (or a lot of scrapping!)
+```
+
+**Universal Parts Alternative:**
+```
+5 Universal → Any upgrade (ignores cost curve, always 5 parts)
+  - Good for first 1-2 upgrades (same/better than specific)
+  - Worse than specific parts for later upgrades
+  - Flexibility premium
+```
+
+#### **Material Inventory System** (Planned)
+
+Each user has a parts inventory:
+```motoko
+type UserInventory = {
+  speedChips: Nat;
+  powerCores: Nat;
+  thrusterKits: Nat;
+  gyroModules: Nat;
+  universalParts: Nat;
+  
+  // Stats tracking
+  totalScrapValue: Nat;  // Lifetime ICP equivalent scrapped
+  nftsScrappped: Nat;
+  collectionsScrapped: Map<Principal, Nat>;  // Count per collection
+};
+```
+
+**Inventory Management:**
+- View current parts via `scrapyard_view_parts_inventory`
+- Parts persist across robots (shared pool)
+- Parts can be traded between users (future: parts marketplace)
+- Parts never expire
+
+#### **Economic Balance**
+
+**Direct ICP Path:**
+- 20 ICP → 5 universal parts → 1 upgrade
+- Simple, instant, predictable
+- Baseline: 20 ICP per upgrade
+
+**Scrap Path:**
+- Find undervalued NFTs on EXT marketplaces
+- Purchase for 5-15 ICP → Scrap for 1-3 universal parts
+- 4-7 cheap NFTs → enough parts for 1 upgrade
+- Requires market research, hunting, strategy
+- Potential 30-50% savings for skilled scrappers
+
+**Hybrid Path:**
+- Mix scrap parts with ICP for flexible budgeting
+- Example: 3 universal parts + 10 ICP = upgrade (50% discount)
+
+**Value Proposition:**
+- **Convenience buyers**: Pay 20 ICP, skip the hunt
+- **Value hunters**: Find deals across IC NFT ecosystem, save ICP
+- **Collection holders**: Scrapped NFTs from your favorite collections have themed bonuses
+- **Dead project owners**: Your NFTs have utility again
+
+**Economic Flywheel:**
+1. Demand for cheap NFTs increases (scrappers hunting)
+2. Floor prices of dead projects stabilize/rise slightly
+3. More ICP flows into various NFT ecosystems
+4. PokedBots Racing becomes hub for cross-collection activity
+5. More users discover PokedBots while browsing scrapyard
+
+#### **Benefits of Unified System**
+
+**For Players:**
+- ✅ Multiple paths to upgrades (ICP, scrap, hybrid)
+- ✅ Inventory management adds strategic depth
+- ✅ Can stockpile parts for future use
+- ✅ Treasure hunt gameplay (find undervalued NFTs)
+- ✅ Collection affinity rewards loyalty to favorite projects
+
+**For Ecosystem:**
+- ✅ Creates utility for dead/inactive NFT projects
+- ✅ Cross-collection marketing opportunities
+- ✅ Deflationary for participating collections
+- ✅ ICP flows to multiple NFT marketplaces
+- ✅ PokedBots becomes discovery hub for IC NFT ecosystem
+- ✅ Wasteland lore: "Scavenging salvage from the old world"
+
+**For Collections:**
+- ✅ Dead projects get second life
+- ✅ Holders can exit with dignity (get value, not dump)
+- ✅ Floor price support from scrap demand
+- ✅ Marketing exposure via scrapyard browser
+
+#### **Future Enhancements**
+
+**Parts Marketplace** (Planned)
+- Trade parts between players
+- Price discovery for different part types
+- Creates secondary economy
+- Tools: `parts_list_for_sale`, `parts_purchase`, `parts_cancel_listing`
+
+**Prize NFT Rewards** (Planned)
+- Top racers can win scrapped NFTs as bonus prizes
+- "Salvage Rights" - race winners get first pick from scrapyard
+- Special rare NFT prizes for tournament champions
+- Creates excitement beyond just ICP prizes
+
+**Achievements & Leaderboards** (Planned)
+- "Wasteland Recycler" badges for scrap volume
+- "Master Scrapper" for highest value scrapped
+- "Collection Completionist" for scrapping all from one collection
+- Faction-specific scrap bonuses
+
+#### **Upgrade Constraints** (All Methods)
+- Robot must have Battery ≥ 30
+- Robot must have Condition ≥ 50  
+- Only one upgrade session active per robot (12-hour cooldown while upgrade processes)
+- Upgrades consume 15 battery per session
+- Stat gains use progressive cost curve (3→5→8→12→18→25 parts for successive upgrades to same stat)
+- **God Class bonus**: Difficulty multipliers reduced by 20% (easier to upgrade high stats)
+- **Wild Bot trait**: +10% random variance on stat gains (±1-2 instead of fixed)
 
 ### 3.5 Wasteland Race System
 
@@ -495,9 +939,11 @@ type Distance = {
 
 **Payment Model:** All paid operations require the user to have approved the canister via ICRC-2 `approve` with sufficient allowance. Each operation will call `transfer_from` to pull the exact amount needed. No virtual balance to manage.
 
-**Phase 1 (COMPLETE):** Marketplace browsing, purchasing, and garage management tools are fully functional on IC mainnet.
-
-**Future Phases:** Robot management, maintenance, upgrades, and racing tools will be implemented in subsequent phases.
+**Status (COMPLETE):** All 15 MCP tools are fully functional on IC mainnet:
+- ✅ Marketplace: browse, purchase, list, unlist, transfer
+- ✅ Garage: initialize bots, get details, view owned bots
+- ✅ Maintenance: recharge, repair, upgrades
+- ✅ Racing: list races, enter races, sponsor races
 
 ### 5.1 Robot Management Tools
 
@@ -604,8 +1050,8 @@ Purchase a PokedBot from the marketplace using ICRC-2 approval-based payment.
 
 ---
 
-#### **Tool: `garage_initialize_pokedbot`** ⏳ FUTURE ⏳ FUTURE
-Initialize a PokedBot for racing (first-time setup, free). Will be implemented in Phase 2.
+#### **Tool: `garage_initialize_pokedbot`** ✅ IMPLEMENTED
+Initialize a PokedBot for racing (first-time setup, free).
 
 **Input:**
 ```json
@@ -635,116 +1081,67 @@ Initialize a PokedBot for racing (first-time setup, free). Will be implemented i
 
 **Behavior:**
 - Verifies user owns this PokedBot via EXT canister
-- Generates deterministic stats from token index
+- Loads precomputed stats from data/precomputed-stats.json (deterministic from token index)
 - Applies faction bonuses
 - Stores racing stats in racing canister
 - No payment required
 
 ---
 
-#### **Tool: `garage_list_my_robots`** ⏳ FUTURE
-List all PokedBots with active racing stats (convenience method). Will be implemented in Phase 2.
+#### **Tool: `garage_get_robot_details`** ✅ IMPLEMENTED
+Get comprehensive details for a specific PokedBot.
+
+
 
 **Input:**
 ```json
 {
-  "include_stats": true,
-  "faction_filter": "BattleBot",
-  "sort_by": "overall_rating"
+  "token_index": 4079
 }
 ```
 
 **Output:**
 ```json
 {
-  "robots": [
-    {
-      "token_index": 42,
-      "faction": "BattleBot",
-      "runtime_days": 45,
-      "battery": 85,
-      "condition": 95,
-      "calibration": 72,
-      "overall_rating": 76,
-      "races_won": 3,
-      "total_scrap_earned": "500000",
-      "status": "Ready",
-      "can_race": true
-    }
-  ],
-  "total_count": 1
-}
-```
-
----
-
-#### **Tool: `garage_get_robot_details`** ⏳ FUTURE
-Get comprehensive details for a specific PokedBot. Will be implemented in Phase 2.
-
-**Input:**
-```json
-{
-  "token_id": "42"
-}
-```
-
-**Output:**
-```json
-{
-  "token_id": "42",
+  "token_index": 4079,
   "owner": "aaaaa-aa",
-  "name": "Scrap-Runner-7",
   "faction": "BattleBot",
-  "chassis": "Rusted Steel",
-  "accents": "Combat Scarring",
+  "initialized": true,
   
   "stats": {
-    "speed": 67,           // Current (improved from base)
+    "speed": 67,
     "powerCore": 80,
     "acceleration": 70,
     "stability": 84,
-    "base_speed": 65,      // Original stats at activation
-    "base_powerCore": 78
+    "overall_rating": 75
   },
   
   "condition": {
-    "battery": 85,
-    "condition": 95,
-    "calibration": 72,
+    "battery": 100,
+    "condition": 100,
     "status": "Ready"
   },
   
   "career": {
-    "races_entered": 12,
-    "wins": 3,
-    "places": 2,
-    "shows": 4,
-    "total_scrap_earned": "500000",
-    "faction_reputation": 150
+    "races_entered": 0,
+    "wins": 0,
+    "places": 0,
+    "shows": 0
   },
   
-  "next_maintenance_available": {
-    "recharge": "2025-11-15T10:00:00Z",
-    "repair": "2025-11-16T08:00:00Z",
-    "diagnostics": null
-  },
-  
-  "upgrade": {
-    "active": true,
-    "type": "Velocity Module",
-    "ends_at": "2025-11-15T20:00:00Z",
-    "parts_source": "Ancient vehicle components"
+  "upgrade_status": {
+    "active": false
   }
 }
 ```
 
 ---
 
-### 5.3 Maintenance & Upgrade Tools (Phase 2+ - FUTURE)
+### 5.3 Maintenance & Upgrade Tools (COMPLETE)
 
 **Note:** All paid maintenance/upgrade operations pull funds directly from user's wallet via ICRC-2 `transfer_from`. User must maintain sufficient ICRC-2 allowance.
 
-#### **Tool: `garage_recharge_robot`**
+#### **Tool: `garage_recharge_robot`** ✅ IMPLEMENTED
 Recharge a robot to restore condition and battery.
 
 **Input:**
@@ -792,13 +1189,13 @@ Recharge a robot to restore condition and battery.
 
 ---
 
-#### **Tool: `garage_upgrade_robot`**
+#### **Tool: `garage_upgrade_robot`** ✅ IMPLEMENTED
 Start an upgrade session for a robot.
 
 **Input:**
 ```json
 {
-  "token_id": "42",
+  "token_index": 4079,
   "upgrade_type": "Velocity"  // Velocity, PowerCore, Thruster, Gyro
 }
 ```
@@ -806,55 +1203,24 @@ Start an upgrade session for a robot.
 **Output:**
 ```json
 {
-  "token_id": "42",
-  "upgrade_type": "Velocity Module",
-  "payment": {
-    "amount": "20",
-    "fee": "0.01",
-    "total": "20.01"
-  },
-  "duration_hours": 12,
+  "success": true,
+  "token_index": 4079,
+  "upgrade_type": "Velocity",
+  "payment": "20 ICP + 0.0001 ICP fee",
+  "duration": "12 hours",
   "completes_at": "2025-11-16T02:00:00Z",
-  "expected_gain": "1-3 Speed points",
-  "parts_source": "Installing ancient vehicle components..."
+  "expected_gain": "+1-3 Speed",
+  "message": "Installing velocity module..."
 }
 ```
 
 ---
 
-#### **Tool: `garage_complete_upgrade`**
-Manually complete a finished upgrade session (also auto-completes when querying robot).
-
-**Input:**
-```json
-{
-  "token_id": "42"
-}
-```
-
-**Output:**
-```json
-{
-  "token_id": "42",
-  "upgrade_completed": "Velocity Module",
-  "stat_gains": {
-    "speed": 2
-  },
-  "new_stats": {
-    "speed": 67
-  },
-  "xp_gained": 5,
-  "message": "Velocity module installed. Performance enhanced."
-}
-```
-
----
-
-### 5.4 Wasteland Race Tools (Phase 2+ - FUTURE)
+### 5.4 Racing Tools (COMPLETE)
 
 **Note:** Race entries pull funds directly from user's wallet via ICRC-2 `transfer_from`. Prize winnings are sent directly back to user's wallet via ICRC-2 `transfer`.
 
-#### **Tool: `garage_list_races`**
+#### **Tool: `racing_list_races`** ✅ IMPLEMENTED
 List available and upcoming wasteland races departing from Delta City.
 
 **Input:**
@@ -902,7 +1268,7 @@ List available and upcoming wasteland races departing from Delta City.
 
 ---
 
-#### **Tool: `garage_enter_race`**
+#### **Tool: `racing_enter_race`** ✅ IMPLEMENTED
 Enter a robot in a wasteland race.
 
 **Input:**
@@ -1027,19 +1393,34 @@ Get detailed results of a completed wasteland race.
 }
 ```
 
+#### **Tool: `racing_sponsor_race`** ✅ IMPLEMENTED
+Sponsor a race to add funds to the prize pool.
+
+**Input:**
+```json
+{
+  "race_id": 123,
+  "amount_icp": 10.5,
+  "message": "Go BattleBots!"
+}
+```
+
+**Output:**
+```json
+{
+  "success": true,
+  "race_id": 123,
+  "amount": "10.5 ICP",
+  "new_prize_pool": "125.5 ICP",
+  "message": "Sponsorship added to race prize pool!"
+}
+```
+
 ---
 
-### 5.5 Secondary Marketplace Tools (Phase 3+ - FUTURE)
+### 5.5 Secondary Marketplace Tools (COMPLETE)
 
-**Note:** Marketplace transactions will use ICRC-2 `transfer_from` for purchases, with seller receiving funds directly.
-
-#### **Tool: `garage_list_robots_for_sale`**
-List PokedBots available for purchase from other players in Delta City marketplace.
-
-#### **Tool: `garage_buy_robot`**
-Purchase a robot from another player's listing. Payment via ICRC-2 `transfer_from`.
-
-#### **Tool: `garage_sell_robot`**
+#### **Tool: `marketplace_list_pokedbot`** ✅ IMPLEMENTED
 List a robot for sale in Delta City marketplace.
 
 ---
@@ -1390,50 +1771,61 @@ For an 8-robot race with 150 credit entry fee:
 1. `marketplace_browse_pokedbots` - Browse 1,252+ listings with pagination
 2. `marketplace_purchase_pokedbot` - Purchase with ICRC-2 approval
 3. `garage_list_my_pokedbots` - View owned NFTs with images
+4. `marketplace_list_pokedbot` - List bots for sale
+5. `marketplace_unlist_pokedbot` - Remove listings
+6. `garage_transfer_pokedbot` - Transfer bots to other users
 
-### **Phase 2: Robot Stats & Management (PLANNED)**
-- Implement racing stats initialization (deterministic from token index)
-- Create PokedBot data structures with faction types
-- Write faction-based stat derivation algorithm
-- Build maintenance system (recharge, repair, diagnostics) with ICRC-2 payments
-- Build upgrade system (4 types with faction modifiers)
-- Add decay mechanics (faction-specific rates)
-- Implement faction reputation tracking
-- Create wasteland lore flavor text system
+### **Phase 2: Generic Racing Architecture (COMPLETE) ✅**
+- ✅ Design RacingSimulator module with RacingStatsProvider interface
+- ✅ Implement PokedBotsGarage module for collection-specific logic
+- ✅ Generate precomputed-stats.json for all 10,000 PokedBots (deterministic from token index)
+- ✅ Implement racing stats initialization (from precomputed stats)
+- ✅ Create PokedBot data structures with faction types and bonuses
+- ✅ Build maintenance system (recharge, repair) with ICRC-2 payments
+- ✅ Build upgrade system (Velocity, PowerCore, Thruster, Gyro)
+- ✅ Implement faction reputation tracking
+- ✅ Create wasteland lore flavor text system
 
-### **Phase 3: Wasteland Racing Engine (PLANNED)**
-- Design race simulation algorithm with faction bonuses
-- Implement race creation timer (with thematic naming)
-- Build race entry system (ICRC-2 transfer_from for fees)
-- Create race simulation timer (with hazard events)
-- Implement prize distribution (ICRC-2 transfer to winners)
-- Add Silent Klan tax collection and treasury management
-- Add race commentary/flavor text
-- Set up subaccount architecture for race pools
+**Deployed Tools:**
+7. `garage_initialize_pokedbot` - Register bot for racing (free)
+8. `garage_get_robot_details` - View detailed bot stats
+9. `garage_recharge_robot` - Restore battery/condition (10 ICP)
+10. `garage_repair_robot` - Restore condition (5 ICP)
+11. `garage_upgrade_robot` - Start upgrade session (20 ICP)
 
-### **Phase 4: MCP Tools Expansion (PLANNED)**
-- Expose robot management tools (initialize, details, stats)
-- Add maintenance tools (recharge, repair, diagnostics, upgrades)
-- Add racing tools (list races, enter, claim results)
-- Write tool schemas with wasteland-themed descriptions
-- Add ICRC-2 allowance checking and error handling
-- Implement authentication for all new tools
-- Add faction-specific response messages
+### **Phase 3: Racing Engine (COMPLETE) ✅**
+- ✅ Implement race simulation algorithm with faction bonuses
+- ✅ Build RaceCalendar module with automated scheduling
+- ✅ Create race creation system (daily sprints, weekly leagues, monthly tournaments)
+- ✅ Build race entry system (ICRC-2 transfer_from for fees)
+- ✅ Implement race simulation with terrain effects and hazards
+- ✅ Add prize distribution (ICRC-2 transfer to winners)
+- ✅ Implement platform tax collection (5%)
+- ✅ Add race commentary/flavor text
+- ✅ Build sponsorship system for augmenting prize pools
 
-### **Phase 5: Testing & Polish (PLANNED)**
-- Integration testing with racing mechanics
-- Test allowance edge cases (insufficient, expired, etc.)
-- Balance tuning (faction advantages, costs, stat gains, race variance)
-- Documentation updates with racing mechanics
-- Create ICRC-2 approval guide for AI agents
-- Create sample agent workflows for full game loop
+**Deployed Tools:**
+12. `racing_list_races` - Browse upcoming races with filters
+13. `racing_enter_race` - Enter bot in race
+14. `racing_sponsor_race` - Add to prize pools
+
+### **Phase 4: Leaderboard & Polish (COMPLETE) ✅**
+- ✅ Implement Leaderboard module with rankings
+- ✅ Add achievement tracking
+- ✅ Integration testing with full racing mechanics
+- ✅ Balance tuning (faction advantages, costs, stat gains)
+- ✅ Documentation updates with complete system architecture
+- ✅ Create comprehensive guides for users and AI agents
+
+**Current Status:** All 15 MCP tools deployed and functional on IC mainnet canister `3od6b-qiaaa-aaaai-q37ma-cai`
 
 ---
 
 ## 12. Success Metrics
 
-### Phase 1: Marketplace Integration (COMPLETE) ✅
+### All Phases Complete ✅
 
+**Marketplace Integration:**
 1. ✅ Users can approve canister for ICRC-2 spending (150M e8s recommended)
 2. ✅ Users can browse PokedBots marketplace (1,252+ listings)
 3. ✅ Pagination works correctly (5 listings per page, cursor-based)
@@ -1446,78 +1838,79 @@ For an 8-robot race with 150 credit entry fee:
 10. ✅ Users can view owned PokedBots in garage with image URLs
 11. ✅ All MCP tools handle ICRC-2 allowance errors gracefully
 12. ✅ Real purchase test successful (PokedBot #4079 for 6.00 ICP)
-13. ✅ Comprehensive documentation created
+13. ✅ Users can list and unlist bots on marketplace
+14. ✅ Users can transfer bots to other accounts
 
-### Phase 2+: Racing Mechanics (FUTURE)
-
-1. ⏳ Users can initialize PokedBots for racing (deterministic stats)
-2. ⏳ Users can view detailed robot stats with faction bonuses
-3. ⏳ Users can recharge, repair, and upgrade robots via ICRC-2 payments
-4. ⏳ Automated wasteland races are created every 30-60 minutes
-5. ⏳ Users can enter robots in races with ICRC-2 fee payment
-6. ⏳ Races simulate deterministically with faction bonuses
-7. ⏳ Prize winnings are sent directly to user wallets via ICRC-2 transfer
-8. ⏳ Robot stats evolve correctly through upgrades and racing
-9. ⏳ Faction reputation increases with race performance
-10. ⏳ Silent Klan 5% tax is properly collected in treasury subaccount
-11. ⏳ Treasury covers all outgoing transfer fees for prizes
-12. ⏳ System handles 100+ concurrent robots without performance issues
-13. ⏳ Faction-specific mechanics work correctly (Wild Bot variance, God Class bonuses, etc.)
-14. ⏳ No virtual balance exploits or stuck funds scenarios
-15. ⏳ Lore and flavor text enhance the experience without being intrusive
+**Racing System:**
+1. ✅ Users can initialize PokedBots for racing (deterministic stats from precomputed data)
+2. ✅ Users can view detailed robot stats with faction bonuses
+3. ✅ Users can recharge and repair robots via ICRC-2 payments
+4. ✅ Users can upgrade robots (Velocity, PowerCore, Thruster, Gyro) via ICRC-2 payments
+5. ✅ Automated races are created on daily/weekly/monthly schedules
+6. ✅ Users can enter robots in races with ICRC-2 fee payment
+7. ✅ Races simulate deterministically with faction bonuses and terrain effects
+8. ✅ Prize winnings are distributed correctly via ICRC-2 transfer
+9. ✅ Robot stats evolve correctly through upgrades and racing
+10. ✅ Faction reputation increases with race performance
+11. ✅ Platform 5% tax is properly collected
+12. ✅ Sponsorship system allows adding to prize pools
+13. ✅ System handles 100+ concurrent robots without performance issues
+14. ✅ Faction-specific mechanics work correctly (faction bonuses, stat distributions)
+15. ✅ No stuck funds scenarios (all flows tested)
+16. ✅ Lore and flavor text enhance the experience
+17. ✅ Comprehensive documentation and guides available
 
 ---
 
 ## 13. Technical Dependencies
 
 ### 13.1 Motoko Packages (mops.toml)
-**Current Implementation (Phase 1):**
+**Current Implementation (All Phases Complete):**
 ```toml
 [dependencies]
 base = "0.11.1"
-base16 = "1.0.0"  # For hex decoding marketplace payment addresses
-account-identifier = "1.0.2"  # For EXT AccountIdentifier encoding
-icrc2-types = "1.1.0"  # For ICRC-2 transfer types
+base16 = "1.0.0"
+account-identifier = "1.0.2"
+icrc2-types = "1.1.0"
 array = "0.2.1"
 iterators = "0.1.1"
 stable-hash-map = "0.2.0"
-```
-
-**Future Additions (Phase 2+):**
-```toml
 json = "1.4.0"
 map = "9.0.1"
 http-types = "1.0.1"
 mcp-motoko-sdk = "2.0.2"
 datetime = "1.1.0"
 certified-cache = "0.3.0"
-sha2 = "0.1.6"  # For stat derivation hashing
+timer-tool = "0.3.0"
+star = "0.3.3"
+sha2 = "0.1.6"
+ic = "1.0.1"
+class-plus = "1.0.0"
 ```
 
 ### 13.2 External Canisters
 
-**PokedBots EXT NFT & Marketplace Canister** (Primary Integration)
+**PokedBots EXT NFT & Marketplace Canister**
 - **Canister ID:** `bzsui-sqaaa-aaaah-qce2a-cai`
 - **Standard:** EXT (Entrepot extensible token standard)
 - **Purpose:** Marketplace listings, NFT purchases, ownership verification
-- **Phase 1 Methods Used:**
+- **Methods Used:**
   - `listings() -> [(TokenIndex, Listing, Metadata)]` - Get all marketplace listings (1,252+)
   - `lock(TokenIndex, Nat64, AccountIdentifier) -> Result_9` - Reserve NFT for purchase
   - `settle(TokenIdentifier) -> Result_8` - Complete NFT transfer after payment
   - `tokens(AccountIdentifier) -> Result_1` - Get user's owned token indices
   - `bearer(TokenIdentifier) -> Result_5` - Get owner of specific token
-- **Integration Pattern:** Purchase-enabled wrapper (racing canister facilitates buying, not selling)
+- **Integration Pattern:** Full marketplace integration (buy, sell, list, unlist, transfer)
 
-**ICP Ledger Canister** (Payment Integration)
+**ICP Ledger Canister**
 - **Canister ID:** `ryjl3-tyaaa-aaaaa-aaaba-cai`
-- **Token:** ICP (used for PokedBot purchases)
-- **Phase 1 Methods Used:**
+- **Token:** ICP (used for all payments)
+- **Methods Used:**
   - `icrc2_approve` - User approves racing canister for spending
-  - `icrc2_transfer_from` - Racing canister pulls ICP from user to garage subaccount
-  - `transfer` - Racing canister sends ICP from garage to marketplace payment address
-  - `icrc2_allowance` - Check remaining approved amount (for error handling)
-- **Future Methods (Phase 2+):**
-  - `icrc2_transfer` - Send prize winnings to users
+  - `icrc2_transfer_from` - Racing canister pulls ICP from user
+  - `icrc2_transfer` - Racing canister sends prizes to users
+  - `transfer` - Legacy transfer for marketplace payments
+  - `icrc2_allowance` - Check remaining approved amount
 
 **No Oracle Dependencies**
 - Self-contained race simulation
@@ -1561,102 +1954,70 @@ sha2 = "0.1.6"  # For stat derivation hashing
 
 ## 15. Conclusion
 
-This design provides a comprehensive blueprint for a PokedBots wasteland racing simulation MCP server.
+This design document provides a comprehensive specification for the PokedBots Racing simulation MCP server.
 
-### Current Status (Phase 1 Complete) ✅
+### Current Status (All Phases Complete) ✅
 
 **Deployed System:**
 - **Canister:** `3od6b-qiaaa-aaaai-q37ma-cai` on IC mainnet
-- **Functionality:** Marketplace browsing, purchasing, and garage management
+- **Website:** `32qki-jaaaa-aaaai-q4a7a-cai` (https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io)
+- **Architecture:** Modular design with RacingSimulator and PokedBotsGarage modules
+- **Tools:** 15 MCP tools for marketplace, garage management, and racing
 - **Integration:** PokedBots EXT marketplace (`bzsui-sqaaa-aaaah-qce2a-cai`)
 - **Payment:** ICRC-2 approval-based with ICP Ledger (`ryjl3-tyaaa-aaaaa-aaaba-cai`)
-- **Architecture:** Subaccount-based garage system ("GARG" + principal bytes)
-- **Tools:** 4 MCP tools (browse, purchase, garage list, weather example)
 
-**Key Achievements:**
-- ✅ Successfully integrated with existing NFT marketplace (1,252+ listings)
-- ✅ Implemented efficient caching and pagination for marketplace browsing
-- ✅ Built robust ICRC-2 approval-based purchase flow with two-step payment routing
-- ✅ Proper EXT AccountIdentifier encoding for marketplace compatibility
-- ✅ Tested with real purchase (PokedBot #4079 for 6.00 ICP)
-- ✅ Comprehensive documentation for phase transition
+**Key Features:**
+- ✅ Marketplace integration (browse, purchase, list, unlist, transfer)
+- ✅ Racing stats system with faction bonuses (BattleBot, EntertainmentBot, WildBot, Master, GodClass)
+- ✅ Upgrade system (Velocity, PowerCore, Thruster, Gyro)
+- ✅ Maintenance system (recharge, repair)
+- ✅ Race calendar with automated scheduling (daily/weekly/monthly)
+- ✅ Race simulation with terrain effects and faction bonuses
+- ✅ Prize distribution via ICRC-2
+- ✅ Sponsorship system for augmenting prize pools
+- ✅ Leaderboard and achievement tracking
+- ✅ Comprehensive documentation and user guides
 
-### Future Vision (Phase 2+) ⏳
+**Technical Achievements:**
+- ✅ Generic racing architecture via RacingStatsProvider interface
+- ✅ Collection-specific logic cleanly separated in PokedBotsGarage module
+- ✅ Efficient caching and pagination for marketplace browsing
+- ✅ Robust ICRC-2 approval-based payment flow
+- ✅ Precomputed base stats for all 10,000 PokedBots
+- ✅ Deterministic race simulation
+- ✅ Platform tax collection (5% of race entry fees)
+- ✅ Complete MCP tool suite for AI agent integration
 
-The complete system will:
-- **Use NFTs as evolving game assets** with faction-based mechanics and deterministic stat generation
-- **Provide engaging gameplay** through maintenance, upgrades, faction bonuses, and strategic racing
-- **Operate entirely on-chain** with deterministic simulations and transparent outcomes
-- **Offer an agent-first interface** via MCP tools with rich thematic flavor
-- **Create a sustainable token economy** with the Silent Klan tax system covering operational costs
-- **Immerse players** in the rich lore of post-apocalyptic Delta City and the eastern wastelands
+### System Strengths
 
-### Thematic Strengths
-The PokedBots universe provides:
-- **Rich Faction System**: 5 distinct robot types with unique personalities, bonuses, and lore
-- **Environmental Storytelling**: Races through garbage towers, wasteland sand, and ancient highways
-- **Power Dynamics**: Silent Klan control, God Class superiority, Master faction mysteries
-- **Post-Apocalyptic Atmosphere**: Solar flares, deranged Wild Bots, scavenged technology
-- **Emergent Narrative**: Europa Base 7 connections hint at larger story for future expansions
+**Technical:**
+- **Modular Architecture**: RacingSimulator can work with any NFT collection
+- **Fair Gameplay**: Deterministic outcomes prevent manipulation
+- **Transparent Economics**: All payments visible on ICRC ledger
+- **Scalable**: Single canister architecture ready for expansion
+- **User-Friendly**: No deposit/withdrawal friction, direct ICRC-2 payments
 
-### Technical Advantages
-The system is designed to be:
-- **Extensible**: Easy to add robot breeding/fusion, story missions, faction quests, equipment systems
-- **Fair**: Deterministic outcomes prevent manipulation while faction bonuses create strategic depth
-- **Engaging**: Depth in stat management, faction optimization, and race strategy
-- **Accessible**: Agent-operable via MCP, no complex UI required for MVP
-- **Scalable**: Single canister architecture proven by Final Score, ready for multi-canister expansion
-- **Simple**: Direct ICRC-2 transfers eliminate virtual balance complexity and withdrawal friction
-- **Transparent**: All payments visible on ICRC ledger, no hidden balance state
-- **User-friendly**: No deposit step required, users keep full custody of funds until spent
+**Gameplay:**
+- **Strategic Depth**: Faction bonuses, terrain preferences, upgrade paths
+- **Engaging Mechanics**: Maintenance, upgrades, scheduled races
+- **Balanced Factions**: Each faction has unique advantages
+- **Rich Lore**: Wasteland theme with Delta City, Silent Klan, faction backstories
 
-### ICRC-2 Workflow for AI Agents
-```motoko
-// 1. Agent approves canister to spend tokens
-icrc2_approve({
-  spender: canister_principal,
-  amount: 10000,  // Enough for several actions
-  expires_at: null
-})
+**Accessibility:**
+- **Agent-First**: Full MCP tool suite for AI agent integration
+- **No Wallet Switching**: Purchase and race without leaving MCP interface
+- **Simple Payments**: One-time ICRC-2 approval, canister handles rest
+- **Comprehensive Guides**: Documentation for users and developers
 
-// 2. Agent calls MCP tool (e.g., mint robot)
-garage_mint_robot({
-  name: "Scrap-Runner-7",
-  faction: "BattleBot"
-})
+### The PokedBots Racing Experience
 
-// 3. Canister pulls funds via transfer_from
-// 4. Robot NFT is minted and transferred to agent
-// 5. Agent receives confirmation with payment details
+Users can now:
+1. **Browse & Purchase**: Find PokedBots on the marketplace and buy with ICP
+2. **Initialize for Racing**: Register bots for wasteland racing (free)
+3. **Upgrade & Maintain**: Improve stats and keep bots in racing condition
+4. **Compete & Win**: Enter scheduled races and earn ICP prizes
+5. **Track Progress**: View leaderboards and career statistics
 
-// Agent can check/refresh approval as needed
-icrc2_allowance({
-  account: { owner: agent_principal },
-  spender: { owner: canister_principal }
-})
-```
+All accessible through AI agents via the Model Context Protocol, creating a seamless on-chain gaming experience.
 
-### Next Steps
-
-**Phase 1 (COMPLETE):** ✅ Marketplace integration deployed and tested
-
-**Phase 2 (NEXT):**
-1. Design racing stats initialization system (deterministic from token index)
-2. Implement faction-based stat derivation algorithm
-3. Build robot management tools (initialize, details, stats query)
-4. Add maintenance system (recharge, repair, diagnostics)
-5. Implement upgrade system (4 types with faction modifiers)
-6. Create wasteland lore flavor text system
-
-**Phase 3 (RACING):**
-1. Design race simulation algorithm with faction bonuses
-2. Implement automated race scheduling and execution
-3. Build race entry and prize distribution systems
-4. Add Silent Klan tax collection and treasury management
-5. Integration testing with full game loop
-
-**Current Deployment:** `3od6b-qiaaa-aaaai-q37ma-cai` on IC mainnet
-
-**Documentation:** See `docs/marketplace-integration.md` for Phase 1 technical details
-
-**The marketplace is open. Delta City's robot traders await. The wastelands will come next.**
+**The wasteland awaits. Delta City's racing circuit is open for business.**

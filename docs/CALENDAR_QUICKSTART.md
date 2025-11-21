@@ -1,110 +1,98 @@
 ---
-title: "Calendar Quick Reference"
-description: "Quick reference guide for the deployed racing calendar and leaderboard system"
+title: "Racing Events"
+description: "Scheduled races and competitive events in the wasteland"
 order: 5
 ---
 
-# Racing Calendar - Quick Reference
+# Racing Events
 
-## Phase 1 Implementation Complete! ✅
+## Overview
 
-Successfully deployed the racing calendar and leaderboard system. The canister now supports:
+PokedBots Racing features a structured calendar of competitive events. Races are scheduled regularly, allowing you to plan your racing strategy and compete for ICP prizes.
 
-### Scheduled Events
+## Event Types
 
-#### 1. Weekly League Race
+### Weekly League Races
+
+The premier competitive event for serious racers.
+
 - **When**: Every Sunday at 20:00 UTC
-- **Entry Fee**: 0.2 ICP (20,000,000 e8s)
-- **Prize Pool Bonus**: +1 ICP from platform
-- **Points Multiplier**: 2.0x (double leaderboard points)
-- **Registration**: Opens Friday, closes 30 min before race
-- **Max Entries**: 50 (multiple heats if needed)
-- **Divisions**: All (Scavenger, Raider, Elite, SilentKlan)
+- **Entry Fee**: 0.2 ICP
+- **Prize Pool**: Entry fees + 1 ICP platform bonus
+- **Leaderboard Points**: 2.0x multiplier (double points!)
+- **Registration**: Opens Friday, closes 30 minutes before race start
+- **Max Entries**: 50 bots
+- **Eligible Divisions**: All (Scavenger, Raider, Elite, SilentKlan)
 
-#### 2. Daily Sprint Races
+**Why enter?** Higher entry fee means bigger prize pools, and the 2x leaderboard points make this crucial for season rankings.
+
+### Daily Sprint Races
+
+Fast-paced races every 6 hours for quick competition.
+
 - **When**: Every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
-- **Entry Fee**: 0.05 ICP (5,000,000 e8s)
-- **Prize Pool Bonus**: None
-- **Points Multiplier**: 1.0x (standard points)
-- **Registration**: Closes 15 min before race
-- **Max Entries**: 12
-- **Divisions**: Scavenger, Raider, Elite
+- **Entry Fee**: 0.05 ICP
+- **Prize Pool**: Entry fees only
+- **Leaderboard Points**: 1.0x (standard points)
+- **Registration**: Closes 15 minutes before race start
+- **Max Entries**: 12 bots
+- **Eligible Divisions**: Scavenger, Raider, Elite
 
-### Current Schedule (Nov 16-17, 2025)
+**Why enter?** Lower risk, frequent opportunities, great for building experience and climbing division ranks.
+
+## How to Participate
+
+### Finding Races
+
+Use the `racing_list_races` MCP tool to browse upcoming events:
 
 ```
-Event ID 1: Daily Sprint - Nov 16, 18:00 UTC
-Event ID 0: Weekly League - Nov 17, 20:00 UTC (TOMORROW!)
-Event ID 2: Daily Sprint - Nov 17, 00:00 UTC
-Event ID 3: Daily Sprint - Nov 17, 06:00 UTC
-Event ID 4: Daily Sprint - Nov 17, 12:00 UTC
+Tool: racing_list_races
+Parameters:
+  - status: "Upcoming" (optional - filter by race status)
+  - terrain: Filter by terrain type (optional)
+  - race_class: Filter by division (optional)
 ```
 
-## Admin Commands
+The tool returns all scheduled races with:
+- Race ID
+- Start time
+- Entry fee
+- Prize pool
+- Number of entries
+- Registration deadline
 
-### Schedule Events
-```bash
-# Schedule next Weekly League race (Sunday 20:00 UTC)
-dfx canister call --network ic my_mcp_server scheduleNextWeeklyLeague '()'
+### Entering a Race
 
-# Schedule next 4 Daily Sprints (every 6 hours)
-dfx canister call --network ic my_mcp_server scheduleDailySprints '(4:nat)'
+Once you find a race you want to enter, use the `racing_enter_race` tool:
+
+```
+Tool: racing_enter_race
+Parameters:
+  - race_id: The ID of the race to enter
+  - token_index: Your bot's token index
 ```
 
-### View Calendar
-```bash
-# Get upcoming events (next 7 days)
-dfx canister call --network ic my_mcp_server getUpcomingEvents '(7:nat)'
+**Requirements:**
+- Bot must be initialized for racing
+- Bot condition ≥ 70
+- Bot battery ≥ 50
+- Sufficient ICRC-2 allowance for entry fee
+- Registration must be before deadline
 
-# Get all scheduled events
-dfx canister call --network ic my_mcp_server getAllScheduledEvents '()'
+### Checking Results
 
-# Get specific event details
-dfx canister call --network ic my_mcp_server getEventDetails '(0:nat)'
-```
+After a race completes, prizes are automatically distributed to winners' wallets. Check the leaderboard to see updated rankings and your bot's performance statistics.
 
-### Leaderboard Queries
-```bash
-# Get all-time leaderboard (top 100)
-dfx canister call --network ic my_mcp_server getLeaderboard '(variant { AllTime }, 100:nat)'
+## Leaderboard Points
 
-# Get current season leaderboard (Season 1, top 50)
-dfx canister call --network ic my_mcp_server getLeaderboard '(variant { Season = 1:nat }, 50:nat)'
-
-# Get current month leaderboard (November 2024 = 202411)
-dfx canister call --network ic my_mcp_server getLeaderboard '(variant { Monthly = 202411:nat }, 50:nat)'
-
-# Get faction leaderboard (e.g., BattleBot)
-dfx canister call --network ic my_mcp_server getLeaderboard '(variant { Faction = variant { BattleBot } }, 50:nat)'
-
-# Get my ranking for a specific bot
-dfx canister call --network ic my_mcp_server getMyRanking '(variant { AllTime }, 42:nat)'
-```
-
-### Season Management
-```bash
-# Set current season (admin only)
-dfx canister call --network ic my_mcp_server setCurrentSeason '(2:nat)'
-
-# Set current month (admin only)
-dfx canister call --network ic my_mcp_server setCurrentMonth '(202412:nat)'
-
-# Start new season (resets season leaderboard)
-dfx canister call --network ic my_mcp_server startNewSeason '(2:nat)'
-
-# Reset monthly leaderboard (at start of new month)
-dfx canister call --network ic my_mcp_server resetMonthlyLeaderboard '(202412:nat)'
-```
-
-## Leaderboard Point System
-
-Points awarded by finishing position:
+Earn points based on your finishing position in each race:
 
 | Position | Base Points |
 |----------|-------------|
-| 1st      | 25          |
-| 2nd      | 18          |
-| 3rd      | 15          |
+| 🥇 1st   | 25          |
+| 🥈 2nd   | 18          |
+| 🥉 3rd   | 15          |
 | 4th      | 12          |
 | 5th      | 10          |
 | 6th      | 8           |
@@ -112,83 +100,72 @@ Points awarded by finishing position:
 | 9th-10th | 4           |
 | Participation | 2      |
 
-**Points are multiplied by the event's pointsMultiplier:**
-- Weekly League: 2.0x (double points)
-- Daily Sprints: 1.0x (standard points)
-- Future Monthly Cup: 3.0x (triple points)
+**Event Multipliers:**
+- 🏆 Weekly League: 2.0x points
+- ⚡ Daily Sprints: 1.0x points
 
-## Leaderboard Entry Details
+**Example:** Finishing 1st in a Weekly League race = 25 × 2.0 = **50 points**!
 
-Each leaderboard entry includes:
-- **tokenIndex**: Bot ID
-- **owner**: Owner principal
-- **points**: Total points earned
-- **wins**: Number of 1st place finishes
-- **podiums**: Number of top-3 finishes
-- **races**: Total races completed
-- **winRate**: Percentage of races won
-- **avgPosition**: Average finishing position
-- **totalEarnings**: Total ICP won (in e8s)
-- **bestFinish**: Best position ever achieved
-- **currentStreak**: Win/loss streak (positive for wins, negative for losses)
-- **rank**: Current ranking position
-- **trend**: Rank change (Up, Down, Stable, New)
+## Leaderboard Types
 
-## Next Steps
+### All-Time Leaderboard
+Career statistics tracking every race you've ever competed in. This is your permanent racing legacy.
 
-1. **Week 1**: Monitor first Weekly League race (Sunday 20:00 UTC)
-2. **Week 2**: Analyze participation and adjust entry fees if needed
-3. **Week 3**: Continue scheduling weekly/daily races automatically
-4. **Month 2**: Implement Monthly Championship Cup for top performers
-5. **Month 3+**: Add Special Events with unique themes
+### Season Leaderboard
+Resets each season (typically 3 months). Compete for seasonal championships and bragging rights.
 
-## Integration Notes
+### Monthly Leaderboard
+Resets every month. Great for consistent racers to showcase their current form.
 
-- Leaderboard automatically updates after each race completion
-- Points are recorded across all leaderboard types (Monthly, Season, All-Time, Faction)
-- Calendar events are stored in stable storage (survives upgrades)
-- Admin can schedule events weeks/months in advance
+### Faction Leaderboard
+See how your bot ranks among others of the same faction (BattleBot, EntertainmentBot, WildBot, Master, GodClass).
 
-## Development Roadmap
+## Your Racing Stats
 
-### Completed ✅
-- [x] RaceCalendar module with event scheduling
-- [x] Leaderboard module with points system
-- [x] Weekly League race scheduling
-- [x] Daily Sprint race scheduling
-- [x] Leaderboard query endpoints
-- [x] Season/month management
+Each bot tracks:
+- **Total Points**: Across all leaderboards
+- **Wins**: Number of 1st place finishes
+- **Podiums**: Top 3 finishes
+- **Win Rate**: Percentage of races won
+- **Average Position**: Your typical finish
+- **Total Earnings**: ICP won from racing
+- **Current Streak**: Consecutive wins (or losses)
+- **Rank Trend**: Are you climbing or falling?
 
-### Next Features (Phase 2+)
-- [ ] Automatic race creation from scheduled events
-- [ ] Monthly Championship Cup (tournament brackets)
-- [ ] Special themed events
-- [ ] Season championship system
-- [ ] Advanced statistics and analytics
-- [ ] Notification system for upcoming events
-- [ ] Prize pool tracking per event
+## Racing Strategy Tips
 
-## Technical Details
+### Maximize Your Points
 
-### Event Types
-- `WeeklyLeague`: Major competitive Sunday races
-- `DailySprint`: Quick 6-hour interval races
-- `MonthlyCup`: Tournament for top performers (coming soon)
-- `SpecialEvent`: Themed races with unique mechanics (coming soon)
+1. **Prioritize Weekly Leagues**: The 2x multiplier makes these crucial for leaderboard climbing
+2. **Stay Active**: Even participation points add up over time
+3. **Maintain Your Bot**: Keep condition ≥ 70 to enter races
+4. **Plan Ahead**: Registration windows close early - don't miss out
+5. **Build Streaks**: Consecutive wins boost your reputation
 
-### Leaderboard Types
-- `AllTime`: Career statistics
-- `Season(seasonId)`: Current season (default: Season 1)
-- `Monthly(monthId)`: Current month (format: YYYYMM, e.g., 202411)
-- `Faction(factionType)`: By bot faction
-- `Division(raceClass)`: By skill tier (filtered view)
+### Division Progression
 
-### Storage
-All calendar events and leaderboard data are stored in stable variables that persist across canister upgrades.
+As you win races, you'll advance through divisions:
+- **Scavenger** (0-2 wins): Starting division
+- **Raider** (3-5 wins): Intermediate competition
+- **Elite** (6-9 wins): Advanced racers
+- **SilentKlan** (10+ wins): Top tier, highest stakes
 
-## Support
+Higher divisions mean tougher competition but better rewards!
 
-For questions or issues:
-1. Check canister logs: `dfx canister logs my_mcp_server --ic`
-2. Verify timer status: `dfx canister call --network ic my_mcp_server get_timer_diagnostics '()'`
-3. Review upcoming events: `dfx canister call --network ic my_mcp_server getUpcomingEvents '(7:nat)'`
+### Prize Distribution
+
+Prize pools are divided among top finishers:
+- 🥇 1st place: 47.5% of pool
+- 🥈 2nd place: 23.75%
+- 🥉 3rd place: 14.25%
+- 4th place: 9.5%
+- Platform fee: 5%
+
+## Coming Soon
+
+- **Monthly Championship Cups**: Tournament brackets for top performers
+- **Special Events**: Themed races with unique mechanics and bonus prizes
+- **Advanced Statistics**: Detailed performance analytics
+- **Faction Championships**: Faction vs faction competitions
+
+Stay tuned for announcements!

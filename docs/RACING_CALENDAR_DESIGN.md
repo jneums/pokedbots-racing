@@ -1,104 +1,198 @@
 ---
-title: "Racing Calendar Design"
-description: "Structured racing season system with multiple event types, leaderboards, and championship tournaments"
+title: "Racing Season Guide"
+description: "How racing seasons, divisions, and championships work"
 order: 2
 ---
 
-# Racing Calendar System Design
+# Racing Season Guide
 
 ## Overview
-Transform the current ad-hoc race creation into a structured racing season with multiple event types, leaderboards, and championship tournaments.
 
-## Event Types
+PokedBots Racing features a structured competitive season with multiple event types, leaderboards, and championship opportunities. This guide explains how it all works together.
 
-### 1. Weekly League Race
-- **Schedule**: Every Sunday at 20:00 UTC
-- **Purpose**: Main competitive event for leaderboard points
-- **Format**:
-  - All skill tiers participate in separate divisions
-  - Large prize pool (entry fees pooled + platform bonus)
-  - Double leaderboard points
-  - Multiple heats if >12 entries per division
-- **Entry**: Open registration Friday-Sunday 19:30 UTC
-- **Prize Distribution**: 
-  - 1st: 40%
-  - 2nd: 25%
-  - 3rd: 15%
-  - 4th-6th: 5% each
-  - 7th-10th: 1.25% each
+## Current Event Types
 
-### 2. Daily Sprints
-- **Schedule**: Every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
-- **Purpose**: Quick races for XP and minor rewards
-- **Format**:
-  - Fast races (5-10km)
-  - Lower entry fees
-  - Quick turnaround (entries close 15 min before)
-  - XP bonuses for participation
-- **Prize Distribution**: Standard 47.5%/23.75%/14.25%/9.5%
+### Weekly League Races
+**The main competitive event**
 
-### 3. Monthly Championship Cup
-- **Schedule**: 1st Saturday of each month at 20:00 UTC
-- **Purpose**: Elite tournament for top performers
-- **Format**:
-  - Qualification: Top 32 or 64 on monthly leaderboard
-  - Single or double elimination bracket
-  - Seeded by league performance
-  - Best of 3 races per match
-- **Prizes**:
-  - Winner: Special NFT or unique PokedBot
+- **When**: Every Sunday at 20:00 UTC
+- **Registration**: Opens Friday, closes 30 minutes before start
+- **Entry Fee**: 0.2 ICP
+- **Prize Pool**: All entry fees + 1 ICP platform bonus
+- **Leaderboard Points**: 2x multiplier (crucial for rankings!)
+- **Format**: All divisions compete, multiple heats if needed
+- **Why participate**: Biggest prizes, most points, best competition
+
+### Daily Sprint Races
+**Quick competitive action**
+
+- **When**: Every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
+- **Registration**: Closes 15 minutes before start
+- **Entry Fee**: 0.05 ICP
+- **Prize Pool**: Entry fees only
+- **Leaderboard Points**: 1x (standard)
+- **Format**: Fast races (5-10km), max 12 bots
+- **Why participate**: Low risk, frequent opportunities, builds experience
+
+## Coming Soon
+
+### Monthly Championship Cup
+**Elite tournament for top performers** (Launching soon!)
+
+- **When**: First Saturday of each month at 20:00 UTC
+- **Qualification**: Top 32-64 on monthly leaderboard
+- **Format**: Single/double elimination bracket
+- **Prizes**: 
+  - Winner: Exclusive NFT or unique PokedBot
   - Top 3: Major ICP prizes
-  - Participants: Exclusive badges/titles
+  - All participants: Special badges
+- **Entry**: Free for qualified racers
 
-### 4. Special Events
-- **Schedule**: Announced 48+ hours in advance
-- **Purpose**: Themed races with unique mechanics
-- **Examples**:
-  - "Wasteland Storm" - randomized weather effects
-  - "Scrap Rally" - all terrain stages
-  - "Faction Wars" - team-based competition
-  - "Survival Sprint" - last bot standing
-- **Format**: Varies by event theme
-- **Prizes**: Unique rewards and special NFTs
+### Special Events
+**Themed races with unique mechanics** (Coming soon!)
 
-## Season Structure
+Examples include:
+- **Wasteland Storm**: Random weather effects during race
+- **Scrap Rally**: Multi-stage race across all terrains
+- **Faction Wars**: Team-based faction vs faction competition
+- **Survival Sprint**: Elimination-style racing
 
-### League Season (10-20 races)
-- **Duration**: ~2.5-5 months (weekly races)
-- **Points System**:
-  - 1st place: 25 points
-  - 2nd place: 18 points
-  - 3rd place: 15 points
-  - 4th place: 12 points
-  - 5th place: 10 points
-  - 6th place: 8 points
-  - 7th-8th: 6 points
-  - 9th-10th: 4 points
-  - Participation: 2 points
-- **Divisions**: Scavenger, Raider, Elite, SilentKlan
-- **Qualification**: Top 8 per division advance to Championship Cup
+## Division System
+
+As you win races, you progress through divisions:
+
+### Scavenger Class (0-2 wins)
+- **Starting division** for all new racers
+- **Entry requirements**: Any bot with condition ≥ 70
+- **Competition**: Mixed skill levels, good for learning
+- **Advancement**: Win 3 races to reach Raider
+
+### Raider Class (3-5 wins)
+- **Intermediate division**
+- **Entry requirements**: 3+ career wins
+- **Competition**: More experienced racers
+- **Advancement**: Win 6 total races to reach Elite
+
+### Elite Class (6-9 wins)
+- **Advanced division**
+- **Entry requirements**: 6+ career wins
+- **Competition**: Top-tier racers
+- **Advancement**: Win 10 total races to reach SilentKlan
+
+### SilentKlan Invitational (10+ wins)
+- **Top tier** - highest stakes racing
+- **Entry requirements**: 10+ career wins
+- **Competition**: Champions only
+- **Special**: Occasionally restricted to GodClass & Master factions only
+
+## Points System
+
+Points are awarded based on finishing position:
+
+| Position | Points Earned |
+|----------|---------------|
+| 🥇 1st   | 25 points     |
+| 🥈 2nd   | 18 points     |
+| 🥉 3rd   | 15 points     |
+| 4th      | 12 points     |
+| 5th      | 10 points     |
+| 6th      | 8 points      |
+| 7th-8th  | 6 points      |
+| 9th-10th | 4 points      |
+| Participation | 2 points |
+
+**Event Multipliers:**
+- Weekly League: 2.0x (e.g., 1st place = 50 points!)
+- Daily Sprints: 1.0x
+- Monthly Cup: 3.0x (when launched)
+
+## Leaderboard Types
+
+### All-Time Leaderboard
+- **Purpose**: Your permanent racing legacy
+- **Duration**: Never resets
+- **Scope**: Every race you've ever competed in
+- **Why it matters**: Bragging rights, historical record
+
+### Season Leaderboard
+- **Purpose**: Current season competition
+- **Duration**: ~3 months per season
+- **Scope**: Only races in current season
+- **Why it matters**: Season championship qualification
+
+### Monthly Leaderboard
+- **Purpose**: Short-term competition
+- **Duration**: Resets on 1st of each month
+- **Scope**: Only races in current calendar month
+- **Why it matters**: Monthly Championship Cup qualification (top 32-64)
+
+### Faction Leaderboard
+- **Purpose**: Compete within your faction
+- **Duration**: Never resets
+- **Scope**: Only bots from your faction
+- **Why it matters**: Faction pride, special faction events
+
+## Prize Distribution
+
+**Standard Race Format:**
+- 🥇 1st place: 47.5% of prize pool
+- 🥈 2nd place: 23.75%
+- 🥉 3rd place: 14.25%
+- 4th place: 9.5%
+- Platform fee: 5% (covers operations)
+
+**Weekly League may have adjusted splits** to reward more positions when fields are large.
+
+## Season Structure (Coming Soon)
+
+### League Season
+- **Duration**: 10-20 weeks (one Weekly League per week)
+- **Points accumulate** throughout season
+- **Top 8 per division** advance to Championship Cup
+- **Season rewards**: Special badges, titles, potential NFT rewards
 
 ### End of Season Championship Cup
 - **Format**: Double elimination bracket
-- **Seeding**: Based on league points
-- **Rounds**:
-  - Round of 32 (or 64)
-  - Round of 16
-  - Quarterfinals
-  - Semifinals
-  - Finals
-- **Special Rules**:
-  - Best of 3 races per match
-  - Varied terrain/distance per race
-  - Loser's bracket for second chances
+- **Seeding**: Based on season league points
+- **Rounds**: 32 → 16 → 8 → 4 → Finals
+- **Best of 3**: Each match is best 2 out of 3 races
+- **Varied conditions**: Each race in match has different terrain/distance
+- **Special prizes**: Season champion NFT, major ICP prize
 
-## Leaderboard System
+## Strategy Tips
 
-### Monthly Leaderboard
-- Points from all races in calendar month
-- Determines Monthly Cup qualification
-- Resets 1st of each month
-- Top 32/64 qualify for Monthly Cup
+### Early Season
+- Focus on **consistency** - participation points add up
+- Enter Daily Sprints to build win count and advance divisions
+- Keep your bot maintained (condition/battery) to never miss races
+
+### Mid Season
+- Prioritize **Weekly Leagues** for the 2x points
+- Target specific divisions where you're competitive
+- Consider strategic upgrades to boost performance
+
+### Late Season
+- If you're in top 8, **protect your position**
+- If you're close, go aggressive in Weekly Leagues
+- Prepare your best bot for Championship Cup
+
+### Monthly Cup Prep
+- Track monthly leaderboard rankings
+- Last week of month is crucial for qualification
+- Top 32-64 qualify - know your cutoff position
+
+## Racing Calendar
+
+Check upcoming races using the `racing_list_races` MCP tool:
+- Filter by division, terrain, or time
+- See entry deadlines and prize pools
+- Plan your racing schedule strategically
+
+Most competitive racers enter:
+- 1 Weekly League per week (Sundays)
+- 2-4 Daily Sprints per week
+- All available Special Events
+- Monthly Cup if qualified
 
 ### Season Leaderboard
 - Points from designated league races only

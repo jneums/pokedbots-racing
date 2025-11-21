@@ -15,11 +15,34 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io'),
   title: "PokedBots Racing | Wasteland Racing on ICP",
   description: "Race your PokedBots in the wasteland. Upgrade with scrap parts, compete in events, and win ICP prizes.",
   icons: {
     icon: '/pokedbots-racing-logo.webp',
     apple: '/pokedbots-racing-logo.webp',
+  },
+  openGraph: {
+    title: "PokedBots Racing | Wasteland Racing on ICP",
+    description: "Race your PokedBots in the wasteland. Upgrade with scrap parts, compete in events, and win ICP prizes.",
+    url: "https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io",
+    siteName: "PokedBots Racing",
+    images: [
+      {
+        url: "/pokedbots-racing-logo.webp",
+        width: 600,
+        height: 200,
+        alt: "PokedBots Racing - Wasteland Racing on ICP",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "PokedBots Racing | Wasteland Racing on ICP",
+    description: "Race your PokedBots in the wasteland. Upgrade with scrap parts, compete in events, and win ICP prizes.",
+    images: ["/pokedbots-racing-logo.webp"],
   },
 };
 
@@ -33,7 +56,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <header className="sticky top-0 z-50 w-full border-b bg-card/50 backdrop-blur-lg">
+        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container mx-auto px-6">
             <div className="flex h-20 items-center justify-between">
               <Link href="/" className="flex items-center gap-3 font-semibold text-foreground hover:text-primary transition-colors">

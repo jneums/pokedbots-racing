@@ -387,7 +387,7 @@ List races with prize pools over 50 ICP
 ```
 🏁 Race #42 - Scavenger Class
    🏆 Prize Pool: 10.5 ICP (7 entries)
-   💰 Entry Fee: 1.5 ICP
+   💰 Entry Fee: 0.15 ICP
    📏 Distance: 8.2 km (MediumHaul)
    🌍 Terrain: MetalRoads
    👥 Spots: 7/12 filled
@@ -650,7 +650,7 @@ Transfer bot #1417 to [recipient_account_id]
 
 **Costs to Consider:**
 - Bot purchase: 6-599 ICP (budget 20-50 ICP for starters)
-- Race entry fees: 0.5-50 ICP depending on class
+- Race entry fees: 0.05-5 ICP depending on class
 - Recharges: 10 ICP per recharge (needed every ~5 races)
 - Repairs: 5 ICP (cheaper than recharge if battery is fine)
 - Upgrades: 20 ICP per upgrade (permanent improvement)

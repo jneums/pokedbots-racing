@@ -308,22 +308,33 @@ export default function Home() {
                 </Link>
               </div>
               <div className="grid md:grid-cols-2 gap-6">
-                {guides.slice(0, 4).map((guide) => (
-                  <Link key={guide.slug} href={`/guides/${guide.slug}`}>
-                    <Card className="border-2 hover:border-primary/50 transition-all h-full hover:shadow-xl hover:shadow-primary/5 group">
-                      <CardHeader className="space-y-3">
-                        <CardTitle className="text-2xl group-hover:text-primary transition-colors">
-                          {guide.metadata.title || guide.slug}
-                        </CardTitle>
-                        {guide.metadata.description && (
-                          <CardDescription className="text-base leading-relaxed">
-                            {guide.metadata.description}
-                          </CardDescription>
-                        )}
-                      </CardHeader>
-                    </Card>
-                  </Link>
-                ))}
+                {(() => {
+                  const featuredSlugs = [
+                    'beginner-racing-guide',
+                    'full-system-demo-and-recommendations', 
+                    'elite-faction-showcase',
+                    'mcp-tools-guide'
+                  ];
+                  const featuredGuides = featuredSlugs
+                    .map(slug => guides.find(g => g.slug === slug))
+                    .filter((guide): guide is NonNullable<typeof guide> => guide !== undefined);
+                  return featuredGuides.map((guide) => (
+                    <Link key={guide.slug} href={`/guides/${guide.slug}`}>
+                      <Card className="border-2 hover:border-primary/50 transition-all h-full hover:shadow-xl hover:shadow-primary/5 group">
+                        <CardHeader className="space-y-3">
+                          <CardTitle className="text-2xl group-hover:text-primary transition-colors">
+                            {guide.metadata.title || guide.slug}
+                          </CardTitle>
+                          {guide.metadata.description && (
+                            <CardDescription className="text-base leading-relaxed">
+                              {guide.metadata.description}
+                            </CardDescription>
+                          )}
+                        </CardHeader>
+                      </Card>
+                    </Link>
+                  ));
+                })()}
               </div>
             </div>
           </div>
@@ -486,7 +497,7 @@ export default function Home() {
               <div className="flex flex-wrap items-center justify-between gap-6 mb-16">
                 <div>
                   <h2 className="text-5xl font-bold mb-3">Docs</h2>
-                  <p className="text-xl text-muted-foreground">Explore design docs and technical details</p>
+                  <p className="text-xl text-muted-foreground">System guides and racing mechanics explained</p>
                 </div>
                 <Link href="/docs">
                   <Button variant="outline" size="lg" className="text-base px-6 border-2">
@@ -495,7 +506,7 @@ export default function Home() {
                 </Link>
               </div>
               <div className="grid md:grid-cols-2 gap-6">
-                {docs.slice(0, 4).map((doc) => (
+                {docs.map((doc) => (
                   <Link key={doc.slug} href={`/docs/${doc.slug}`}>
                     <Card className="border-2 hover:border-primary/50 transition-all h-full hover:shadow-xl hover:shadow-primary/5 group">
                       <CardHeader className="space-y-3">

@@ -1,103 +1,168 @@
 ---
-title: "Comprehensive Stats Design"
-description: "Multi-trait stat derivation system for more realistic robot performance"
+title: "Bot Stats Explained"
+description: "Understanding your PokedBot's racing statistics and performance"
 order: 4
 ---
 
-# Comprehensive Stat Derivation Design
+# Understanding Bot Stats
 
-## Current Problem
+## The Four Core Stats
 
-Each stat is derived from **only one trait** using a hash function:
-- Speed ← Arms only
-- Power Core ← Body only
-- Acceleration ← Legs only
-- Stability ← Driver Guy only
+Every PokedBot has four primary stats that determine its racing performance:
 
-This doesn't make physical sense! A robot's speed depends on its **legs** (locomotion), **wings** (thrust/jets), **body** (weight/aerodynamics), and arms (balance/propulsion).
+### 🏎️ Speed (30-100)
+**What it does**: Determines your bot's top speed on straightaways
 
-## Proposed: Multi-Trait Formulas
+**Influenced by:**
+- **Legs** (40%): Primary locomotion - rocket legs, power legs, super legs
+- **Wings** (30%): Jets, rockets, engines for thrust
+- **Body** (20%): Lighter bodies = faster (heavy builds slow you down)
+- **Arms** (10%): Rocket arms add thrust
 
-### 🏎️ SPEED = Legs (40%) + Wings (30%) + Body (20%) + Arms (10%)
+**Best for**: Short sprints and final stretches
 
-**Why:**
-- **Legs (40%)** - Primary locomotion! Rockets, super legs, power legs vs small bendy
-- **Wings (30%)** - Jets, rockets, engines provide major thrust
-- **Body (20%)** - Heavy bodies slow you down, aerodynamic/small bodies are faster
-- **Arms (10%)** - Minor: rockets/jets on arms add thrust, heavy arms slow down
+### ⚡ Power Core (30-100)
+**What it does**: Determines endurance and performance over longer distances
 
-**Legs keywords (40% weight):**
-- HIGH (60-75): `rocket`, `super`, `midi super fast`, `power walker`, `ultimate`
-- MEDIUM-HIGH (50-65): `power`, `strong`, `chunky`, `8 bit power`, `spiky`
-- MEDIUM (40-55): `midi`, `bendy`, `cables`, `bird claw`, `frog`, `balloon`
-- LOW (30-50): `small`, `burnt`, `rust`, `inflatable`, `cactus`
+**Influenced by:**
+- **Body** (50%): Larger chassis = bigger power capacity
+- **Arms** (25%): Power arms and weapons draw significant energy
+- **Legs** (15%): Power legs need consistent energy
+- **Wings** (10%): Engines consume power
 
-**Wings keywords (30% weight):**
-- HIGH (60-75): `massive engines`, `rocket`, `jet`, `triangle up` (fins = aerodynamic)
-- MEDIUM-HIGH (50-65): `power cells`, `butterfly double`, `angel wings` (large)
-- MEDIUM (40-55): `8 bit`, `bear ears`, `horns`, `decal`
-- LOW (30-45): `inflatable`, `burnt`, `lolly pops`, `straws`, `blank` (none)
+**Best for**: Long-distance races (15km+)
 
-**Body keywords (20% weight, INVERSE - heavy = slow):**
-- LIGHT/FAST (60-75): `egg`, `bubble`, `balloon`, `glass`, `gummy`
-- MEDIUM (45-60): `game boy`, `n 64`, `ipod`, `8 bit`
-- HEAVY/SLOW (30-45): `mega controller`, `large controller`, `beast`, `tower`, `massive`
+### 🏃 Acceleration (30-100)
+**What it does**: How quickly your bot reaches top speed from a standstill
 
-**Arms keywords (10% weight):**
-- HIGH (60-75): `rocket`, `jet`, `lazer`, `rainbow`
-- MEDIUM (45-60): `power arms`, `8 bit`, `connector`
-- LOW (30-45): `hands down`, `3 fingers`, `bone`
+**Influenced by:**
+- **Legs** (50%): Quick response, agility, burst speed
+- **Arms** (20%): Initial thrust and push-off power
+- **Wings** (20%): Jets for quick bursts
+- **Body** (10%, inverse): Heavy bodies accelerate slower
 
----
+**Best for**: Tight races with lots of position changes
 
-### ⚡ POWER CORE = Body (50%) + Arms (25%) + Legs (15%) + Wings (10%)
+### 🎯 Stability (30-100)
+**What it does**: Consistency on rough terrain and resistance to hazards
 
-**Why:**
-- **Body (50%)** - The main chassis houses the power core! Larger = more power capacity
-- **Arms (25%)** - Power arms, heavy weapons draw significant power
-- **Legs (15%)** - Power legs, strong legs need energy
-- **Wings (10%)** - Engines/jets consume power but less than main systems
+**Influenced by:**
+- **Driver Guy** (50%): Pilot skill and control
+- **Body** (25%): Lower center of gravity = more stable
+- **Legs** (15%): Strong legs handle bumps better
+- **Wings** (10%): Large wings help balance
 
-**Body keywords (50% weight):**
-- HIGH (60-80): `mega`, `large`, `ultimate`, `tower`, `master`, `super`, `golden`, `beast`
-- MEDIUM-HIGH (50-65): `controller`, `battle box`, `command box`, `iron`, `copper`
-- MEDIUM (40-55): `egg`, `game boy`, `n 64`, `frog`, `bee body`
-- LOW (30-45): `small`, `mini`, `bubble`, `glass`, `split`
+**Best for**: Scrap Heap terrain, avoiding crashes
 
-**Arms keywords (25% weight):**
-- HIGH (60-75): `power arms`, `ultimate`, `massive jets`, `rainbow lazers`, `double arms`
-- MEDIUM (45-60): `rocket`, `8 bit`, `connector`, `cable`, `lazer`
-- LOW (30-45): `hands down`, `small`, `3 fingers`, `bone white`
+## Faction Bonuses
 
-**Legs keywords (15% weight):**
-- HIGH (55-70): `power`, `strong`, `chunky`, `ultimate`, `super legs`
-- MEDIUM (40-55): `midi`, `8 bit`, `cables`, `industrial`
-- LOW (30-45): `small`, `bendy`, `burnt`, `balloon`
+Your bot's faction provides permanent stat bonuses:
 
-**Wings keywords (10% weight):**
-- HIGH (55-70): `massive engines`, `power cells`, `ultimate`, `golden`
-- MEDIUM (40-55): `angel wings`, `rocket`, `8 bit`, `butterfly`
-- LOW (30-45): `blank`, `decal`, `burnt`, `inflatable`, `lolly pops`
+- **BattleBot** (59.3% of bots): +5 to all stats
+- **EntertainmentBot** (24.3%): +10 Speed, +5 Acceleration
+- **WildBot** (5.8%): +10 Stability, +5 Power Core
+- **Master** (6.9%): +12 Speed/Power, +8 Acceleration/Stability
+- **GodClass** (2.7% - rarest!): +15 to ALL stats
 
----
+## Rarity Attributes
 
-### 🏃 ACCELERATION = Legs (50%) + Arms (20%) + Wings (20%) + Body (10% INVERSE)
+Special attributes add bonus stats:
 
-**Why:**
-- **Legs (50%)** - Quick response, agility, burst speed from legs
-- **Arms (20%)** - Can push off, provide initial thrust
-- **Wings (20%)** - Jets provide quick bursts
-- **Body (10% inverse)** - Heavy bodies accelerate slower
+- **GOLD**: Significant boost to all stats (~+36 total)
+- **BLACK**: Moderate boost to all stats (~+21 total)
+- **BLUE**: Small boost to all stats (~+3 total)
+- **PINK**: Minor boost to all stats
+- **RUST**: Slight penalty to stats (battle-worn aesthetic)
 
-**Legs keywords (50% weight):**
-- HIGH (60-80): `midi super fast`, `super legs`, `spiky`, `bird claw`, `frog` (spring-like)
-- MEDIUM (45-60): `bendy`, `midi`, `cables`, `power`, `8 bit`
-- LOW (30-45): `chunky`, `large`, `burnt`, `rust`, `inflatable`
+**Multiple attributes stack!** A bot with GOLD + BLACK gets both bonuses.
 
-**Arms keywords (20% weight):**
-- HIGH (55-70): `lazer`, `rainbow`, `rocket up`, `power jets`, `chainsaw` (torque)
-- MEDIUM (40-55): `claws`, `power arms`, `8 bit`, `connector`
-- LOW (30-45): `hands down large`, `bone`, `burnt`, `lazers off`
+## Overall Rating
+
+Your bot's Overall Rating is calculated as:
+```
+(Speed + Power Core + Acceleration + Stability) / 4
+```
+
+**Rating ranges:**
+- 70-80: Elite tier (top 10%)
+- 60-70: Strong performer
+- 50-60: Average racer
+- 40-50: Entry level
+- 30-40: Needs upgrades
+
+## How Stats Affect Racing
+
+### Short Sprints (5-10km)
+- **Most Important**: Speed, Acceleration
+- **Less Important**: Power Core
+- **Key Traits**: Rocket legs, jet wings, light body
+
+### Medium Races (10-20km)
+- **Balanced** importance across all stats
+- **Key Factor**: Avoiding crashes (Stability)
+
+### Long Treks (20-30km)
+- **Most Important**: Power Core, Stability
+- **Less Important**: Acceleration
+- **Key Traits**: Large body, strong legs, experienced driver
+
+### Terrain Effects
+
+**Scrap Heaps** (garbage towers):
+- Stability most important
+- BattleBots get +8% bonus
+- Many obstacles and hazards
+
+**Wasteland Sand** (desert):
+- Speed and Power Core important
+- Medium difficulty terrain
+
+**Metal Roads** (ancient highways):
+- Pure speed race
+- EntertainmentBots excel here
+
+## Improving Your Stats
+
+### Permanent Upgrades
+Use the upgrade system to permanently boost stats:
+- **Velocity Module**: +1-3 Speed (20 ICP, 12 hours)
+- **PowerCore Enhancement**: +1-3 Power Core (20 ICP, 12 hours)
+- **Thruster Calibration**: +1-3 Acceleration (20 ICP, 12 hours)
+- **Gyro Stabilization**: +1-2 Stability (25 ICP, 24 hours)
+
+Upgrades are permanent and stack over time!
+
+### Temporary Boosts
+- **High Condition**: Bots with condition ≥ 90 perform at peak
+- **Full Battery**: Battery ≥ 80 ensures no power loss mid-race
+- **Terrain Match**: Racing on your preferred terrain gives slight edge
+
+## Finding the Right Bot
+
+### For Speed Demons
+Look for: Rocket legs, jet wings, light body (eggs, bubbles)
+**Factions**: EntertainmentBot, Master
+
+### For Endurance Racers
+Look for: Large body, power cores, strong legs
+**Factions**: BattleBot, GodClass
+
+### For All-Rounders
+Look for: Balanced traits, GOLD attribute
+**Factions**: Master, GodClass
+
+### Best Value
+- BattleBots with GOLD (common faction + rare attribute)
+- WildBots with high stability (undervalued faction)
+- Any bot with 60+ overall rating under 10 ICP
+
+## Pro Tips
+
+1. **Check the full build** - One great trait doesn't make a champion
+2. **Rarity matters** - GOLD attribute often worth more than faction
+3. **Upgrade strategically** - Focus on your bot's strongest stat
+4. **Match to race type** - Speed bot for sprints, Power bot for treks
+5. **Condition is key** - A well-maintained 60-rated bot beats a neglected 70
 
 **Wings keywords (20% weight):**
 - HIGH (55-70): `rocket`, `massive engines`, `power cells sparks`, `triangle up` (quick)

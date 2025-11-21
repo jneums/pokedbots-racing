@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { getDocBySlug, getDocSlugs } from "@/lib/markdown";
-import { ChevronLeft } from "lucide-react";
+import { getDocBySlug, getDocSlugs, getAllDocs } from "@/lib/markdown";
+import { ChevronLeft, ChevronRight, List } from "lucide-react";
 
 export async function generateStaticParams() {
   const slugs = getDocSlugs('guides');
@@ -35,6 +35,12 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
     notFound();
   }
 
+  // Get all guides to find next/previous
+  const allGuides = getAllDocs('guides');
+  const currentIndex = allGuides.findIndex(g => g.slug === slug);
+  const prevGuide = currentIndex > 0 ? allGuides[currentIndex - 1] : null;
+  const nextGuide = currentIndex < allGuides.length - 1 ? allGuides[currentIndex + 1] : null;
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-12">
@@ -54,6 +60,40 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
             )}
             <div className="markdown-content" dangerouslySetInnerHTML={{ __html: guide.content }} />
           </article>
+
+          {/* Navigation Buttons */}
+          <div className="mt-16 pt-8 border-t border-border">
+            <div className="flex flex-wrap gap-4 items-center justify-between">
+              <div className="flex gap-4">
+                {prevGuide && (
+                  <Link href={`/guides/${prevGuide.slug}`}>
+                    <Button variant="outline" size="lg" className="text-base">
+                      <ChevronLeft className="mr-2 h-5 w-5" />
+                      {prevGuide.metadata.title || prevGuide.slug}
+                    </Button>
+                  </Link>
+                )}
+              </div>
+              
+              <div className="flex gap-4">
+                <Link href="/guides">
+                  <Button variant="outline" size="lg" className="text-base">
+                    <List className="mr-2 h-5 w-5" />
+                    All Guides
+                  </Button>
+                </Link>
+                
+                {nextGuide && (
+                  <Link href={`/guides/${nextGuide.slug}`}>
+                    <Button variant="default" size="lg" className="text-base">
+                      {nextGuide.metadata.title || nextGuide.slug}
+                      <ChevronRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

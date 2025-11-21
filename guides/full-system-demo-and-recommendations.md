@@ -1,10 +1,10 @@
 ---
-title: Full System Demo & Recommendations
+title: Complete System Guide
 description: Complete walkthrough of the racing system with strategic recommendations
 order: 2
 ---
 
-# PokedBots Racing: Complete System Demo & Recommendations 🏁
+# PokedBots Racing: Complete System Guide 🏁
 
 *Your Ultimate Guide to Dominating the Wasteland - November 16, 2025*
 
@@ -57,7 +57,7 @@ This guide provides data-driven recommendations for getting started and maximizi
 - Example: Token #4375 (6 ICP, 55 rating, BattleBot)
 
 **Racing Approach:**
-- Start with Scavenger class races (0.5-2 ICP entry fees)
+- Start with Scavenger class races (0.05-0.2 ICP entry fees)
 - Enter 5-10 races to learn mechanics
 - Focus on MetalRoads terrain (most common)
 
@@ -261,28 +261,28 @@ This guide provides data-driven recommendations for getting started and maximizi
 ### Understanding Race Classes
 
 **Scavenger Class (0-2 wins)**
-- Entry Fee: 0.5-2 ICP
+- Entry Fee: 0.05-0.2 ICP
 - Prize Pool: 5-20 ICP
 - Competition: Beginner bots
 - Strategy: Learn mechanics, build win record
 - Recommended: All new racers start here
 
 **Raider Class (3-9 wins)**
-- Entry Fee: 2-10 ICP
+- Entry Fee: 0.2-1 ICP
 - Prize Pool: 20-100 ICP
 - Competition: Upgraded mid-tier bots
 - Strategy: Specialized builds, terrain matching
 - Recommended: After 3 wins and 1-2 upgrades
 
 **Elite Class (10+ wins)**
-- Entry Fee: 10-50 ICP
+- Entry Fee: 1-5 ICP
 - Prize Pool: 100-500 ICP
 - Competition: Highly upgraded premium bots
 - Strategy: Min-maxed builds, perfect terrain/distance matching
 - Recommended: Multiple upgrades, 65+ rating
 
 **SilentKlan (10+ wins, invite only)**
-- Entry Fee: 50-200 ICP
+- Entry Fee: 5-20 ICP
 - Prize Pool: 500-2,000 ICP
 - Competition: Best of the best
 - Strategy: Elite GodClass/Master bots, full upgrades

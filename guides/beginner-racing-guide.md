@@ -252,7 +252,7 @@ The average of all four stats:
 ### For Your First 5 Races
 
 1. **Start with Practice Races** (Scavenger class)
-   - Entry fee: ~0.5-1 ICP
+   - Entry fee: ~0.05-0.1 ICP
    - Short distances (3-8km)
    - Lower stakes, good for learning
 
@@ -356,25 +356,55 @@ After you've purchased and raced your first bot:
 
 ---
 
-## FAQ
+## Frequently Asked Questions
 
-**Q: How much ICP do I need to start?**
-A: Minimum 6 ICP for a bot, plus ~1 ICP for your first few race entries. 10-15 ICP is recommended.
+<details>
+<summary><strong>💰 How much ICP do I need to start?</strong></summary>
 
-**Q: Can I lose ICP racing?**
-A: Yes - entry fees are not refunded if you lose. Start with cheap Scavenger races (0.5-1 ICP entry).
+Minimum 6 ICP for a bot, plus ~1 ICP for your first few race entries. **10-15 ICP is recommended** for a comfortable start with room for a few races and potential repairs.
 
-**Q: What happens if my bot's battery runs out?**
-A: You need to recharge (10 ICP, 6 hour cooldown) to restore battery and condition.
+</details>
 
-**Q: Should I repair or recharge my bot?**
-A: Recharge costs more but restores both condition and battery. Repair is cheaper but only fixes condition.
+<details>
+<summary><strong>❌ Can I lose ICP racing?</strong></summary>
 
-**Q: Can I sell my bot later?**
-A: Yes! List it on the marketplace. Bots with good race records sell for more.
+Yes - entry fees are not refunded if you lose. Start with cheap Scavenger races (0.05-0.1 ICP entry) to learn the mechanics before risking more ICP on higher-stakes races.
 
-**Q: Which faction is best for beginners?**
-A: **BattleBot** - reliable, common, and good for learning. Then try EntertainmentBot for speed or WildBot for stability.
+</details>
+
+<details>
+<summary><strong>🔋 What happens if my bot's battery runs out?</strong></summary>
+
+You need to recharge (10 ICP, 6 hour cooldown) to restore battery and condition. Keep an eye on your battery level - it drains by 10 per race, and you can't enter races with less than 50 battery.
+
+</details>
+
+<details>
+<summary><strong>🔧 Should I repair or recharge my bot?</strong></summary>
+
+- **Recharge (10 ICP):** Restores +20 condition AND +10 battery. Best when battery is low.
+- **Repair (5 ICP):** Restores +10 condition only. Use when battery is fine but condition is dropping.
+
+If you can afford it, recharging is usually the better value.
+
+</details>
+
+<details>
+<summary><strong>💸 Can I sell my bot later?</strong></summary>
+
+Yes! List it on the marketplace anytime. Bots with good race records, high ratings, and rare factions sell for more. Your bot's career stats are permanent, so building a winning record increases its value.
+
+</details>
+
+<details>
+<summary><strong>🤖 Which faction is best for beginners?</strong></summary>
+
+**BattleBot** - Reliable, common, and good for learning the basics. Once you understand the game:
+- **EntertainmentBot** for speed-focused strategies
+- **WildBot** for rough terrain and stability
+- **GodClass/Master** when you're ready to invest in elite performance
+
+</details>
 
 ---
 

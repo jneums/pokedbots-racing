@@ -191,14 +191,24 @@
     border-collapse: collapse;
     width: 100%;
     margin: 1.5rem 0;
-    display: table;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
   
   .markdown-content table th,
   .markdown-content table td {
     border: 1px solid oklch(0.30 0.02 250);
-    padding: 1rem !important;
+    padding: 0.75rem !important;
     text-align: left;
+    white-space: nowrap;
+  }
+  
+  @media (min-width: 640px) {
+    .markdown-content table th,
+    .markdown-content table td {
+      padding: 1rem !important;
+    }
   }
   
   .markdown-content table th:first-child,

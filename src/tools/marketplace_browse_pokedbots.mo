@@ -215,58 +215,64 @@ module {
                   meta,
                   func(trait) { Text.toLowercase(trait.0) == "background" },
                 );
-                
+
                 switch (background) {
                   case (?(_, value)) {
                     let bg = Text.toLowercase(value);
-                    
+
                     // Map background colors to terrain types
                     // Warm/sandy/earthy → WastelandSand
-                    if (Text.contains(bg, #text "brown") or 
-                        Text.contains(bg, #text "red") or
-                        Text.contains(bg, #text "yellow") or
-                        Text.contains(bg, #text "bones")) {
-                      "WastelandSand"
-                    }
+                    if (
+                      Text.contains(bg, #text "brown") or
+                      Text.contains(bg, #text "red") or
+                      Text.contains(bg, #text "yellow") or
+                      Text.contains(bg, #text "bones")
+                    ) {
+                      "WastelandSand";
+                    };
                     // Cool/tech/metallic → MetalRoads
-                    else if (Text.contains(bg, #text "blue") or 
-                             Text.contains(bg, #text "purple") or 
-                             Text.contains(bg, #text "grey") or
-                             Text.contains(bg, #text "gray") or
-                             Text.contains(bg, #text "teal")) {
-                      "MetalRoads"
-                    }
+                    else if (
+                      Text.contains(bg, #text "blue") or
+                      Text.contains(bg, #text "purple") or
+                      Text.contains(bg, #text "grey") or
+                      Text.contains(bg, #text "gray") or
+                      Text.contains(bg, #text "teal")
+                    ) {
+                      "MetalRoads";
+                    };
                     // Dark/space/natural → ScrapHeaps
-                    else if (Text.contains(bg, #text "black") or 
-                             Text.contains(bg, #text "green") or 
-                             Text.contains(bg, #text "planet") or
-                             Text.contains(bg, #text "stars") or
-                             Text.contains(bg, #text "gold")) {
-                      "ScrapHeaps"
-                    }
+                    else if (
+                      Text.contains(bg, #text "black") or
+                      Text.contains(bg, #text "green") or
+                      Text.contains(bg, #text "planet") or
+                      Text.contains(bg, #text "stars") or
+                      Text.contains(bg, #text "gold")
+                    ) {
+                      "ScrapHeaps";
+                    };
                     // Fallback
                     else {
                       let choice = Nat32.toNat(tokenIndex) % 3;
-                      if (choice == 0) { "ScrapHeaps" }
-                      else if (choice == 1) { "MetalRoads" }
-                      else { "WastelandSand" }
-                    }
+                      if (choice == 0) { "ScrapHeaps" } else if (choice == 1) {
+                        "MetalRoads";
+                      } else { "WastelandSand" };
+                    };
                   };
                   case null {
                     // Fallback: use token index for variety
                     let choice = Nat32.toNat(tokenIndex) % 3;
-                    if (choice == 0) { "ScrapHeaps" }
-                    else if (choice == 1) { "MetalRoads" }
-                    else { "WastelandSand" }
+                    if (choice == 0) { "ScrapHeaps" } else if (choice == 1) {
+                      "MetalRoads";
+                    } else { "WastelandSand" };
                   };
                 };
               };
               case null {
                 // No metadata available, use token index
                 let choice = Nat32.toNat(tokenIndex) % 3;
-                if (choice == 0) { "ScrapHeaps" }
-                else if (choice == 1) { "MetalRoads" }
-                else { "WastelandSand" }
+                if (choice == 0) { "ScrapHeaps" } else if (choice == 1) {
+                  "MetalRoads";
+                } else { "WastelandSand" };
               };
             };
 
