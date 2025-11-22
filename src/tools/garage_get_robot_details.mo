@@ -157,6 +157,16 @@ module {
       let currentStats = ctx.garageManager.getCurrentStats(racingStats);
       let baseStats = ctx.garageManager.getBaseStats(tokenIndex);
 
+      // Get user inventory
+      let inventory = ctx.garageManager.getUserInventory(user);
+      let inventoryJson = Json.obj([
+        ("speed_chips", Json.int(inventory.speedChips)),
+        ("power_cells", Json.int(inventory.powerCoreFragments)),
+        ("thruster_parts", Json.int(inventory.thrusterKits)),
+        ("gyro_units", Json.int(inventory.gyroModules)),
+        ("universal_parts", Json.int(inventory.universalParts)),
+      ]);
+
       // Generate image URLs
       let tokenId = ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId);
       let thumbnailUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId # "&type=thumbnail";
@@ -169,7 +179,8 @@ module {
         ("race_class", Json.str(raceClass)),
         ("owner", Json.str(Principal.toText(user))),
         ("faction", Json.str(factionText)),
-        ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability)), ("base_speed", Json.int(baseStats.speed)), ("base_power_core", Json.int(baseStats.powerCore)), ("base_acceleration", Json.int(baseStats.acceleration)), ("base_stability", Json.int(baseStats.stability)), ("speed_bonus", Json.int(racingStats.speedBonus)), ("power_core_bonus", Json.int(racingStats.powerCoreBonus)), ("acceleration_bonus", Json.int(racingStats.accelerationBonus)), ("stability_bonus", Json.int(racingStats.stabilityBonus))])),
+        ("inventory", inventoryJson),
+        ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability)), ("base_speed", Json.int(baseStats.speed)), ("base_power_core", Json.int(baseStats.powerCore)), ("base_acceleration", Json.int(baseStats.acceleration)), ("base_stability", Json.int(baseStats.stability)), ("speed_bonus", Json.int(racingStats.speedBonus)), ("power_core_bonus", Json.int(racingStats.powerCoreBonus)), ("acceleration_bonus", Json.int(racingStats.accelerationBonus)), ("stability_bonus", Json.int(racingStats.stabilityBonus)), ("speed_upgrades", Json.int(racingStats.speedUpgrades)), ("power_core_upgrades", Json.int(racingStats.powerCoreUpgrades)), ("acceleration_upgrades", Json.int(racingStats.accelerationUpgrades)), ("stability_upgrades", Json.int(racingStats.stabilityUpgrades))])),
         ("condition", Json.obj([("battery", Json.int(racingStats.battery)), ("condition", Json.int(racingStats.condition)), ("calibration", Json.int(racingStats.calibration)), ("status", Json.str(status)), ("status_message", Json.str(statusFlavor))])),
         ("career", Json.obj([("races_entered", Json.int(racingStats.racesEntered)), ("wins", Json.int(racingStats.wins)), ("places", Json.int(racingStats.places)), ("shows", Json.int(racingStats.shows)), ("total_scrap_earned", Json.int(racingStats.totalScrapEarned)), ("faction_reputation", Json.int(racingStats.factionReputation)), ("reputation_tier", Json.str(reputationTier))])),
         ("overall_rating", Json.int(overallRating)),

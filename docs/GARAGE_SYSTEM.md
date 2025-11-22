@@ -40,8 +40,8 @@ Each PokedBot has the following core attributes:
 *Change over time with use*
 
 - **Battery** (0-100): Depletes with races (-10 per race), restored by charging
-- **Condition** (0-100): Depletes with neglect (-5 per day), restored by maintenance
-- **Calibration** (0-100): Improves with upgrades, decays without maintenance
+- **Condition** (0-100): Constantly decays (~5 per day for all bots), restored by maintenance
+- **Calibration** (0-100): Improves with upgrades, constantly decays (~3 per day)
 - **Experience** (XP): Increases with races, affects stat caps and upgrade potential
 - **Runtime** (days since activation): Affects performance (peak efficiency at 100-200 days)
 
@@ -169,39 +169,33 @@ Robots require regular maintenance to maintain optimal performance.
 *Cost paid via ICRC-2 transfer*
 
 #### 1. Recharge ⚡
-- **Cost:** 10 ICP + 0.0001 ICP fee
+- **Cost:** 0.1 ICP + 0.0001 ICP fee
 - **Effect:** Restores +20 Condition, +10 Battery
 - **Cooldown:** 6 hours
 - **Use:** After several races, before entering new races
 
 #### 2. Basic Repair 🔧
-- **Cost:** 5 ICP + 0.0001 ICP fee
+- **Cost:** 0.05 ICP + 0.0001 ICP fee
 - **Effect:** Restores +10 Condition
 - **Cooldown:** 12 hours
 - **Use:** Maintain race readiness between events
 
-#### 3. Advanced Diagnostics 🛠️
-- **Cost:** 50 ICP + 0.0001 ICP fee
-- **Effect:** Restores +50 Condition, clears system errors
-- **Cooldown:** 7 days
-- **Use:** Emergency recovery from severe neglect
-
-#### 4. Idle Mode 💤
-- **Cost:** Free
-- **Effect:** +30 Battery over 24 hours, -5 Calibration
-- **Cooldown:** None (can cancel anytime)
-- **Use:** Passive recovery when not actively racing
-
 ### Decay Mechanics
 
-**If a robot is not maintained:**
-- Condition decreases by **-5 per day**
-- Battery decreases by **-10 per race**
-- Calibration decreases by **-3 per day** without upgrades
+**Automated hourly decay (affects ALL initialized bots):**
+- Condition decreases by **~0.21 per hour** (~5 per day)
+  - Happens constantly, whether you race or not
+  - Drives maintenance economy
+- Battery decreases by **-10 per race** (not affected by decay timer)
+- Calibration decreases by **~0.125 per hour** (~3 per day)
 - **Below 50 Condition:** -10% to all race performance
 - **Below 25 Condition:** Cannot enter races (critical malfunction)
 
-⚠️ **Keep your bot healthy!** Regular maintenance prevents performance degradation.
+**Faction modifiers:**
+- Wild Bot: 20% faster decay (chaotic systems)
+- God Class: 30% slower decay (superior construction)
+
+⚠️ **Keep your bot healthy!** Decay runs every hour. Regular maintenance prevents performance degradation.
 
 ---
 

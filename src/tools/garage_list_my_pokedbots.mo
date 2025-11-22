@@ -1,5 +1,6 @@
 import Principal "mo:base/Principal";
 import Result "mo:base/Result";
+import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
 
 import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
@@ -47,8 +48,19 @@ module {
           if (tokens.size() == 0) {
             "🤖 Empty Garage\n\nNo PokedBots found.\n\nGarage ID: " # garageAccountId;
           } else {
-            var msg = "🤖 Your Garage\n\n" #
-            "Found " # Nat32.toText(Nat32.fromNat(tokens.size())) # " PokedBot(s)\n\n";
+            // Get user inventory
+            let inventory = ctx.garageManager.getUserInventory(userPrincipal);
+            var msg = "🤖 Your Garage\n\n";
+
+            // Add inventory summary
+            msg #= "📦 Inventory:\n";
+            msg #= "   • Speed Chips: " # Nat.toText(inventory.speedChips) # "\n";
+            msg #= "   • Power Cells: " # Nat.toText(inventory.powerCoreFragments) # "\n";
+            msg #= "   • Thruster Parts: " # Nat.toText(inventory.thrusterKits) # "\n";
+            msg #= "   • Gyro Units: " # Nat.toText(inventory.gyroModules) # "\n";
+            msg #= "   • Universal Parts: " # Nat.toText(inventory.universalParts) # "\n\n";
+
+            msg #= "Found " # Nat32.toText(Nat32.fromNat(tokens.size())) # " PokedBot(s)\n\n";
 
             for (tokenIndex in tokens.vals()) {
               let tokenId = ExtIntegration.encodeTokenIdentifier(tokenIndex, ctx.extCanisterId);

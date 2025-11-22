@@ -10,7 +10,7 @@ import Iter "mo:base/Iter";
 import Principal "mo:base/Principal";
 import Option "mo:base/Option";
 import Map "mo:map/Map";
-import { nhash } "mo:map/Map";
+import { nhash; phash } "mo:map/Map";
 import RacingSimulator "./RacingSimulator";
 
 /// PokedBotsGarage - Collection-Specific Racing Logic
@@ -38,23 +38,29 @@ module {
     tokenIndex : Nat;
     ownerPrincipal : Principal;
     faction : FactionType;
-    
+
     // Upgrade bonuses
     speedBonus : Nat;
     powerCoreBonus : Nat;
     accelerationBonus : Nat;
     stabilityBonus : Nat;
-    
+
+    // Upgrade counts (for progressive costs)
+    speedUpgrades : Nat;
+    powerCoreUpgrades : Nat;
+    accelerationUpgrades : Nat;
+    stabilityUpgrades : Nat;
+
     // Dynamic stats
     battery : Nat;
     condition : Nat;
     calibration : Nat;
     experience : Nat;
-    
+
     // Preferences
     preferredDistance : Distance;
     preferredTerrain : Terrain;
-    
+
     // Career stats
     racesEntered : Nat;
     wins : Nat;
@@ -62,7 +68,7 @@ module {
     shows : Nat;
     totalScrapEarned : Nat;
     factionReputation : Nat;
-    
+
     // Timestamps
     activatedAt : Int;
     lastRecharged : ?Int;
@@ -85,6 +91,23 @@ module {
     upgradeType : UpgradeType;
     startedAt : Int;
     endsAt : Int;
+  };
+
+  public type PartType = {
+    #SpeedChip;
+    #PowerCoreFragment;
+    #ThrusterKit;
+    #GyroModule;
+    #UniversalPart;
+  };
+
+  public type UserInventory = {
+    owner : Principal;
+    speedChips : Nat;
+    powerCoreFragments : Nat;
+    thrusterKits : Nat;
+    gyroModules : Nat;
+    universalParts : Nat;
   };
 
   // Import stat derivation functions from Racing module (we'll keep these here)
@@ -112,6 +135,7 @@ module {
   public class PokedBotsGarageManager(
     initStats : Map.Map<Nat, PokedBotRacingStats>,
     initActiveUpgrades : Map.Map<Nat, UpgradeSession>,
+    initUserInventories : Map.Map<Principal, UserInventory>,
     statsProvider : {
       getNFTMetadata : (Nat) -> ?[(Text, Text)];
       getPrecomputedStats : (Nat) -> ?{
@@ -125,6 +149,7 @@ module {
   ) {
     private let stats = initStats;
     private let activeUpgrades = initActiveUpgrades;
+    private let userInventories = initUserInventories;
 
     // ===== RACING STATS PROVIDER IMPLEMENTATION =====
 
@@ -157,9 +182,7 @@ module {
         case (?idx) {
           switch (Map.get(stats, nhash, idx)) {
             case (?botStats) {
-              botStats.condition >= 70 and botStats.battery >= 50 and
-              Option.isNull(botStats.upgradeEndsAt) and
-              not botStats.listedForSale;
+              botStats.condition >= 70 and botStats.battery >= 50 and Option.isNull(botStats.upgradeEndsAt) and not botStats.listedForSale;
             };
             case (null) { false };
           };
@@ -178,9 +201,15 @@ module {
               let updatedStats = {
                 botStats with
                 racesEntered = botStats.racesEntered + 1;
-                wins = if (position == 1) { botStats.wins + 1 } else { botStats.wins };
-                places = if (position == 2) { botStats.places + 1 } else { botStats.places };
-                shows = if (position == 3) { botStats.shows + 1 } else { botStats.shows };
+                wins = if (position == 1) { botStats.wins + 1 } else {
+                  botStats.wins;
+                };
+                places = if (position == 2) { botStats.places + 1 } else {
+                  botStats.places;
+                };
+                shows = if (position == 3) { botStats.shows + 1 } else {
+                  botStats.shows;
+                };
                 totalScrapEarned = botStats.totalScrapEarned + prize;
                 experience = botStats.experience + (if (position == 1) { 20 } else if (position <= 3) { 10 } else { 5 });
                 factionReputation = botStats.factionReputation + (if (position == 1) { 10 } else if (position <= 3) { 5 } else { 2 });
@@ -224,7 +253,7 @@ module {
       factionOverride : ?FactionType,
     ) : PokedBotRacingStats {
       let metadata = statsProvider.getNFTMetadata(tokenIndex);
-      
+
       // Get faction from precomputed stats or use override
       let faction = switch (factionOverride) {
         case (?f) { f };
@@ -234,10 +263,9 @@ module {
             case (null) {
               // Fallback: simple distribution based on tokenIndex
               let mod = tokenIndex % 100;
-              if (mod < 5) { #GodClass } else if (mod < 15) { #Master }
-              else if (mod < 35) { #WildBot }
-              else if (mod < 60) { #EntertainmentBot }
-              else { #BattleBot };
+              if (mod < 5) { #GodClass } else if (mod < 15) { #Master } else if (mod < 35) {
+                #WildBot;
+              } else if (mod < 60) { #EntertainmentBot } else { #BattleBot };
             };
           };
         };
@@ -245,9 +273,9 @@ module {
 
       // Get base stats
       let baseStats = getBaseStats(tokenIndex);
-      
+
       let now = Time.now();
-      
+
       let racingStats : PokedBotRacingStats = {
         tokenIndex = tokenIndex;
         ownerPrincipal = owner;
@@ -256,6 +284,10 @@ module {
         powerCoreBonus = 0;
         accelerationBonus = 0;
         stabilityBonus = 0;
+        speedUpgrades = 0;
+        powerCoreUpgrades = 0;
+        accelerationUpgrades = 0;
+        stabilityUpgrades = 0;
         battery = 100;
         condition = 100;
         calibration = 50;
@@ -266,9 +298,9 @@ module {
           case (null) {
             let hash = hashNat(tokenIndex);
             let choice = hash % 3;
-            if (choice == 0) { #ScrapHeaps }
-            else if (choice == 1) { #MetalRoads }
-            else { #WastelandSand };
+            if (choice == 0) { #ScrapHeaps } else if (choice == 1) {
+              #MetalRoads;
+            } else { #WastelandSand };
           };
         };
         racesEntered = 0;
@@ -285,7 +317,7 @@ module {
         upgradeEndsAt = null;
         listedForSale = false;
       };
-      
+
       ignore Map.put(stats, nhash, tokenIndex, racingStats);
       racingStats;
     };
@@ -368,11 +400,11 @@ module {
 
     /// Get bot status
     public func getBotStatus(botStats : PokedBotRacingStats) : Text {
-      if (botStats.condition < 25) { "Critical Malfunction" }
-      else if (botStats.condition < 50) { "Needs Repair" }
-      else if (botStats.battery < 30) { "Low Battery" }
-      else if (botStats.condition >= 70 and botStats.battery >= 50) { "Ready" }
-      else { "Maintenance Required" };
+      if (botStats.condition < 25) { "Critical Malfunction" } else if (botStats.condition < 50) {
+        "Needs Repair";
+      } else if (botStats.battery < 30) { "Low Battery" } else if (botStats.condition >= 70 and botStats.battery >= 50) {
+        "Ready";
+      } else { "Maintenance Required" };
     };
 
     // ===== UPGRADE SYSTEM =====
@@ -424,16 +456,16 @@ module {
           if (Option.isSome(botStats.upgradeEndsAt)) {
             return ?botStats;
           };
-          
+
           let decayMultiplier : Float = switch (botStats.faction) {
             case (#WildBot) { 1.2 };
             case (#GodClass) { 0.7 };
             case (_) { 1.0 };
           };
-          
+
           let conditionLoss = Nat.min(botStats.condition, Int.abs(Float.toInt(0.21 * decayMultiplier)));
           let calibrationLoss = Nat.min(botStats.calibration, Int.abs(Float.toInt(0.125 * decayMultiplier)));
-          
+
           let extraConditionLoss = switch (botStats.lastRecharged) {
             case (?lastTime) {
               let hoursSinceRecharge = (now - lastTime) / 3_600_000_000_000;
@@ -444,15 +476,15 @@ module {
               if (hoursSinceActivation > 48) { 1 } else { 0 };
             };
           };
-          
+
           let totalConditionLoss = Nat.min(botStats.condition, conditionLoss + extraConditionLoss);
-          
+
           let updatedStats = {
             botStats with
             condition = Nat.sub(botStats.condition, totalConditionLoss);
             calibration = Nat.sub(botStats.calibration, calibrationLoss);
           };
-          
+
           updateStats(tokenIndex, updatedStats);
           ?updatedStats;
         };
@@ -464,14 +496,14 @@ module {
     public func applyDecayToAll(now : Int) : Nat {
       let allBots = Map.entries(stats);
       var decayedCount : Nat = 0;
-      
+
       for ((tokenIndex, _) in allBots) {
         switch (applyDecay(tokenIndex, now)) {
           case (?_) { decayedCount += 1 };
           case (null) {};
         };
       };
-      
+
       decayedCount;
     };
 
@@ -480,9 +512,9 @@ module {
     // These fallback functions are only used if precomputed data is missing (should never happen in production)
 
     private func derivePreferredDistance(powerCore : Nat, speed : Nat) : Distance {
-      if (powerCore > 55 and speed < 50) { #LongTrek }
-      else if (speed > 55 and powerCore < 50) { #ShortSprint }
-      else { #MediumHaul };
+      if (powerCore > 55 and speed < 50) { #LongTrek } else if (speed > 55 and powerCore < 50) {
+        #ShortSprint;
+      } else { #MediumHaul };
     };
 
     private func derivePreferredTerrain(metadata : [(Text, Text)]) : Terrain {
@@ -494,12 +526,16 @@ module {
       switch (background) {
         case (?(_, value)) {
           let bg = Text.toLowercase(value);
-          if (Text.contains(bg, #text "brown") or Text.contains(bg, #text "red") or 
-              Text.contains(bg, #text "yellow") or Text.contains(bg, #text "bones")) {
+          if (
+            Text.contains(bg, #text "brown") or Text.contains(bg, #text "red") or
+            Text.contains(bg, #text "yellow") or Text.contains(bg, #text "bones")
+          ) {
             #WastelandSand;
-          } else if (Text.contains(bg, #text "blue") or Text.contains(bg, #text "purple") or
-                     Text.contains(bg, #text "grey") or Text.contains(bg, #text "gray") or
-                     Text.contains(bg, #text "teal")) {
+          } else if (
+            Text.contains(bg, #text "blue") or Text.contains(bg, #text "purple") or
+            Text.contains(bg, #text "grey") or Text.contains(bg, #text "gray") or
+            Text.contains(bg, #text "teal")
+          ) {
             #MetalRoads;
           } else {
             #ScrapHeaps;
@@ -508,11 +544,99 @@ module {
         case (null) {
           let hash = hashNat(0);
           let choice = hash % 3;
-          if (choice == 0) { #ScrapHeaps }
-          else if (choice == 1) { #MetalRoads }
-          else { #WastelandSand };
+          if (choice == 0) { #ScrapHeaps } else if (choice == 1) { #MetalRoads } else {
+            #WastelandSand;
+          };
         };
       };
+    };
+
+    // ===== INVENTORY SYSTEM =====
+
+    /// Get user inventory (or create default if missing)
+    public func getUserInventory(user : Principal) : UserInventory {
+      switch (Map.get(userInventories, phash, user)) {
+        case (?inv) { inv };
+        case (null) {
+          let newInv : UserInventory = {
+            owner = user;
+            speedChips = 0;
+            powerCoreFragments = 0;
+            thrusterKits = 0;
+            gyroModules = 0;
+            universalParts = 0;
+          };
+          ignore Map.put(userInventories, phash, user, newInv);
+          newInv;
+        };
+      };
+    };
+
+    /// Add parts to user inventory
+    public func addParts(user : Principal, partType : PartType, amount : Nat) {
+      let inv = getUserInventory(user);
+      let updatedInv = switch (partType) {
+        case (#SpeedChip) { { inv with speedChips = inv.speedChips + amount } };
+        case (#PowerCoreFragment) {
+          { inv with powerCoreFragments = inv.powerCoreFragments + amount };
+        };
+        case (#ThrusterKit) {
+          { inv with thrusterKits = inv.thrusterKits + amount };
+        };
+        case (#GyroModule) {
+          { inv with gyroModules = inv.gyroModules + amount };
+        };
+        case (#UniversalPart) {
+          { inv with universalParts = inv.universalParts + amount };
+        };
+      };
+      ignore Map.put(userInventories, phash, user, updatedInv);
+    };
+
+    /// Remove parts from user inventory (returns false if insufficient)
+    public func removeParts(user : Principal, partType : PartType, amount : Nat) : Bool {
+      let inv = getUserInventory(user);
+      let currentAmount = switch (partType) {
+        case (#SpeedChip) { inv.speedChips };
+        case (#PowerCoreFragment) { inv.powerCoreFragments };
+        case (#ThrusterKit) { inv.thrusterKits };
+        case (#GyroModule) { inv.gyroModules };
+        case (#UniversalPart) { inv.universalParts };
+      };
+
+      if (currentAmount >= amount) {
+        let updatedInv = switch (partType) {
+          case (#SpeedChip) {
+            { inv with speedChips = inv.speedChips - amount };
+          };
+          case (#PowerCoreFragment) {
+            { inv with powerCoreFragments = inv.powerCoreFragments - amount };
+          };
+          case (#ThrusterKit) {
+            { inv with thrusterKits = inv.thrusterKits - amount };
+          };
+          case (#GyroModule) {
+            { inv with gyroModules = inv.gyroModules - amount };
+          };
+          case (#UniversalPart) {
+            { inv with universalParts = inv.universalParts - amount };
+          };
+        };
+        ignore Map.put(userInventories, phash, user, updatedInv);
+        true;
+      } else {
+        false;
+      };
+    };
+
+    /// Calculate upgrade cost based on current upgrade count
+    /// Progressive cost: 3 -> 5 -> 8 -> 12 -> 18 -> 25
+    public func calculateUpgradeCost(currentUpgradeCount : Nat) : Nat {
+      if (currentUpgradeCount == 0) { 3 } else if (currentUpgradeCount == 1) {
+        5;
+      } else if (currentUpgradeCount == 2) { 8 } else if (currentUpgradeCount == 3) {
+        12;
+      } else if (currentUpgradeCount == 4) { 18 } else { 25 };
     };
 
     // ===== STABLE STORAGE =====
@@ -523,6 +647,25 @@ module {
 
     public func getActiveUpgradesMap() : Map.Map<Nat, UpgradeSession> {
       activeUpgrades;
+    };
+
+    public func getUserInventoriesMap() : Map.Map<Principal, UserInventory> {
+      userInventories;
+    };
+
+    /// Get upgrade count for a specific stat
+    public func getUpgradeCount(tokenIndex : Nat, upgradeType : UpgradeType) : Nat {
+      switch (getStats(tokenIndex)) {
+        case (?stats) {
+          switch (upgradeType) {
+            case (#Velocity) { stats.speedUpgrades };
+            case (#PowerCore) { stats.powerCoreUpgrades };
+            case (#Thruster) { stats.accelerationUpgrades };
+            case (#Gyro) { stats.stabilityUpgrades };
+          };
+        };
+        case (null) { 0 };
+      };
     };
   };
 };

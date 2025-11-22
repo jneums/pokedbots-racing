@@ -122,7 +122,7 @@ module {
     let SECONDS_PER_DAY : Int = 86400;
 
     // Approximate days since epoch for start of month
-    // This is a placeholder - needs proper calendar math  
+    // This is a placeholder - needs proper calendar math
     let daysSinceEpoch = (Nat.sub(year, 1970) * 365) + Nat.sub(month, 1) * 30;
     let firstOfMonthSeconds = daysSinceEpoch * SECONDS_PER_DAY;
 
@@ -287,11 +287,11 @@ module {
     public func createWeeklyLeagueEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Weekly League Championship";
-        description = "Major competitive event with double points and large prize pool";
-        entryFee = 20_000_000; // 0.2 ICP
+        description = "Major competitive event - Entry scales by class (Scavenger 0.2, Raider 0.4, Elite 1.0, SilentKlan 2.0 ICP). Scavenger/Raider classes receive platform bonus.";
+        entryFee = 20_000_000; // 0.2 ICP base (Scavenger)
         maxEntries = 50; // Multiple heats if needed
         minEntries = 6;
-        prizePoolBonus = 100_000_000; // Platform adds 1 ICP
+        prizePoolBonus = 200_000_000; // Platform adds 2 ICP (Phase 1 bonus)
         pointsMultiplier = 2.0; // Double points
         divisions = [#Scavenger, #Raider, #Elite, #SilentKlan]; // All divisions
       };
@@ -310,11 +310,11 @@ module {
     public func createDailySprintEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Daily Sprint Challenge";
-        description = "Quick race for XP and minor rewards";
-        entryFee = 5_000_000; // 0.05 ICP
+        description = "Quick race for XP and rewards - Entry scales by class (Scavenger 0.05, Raider 0.1, Elite 0.25 ICP). Scavenger/Raider receive platform bonus.";
+        entryFee = 5_000_000; // 0.05 ICP base (Scavenger)
         maxEntries = 12;
         minEntries = 3;
-        prizePoolBonus = 0; // No bonus
+        prizePoolBonus = 50_000_000; // Platform adds 0.5 ICP (Phase 1 bonus)
         pointsMultiplier = 1.0; // Standard points
         divisions = [#Scavenger, #Raider, #Elite]; // Exclude SilentKlan
       };
@@ -333,8 +333,8 @@ module {
     public func createMonthlyCupEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Monthly Championship Cup";
-        description = "Elite tournament for top 32 leaderboard racers";
-        entryFee = 50_000_000; // 0.5 ICP
+        description = "Elite tournament - Entry scales by class (Elite 0.5, SilentKlan 5.0 ICP). No platform bonus - prize pools self-sustaining.";
+        entryFee = 50_000_000; // 0.5 ICP base (Elite)
         maxEntries = 64; // Top 64 qualify
         minEntries = 16; // At least 16 for bracket
         prizePoolBonus = 500_000_000; // Platform adds 5 ICP

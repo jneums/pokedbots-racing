@@ -104,13 +104,13 @@ import Star "mo:star/star";
       stable_current_season_id : Nat;
       stable_current_month_id : Nat;
       stable_timer_state : TT.State;
-    }
+    };
   ) : {
     stable_races : Map.Map<Nat, RacingSimulator.Race>;
   } {
     // Migrate races: convert tokenIndex to nftId (Text) in entries and results
     let new_races = Map.new<Nat, RacingSimulator.Race>();
-    
+
     for ((raceId, oldRace) in Map.entries(old_state.stable_races)) {
       // Convert old entries to new entries (tokenIndex -> nftId)
       let newEntries = Array.map<
@@ -124,10 +124,10 @@ import Star "mo:star/star";
             owner = oldEntry.owner;
             entryFee = oldEntry.entryFee;
             enteredAt = oldEntry.enteredAt;
-          }
-        }
+          };
+        };
       );
-      
+
       // Convert old results to new results (tokenIndex -> nftId)
       let newResults : ?[RacingSimulator.RaceResult] = switch (oldRace.results) {
         case (null) { null };
@@ -144,12 +144,12 @@ import Star "mo:star/star";
                 position = oldResult.position;
                 finalTime = oldResult.finalTime;
                 prizeAmount = oldResult.prizeAmount;
-              }
-            }
+              };
+            };
           );
         };
       };
-      
+
       // Create new race with converted entries and results
       // Note: silentKlanTax is renamed to platformTax
       let newRace : RacingSimulator.Race = {
@@ -171,17 +171,17 @@ import Star "mo:star/star";
         platformTax = oldRace.silentKlanTax;  // Rename: silentKlanTax -> platformTax
         sponsors = oldRace.sponsors;
       };
-      
+
       Map.set(new_races, Map.nhash, raceId, newRace);
     };
-    
+
     // Note: stable_current_season_id, stable_current_month_id, and stable_timer_state
     // are intentionally discarded as they're no longer used in the new architecture
-    
+
     {
       stable_races = new_races;
-    }
-  }
+    };
+  };
 )
 */
 shared ({ caller = deployer }) persistent actor class McpServer(
@@ -209,6 +209,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   // Stable state for racing stats (PokedBots-specific)
   var stable_racing_stats = Map.new<Nat, PokedBotsGarage.PokedBotRacingStats>();
   let stable_active_upgrades = Map.new<Nat, PokedBotsGarage.UpgradeSession>();
+  let stable_user_inventories = Map.new<Principal, PokedBotsGarage.UserInventory>();
 
   // Stable state for races (generic racing)
   let stable_races = Map.new<Nat, RacingSimulator.Race>();
@@ -293,6 +294,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   transient let garageManager = PokedBotsGarage.PokedBotsGarageManager(
     stable_racing_stats,
     stable_active_upgrades,
+    stable_user_inventories,
     {
       getNFTMetadata = func(tokenId : Nat) : ?[(Text, Text)] {
         statsManager.getNFTMetadata(tokenId);
@@ -448,28 +450,62 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             // Get current stats
             switch (garageManager.getStats(tokenIndex)) {
               case (?stats) {
-                // Generate random stat increase (1-3 for most, 1-2 for stability)
-                let seed = Nat32.fromNat(tokenIndex + Int.abs(Time.now()));
-                let baseIncrease = switch (session.upgradeType) {
-                  case (#Gyro) { 1 + (Nat32.toNat(seed % 2)) }; // 1-2 for stability
-                  case (_) { 1 + (Nat32.toNat(seed % 3)) }; // 1-3 for others
+                // Get current stats for difficulty calculation
+                let currentStats = garageManager.getCurrentStats(stats);
+
+                let (currentStatValue, upgradeCount) = switch (session.upgradeType) {
+                  case (#Velocity) { (currentStats.speed, stats.speedUpgrades) };
+                  case (#PowerCore) {
+                    (currentStats.powerCore, stats.powerCoreUpgrades);
+                  };
+                  case (#Thruster) {
+                    (currentStats.acceleration, stats.accelerationUpgrades);
+                  };
+                  case (#Gyro) {
+                    (currentStats.stability, stats.stabilityUpgrades);
+                  };
                 };
+
+                // Base gain based on upgrade count (diminishing returns)
+                let maxBaseGain = if (upgradeCount == 0) { 3 } else if (upgradeCount <= 2) {
+                  2;
+                } else { 1 };
+
+                // Random roll 1 to maxBaseGain
+                let seed = Nat32.fromNat(tokenIndex + Int.abs(Time.now()));
+                let roll = (Nat32.toNat(seed) % maxBaseGain) + 1;
+
+                // Difficulty modifier based on current stat value
+                let difficultyMultiplier : Float = if (currentStatValue < 60) {
+                  1.0;
+                } else if (currentStatValue < 70) { 0.8 } else if (currentStatValue < 80) {
+                  0.6;
+                } else if (currentStatValue < 90) { 0.4 } else { 0.2 };
+
+                // Apply difficulty
+                let difficultyAdjustedGain = Float.toInt(Float.fromInt(roll) * difficultyMultiplier);
+
+                // Ensure at least 1 gain for early upgrades, allow 0 for later ones
+                let baseIncrease = if (upgradeCount < 3) {
+                  Nat.max(1, Int.abs(difficultyAdjustedGain));
+                } else { difficultyAdjustedGain };
 
                 // Apply faction modifiers to the increase
                 let increase = garageManager.applyFactionModifier(
                   stats.faction,
-                  baseIncrease,
+                  Int.abs(baseIncrease),
                   seed,
                 );
 
                 Debug.print("Applying +" # debug_show (increase) # " to stat (faction: " # debug_show (stats.faction) # ")");
 
-                // Apply the stat boost by increasing the bonus
+                // Apply the stat boost by increasing the bonus and incrementing upgrade count
                 let updatedStats = switch (session.upgradeType) {
                   case (#Velocity) {
                     {
                       stats with
                       speedBonus = stats.speedBonus + increase;
+                      speedUpgrades = stats.speedUpgrades + 1;
                       experience = stats.experience + 5;
                       factionReputation = stats.factionReputation + 2;
                       upgradeEndsAt = null;
@@ -480,6 +516,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                     {
                       stats with
                       powerCoreBonus = stats.powerCoreBonus + increase;
+                      powerCoreUpgrades = stats.powerCoreUpgrades + 1;
                       experience = stats.experience + 5;
                       factionReputation = stats.factionReputation + 2;
                       upgradeEndsAt = null;
@@ -490,6 +527,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                     {
                       stats with
                       accelerationBonus = stats.accelerationBonus + increase;
+                      accelerationUpgrades = stats.accelerationUpgrades + 1;
                       experience = stats.experience + 5;
                       factionReputation = stats.factionReputation + 2;
                       upgradeEndsAt = null;
@@ -500,6 +538,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                     {
                       stats with
                       stabilityBonus = stats.stabilityBonus + increase;
+                      stabilityUpgrades = stats.stabilityUpgrades + 1;
                       experience = stats.experience + 10;
                       factionReputation = stats.factionReputation + 3;
                       upgradeEndsAt = null;
@@ -628,13 +667,32 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             };
           };
 
+          // Apply class-based entry fee multiplier
+          let classFeeMultiplier : Float = switch (division) {
+            case (#Scavenger) { 1.0 }; // Base fee
+            case (#Raider) { 2.0 }; // 2x
+            case (#Elite) { 5.0 }; // 5x
+            case (#SilentKlan) { 10.0 }; // 10x
+          };
+
+          let adjustedEntryFee = Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
+
+          // Apply platform bonus only to Scavenger/Raider (Elite/SilentKlan are self-sustaining)
+          let platformBonus : Nat = switch (division) {
+            case (#Scavenger) { event.metadata.prizePoolBonus };
+            case (#Raider) { event.metadata.prizePoolBonus };
+            case (#Elite) { 0 };
+            case (#SilentKlan) { 0 };
+          };
+
           let race = raceManager.createRace(
             distance,
             terrain,
             division,
-            event.metadata.entryFee,
+            adjustedEntryFee,
             event.metadata.maxEntries,
             event.scheduledTime,
+            platformBonus,
             raceSimulator,
           );
 

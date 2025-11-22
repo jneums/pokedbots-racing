@@ -18,18 +18,18 @@ import ExtIntegration "../ExtIntegration";
 import WastelandFlavor "WastelandFlavor";
 
 module {
-  let UPGRADE_COST = 20000000 : Nat; // 0.2 ICP (reduced for testing)
+  let PART_PRICE_E8S = 3330000 : Nat; // 0.033 ICP per part (testing value, production is 333000000 = 3.33 ICP)
   let TRANSFER_FEE = 10000 : Nat;
   let UPGRADE_DURATION : Int = 43200000000000; // 12 hours in nanoseconds
 
   public func config() : McpTypes.Tool = {
     name = "garage_upgrade_robot";
     title = ?"Upgrade Robot";
-    description = ?"Start an upgrade session. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability). Costs 20 ICP, takes 12 hours.";
+    description = ?"Start an upgrade session. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability). Costs parts or ICP (progressive cost). Takes 12 hours.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("The token index of the PokedBot"))])), ("upgrade_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Velocity"), Json.str("PowerCore"), Json.str("Thruster"), Json.str("Gyro")])), ("description", Json.str("The type of upgrade"))]))])),
+      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("The token index of the PokedBot"))])), ("upgrade_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Velocity"), Json.str("PowerCore"), Json.str("Thruster"), Json.str("Gyro")])), ("description", Json.str("The type of upgrade"))])), ("use_parts", Json.obj([("type", Json.str("boolean")), ("description", Json.str("If true, use parts from inventory. If false, pay ICP."))]))])),
       ("required", Json.arr([Json.str("token_index"), Json.str("upgrade_type")])),
     ]);
     outputSchema = null;
@@ -56,6 +56,11 @@ module {
       let upgradeTypeStr = switch (Result.toOption(Json.getAsText(_args, "upgrade_type"))) {
         case (null) { return ToolContext.makeError("Missing upgrade_type", cb) };
         case (?t) { t };
+      };
+
+      let useParts = switch (Result.toOption(Json.getAsBool(_args, "use_parts"))) {
+        case (null) { false };
+        case (?b) { b };
       };
 
       // Verify ownership via EXT (source of truth)
@@ -99,81 +104,108 @@ module {
         case (null) {};
       };
 
-      let icpLedger = actor ("ryjl3-tyaaa-aaaaa-aaaba-cai") : actor {
-        icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
+      // Parse upgrade type
+      let upgradeType : PokedBotsGarage.UpgradeType = switch (upgradeTypeStr) {
+        case "Velocity" { #Velocity };
+        case "PowerCore" { #PowerCore };
+        case "Thruster" { #Thruster };
+        case "Gyro" { #Gyro };
+        // Fallback for lowercase
+        case "velocity" { #Velocity };
+        case "power_core" { #PowerCore };
+        case "thruster" { #Thruster };
+        case "gyro" { #Gyro };
+        case _ { #Velocity }; // default
       };
-      let totalCost = UPGRADE_COST + TRANSFER_FEE;
 
-      try {
-        let transferResult = await icpLedger.icrc2_transfer_from({
-          from = { owner = user; subaccount = null };
-          to = { owner = ctx.canisterPrincipal; subaccount = null };
-          amount = totalCost;
-          fee = ?TRANSFER_FEE;
-          memo = null;
-          created_at_time = null;
-          spender_subaccount = null;
-        });
+      // Determine cost
+      let upgradeCount = ctx.garageManager.getUpgradeCount(tokenIndex, upgradeType);
+      let partsNeeded = ctx.garageManager.calculateUpgradeCost(upgradeCount);
 
-        switch (transferResult) {
-          case (#Err(_)) {
-            return ToolContext.makeError("Payment failed - check ICRC-2 allowance", cb);
-          };
-          case (#Ok(blockIndex)) {
-            let endsAt = now + UPGRADE_DURATION;
+      // Determine part type
+      let partType : PokedBotsGarage.PartType = switch (upgradeType) {
+        case (#Velocity) { #SpeedChip };
+        case (#PowerCore) { #PowerCoreFragment };
+        case (#Thruster) { #ThrusterKit };
+        case (#Gyro) { #GyroModule };
+      };
 
-            // Parse upgrade type
-            let upgradeType : PokedBotsGarage.UpgradeType = switch (upgradeTypeStr) {
-              case "velocity" { #Velocity };
-              case "power_core" { #PowerCore };
-              case "thruster" { #Thruster };
-              case "gyro" { #Gyro };
-              case _ { #Velocity }; // default
-            };
-
-            // Get flavor text for this upgrade and faction
-            let upgradeFlavor = WastelandFlavor.getUpgradeFlavor(upgradeType, racingStats.faction);
-
-            // Track the upgrade session
-            ctx.garageManager.startUpgrade(tokenIndex, upgradeType, now, endsAt);
-
-            // Schedule timer to complete the upgrade
-            let actionId = ctx.timerTool.setActionSync<system>(
-              Int.abs(endsAt),
-              {
-                actionType = "upgrade_complete";
-                params = to_candid (tokenIndex);
-              },
-            );
-
-            let updatedStats = {
-              racingStats with
-              battery = Nat.sub(racingStats.battery, 15);
-              upgradeEndsAt = ?endsAt;
-            };
-
-            ctx.garageManager.updateStats(tokenIndex, updatedStats);
-
-            let expectedGain = switch (racingStats.faction) {
-              case (#GodClass) { "1-3 points (20% chance for 2x bonus!)" };
-              case (#WildBot) { "Unstable: Could range wildly" };
-              case (_) { "1-3 stat points" };
-            };
-
-            let response = Json.obj([
-              ("token_index", Json.int(tokenIndex)),
-              ("upgrade_type", Json.str(upgradeFlavor)),
-              ("duration_hours", Json.int(12)),
-              ("expected_gain", Json.str(expectedGain)),
-              ("message", Json.str("🔧 Upgrade in progress. Your bot is in the garage bay, scavenging wasteland tech. Check back in 12 hours.")),
-            ]);
-
-            ToolContext.makeSuccess(response, cb);
-          };
+      // Handle payment
+      if (useParts) {
+        if (not ctx.garageManager.removeParts(user, partType, partsNeeded)) {
+          // Try universal parts? For now, strict check.
+          return ToolContext.makeError("Insufficient parts. Needed: " # Nat.toText(partsNeeded) # " specific parts.", cb);
         };
-      } catch (e) {
-        return ToolContext.makeError("Payment failed: " # Error.message(e), cb);
+      } else {
+        let icpLedger = actor ("ryjl3-tyaaa-aaaaa-aaaba-cai") : actor {
+          icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
+        };
+        let totalCost = (partsNeeded * PART_PRICE_E8S) + TRANSFER_FEE;
+
+        try {
+          let transferResult = await icpLedger.icrc2_transfer_from({
+            from = { owner = user; subaccount = null };
+            to = { owner = ctx.canisterPrincipal; subaccount = null };
+            amount = totalCost;
+            fee = ?TRANSFER_FEE;
+            memo = null;
+            created_at_time = null;
+            spender_subaccount = null;
+          });
+
+          switch (transferResult) {
+            case (#Err(_)) {
+              return ToolContext.makeError("Payment failed - check ICRC-2 allowance. Cost: " # Nat.toText(totalCost) # " e8s", cb);
+            };
+            case (#Ok(_)) {};
+          };
+        } catch (e) {
+          return ToolContext.makeError("Payment failed: " # Error.message(e), cb);
+        };
       };
+
+      // Start upgrade
+      let endsAt = now + UPGRADE_DURATION;
+
+      // Get flavor text for this upgrade and faction
+      let upgradeFlavor = WastelandFlavor.getUpgradeFlavor(upgradeType, racingStats.faction);
+
+      // Track the upgrade session
+      ctx.garageManager.startUpgrade(tokenIndex, upgradeType, now, endsAt);
+
+      // Schedule timer to complete the upgrade
+      let actionId = ctx.timerTool.setActionSync<system>(
+        Int.abs(endsAt),
+        {
+          actionType = "upgrade_complete";
+          params = to_candid (tokenIndex);
+        },
+      );
+
+      let updatedStats = {
+        racingStats with
+        battery = Nat.sub(racingStats.battery, 15);
+        upgradeEndsAt = ?endsAt;
+      };
+
+      ctx.garageManager.updateStats(tokenIndex, updatedStats);
+
+      let expectedGain = switch (racingStats.faction) {
+        case (#GodClass) { "1-3 points (20% chance for 2x bonus!)" };
+        case (#WildBot) { "Unstable: Could range wildly" };
+        case (_) { "1-3 stat points" };
+      };
+
+      let response = Json.obj([
+        ("token_index", Json.int(tokenIndex)),
+        ("upgrade_type", Json.str(upgradeFlavor)),
+        ("duration_hours", Json.int(12)),
+        ("parts_used", Json.int(partsNeeded)),
+        ("expected_gain", Json.str(expectedGain)),
+        ("message", Json.str("🔧 Upgrade in progress. Your bot is in the garage bay, scavenging wasteland tech. Check back in 12 hours.")),
+      ]);
+
+      ToolContext.makeSuccess(response, cb);
     };
   };
 };

@@ -16,8 +16,6 @@ order: 1
 
 PokedBots Racing is an on-chain racing simulation built as an MCP (Model Context Protocol) server on the Internet Computer. Race your PokedBot NFTs in the dangerous wastelands, earn ICP prizes, and climb the leaderboards!
 
-**Deployment:** Canister `3od6b-qiaaa-aaaai-q37ma-cai` on IC mainnet
-
 ## What You Can Do
 
 - 🛒 **Browse & Purchase** PokedBots from the integrated marketplace

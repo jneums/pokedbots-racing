@@ -17,22 +17,29 @@ PokedBots Racing features a structured competitive season with multiple event ty
 
 - **When**: Every Sunday at 20:00 UTC
 - **Registration**: Opens Friday, closes 30 minutes before start
-- **Entry Fee**: 0.2 ICP
-- **Prize Pool**: All entry fees + 1 ICP platform bonus
+- **Entry Fee**: Class-based scaling
+  - Scavenger: 0.2 ICP
+  - Raider: 0.4 ICP
+  - Elite: 1.0 ICP
+  - SilentKlan: 2.0 ICP
+- **Prize Pool**: Entry fees + 2 ICP platform bonus (Scavenger/Raider only)
 - **Leaderboard Points**: 2x multiplier (crucial for rankings!)
-- **Format**: All divisions compete, multiple heats if needed
-- **Why participate**: Biggest prizes, most points, best competition
+- **Format**: Separate race per class, multiple heats if needed
+- **Why participate**: Best prizes for intermediate racers, 2x points
 
 ### Daily Sprint Races
 **Quick competitive action**
 
 - **When**: Every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
 - **Registration**: Closes 15 minutes before start
-- **Entry Fee**: 0.05 ICP
-- **Prize Pool**: Entry fees only
+- **Entry Fee**: Class-based scaling
+  - Scavenger: 0.05 ICP
+  - Raider: 0.1 ICP
+  - Elite: 0.25 ICP (no SilentKlan Dailies)
+- **Prize Pool**: Entry fees + 0.5 ICP platform bonus (Scavenger/Raider only)
 - **Leaderboard Points**: 1x (standard)
-- **Format**: Fast races (5-10km), max 12 bots
-- **Why participate**: Low risk, frequent opportunities, builds experience
+- **Format**: Fast races (5-10km), max 12 bots, separate race per class
+- **Why participate**: Low risk, frequent opportunities, profitable for beginners
 
 ## Coming Soon
 
@@ -41,12 +48,16 @@ PokedBots Racing features a structured competitive season with multiple event ty
 
 - **When**: First Saturday of each month at 20:00 UTC
 - **Qualification**: Top 32-64 on monthly leaderboard
+- **Entry Fee**: Class-based
+  - Elite: 0.5 ICP
+  - SilentKlan: 5.0 ICP
+- **Prize Pool**: Entry fees + 5 ICP platform bonus
 - **Format**: Single/double elimination bracket
 - **Prizes**: 
   - Winner: Exclusive NFT or unique PokedBot
   - Top 3: Major ICP prizes
   - All participants: Special badges
-- **Entry**: Free for qualified racers
+- **Entry**: Open to Elite/SilentKlan classes only
 
 ### Special Events
 **Themed races with unique mechanics** (Coming soon!)
@@ -58,6 +69,27 @@ Examples include:
 - **Survival Sprint**: Elimination-style racing
 
 ## Division System
+
+### Class-Based Entry Fees
+
+**Progressive entry fee scaling** creates natural skill progression:
+
+- **Scavenger (1x)**: Base entry fee - perfect for learning
+- **Raider (2x)**: Double the stakes, bigger prizes
+- **Elite (5x)**: High-stakes competitive racing
+- **SilentKlan (10x)**: Premium ultra-competitive events
+
+**Platform Bonuses (Phase 1):**
+- Scavenger/Raider: Receive platform bonuses to encourage participation
+- Elite/SilentKlan: No bonuses - self-sustaining prize pools
+
+This system ensures:
+- Beginners can race affordably with platform support
+- Competitive players earn meaningful prizes in Raider class
+- Elite racers compete for large self-funded prize pools
+- Natural economic progression as skills improve
+
+### Division Advancement
 
 As you win races, you progress through divisions:
 
@@ -134,14 +166,27 @@ Points are awarded based on finishing position:
 
 ## Prize Distribution
 
-**Standard Race Format:**
+**Standard Race Format (after 5% platform tax):**
 - 🥇 1st place: 47.5% of prize pool
 - 🥈 2nd place: 23.75%
 - 🥉 3rd place: 14.25%
-- 4th place: 9.5%
-- Platform fee: 5% (covers operations)
+- 🥉 4th place: 9.5%
+- Platform tax: 5% (funds operations and bonuses)
 
-**Weekly League may have adjusted splits** to reward more positions when fields are large.
+**Platform Bonuses:**
+- Daily Sprints: +0.5 ICP (Scavenger/Raider classes)
+- Weekly Leagues: +2 ICP (Scavenger/Raider classes)
+- Monthly Cups: +5 ICP (Elite/SilentKlan classes)
+
+**Example Prize Pool (8 racers, Scavenger Daily Sprint):**
+- Entry fees: 8 × 0.05 = 0.4 ICP
+- Platform tax (5%): 0.02 ICP
+- Platform bonus: 0.5 ICP
+- Total pool: 0.88 ICP
+- 1st: 0.42 ICP (8.4x return!)
+- 2nd: 0.21 ICP (4.2x)
+- 3rd: 0.13 ICP (2.6x)
+- 4th: 0.08 ICP (1.6x)
 
 ## Season Structure (Coming Soon)
 

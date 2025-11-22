@@ -229,9 +229,7 @@ module {
                       Text.contains(bg, #text "bones")
                     ) {
                       "WastelandSand";
-                    };
-                    // Cool/tech/metallic → MetalRoads
-                    else if (
+                    } else if (
                       Text.contains(bg, #text "blue") or
                       Text.contains(bg, #text "purple") or
                       Text.contains(bg, #text "grey") or
@@ -239,9 +237,7 @@ module {
                       Text.contains(bg, #text "teal")
                     ) {
                       "MetalRoads";
-                    };
-                    // Dark/space/natural → ScrapHeaps
-                    else if (
+                    } else if (
                       Text.contains(bg, #text "black") or
                       Text.contains(bg, #text "green") or
                       Text.contains(bg, #text "planet") or
@@ -249,9 +245,7 @@ module {
                       Text.contains(bg, #text "gold")
                     ) {
                       "ScrapHeaps";
-                    };
-                    // Fallback
-                    else {
+                    } else {
                       let choice = Nat32.toNat(tokenIndex) % 3;
                       if (choice == 0) { "ScrapHeaps" } else if (choice == 1) {
                         "MetalRoads";

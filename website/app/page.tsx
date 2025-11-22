@@ -25,7 +25,35 @@ export default function Home() {
                 priority
               />
             </div>
-            <p className="text-2xl sm:text-3xl text-muted-foreground/90 max-w-3xl mx-auto leading-relaxed font-light">
+            
+            {/* Simple Explanation */}
+            <div className="max-w-2xl mx-auto space-y-6">
+              <h1 className="text-3xl sm:text-4xl font-bold text-foreground">
+                What is PokedBots Racing?
+              </h1>
+              <p className="text-xl sm:text-2xl text-muted-foreground leading-relaxed">
+                A competitive racing game built on the Internet Computer where you race your PokedBot NFTs against other players for real ICP prizes.
+              </p>
+              <div className="grid sm:grid-cols-3 gap-4 pt-4">
+                <div className="bg-card/50 backdrop-blur border-2 rounded-lg p-4">
+                  <div className="text-3xl mb-2">🏎️</div>
+                  <div className="font-semibold mb-1">Race</div>
+                  <div className="text-sm text-muted-foreground">Enter races with your PokedBot NFT</div>
+                </div>
+                <div className="bg-card/50 backdrop-blur border-2 rounded-lg p-4">
+                  <div className="text-3xl mb-2">⚡</div>
+                  <div className="font-semibold mb-1">Upgrade</div>
+                  <div className="text-sm text-muted-foreground">Boost stats to win more races</div>
+                </div>
+                <div className="bg-card/50 backdrop-blur border-2 rounded-lg p-4">
+                  <div className="text-3xl mb-2">💰</div>
+                  <div className="font-semibold mb-1">Win ICP</div>
+                  <div className="text-sm text-muted-foreground">Top 3 finishers earn prizes</div>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xl sm:text-2xl text-muted-foreground/80 max-w-3xl mx-auto leading-relaxed font-light pt-4">
               Race your PokedBots in the wasteland. Upgrade with scrap parts, compete in events, and win ICP prizes.
             </p>
             <div className="flex gap-5 justify-center flex-wrap pt-6">

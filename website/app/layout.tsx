@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import Image from "next/image";
+import { Navigation } from "./navigation";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -62,22 +63,7 @@ export default function RootLayout({
               <Link href="/" className="flex items-center gap-3 font-semibold text-foreground hover:text-primary transition-colors">
                 <Image src="/pokedbots-racing-icon.webp" alt="PokedBots Racing" width={150} height={50} className="h-9 w-auto translate-y-1" />
               </Link>
-              <nav className="flex items-center gap-6">
-                <Link href="/docs" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                  Docs
-                </Link>
-                <Link href="/guides" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                  Guides
-                </Link>
-                <Link 
-                  href="https://github.com/jneums/pokedbots-racing" 
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  GitHub
-                </Link>
-              </nav>
+              <Navigation />
             </div>
           </div>
         </header>

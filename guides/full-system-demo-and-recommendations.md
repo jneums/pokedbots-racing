@@ -63,9 +63,10 @@ This guide provides data-driven recommendations for getting started and maximizi
 
 **Expected Costs:**
 - Bot: 6-20 ICP
-- 5 race entries: 5-10 ICP
-- 1 recharge: 10 ICP
-- **Total: 21-40 ICP**
+- 5 race entries: 0.25-1 ICP
+- 1 recharge: 0.1 ICP
+- Optional: 1 upgrade (3 parts, ~20 ICP)
+- **Total: 6.35-41.1 ICP**
 
 **Pros:**
 - Low financial risk
@@ -95,10 +96,10 @@ This guide provides data-driven recommendations for getting started and maximizi
 
 **Expected Costs:**
 - Bot: 30-50 ICP
-- 10 race entries: 10-30 ICP
-- 2 recharges: 20 ICP
-- 1 upgrade: 20 ICP
-- **Total: 80-120 ICP**
+- 10 race entries: 0.5-5 ICP
+- 2 recharges: 0.2 ICP
+- 1-2 upgrades: 20-40 ICP (first upgrades to different stats)
+- **Total: 50.7-95.2 ICP**
 
 **Pros:**
 - Competitive win rates
@@ -128,10 +129,10 @@ This guide provides data-driven recommendations for getting started and maximizi
 
 **Expected Costs:**
 - Bot: 99-500 ICP
-- 15 Elite race entries: 150-300 ICP
-- 3-5 recharges: 30-50 ICP
-- 3-4 upgrades: 60-80 ICP
-- **Total: 339-930 ICP**
+- 15 Elite race entries: 7.5-75 ICP
+- 3-5 recharges: 0.3-0.5 ICP
+- 3-4 upgrades: 75-165 ICP (progressive costs: 20+35+55+80)
+- **Total: 181.8-740.5 ICP**
 
 **Pros:**
 - Highest win probability
@@ -261,30 +262,34 @@ This guide provides data-driven recommendations for getting started and maximizi
 ### Understanding Race Classes
 
 **Scavenger Class (0-2 wins)**
-- Entry Fee: 0.05-0.2 ICP
-- Prize Pool: 5-20 ICP
+- Events Available: Daily Sprint, Weekly League
+- Entry Fees: 0.05-0.2 ICP depending on event
+- Prize Pools: 0.15-11 ICP (based on entries + platform bonus)
 - Competition: Beginner bots
 - Strategy: Learn mechanics, build win record
 - Recommended: All new racers start here
 
 **Raider Class (3-9 wins)**
-- Entry Fee: 0.2-1 ICP
-- Prize Pool: 20-100 ICP
+- Events Available: Daily Sprint, Weekly League
+- Entry Fees: 0.05-0.2 ICP depending on event
+- Prize Pools: 0.15-11 ICP (based on entries + platform bonus)
 - Competition: Upgraded mid-tier bots
 - Strategy: Specialized builds, terrain matching
 - Recommended: After 3 wins and 1-2 upgrades
 
 **Elite Class (10+ wins)**
-- Entry Fee: 1-5 ICP
-- Prize Pool: 100-500 ICP
+- Events Available: Daily Sprint, Weekly League, Monthly Cup
+- Entry Fees: 0.05-0.5 ICP depending on event
+- Prize Pools: 0.15-37 ICP (based on entries + platform bonus)
 - Competition: Highly upgraded premium bots
 - Strategy: Min-maxed builds, perfect terrain/distance matching
 - Recommended: Multiple upgrades, 65+ rating
 
 **SilentKlan (10+ wins, invite only)**
-- Entry Fee: 5-20 ICP
-- Prize Pool: 500-2,000 ICP
-- Competition: Best of the best
+- Events Available: Weekly League, Monthly Cup
+- Entry Fees: 0.2-0.5 ICP depending on event
+- Prize Pools: 2.2-37 ICP (based on entries + platform bonus)
+- Competition: Best of the best (GodClass/Master only)
 - Strategy: Elite GodClass/Master bots, full upgrades
 - Recommended: Top 5% performers only
 
@@ -342,54 +347,184 @@ This guide provides data-driven recommendations for getting started and maximizi
 
 ## 🔧 Upgrade Strategy Matrix
 
+### Understanding the Upgrade System
+
+PokedBots Racing uses a **progressive cost, scrap-based upgrade system** with three paths to upgrading:
+
+**Path 1: Direct ICP Purchase** (Current)
+- 20 ICP → 3 specific parts (e.g., Speed Chips for Velocity upgrades)
+- Instant materials, no waiting
+- Simple and predictable
+
+**Path 2: Scrap NFTs** (Planned)
+- Purchase NFTs from any EXT collection marketplace
+- Scrap them for parts based on rarity and value
+- Example: 100 ICP ICPunk → ~15 Universal Parts (60 ICP equivalent)
+- Potential 30-50% savings for skilled scrappers
+
+**Path 3: Hybrid** (Planned)
+- Combine scrap parts + ICP for discounts
+- Example: 2 parts + 10 ICP = upgrade (50% discount)
+
+### Progressive Cost Curve
+
+Each successive upgrade to the **same stat** costs more parts:
+
+```
+Upgrade #1:  3 parts → +1-3 to stat (~20 ICP)
+Upgrade #2:  5 parts → +1-2 to stat (~35 ICP)
+Upgrade #3:  8 parts → +1-2 to stat (~55 ICP)
+Upgrade #4: 12 parts → +0-1 to stat (~80 ICP)
+Upgrade #5: 18 parts → +0-1 to stat (~120 ICP)
+Upgrade #6: 25 parts → +0-1 to stat (~170 ICP)
+```
+
+**Why This Matters:**
+- First upgrade is affordable (20 ICP)
+- Early upgrades give best returns (+1-3 stat points)
+- Later upgrades have diminishing returns (+0-1 stat points)
+- Creates natural stat caps around 70-75
+- Preserves value of naturally high-stat bots
+
 ### When to Upgrade
 
 **After 3 Races:**
 - Identify your bot's weakest stat
-- Upgrade to bring up to competitive level (60+)
-- Cost: 20 ICP
+- First upgrade to any stat: 3 parts (~20 ICP)
+- Best bang for buck: +1-3 stat points
 
 **After 10 Races:**
-- Second upgrade on strength or weakness
+- Second upgrade to same stat: 5 parts (~35 ICP)
+- OR first upgrade to different stat: 3 parts (~20 ICP)
 - Consider terrain specialization
-- Cost: 20 ICP
 
 **After 20 Races:**
-- Third upgrade for min-maxing
+- Third upgrade to primary stat: 8 parts (~55 ICP)
+- OR spread upgrades across multiple stats
 - Focus on your preferred race type
-- Cost: 20 ICP
 
 **After 50 Races:**
-- Fourth upgrade (optional)
-- At this point, consider buying a second bot
-- Cost: 20 ICP vs. new bot cost
+- Fourth+ upgrades get expensive (12+ parts)
+- Consider if 80-120 ICP for +0-1 is worth it
+- May be better to buy a second bot or diversify stats
 
 ---
 
 ### Upgrade Priority by Bot Type
 
 **Balanced Bot (all stats 55-65):**
-1. Speed (biggest impact on race times)
-2. Acceleration (better positioning)
-3. Power (longer races)
-4. Stability (consistency)
+1. **First upgrade (3 parts)**: Speed (biggest impact on race times)
+2. **Second upgrade (3 parts)**: Acceleration (different stat = still cheap!)
+3. **Third upgrade (3 parts)**: Power OR Stability
+4. **Fourth upgrade (5 parts)**: Second Speed upgrade (now more expensive)
+- Strategy: Spread early upgrades across stats to keep costs low
 
 **Speed Specialist (Speed 70+):**
-1. Acceleration (complement strength)
-2. Speed (double down)
-3. Stability (cover weakness)
-4. Power (last priority)
+1. **First (3 parts)**: Acceleration (complement strength, cheap)
+2. **Second (3 parts)**: Stability (cover weakness, still cheap)
+3. **Third (5 parts)**: Second Speed upgrade (already at 70, so 2nd upgrade)
+4. **Fourth (3 parts)**: Power (new stat, back to cheap cost)
+- Strategy: Avoid pushing already-high stats early (expensive!)
 
 **Endurance Specialist (Power 70+):**
-1. Stability (complement strength)
-2. Power (double down)
-3. Speed (improve times)
-4. Acceleration (last priority)
+1. **First (3 parts)**: Stability (complement strength)
+2. **Second (3 parts)**: Speed (improve race times)
+3. **Third (5 parts)**: Second Power upgrade (maximize strength)
+4. **Fourth (3 parts)**: Acceleration (round out build)
+- Strategy: Build complementary stats first, then double down
 
 **Low-Rated Bot (50-55):**
-1. Weakest stat first (bring to 60+)
-2. Second weakest stat (balance)
-3. Consider if more upgrades worth it vs. buying better bot
+1. **First (3 parts)**: Weakest stat (bring to 53-55)
+2. **Second (3 parts)**: Second weakest stat (balance)
+3. **Third (3 parts)**: Third stat (all upgrades still cheap!)
+4. **Fourth (5-8 parts)**: Decision time - worth it or buy better bot?
+- Strategy: Low-stat bots benefit most from spreading cheap upgrades
+
+---
+
+## 🔩 Upgrade Economics & Strategy
+
+### Realistic Stat Progression
+
+Due to progressive costs and diminishing returns, here's what to expect:
+
+```
+Starting stat: 50
+After 1 upgrade (20 ICP):  53-55 (+3-5 total)
+After 2 upgrades (55 ICP): 55-58 (+5-8 total)
+After 3 upgrades (110 ICP): 58-62 (+8-12 total)
+After 4 upgrades (190 ICP): 60-65 (+10-15 total)
+After 5 upgrades (310 ICP): 62-67 (+12-17 total)
+After 6 upgrades (480 ICP): 64-70 (+14-20 total)
+
+Practical max: 70-75 (cost becomes prohibitive)
+Theoretical max: 100 (would cost thousands of ICP)
+```
+
+### Smart Upgrade Paths
+
+**Budget Path (60-100 ICP total):**
+- 3 first upgrades to different stats (3 parts each = 60 ICP)
+- Example: Speed +3, Acceleration +2, Stability +2
+- Result: Well-rounded bot, all stats improved, affordable
+- **Best value per ICP spent**
+
+**Competitive Path (100-250 ICP total):**
+- 2 first upgrades (3 parts each = 40 ICP)
+- 2 second upgrades (5 parts each = 70 ICP)
+- 1 third upgrade (8 parts = 55 ICP)
+- Result: Specialized bot with 2-3 strong stats
+- **Good balance of power and cost**
+
+**Elite Path (250-500 ICP total):**
+- 4 first upgrades (12 parts = 80 ICP)
+- 3 second upgrades (15 parts = 105 ICP)
+- 2 third upgrades (16 parts = 110 ICP)
+- 1 fourth upgrade (12 parts = 80 ICP)
+- Result: Highly optimized specialist, multiple stats 65+
+- **Competitive in top-tier races**
+
+**Whale Path (500+ ICP):**
+- Push multiple stats to 70+
+- Fourth, fifth, sixth upgrades (12-25 parts each)
+- Diminishing returns (+0-1 per upgrade)
+- Only for collectors or SilentKlan racers
+- **More cost-effective to buy multiple specialized bots**
+
+### Faction Upgrade Advantages
+
+**GodClass (+15 all stats):**
+- Start with effectively 65-85 stats (50-70 base + 15 bonus)
+- Difficulty modifiers reduced by 20%
+- Higher chance of +2-3 on later upgrades
+- **Best upgrade value - compound bonuses**
+
+**WildBot (+9 STB, +6 ACC):**
+- ±10% variance on stat gains
+- Can get lucky with +4-5 on some upgrades
+- Can also get unlucky with +0-1
+- **Gambling playstyle**
+
+**Others (BattleBot, Entertainment, Master):**
+- Standard upgrade progression
+- Predictable 1-3 gains on early upgrades
+- **Consistent and reliable**
+
+### When NOT to Upgrade
+
+❌ **Don't upgrade if:**
+- Stat already at 70+ (costs 80-170 ICP for +0-1)
+- You have <50 ICP total budget (buy better bot instead)
+- Bot condition <50 or battery <30 (upgrade will fail)
+- You're about to sell the bot (buyers factor in base stats more)
+- Already have 4+ upgrades to one stat (diminishing returns)
+
+✅ **DO upgrade if:**
+- First upgrade to any stat (3 parts, great value)
+- Stat is below 60 (lots of room to grow)
+- You race frequently (ROI through prizes)
+- You have scrap parts already (free/discounted)
+- Specializing for specific terrain/distance
 
 ---
 
@@ -400,40 +535,40 @@ This guide provides data-driven recommendations for getting started and maximizi
 **Battery Depletion:**
 - Each race: -10 battery
 - Can race 5 times before recharge needed
-- Recharge: 10 ICP (+10 battery, +20 condition)
+- Recharge: 0.1 ICP (+10 battery, +20 condition)
 
 **Condition Degradation:**
 - Varies by race difficulty and results
 - Crashes/poor performance = more degradation
-- Repair: 5 ICP (+10 condition only)
-- Recharge: 10 ICP (+20 condition, +10 battery)
+- Repair: 0.05 ICP (+10 condition only)
+- Recharge: 0.1 ICP (+20 condition, +10 battery)
 
 **Recommended Maintenance Schedule:**
-- After 5 races: Recharge (10 ICP)
-- If condition <70 between recharges: Repair (5 ICP)
-- Budget: 2-3 ICP per race for maintenance
+- After 5 races: Recharge (0.1 ICP)
+- If condition <70 between recharges: Repair (0.05 ICP)
+- Budget: ~0.02 ICP per race for maintenance
 
 ---
 
 ### Monthly Racing Budget Example
 
 **Casual Racer (10 races/month):**
-- Race entries: 10-20 ICP (Scavenger)
-- Recharges: 20 ICP (2x)
+- Race entries: 0.5-5 ICP (Scavenger/Raider)
+- Recharges: 0.2 ICP (2x)
 - Upgrades: 0-20 ICP (optional)
-- **Total: 30-60 ICP/month**
+- **Total: 0.7-25.2 ICP/month**
 
 **Competitive Racer (30 races/month):**
-- Race entries: 60-150 ICP (Raider)
-- Recharges: 60 ICP (6x)
+- Race entries: 1.5-150 ICP (Raider/Elite)
+- Recharges: 0.6 ICP (6x)
 - Upgrades: 20-40 ICP (1-2x)
-- **Total: 140-250 ICP/month**
+- **Total: 22.1-190.6 ICP/month**
 
 **Elite Racer (50 races/month):**
-- Race entries: 500-1,000 ICP (Elite)
-- Recharges: 100 ICP (10x)
+- Race entries: 25-250 ICP (Elite/SilentKlan)
+- Recharges: 1 ICP (10x)
 - Upgrades: 40-80 ICP (2-4x)
-- **Total: 640-1,180 ICP/month**
+- **Total: 66-331 ICP/month**
 
 ---
 
@@ -528,32 +663,32 @@ Token #4343 (GodClass, 68 rating, 44 ICP):
 - [ ] Browse marketplace, analyze price/rating ratios
 - [ ] Purchase starter bot (21-50 ICP recommended)
 - [ ] Initialize bot for racing (free)
-- [ ] Enter first Scavenger race (0.5-2 ICP)
+- [ ] Enter first Scavenger race (0.05-0.5 ICP)
 - [ ] Review race results and bot performance
 - [ ] Enter 2-3 more races to build experience
-- [ ] Budget: 30-60 ICP
+- [ ] Budget: 21-50 ICP (mostly bot purchase)
 
 ### Week 2: Building Experience
 - [ ] Analyze which terrain/distance your bot excels at
 - [ ] Enter 5-7 races in preferred conditions
-- [ ] Recharge bot after 5 races (10 ICP)
+- [ ] Recharge bot after 5 races (0.1 ICP)
 - [ ] Aim for first win
-- [ ] Budget: 20-40 ICP
+- [ ] Budget: 0.35-3.6 ICP
 
 ### Week 3: First Upgrade
 - [ ] Review bot stats after 10+ races
 - [ ] Identify weakest or most beneficial stat
-- [ ] Save 20 ICP for upgrade
+- [ ] Save 20 ICP for first upgrade (3 parts)
 - [ ] Start upgrade session (12-hour wait)
-- [ ] Continue racing with improved bot
-- [ ] Budget: 40-60 ICP
+- [ ] Continue racing with improved bot (+1-3 to chosen stat)
+- [ ] Budget: 20-25 ICP (first upgrade is 3 parts)
 
 ### Week 4: Progression
 - [ ] Enter Raider class races (if 3+ wins)
 - [ ] Consider second bot purchase for diversification
-- [ ] Plan second upgrade
+- [ ] Plan second upgrade (20 ICP if different stat, 35 ICP if same stat)
 - [ ] Set goal: 10 wins for Elite/SilentKlan access
-- [ ] Budget: 50-100 ICP
+- [ ] Budget: 0.5-55 ICP (20-35 ICP if upgrading, otherwise race fees)
 
 ---
 
@@ -594,49 +729,272 @@ Token #4343 (GodClass, 68 rating, 44 ICP):
 
 ## 📊 Expected ROI Analysis
 
-### Scenario 1: Budget Racer (6 ICP bot)
+### Understanding Race Economics
+
+**Prize Distribution:**
+- 1st Place: 47.5% of prize pool (after 5% platform tax)
+- 2nd Place: 23.75% of prize pool
+- 3rd Place: 14.25% of prize pool
+- 4th Place: 9.5% of prize pool
+- 5th+ Place: 0 ICP
+
+**Class-Based Entry Fee Scaling:**
+- **Scavenger:** 1x base fee (entry-level racing)
+- **Raider:** 2x base fee (competitive racing)
+- **Elite:** 5x base fee (high-stakes racing)
+- **SilentKlan:** 10x base fee (premium GodClass/Master only)
+
+**Platform Bonuses (Phase 1 - Treasury Funded):**
+- **Scavenger/Raider classes:** Receive platform bonuses to encourage participation
+- **Elite/SilentKlan classes:** No bonuses - prize pools are self-sustaining
+- Daily Sprint bonuses: +0.5 ICP (Scavenger/Raider only)
+- Weekly League bonuses: +2 ICP (Scavenger/Raider only)
+- Monthly Cup bonuses: +5 ICP (Elite/SilentKlan only - rare prestige tournaments)
+
+**Typical Prize Pools by Class (8 racers):**
+
+**Daily Sprint:**
+- **Scavenger (0.05):** 0.38 + 0.5 bonus = **0.88 ICP** → 1st: 0.42 ICP (8.4x)
+- **Raider (0.1):** 0.76 + 0.5 bonus = **1.26 ICP** → 1st: 0.60 ICP (6x)
+- **Elite (0.25):** 1.9 + 0 bonus = **1.9 ICP** → 1st: 0.90 ICP (3.6x)
+
+**Weekly League:**
+- **Scavenger (0.2):** 1.52 + 2 bonus = **3.52 ICP** → 1st: 1.67 ICP (8.4x)
+- **Raider (0.4):** 3.04 + 2 bonus = **5.04 ICP** → 1st: 2.39 ICP (6x)
+- **Elite (1.0):** 7.6 + 0 bonus = **7.6 ICP** → 1st: 3.61 ICP (3.6x)
+- **SilentKlan (2.0):** 15.2 + 0 bonus = **15.2 ICP** → 1st: 7.22 ICP (3.6x)
+
+**Monthly Cup:**
+- **Elite (0.5):** Large tournaments with 5 ICP bonus
+- **SilentKlan (5.0):** Ultra-premium 20+ racer events with 5 ICP bonus
+
+---
+
+### Scenario 1: Budget Racer (Scavenger Class, 6 ICP bot)
 **Investment:**
 - Bot: 6 ICP
-- 20 races: 20 ICP (entries + maintenance)
-- 1 upgrade: 20 ICP
-- **Total: 46 ICP**
+- 40 Scavenger Daily races at 0.05 ICP: 2 ICP
+- Maintenance (4 recharges): 0.4 ICP
+- 1 upgrade (first, 3 parts): 10 ICP
+- **Total: 18.4 ICP**
 
-**Potential Returns:**
-- 3 wins in Scavenger: 10-15 ICP in prizes
-- Sell upgraded bot: 15-20 ICP
-- **Total Return: 25-35 ICP**
-- **Net: -11 to -21 ICP**
-- **ROI: Entertainment value, learning experience**
+**Realistic Performance (40 Scavenger Dailies, 12 wins = 30% win rate):**
+- 12 wins (1st place): 12 × 0.42 ICP = **5.04 ICP**
+- 10 second places: 10 × 0.21 ICP = **2.10 ICP**
+- 10 third places: 10 × 0.13 ICP = **1.30 ICP**
+- **Total Prizes: 8.44 ICP**
 
-### Scenario 2: Competitive Racer (30 ICP bot)
+**Net After Entry Fees: 8.44 - 2 = 6.44 ICP profit from racing**
+
+**Exit Strategy:**
+- Sell upgraded bot: 12-18 ICP (6 ICP base + 6-12 ICP upgrade premium)
+
+**Total Return: 6.44 racing + 12-18 bot sale = 18.44-24.44 ICP**
+**Net: +0.04 to +6.04 ICP**
+**ROI: +0.2% to +33% profit!**
+
+**Reality Check:** Budget Scavenger racers can now BREAK EVEN or turn small profit! The 10 ICP upgrade cost makes this tier actually viable. With 30% win rate, you profit 0-6 ICP while learning the game. This is the perfect onboarding experience.
+
+---
+
+### Scenario 2: Competitive Racer (Raider Class, 30 ICP bot)
 **Investment:**
 - Bot: 30 ICP
-- 30 races: 80 ICP (entries + maintenance)
-- 2 upgrades: 40 ICP
-- **Total: 150 ICP**
+- 30 Raider Daily races at 0.1 ICP: 3 ICP
+- 10 Raider Weekly races at 0.4 ICP: 4 ICP
+- Maintenance (8 recharges): 0.8 ICP
+- 3 upgrades (3×10 ICP first upgrades): 30 ICP
+- **Total: 67.8 ICP**
 
-**Potential Returns:**
-- 8 wins (5 Scavenger, 3 Raider): 40-80 ICP in prizes
-- Sell upgraded bot: 60-80 ICP
-- **Total Return: 100-160 ICP**
-- **Net: -50 to +10 ICP**
-- **ROI: Break-even to small profit + experience**
+**Realistic Performance (40% win rate in Raider class):**
+**Daily Sprints (30 races, 12 wins):**
+- 12 wins: 12 × 0.60 = **7.20 ICP**
+- 8 seconds: 8 × 0.30 = **2.40 ICP**
+- 6 thirds: 6 × 0.18 = **1.08 ICP**
+- Subtotal: **10.68 ICP**
 
-### Scenario 3: Elite Racer (99 ICP GodClass)
+**Weekly Leagues (10 races, 4 wins):**
+- 4 wins: 4 × 2.39 = **9.56 ICP**
+- 3 seconds: 3 × 1.20 = **3.60 ICP**
+- 2 thirds: 2 × 0.72 = **1.44 ICP**
+- Subtotal: **14.60 ICP**
+
+**Total Prizes: 25.28 ICP**
+**Net After Entry Fees: 25.28 - 7 = 18.28 ICP profit from racing!**
+
+**Exit Strategy:**
+- Sell upgraded bot: 60-90 ICP (30 base + 30-60 premium + win record)
+
+**Total Return: 18.28 racing + 60-90 bot = 78.28-108.28 ICP**
+**Net: +10.48 to +40.48 ICP**
+**ROI: +15% to +60% profit!**
+
+**Reality Check:** Raider class is now HIGHLY PROFITABLE! With just 40% win rate, you make 10-40 ICP profit. The combination of class scaling, platform bonuses, and affordable upgrades creates a sustainable income stream. Weekly Leagues pay 2.39 ICP per win - this is the sweet spot for competitive players.
+
+---
+
+### Scenario 3: Elite Racer (Elite/SilentKlan, 99 ICP GodClass)
 **Investment:**
 - Bot: 99 ICP
-- 50 races: 300 ICP (entries + maintenance)
-- 3 upgrades: 60 ICP
-- **Total: 459 ICP**
+- 20 Elite Daily races at 0.25 ICP: 5 ICP
+- 10 Elite Weekly races at 1.0 ICP: 10 ICP
+- 5 SilentKlan Weekly races at 2.0 ICP: 10 ICP
+- 2 Monthly Cups at 0.5/5.0 ICP: 5.5 ICP
+- Maintenance (12 recharges): 1.2 ICP
+- 5 upgrades (10+17+27+40+60 ICP): 154 ICP
+- **Total: 284.7 ICP**
 
-**Potential Returns:**
-- 20 wins (5 Raider, 10 Elite, 5 SilentKlan): 500-1,500 ICP
-- Sell upgraded GodClass: 200-300 ICP
-- **Total Return: 700-1,800 ICP**
-- **Net: +241 to +1,341 ICP**
-- **ROI: 50-300% profit potential**
+**Realistic Performance (50% win rate in Elite, 40% in SilentKlan):**
 
-**Key Insight:** Higher-tier bots have better ROI if you race actively and win consistently.
+**Elite Daily Sprints (20 races, 10 wins, NO BONUS):**
+- 10 wins: 10 × 0.90 = **9.00 ICP**
+- 5 seconds: 5 × 0.45 = **2.25 ICP**
+- 3 thirds: 3 × 0.27 = **0.81 ICP**
+- Subtotal: **12.06 ICP**
+
+**Elite Weekly Leagues (10 races, 5 wins, NO BONUS):**
+- 5 wins: 5 × 3.61 = **18.05 ICP**
+- 3 seconds: 3 × 1.81 = **5.43 ICP**
+- 2 thirds: 2 × 1.08 = **2.16 ICP**
+- Subtotal: **25.64 ICP**
+
+**SilentKlan Weekly Leagues (5 races, 2 wins, NO BONUS):**
+- 2 wins: 2 × 7.22 = **14.44 ICP**
+- 2 seconds: 2 × 3.61 = **7.22 ICP**
+- 1 third: 1 × 2.17 = **2.17 ICP**
+- Subtotal: **23.83 ICP**
+
+**Monthly Cups (2 events with bonuses, mixed placement):**
+- Elite Cup (16 racers, 0.5 entry + 5 bonus): 1st place = **6.65 ICP**
+- SilentKlan Cup (8 racers, 5.0 entry + 5 bonus): 2nd place = **11.40 ICP**
+- Subtotal: **18.05 ICP**
+
+**Total Prizes: 79.58 ICP**
+**Net After Entry Fees: 79.58 - 30.5 = 49.08 ICP profit from racing!**
+
+**Exit Strategy:**
+- Sell heavily upgraded GodClass: 200-350 ICP (99 base + 100-250 premium + elite record)
+
+**Total Return: 49.08 racing + 200-350 bot = 249.08-399.08 ICP**
+**Net: -35.62 to +114.38 ICP**
+**ROI: -13% to +40%**
+
+**Reality Check:** Elite/SilentKlan racers face higher entry fees BUT get massive prize pools from the class multipliers. No platform bonuses needed - the 3.6x-7.2 ICP first place prizes are self-sustaining. With 40-50% win rates, elite racers earn **serious income** from racing alone (49 ICP profit in this scenario). Lower upgrade costs mean you reach profitability faster and can invest more in racing.
+
+---
+
+### Key Insights from Updated Analysis
+
+**Class-Based Progression Creates Natural Economy:**
+- **Scavenger (1x fees):** Entry-level learning with platform bonuses to soften losses
+- **Raider (2x fees):** Competitive sweet spot where skilled racers turn profit
+- **Elite (5x fees):** High-stakes racing with self-sustaining prize pools
+- **SilentKlan (10x fees):** Premium ultra-competitive racing for GodClass/Masters
+
+**Platform Bonuses Are Strategic:**
+- Scavenger/Raider get bonuses to encourage new player onboarding
+- Elite/SilentKlan don't need bonuses - 5x/10x entry fees create massive pools
+- This makes treasury cost sustainable (~50-100 ICP/month vs 300+ ICP for all classes)
+
+**Where Profitability Lives:**
+- **Scavenger:** Still a learning tier, expect -14% to -35% loss but gain experience
+- **Raider:** Break-even at 35% win rate, profitable at 40%+ (-20% to +11% ROI)
+- **Elite:** Profitable at 40%+ win rate with no bonuses needed (-16% to +35% ROI)
+- **SilentKlan:** Highly profitable for GodClass dominators (49+ ICP racing profit)
+
+**Profitable Strategies by Class:**
+
+**Scavenger Strategy - "The Learner":**
+- Race 2-3 Scavenger Dailies per day (0.05 each)
+- Goal: Build 30%+ win rate to minimize losses
+- Graduate to Raider class after 20-30 races
+- Expected outcome: -10 to -20 ICP tuition cost, but bot gains value
+
+**Raider Strategy - "The Grinder":**
+- Mix of Raider Dailies (0.1) and Weeklies (0.4)
+- Target: 40% win rate in Dailies, 30-40% in Weeklies
+- Monthly income potential: **15-25 ICP profit** from racing
+- This is the sustainable income tier for skilled players
+
+**Elite Strategy - "The Competitor":**
+- Focus on Elite Weeklies (1.0 entry, 3.61 ICP wins)
+- Skip Dailies unless confident 50%+ win rate
+- 5 wins/month = 18 ICP in prizes alone
+- Expected: **20-40 ICP/month** profit for consistent performers
+
+**SilentKlan Strategy - "The Champion":**
+- Only for upgraded GodClass/Masters with proven records
+- SilentKlan Weeklies: 2.0 entry, 7.22 ICP wins
+- 4 wins/month = 28.88 ICP in prizes
+- Entry cost: 16 ICP (8 races × 2.0)
+- **Net: 12+ ICP/month** just from SilentKlan, plus Elite racing
+
+---
+
+### Your Path to Profit
+
+**Month 1-2: Scavenger Learning Phase**
+- Buy 6 ICP bot, add 1 upgrade (10 ICP)
+- Race 40 Scavenger Dailies (2 ICP entry)
+- Target: 30% win rate
+- **Expected outcome:** Break even or +3-6 ICP profit while learning
+
+**Month 3-4: Raider Competitive Phase**  
+- Upgrade to 30 ICP Raider bot or upgrade your Scavenger
+- Add 2-3 upgrades (30 ICP total)
+- Mix Raider Dailies + Weekly Leagues (7 ICP/month entry)
+- Target: 40% win rate
+- **Expected outcome:** +15-25 ICP/month racing profit
+
+**Month 5+: Elite/SilentKlan Mastery**
+- Acquire/upgrade to 99 ICP GodClass
+- Focus on Elite Weeklies and Monthly Cups
+- 5 stat upgrades (154 ICP total)
+- Target: 50% win rate
+- **Expected outcome:** +40-50 ICP/month racing profit + bot appreciation
+
+---
+
+### Why This Economy Works for Players
+
+**Platform bonuses subsidize your learning:**
+- Scavenger/Raider classes get extra prize money (0.5-2 ICP per race)
+- You can break even while mastering the game
+- No need to be a pro from day one
+
+**Class scaling creates natural progression:**
+- Start cheap in Scavenger (0.05 ICP races)
+- Graduate to Raider when ready (0.1-0.4 ICP races)
+- Compete for big prizes in Elite/SilentKlan (1-5 ICP races)
+- Always race at stakes matching your skill level
+
+**Affordable upgrades accelerate your growth:**
+- First upgrade: just 10 ICP
+- 3 upgrades for competitive bot: 30 ICP total
+- No pay-to-win, just pay-to-compete at your tier
+
+**NFT value retention protects your investment:**
+- Upgraded bots sell for 2-4x purchase price
+- Win record adds value
+- GodClass/Masters hold value long-term
+- You can exit profitably even if racing isn't for you
+
+**Self-sustaining economy means longevity:**
+- Elite/SilentKlan races run without platform subsidies
+- Prize pools grow with entry fees
+- More players = bigger races = better prizes
+- Platform economics ensure it survives and thrives
+
+---
+
+### The Economic Reality
+
+PokedBots Racing is a **skill-based earning game** where:
+- **Beginners** can break even while learning (0-6 ICP profit in first month)
+- **Competitive players** earn steady income (15-40 ICP/month in Raider/Elite)
+- **Champions** dominate premium races (50+ ICP/month in SilentKlan)
+- **Bot trading** amplifies returns (sell upgraded bots for 2-4x purchase price)
+- **Total addressable market:** Players who enjoy competitive racing AND want real earnings
 
 ---
 
@@ -654,9 +1012,16 @@ Token #4343 (GodClass, 68 rating, 44 ICP):
 **Mistake:** Racing with <70 condition or <50 battery  
 **Solution:** Recharge before critical thresholds
 
-### 4. Random Upgrades
-**Mistake:** Upgrading without strategy  
-**Solution:** Plan upgrades around terrain specialization
+### 4. Inefficient Upgrade Spending
+**Mistake:** Pushing one stat to 70+ early (costs 80-170 ICP for +0-1)  
+**Solution:** Spread first upgrades across multiple stats (3 parts each = great value)
+
+**Example - Bad:**
+- 6 upgrades to Speed: 3+5+8+12+18+25 = 71 parts (475 ICP!) → +8-12 total
+
+**Example - Good:**
+- 1 upgrade each to 4 stats: 3+3+3+3 = 12 parts (80 ICP) → +8-12 total
+- Same total gain, 1/6th the cost!
 
 ### 5. Wrong Race Class
 **Mistake:** Entering Elite races with 55-rated bot  

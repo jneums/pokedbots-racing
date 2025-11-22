@@ -18,7 +18,7 @@ order: 2
 
 ## Key Architectural Decisions
 
-### 2.1 Generic Racing Simulator with Collection-Specific Adapters
+### Generic Racing Simulator with Collection-Specific Adapters
 
 **Decision**: Split racing logic into collection-agnostic simulator and collection-specific garage modules
 
@@ -30,7 +30,7 @@ order: 2
 - Stats stored separately from NFT metadata - upgrades don't pollute on-chain NFT data
 - Each collection can have unique mechanics (factions, special abilities) while sharing core racing
 
-### 2.2 Marketplace Integration
+### Marketplace Integration
 
 **Decision**: Integrate with existing PokedBots marketplace for purchasing
 

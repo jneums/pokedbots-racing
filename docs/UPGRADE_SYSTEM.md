@@ -18,12 +18,17 @@ order: 4
 
 ## How Upgrades Work
 
-Upgrading improves robot stats over time through a **unified crafting system** that accepts both **ICP payments** and **scrap parts** as upgrade materials.
+Upgrading improves robot stats over time through a **progressive cost system** where each successive upgrade to the same stat becomes more expensive.
 
-Every upgrade requires **materials** which can be obtained through:
-1. **Direct Purchase**: Pay 20 ICP to get instant upgrade materials
-2. **Scrap NFTs**: Browse any EXT collection, purchase NFTs, scrap them for parts
-3. **Hybrid**: Combine scrap parts + ICP for partial discounts
+**Current System:**
+- Pay ICP directly when initiating an upgrade
+- Costs scale: 10 ICP → 17 ICP → 27 ICP → 40 ICP → 60 ICP per upgrade
+- Parts purchased automatically (3.33 ICP per part)
+- 12-hour installation time
+
+**Future Enhancement (Planned):**
+- Scrapyard system to reduce costs by scrapping NFTs for parts
+- Potential 30-50% savings for skilled scrappers
 
 ---
 
@@ -43,14 +48,13 @@ Every upgrade requires **materials** which can be obtained through:
 *Current Implementation*
 
 ```
-20 ICP → 3 Specific Parts (e.g., 3 Speed Chips)
-20 ICP → 5 Universal Parts
+3.33 ICP → 1 Part (any upgrade type)
 ```
 
-- ✅ Instant delivery via ICRC-2 transfer_from
-- ✅ No waiting, materials added to inventory immediately
+- ✅ Instant purchase when initiating upgrade
+- ✅ No inventory management needed
 - ✅ Simple and predictable
-- ✅ Baseline: ~20 ICP per upgrade
+- ✅ Progressive costs: 10 ICP → 17 ICP → 27 ICP → 40 ICP → 60 ICP per upgrade
 
 ### Method 2: EXT Scrapyard System
 *Planned Feature*
@@ -211,19 +215,20 @@ The scrapyard uses multiple safeguards to prevent exploits:
 Each successive upgrade to the same stat costs more:
 
 ```
-Upgrade #1:  3 specific parts → +1-3 to stat
-Upgrade #2:  5 specific parts → +1-2 to stat
-Upgrade #3:  8 specific parts → +1-2 to stat
-Upgrade #4: 12 specific parts → +0-1 to stat
-Upgrade #5: 18 specific parts → +0-1 to stat
-Upgrade #6: 25 specific parts → +0-1 to stat (diminishing returns)
+Upgrade #1:  3 parts × 3.33 ICP = 10 ICP  → +1-3 to stat
+Upgrade #2:  5 parts × 3.33 ICP = 17 ICP  → +1-2 to stat
+Upgrade #3:  8 parts × 3.33 ICP = 27 ICP  → +1-2 to stat
+Upgrade #4: 12 parts × 3.33 ICP = 40 ICP  → +0-1 to stat
+Upgrade #5: 18 parts × 3.33 ICP = 60 ICP  → +0-1 to stat
+Upgrade #6: 25 parts × 3.33 ICP = 83 ICP  → +0-1 to stat (diminishing returns)
 Upgrade #7+: Exponentially expensive, minimal gains
 ```
 
-**Universal Parts Conversion:**
-- Universal parts can substitute at 1.5x rate
-- Example: Upgrade #2 needs 5 specific OR 8 universal parts
-- Hybrid allowed: 3 specific + 3 universal = enough for upgrade #2
+**Why Progressive Costs:**
+- First upgrade affordable (10 ICP) for all players
+- Competitive players can reach 3-4 upgrades (54-94 ICP total)
+- Whales can push to 5-6 upgrades (154-237 ICP total per stat)
+- Creates natural stat distribution without hard caps
 
 ---
 
@@ -245,24 +250,24 @@ Practical max: ~75-80 (cost becomes prohibitive)
 
 *Speed Upgrades for a 60 Speed Bot:*
 ```
-Upgrade 1: 3 Speed Chips  → 63 Speed (cost: ~20 ICP equivalent)
-Upgrade 2: 5 Speed Chips  → 65 Speed (cost: ~35 ICP equivalent)  
-Upgrade 3: 8 Speed Chips  → 67 Speed (cost: ~55 ICP equivalent)
-Upgrade 4: 12 Speed Chips → 68 Speed (cost: ~80 ICP equivalent)
-Upgrade 5: 18 Speed Chips → 69 Speed (cost: ~120 ICP equivalent)
+Upgrade 1: 3 parts × 3.33 = 10 ICP  → 63 Speed (+3)
+Upgrade 2: 5 parts × 3.33 = 17 ICP  → 65 Speed (+2)  
+Upgrade 3: 8 parts × 3.33 = 27 ICP  → 67 Speed (+2)
+Upgrade 4: 12 parts × 3.33 = 40 ICP → 68 Speed (+1)
+Upgrade 5: 18 parts × 3.33 = 60 ICP → 69 Speed (+1)
 
-Total to reach 69: 46 Speed Chips (~310 ICP equivalent)
-Next upgrade would cost 25 parts for maybe +1...
+Total to reach 69 Speed: 154 ICP (5 upgrades)
+Next upgrade would cost 83 ICP (25 parts) for maybe +0-1...
 ```
 
 **Why This Works:**
-- ✅ First few upgrades are affordable (3-8 parts)
-- ✅ Dedicated players can reach competitive levels (5-6 upgrades)
-- ✅ Whales can push further but at massive cost (10+ upgrades)
-- ✅ Impossible to reach 100 without spending thousands of ICP
-- ✅ Creates natural stat distribution curve
+- ✅ First upgrade affordable (10 ICP) for all players
+- ✅ Budget racers can get 2-3 upgrades (27-54 ICP total)
+- ✅ Competitive players reach 4-5 upgrades (94-154 ICP per stat)
+- ✅ Whales can push to 6+ but costs skyrocket (237+ ICP per stat)
+- ✅ Natural stat caps emerge from economic pressure
 - ✅ Preserves value of naturally high-stat bots
-- ✅ Makes faction bonuses more valuable (free stats!)
+- ✅ Makes faction bonuses more valuable (free permanent stats!)
 
 ---
 
@@ -330,38 +335,35 @@ let newStat = min(currentStat + actualGain, 100);
 
 ## Economic Balance
 
-**Direct ICP Path:**
-- 20 ICP → 5 universal parts → 1 upgrade
+**Current System (Direct Purchase):**
+- 3.33 ICP per part, purchased automatically when upgrade initiated
+- Progressive costs: 10 → 17 → 27 → 40 → 60 ICP
 - Simple, instant, predictable
+- No inventory management needed
 
-**Scrap Path:**
+**Future Scrapyard Path (Planned):**
 - Find undervalued NFTs on EXT marketplaces
-- Purchase for 5-15 ICP → Scrap for 1-3 universal parts
-- 4-7 cheap NFTs → enough parts for 1 upgrade
+- Scrap NFTs for parts to reduce upgrade costs
 - Potential 30-50% savings for skilled scrappers
-
-**Hybrid Path:**
-- Mix scrap parts with ICP for flexible budgeting
-- Example: 3 universal parts + 10 ICP = upgrade (50% discount)
+- Adds treasure hunt gameplay layer
 
 ---
 
-## Benefits of Unified System
+## Benefits of Current System
 
 **For Players:**
-- ✅ Multiple paths to upgrades (ICP, scrap, hybrid)
-- ✅ Inventory management adds strategic depth
-- ✅ Can stockpile parts for future use
-- ✅ Treasure hunt gameplay (find undervalued NFTs)
-- ✅ Collection affinity rewards loyalty to favorite projects
+- ✅ Simple direct purchase (no inventory management)
+- ✅ Progressive costs create natural upgrade paths
+- ✅ First upgrade affordable for all players (10 ICP)
+- ✅ Diminishing returns prevent power creep
+- ✅ Strategic choices (spread upgrades vs focus one stat)
 
-**For Ecosystem:**
-- ✅ Creates utility for dead/inactive NFT projects
-- ✅ Cross-collection marketing opportunities
-- ✅ Deflationary for participating collections
-- ✅ ICP flows to multiple NFT marketplaces
-- ✅ PokedBots becomes discovery hub for IC NFT ecosystem
-- ✅ Wasteland lore: "Scavenging salvage from the old world"
+**For Platform:**
+- ✅ Revenue stream for platform sustainability
+- ✅ Deflationary pressure on ICP (12-hour upgrade burns)
+- ✅ Economic incentive to maintain bots (must have battery/condition)
+- ✅ Natural stat distribution (not everyone at 100)
+- ✅ Preserves value of naturally high-stat bots
 
 **For Collections:**
 - ✅ Dead projects get second life

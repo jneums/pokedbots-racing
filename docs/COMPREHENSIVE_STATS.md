@@ -125,10 +125,23 @@ Your bot's Overall Rating is calculated as:
 
 ### Permanent Upgrades
 Use the upgrade system to permanently boost stats:
-- **Velocity Module**: +1-3 Speed (20 ICP, 12 hours)
-- **PowerCore Enhancement**: +1-3 Power Core (20 ICP, 12 hours)
-- **Thruster Calibration**: +1-3 Acceleration (20 ICP, 12 hours)
-- **Gyro Stabilization**: +1-2 Stability (25 ICP, 24 hours)
+- **Velocity Module**: +1-3 Speed (10-60 ICP progressive cost, 12 hours)
+- **PowerCore Enhancement**: +1-3 Power Core (10-60 ICP progressive cost, 12 hours)
+- **Thruster Calibration**: +1-3 Acceleration (10-60 ICP progressive cost, 12 hours)
+- **Gyro Stabilization**: +1-3 Stability (10-60 ICP progressive cost, 12 hours)
+
+**Progressive Costs (per stat):**
+- 1st upgrade: 3 parts × 3.33 ICP = **10 ICP**
+- 2nd upgrade: 5 parts × 3.33 ICP = **17 ICP**
+- 3rd upgrade: 8 parts × 3.33 ICP = **27 ICP**
+- 4th upgrade: 12 parts × 3.33 ICP = **40 ICP**
+- 5th upgrade: 18 parts × 3.33 ICP = **60 ICP**
+
+**Diminishing Returns:**
+- Each successive upgrade to the same stat grants smaller gains
+- First upgrades: +1 to +3 points
+- Later upgrades: +0 to +1 points (heavily diminished)
+- **Strategy**: Spread early upgrades across multiple stats for best value
 
 Upgrades are permanent and stack over time!
 

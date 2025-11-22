@@ -25,13 +25,17 @@ order: 8
 **Planned Logic:**
 - Create 2-3 races scheduled 6-24 hours ahead
 - Randomize distance (5-50km), terrain, class
-- Set entry fees based on class:
-  - Scavenger: 5-10 ICP
-  - Raider: 10-20 ICP
-  - Elite: 20-40 ICP
-  - Silent Klan: 40-50 ICP
+- Set entry fees based on class (base × multiplier):
+  - Scavenger: 1x base (0.05-0.2 ICP)
+  - Raider: 2x base (0.1-0.4 ICP)
+  - Elite: 5x base (0.25-1.0 ICP)
+  - SilentKlan: 10x base (0.5-2.0 ICP)
 - Apply 5% platform tax to prize pool
-- Silent Klan races restricted to GodClass/Master with 10+ wins
+- Apply platform bonuses (Scavenger/Raider only):
+  - Daily Sprints: +0.5 ICP
+  - Weekly Leagues: +2 ICP
+  - Monthly Cups: +5 ICP (Elite/SilentKlan)
+- SilentKlan races restricted to GodClass/Master with 10+ wins
 
 ### Race Execution Timer
 **Status:** Implemented via timer-tool
@@ -76,17 +80,19 @@ order: 8
    - Remove from `activeUpgrades` map
 
 ### Robot Decay System
-**Status:** Not yet implemented
-**Planned Frequency:** Every 24 hours or on-demand check
+**Status:** ✅ Implemented
+**Frequency:** Every hour (self-rescheduling timer)
 
-**Planned Logic:**
-- Condition decay: -5 per day of inactivity
-- Calibration decay: -3 per day
+**Logic:**
+- Runs on ALL initialized bots (not just inactive ones)
+- Condition decay: ~0.21 per hour (~5 per day)
+- Calibration decay: ~0.125 per hour (~3 per day)
 - Faction modifiers:
   - Wild Bot: 20% faster decay (chaotic systems)
   - God Class: 30% slower decay (superior construction)
+  - Others: Standard decay rate
 - Minimum values: condition 30, calibration 30
-- Decay only applies to initialized bots
+- Drives maintenance economy (forces recharge/repair usage)
 
 ---
 
@@ -246,9 +252,10 @@ stable var stable_marketplaceCacheTTL: Int = 300_000_000_000;  // 5 minutes
 - Cached principal verified before actions
 
 ### Economic Safeguards
-- Entry fee limits (5-50 ICP)
+- Entry fee scaling by class (1x/2x/5x/10x multiplier)
 - Prize pool validation
-- Silent Klan 5% tax
+- Platform 5% tax on all races
+- Platform bonuses for beginner classes (Scavenger/Raider)
 - ICRC-2 approval amounts checked
 
 ### Data Integrity
@@ -320,34 +327,31 @@ star = "0.3.3"
 ### ICP Flows
 
 **Inflows:**
-- Race entry fees (5-50 ICP per race)
+- Race entry fees (class-based scaling):
+  - Scavenger: 0.05-0.2 ICP
+  - Raider: 0.1-0.4 ICP
+  - Elite: 0.25-1.0 ICP
+  - SilentKlan: 0.5-2.0 ICP
 - Race sponsorships (min 0.1 ICP)
 - Recharge payments (0.1 ICP + 0.0001 fee)
 - Repair payments (0.05 ICP + 0.0001 fee)
-- Upgrade payments (0.2 ICP + 0.0001 fee)
+- Upgrade payments (3.33 ICP per part + 0.0001 fee):
+  - First upgrade: 10 ICP (3 parts)
+  - Second upgrade: 17 ICP (5 parts)
+  - Third upgrade: 27 ICP (8 parts)
 - NFT purchases (marketplace price + 0.0002 fee)
 
 **Outflows:**
-- Race prizes:
-  - 1st place: 50% of prize pool
-  - 2nd place: 30% of prize pool
-  - 3rd place: 20% of prize pool
+- Race prizes (after 5% platform tax):
+  - 1st place: 47.5% of prize pool
+  - 2nd place: 23.75% of prize pool
+  - 3rd place: 14.25% of prize pool
+  - 4th place: 9.5% of prize pool
+- Platform bonuses:
+  - Daily Sprints: +0.5 ICP (Scavenger/Raider)
+  - Weekly Leagues: +2 ICP (Scavenger/Raider)
+  - Monthly Cups: +5 ICP (Elite/SilentKlan)
 - Platform tax: 5% of entry fees (held in canister)
-
-**Note:** All costs shown are testing values (reduced from production):
-- Production: Recharge 10 ICP, Repair 5 ICP, Upgrade 20 ICP
-- Testing: Recharge 0.1 ICP, Repair 0.05 ICP, Upgrade 0.2 ICP
-
-### Scrap Credit System
-
-**Credits Earned:**
-- Race prizes
-- Sponsorship rewards
-
-**Credits Spent:**
-- Race entry fees
-- Maintenance costs
-- Upgrades
 
 ---
 
