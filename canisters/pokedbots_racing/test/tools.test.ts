@@ -9,14 +9,14 @@ import { describe, beforeAll, afterAll, it, expect, inject } from 'vitest';
 import { PocketIc, createIdentity } from '@dfinity/pic';
 import { IDL } from '@icp-sdk/core/candid';
 import { AnonymousIdentity } from '@icp-sdk/core/agent';
-import { idlFactory as mcpServerIdlFactory } from '../.dfx/local/canisters/my_mcp_server/service.did.js';
-import type { _SERVICE as McpServerService } from '../.dfx/local/canisters/my_mcp_server/service.did.d.ts';
+import { idlFactory as mcpServerIdlFactory } from '../../../.dfx/local/canisters/my_mcp_server/service.did.js';
+import type { _SERVICE as McpServerService } from '../../../.dfx/local/canisters/my_mcp_server/service.did.d.ts';
 import type { Actor } from '@dfinity/pic';
 import path from 'node:path';
 
 const MCP_SERVER_WASM_PATH = path.resolve(
   __dirname,
-  '../.dfx/local/canisters/my_mcp_server/my_mcp_server.wasm',
+  '../../../.dfx/local/canisters/my_mcp_server/my_mcp_server.wasm.gz',
 );
 
 describe('Tool-Specific Tests', () => {

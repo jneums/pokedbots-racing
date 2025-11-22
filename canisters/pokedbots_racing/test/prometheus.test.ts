@@ -18,15 +18,15 @@ import { PocketIc, createIdentity } from '@dfinity/pic';
 import { IDL } from '@icp-sdk/core/candid';
 import { AnonymousIdentity } from '@icp-sdk/core/agent';
 import { Principal } from '@icp-sdk/core/principal';
-import { idlFactory as mcpServerIdlFactory } from '../.dfx/local/canisters/my_mcp_server/service.did.js';
-import type { _SERVICE as McpServerService } from '../.dfx/local/canisters/my_mcp_server/service.did.d.ts';
+import { idlFactory as mcpServerIdlFactory } from '../../../.dfx/local/canisters/my_mcp_server/service.did.js';
+import type { _SERVICE as McpServerService } from '../../../.dfx/local/canisters/my_mcp_server/service.did.d.ts';
 import type { Actor } from '@dfinity/pic';
 import path from 'node:path';
 
 // Configure the path to your MCP server WASM
 const MCP_SERVER_WASM_PATH = path.resolve(
   __dirname,
-  '../.dfx/local/canisters/my_mcp_server/my_mcp_server.wasm',
+  '../../../.dfx/local/canisters/my_mcp_server/my_mcp_server.wasm.gz',
 );
 
 describe('MCP Server Requirements', () => {
@@ -34,6 +34,7 @@ describe('MCP Server Requirements', () => {
   let serverActor: Actor<McpServerService>;
   let canisterId: Principal;
   let testOwner = createIdentity('test-owner');
+  let apiKey: string;
 
   beforeAll(async () => {
     // Use the global PocketIC server URL
@@ -63,6 +64,11 @@ describe('MCP Server Requirements', () => {
       mcpServerIdlFactory,
       canisterId,
     );
+    
+    // Create API key for testing
+    serverActor.setIdentity(testOwner);
+    // @ts-ignore
+    apiKey = await serverActor.create_my_api_key('test-key', []);
   });
 
   afterAll(async () => {
@@ -71,8 +77,8 @@ describe('MCP Server Requirements', () => {
 
   describe('JSON-RPC Tool Discovery', () => {
     it('should respond to tools/list request via http_request_update', async () => {
-      // Set anonymous identity for public access
-      serverActor.setIdentity(new AnonymousIdentity());
+      // Use test owner identity with API key
+      serverActor.setIdentity(testOwner);
 
       // Prepare JSON-RPC request
       const rpcPayload = {
@@ -83,11 +89,14 @@ describe('MCP Server Requirements', () => {
       };
       const body = new TextEncoder().encode(JSON.stringify(rpcPayload));
 
-      // Make HTTP request to MCP endpoint
+      // Make HTTP request to MCP endpoint with API key
       const httpResponse = await serverActor.http_request_update({
         method: 'POST',
         url: '/mcp',
-        headers: [['Content-Type', 'application/json']],
+        headers: [
+          ['Content-Type', 'application/json'],
+          ['x-api-key', apiKey],
+        ],
         body,
         certificate_version: [],
       });
@@ -96,7 +105,7 @@ describe('MCP Server Requirements', () => {
     });
 
     it('should return valid JSON-RPC response with tools array', async () => {
-      serverActor.setIdentity(new AnonymousIdentity());
+      serverActor.setIdentity(testOwner);
 
       const rpcPayload = {
         jsonrpc: '2.0',
@@ -109,7 +118,10 @@ describe('MCP Server Requirements', () => {
       const httpResponse = await serverActor.http_request_update({
         method: 'POST',
         url: '/mcp',
-        headers: [['Content-Type', 'application/json']],
+        headers: [
+          ['Content-Type', 'application/json'],
+          ['x-api-key', apiKey],
+        ],
         body,
         certificate_version: [],
       });
@@ -130,7 +142,7 @@ describe('MCP Server Requirements', () => {
     });
 
     it('should return tools with required fields (name, description, inputSchema)', async () => {
-      serverActor.setIdentity(new AnonymousIdentity());
+      serverActor.setIdentity(testOwner);
 
       const rpcPayload = {
         jsonrpc: '2.0',
@@ -143,7 +155,10 @@ describe('MCP Server Requirements', () => {
       const httpResponse = await serverActor.http_request_update({
         method: 'POST',
         url: '/mcp',
-        headers: [['Content-Type', 'application/json']],
+        headers: [
+          ['Content-Type', 'application/json'],
+          ['x-api-key', apiKey],
+        ],
         body,
         certificate_version: [],
       });
@@ -321,7 +336,7 @@ describe('MCP Server Requirements', () => {
 
       // Test 1: Tool Discovery
       try {
-        serverActor.setIdentity(new AnonymousIdentity());
+        serverActor.setIdentity(testOwner);
         const rpcPayload = {
           jsonrpc: '2.0',
           method: 'tools/list',
@@ -332,7 +347,10 @@ describe('MCP Server Requirements', () => {
         const httpResponse = await serverActor.http_request_update({
           method: 'POST',
           url: '/mcp',
-          headers: [['Content-Type', 'application/json']],
+          headers: [
+            ['Content-Type', 'application/json'],
+            ['x-api-key', apiKey],
+          ],
           body,
           certificate_version: [],
         });

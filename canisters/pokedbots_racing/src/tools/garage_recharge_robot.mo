@@ -2,6 +2,7 @@ import Result "mo:base/Result";
 import Principal "mo:base/Principal";
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
+import Int "mo:base/Int";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
 import Error "mo:base/Error";
@@ -15,18 +16,19 @@ import IcpLedger "../IcpLedger";
 import ExtIntegration "../ExtIntegration";
 
 module {
-  let REPAIR_COST = 5000000 : Nat; // 0.05 ICP (reduced for testing)
-  let TRANSFER_FEE = 10000 : Nat;
-  let REPAIR_COOLDOWN : Int = 43200000000000; // 12 hours in nanoseconds
+  // Recharge cost: 0.1 ICP + 0.0001 ICP fee (reduced for testing)
+  let RECHARGE_COST = 10000000 : Nat; // 0.1 ICP in e8s
+  let TRANSFER_FEE = 10000 : Nat; // 0.0001 ICP in e8s
+  let RECHARGE_COOLDOWN : Int = 21600000000000; // 6 hours in nanoseconds
 
   public func config() : McpTypes.Tool = {
-    name = "garage_repair_robot";
-    title = ?"Repair Robot";
-    description = ?"Repair a robot to restore condition. Costs 5 ICP + 0.0001 ICP transfer fee. Restores 10 Condition. Cooldown: 12 hours.";
+    name = "garage_recharge_robot";
+    title = ?"Recharge Robot";
+    description = ?"Recharge a robot to restore condition and battery. Costs 10 ICP + 0.0001 ICP transfer fee. Restores 20 Condition and 10 Battery. Cooldown: 6 hours. Requires ICRC-2 approval.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("The token index of the PokedBot to repair"))]))])),
+      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("The token index of the PokedBot to recharge"))]))])),
       ("required", Json.arr([Json.str("token_index")])),
     ]);
     outputSchema = null;
@@ -38,6 +40,7 @@ module {
     cb : (Result.Result<McpTypes.CallToolResult, McpTypes.HandlerError>) -> (),
   ) -> async () {
     func(_args : McpTypes.JsonValue, _auth : ?AuthTypes.AuthInfo, cb : (Result.Result<McpTypes.CallToolResult, McpTypes.HandlerError>) -> ()) : async () {
+      // Authentication required
       let user = switch (_auth) {
         case (null) {
           return ToolContext.makeError("Authentication required", cb);
@@ -45,6 +48,7 @@ module {
         case (?auth) { auth.principal };
       };
 
+      // Parse token index
       let tokenIndex = switch (Result.toOption(Json.getAsNat(_args, "token_index"))) {
         case (null) {
           return ToolContext.makeError("Missing required argument: token_index", cb);
@@ -79,20 +83,32 @@ module {
         case (?stats) { stats };
       };
 
+      // Check cooldown
       let now = Time.now();
-      switch (racingStats.lastRepaired) {
+      switch (racingStats.lastRecharged) {
         case (?lastTime) {
-          if (now - lastTime < REPAIR_COOLDOWN) {
-            return ToolContext.makeError("Repair cooldown active", cb);
+          let timeSince = now - lastTime;
+          if (timeSince < RECHARGE_COOLDOWN) {
+            let hoursLeft = (RECHARGE_COOLDOWN - timeSince) / (60 * 60 * 1_000_000_000);
+            return ToolContext.makeError("Recharge cooldown active. Hours remaining: " # Nat.toText(Int.abs(hoursLeft)), cb);
           };
         };
         case (null) {};
       };
 
-      let icpLedger = actor ("ryjl3-tyaaa-aaaaa-aaaba-cai") : actor {
+      // Get ICP Ledger canister ID from context
+      let ledgerId = switch (ctx.icpLedgerCanisterId()) {
+        case (?id) { id };
+        case (null) {
+          return ToolContext.makeError("ICP Ledger not configured", cb);
+        };
+      };
+
+      // Pull payment via ICRC-2
+      let icpLedger = actor (Principal.toText(ledgerId)) : actor {
         icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
       };
-      let totalCost = REPAIR_COST + TRANSFER_FEE;
+      let totalCost = RECHARGE_COST + TRANSFER_FEE;
 
       try {
         let transferResult = await icpLedger.icrc2_transfer_from({
@@ -107,23 +123,45 @@ module {
 
         switch (transferResult) {
           case (#Err(error)) {
-            return ToolContext.makeError("Payment failed", cb);
+            let errorMsg = switch (error) {
+              case (#InsufficientFunds { balance }) {
+                "Insufficient funds. Balance: " # Nat.toText(balance) # " e8s, Required: " # Nat.toText(totalCost) # " e8s";
+              };
+              case (#InsufficientAllowance { allowance }) {
+                "Insufficient ICRC-2 allowance. Current: " # Nat.toText(allowance) # " e8s, Required: " # Nat.toText(totalCost) # " e8s. Please approve the canister first.";
+              };
+              case (#BadFee { expected_fee }) {
+                "Bad fee. Expected: " # Nat.toText(expected_fee) # " e8s";
+              };
+              case _ { "Transfer failed" };
+            };
+            return ToolContext.makeError(errorMsg, cb);
           };
           case (#Ok(blockIndex)) {
+            // Payment successful, update stats
+            let conditionRestored = Nat.min(20, 100 - racingStats.condition);
+            let batteryRestored = Nat.min(10, 100 - racingStats.battery);
+
             let updatedStats = {
               racingStats with
-              condition = Nat.min(100, racingStats.condition + 10);
-              lastRepaired = ?now;
+              condition = Nat.min(100, racingStats.condition + 20);
+              battery = Nat.min(100, racingStats.battery + 10);
+              lastRecharged = ?now;
             };
 
             ctx.garageManager.updateStats(tokenIndex, updatedStats);
 
             let response = Json.obj([
               ("token_index", Json.int(tokenIndex)),
-              ("action", Json.str("Repair")),
-              ("condition_restored", Json.int(10)),
+              ("action", Json.str("Recharge")),
+              ("payment", Json.obj([("amount", Json.str("0.1 ICP")), ("fee", Json.str("0.0001 ICP")), ("total", Json.str("0.1001 ICP")), ("block_index", Json.int(blockIndex))])),
+              ("condition_restored", Json.int(conditionRestored)),
+              ("battery_restored", Json.int(batteryRestored)),
               ("new_condition", Json.int(updatedStats.condition)),
-              ("message", Json.str("Repairs complete")),
+              ("new_battery", Json.int(updatedStats.battery)),
+              ("cost_icp", Json.int(10)),
+              ("next_available_hours", Json.int(6)),
+              ("message", Json.str("Power cells recharged. Systems nominal.")),
             ]);
 
             ToolContext.makeSuccess(response, cb);

@@ -121,7 +121,11 @@ module {
             // 2. Legacy transfer from garage subaccount to marketplace payment address
 
             // Create ICP ledger actor
-            let icpLedger = actor ("ryjl3-tyaaa-aaaaa-aaaba-cai") : actor {
+            let ledgerCanisterId = switch (context.icpLedgerCanisterId()) {
+              case (?id) { id };
+              case (null) { return ToolContext.makeError("ICP Ledger not configured", cb); };
+            };
+            let icpLedger = actor (Principal.toText(ledgerCanisterId)) : actor {
               icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
               transfer : shared IcpLedger.TransferArgs -> async IcpLedger.Result_6;
             };

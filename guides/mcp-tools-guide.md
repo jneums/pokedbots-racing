@@ -433,10 +433,10 @@ Join race 55 with token 4247
 4. Bot is locked until race completes
 
 **Entry Fee Structure:**
-- **Scavenger:** ~0.5-2 ICP
-- **Raider:** ~2-10 ICP
-- **Elite:** ~10-50 ICP
-- **SilentKlan:** ~50-200 ICP
+- **Scavenger:** 0.05-0.5 ICP (Daily: 0.05, Weekly: 0.2, Monthly: 0.5)
+- **Raider:** 0.1-1 ICP (Daily: 0.1, Weekly: 0.4, Monthly: 1.0)
+- **Elite:** 0.25-2.5 ICP (Daily: 0.25, Weekly: 1.0, Monthly: 2.5)
+- **SilentKlan:** 0.5-5 ICP (Daily: 0.5, Weekly: 2.0, Monthly: 5.0)
 
 **What Affects Your Performance:**
 - Your bot's stats (Speed, Power, Acceleration, Stability)
@@ -650,7 +650,7 @@ Transfer bot #1417 to [recipient_account_id]
 
 **Costs to Consider:**
 - Bot purchase: 6-599 ICP (budget 20-50 ICP for starters)
-- Race entry fees: 0.05-5 ICP depending on class
+- Race entry fees: 0.05-5 ICP depending on class and event type
 - Recharges: 10 ICP per recharge (needed every ~5 races)
 - Repairs: 5 ICP (cheaper than recharge if battery is fine)
 - Upgrades: 20 ICP per upgrade (permanent improvement)

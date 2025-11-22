@@ -73,11 +73,28 @@ let stability = applyFactionBonus(((seed / 1000000) % 100) * 0.7 + 30, faction, 
 ```
 
 **Faction Bonuses:**
-- **Battle Bots** 🎮: +15% Power Core, +10% Stability
-- **Entertainment Bots** 🎭: +15% Speed, +10% Acceleration  
-- **Wild Bots** ⚡: +20% Acceleration, -10% Stability (erratic but fast)
-- **God Class** 👑: +10% to all stats (rare, expensive to mint)
-- **Masters** 🌙: +12% Speed, +12% Stability, +8% Power Core
+
+*Ultra-Rare Factions (0.5% each):*
+- **Ultimate-Master** 👑: +15% to all stats, 2x upgrade bonus chance
+- **Wild** 🦾: +20% Acceleration, -10% Stability, 30% faster decay
+- **Golden** ✨: +15% all stats when condition ≥90%, elite performance  
+- **Ultimate** ⚡: +12% Speed, +12% Acceleration, peak performance
+
+*Super-Rare Factions (1.5% each):*
+- **Blackhole** 🌌: +12% on MetalRoads terrain, void tech specialist
+- **Dead** 💀: +10% Power Core, +8% Stability, risen from scrap
+- **Master** 🎯: +12% Speed, +8% Power Core, Europa Base 7 tech
+
+*Rare Factions (4% each):*
+- **Bee** 🐝: +10% Acceleration, hive-mind boost
+- **Food** 🍔: +8% Condition recovery, fast-food machinery
+- **Box** 📦: +10% on ScrapHeaps terrain, recycled excellence
+- **Murder** 🔪: +8% Speed, +8% Acceleration, combat-grade
+
+*Common Factions (20% each):*
+- **Game** 🎮: +8% on WastelandSand, entertainment tech
+- **Animal** 🦎: +6% balanced stats, organic-synthetic hybrid  
+- **Industrial** ⚙️: +5% Power Core, +5% Stability, reliable workhorse
 
 **This ensures:**
 - ✅ Uniqueness per robot
@@ -89,75 +106,187 @@ let stability = applyFactionBonus(((seed / 1000000) % 100) * 0.7 + 30, faction, 
 
 ## Faction Mechanics
 
-### Battle Bots 🎮
-*Rugged Wasteland Scavengers*
+### Ultra-Rare Factions (0.5% each)
+
+#### Ultimate-Master 👑
+*The Apex Predator*
 
 **Strengths:**
-- High Power Core (endurance races)
-- High Stability (consistent performance)
-- Best on Metal Roads terrain
-
-**Weaknesses:**
-- Lower Speed (slower top speed)
-- Lower Acceleration (sluggish starts)
-
-**Lore:** Built from old video game consoles and junk food toy parts salvaged from the giant rubbish heaps of former Antarctica. Tough and practical.
-
-### Entertainment Bots 🎭
-*Flashy Speed Demons*
-
-**Strengths:**
-- High Speed (fastest top speed)
-- High Acceleration (explosive starts)
-- Best on Wasteland Sand terrain
-
-**Weaknesses:**
-- Lower Power Core (tire in long races)
-- Lower Stability (inconsistent)
-
-**Lore:** Pieced together from ancient entertainment technology. Charismatic and built for showmanship.
-
-### Wild Bots ⚡
-*Unpredictable Chaos*
-
-**Strengths:**
-- Very High Acceleration (+20%)
-- Unpredictable surges (+10% variance in upgrades)
-- Best on Scrap Heaps terrain
-
-**Weaknesses:**
-- Very Low Stability (-10%)
-- Erratic performance (high variance)
-
-**Lore:** Once normal robots, now deranged after the catastrophic solar flare of 2453 AD. Dangerous and unstable.
-
-### God Class 👑
-*Elite Engineered Perfection*
-
-**Strengths:**
-- +10% to ALL stats
-- 20% reduced upgrade difficulty (easier to reach high stats)
+- +15% to ALL stats
+- 40% slower decay rate
+- 10% chance for 2x upgrades
 - Best on all terrains
 
 **Weaknesses:**
-- Expensive to purchase
-- Rare on marketplace
+- Extremely rare (only ~50 in existence)
+- High marketplace prices
+- Lowest upgrade bonus chance (already powerful)
 
-**Lore:** Rulers of much of eastern Earth, possessing abilities far beyond standard bots. Engineered for superiority.
+**Lore:** The rarest classification. Apex predators of the wasteland. Legendary status among racers.
 
-### The Masters 🌙
-*Mysterious Off-World Tech*
+#### Wild 🦾
+*Chaos Incarnate*
 
 **Strengths:**
-- Balanced bonuses (+12% Speed, +12% Stability, +8% Power Core)
-- Well-rounded for all race types
-- Best on Metal Roads
+- +20% Acceleration
+- High variance upgrades (-2 to +2, unpredictable)
+- Unique upgrade mechanics
 
 **Weaknesses:**
-- No major weaknesses
+- -10% Stability
+- 30% faster decay (chaotic systems)
+- Unreliable upgrade results
+
+**Lore:** Deranged systems from the 2453 solar flare. Unpredictable chaos engines.
+
+#### Golden ✨
+*Elite Performance*
+
+**Strengths:**
+- +15% all stats when condition ≥90%
+- 30% slower decay
+- 10% chance for 2x upgrades
+- Superior golden-forged chassis
+
+**Weaknesses:**
+- Requires high maintenance
+- Performance drops if condition < 90%
+
+**Lore:** Delta City's elite. Golden-forged perfection requires constant care.
+
+#### Ultimate ⚡
+*Peak Design*
+
+**Strengths:**
+- +12% Speed, +12% Acceleration
+- 25% slower decay
+- 10% chance for 2x upgrades
+- Advanced tech superiority
+
+**Weaknesses:**
+- Balanced but not specialized
+
+**Lore:** Peak performance design from advanced engineering facilities.
+
+### Super-Rare Factions (1.5% each)
+
+#### Blackhole 🌌
+*Void Tech Specialist*
+
+**Strengths:**
+- +12% performance on MetalRoads
+- 20% chance for 2x upgrades
+- Reality-warping tech
+- Terrain specialist advantage
+
+**Weaknesses:**
+- Standard performance on other terrains
+
+**Lore:** Reality-warping MetalRoads specialist using mysterious void technology.
+
+#### Dead 💀
+*Risen from Scrap*
+
+**Strengths:**
+- +10% Power Core
+- +8% Stability
+- 20% chance for 2x upgrades
+- Eerie resilience
+
+**Weaknesses:**
+- Unsettling appearance
+
+**Lore:** Resurrected from the scrap tombs. Mysterious second life grants unusual durability.
+
+#### Master 🎯
+*Off-World Excellence*
+
+**Strengths:**
+- +12% Speed
+- +8% Power Core
+- 20% chance for 2x upgrades
+- Well-rounded elite performance
+
+**Weaknesses:**
 - No extreme specialization
 
-**Lore:** A secretive society with mysterious connections to the off-world Europa Base 7 colony. Advanced alien-influenced technology.
+**Lore:** Mysterious Europa Base 7 connection. Off-world technology integration.
+
+### Rare Factions (4% each)
+
+#### Bee 🐝
+*Hive-Mind Acceleration*
+
+**Strengths:**
+- +10% Acceleration
+- 35% chance for 2x upgrades (best catch-up mechanic!)
+- Swarm intelligence systems
+
+**Lore:** Hive-mind acceleration systems enable coordinated burst performance. Highest upgrade success rate helps compete with elite bots.
+
+#### Food 🍔
+*Fast-Food Machinery*
+
+**Strengths:**
+- +8% Condition recovery
+- 35% chance for 2x upgrades (best catch-up mechanic!)
+- Surprisingly durable construction
+
+**Lore:** Built from ancient fast-food machinery. Surprisingly effective engineering. Rapid improvement potential.
+
+#### Box 📦
+*Scrap Heap Master*
+
+**Strengths:**
+- +10% performance on ScrapHeaps
+- 35% chance for 2x upgrades (best catch-up mechanic!)
+- Recycled excellence
+
+**Lore:** Scrap heap specialists. Masters of recycled component integration. Can scavenge superior upgrades.
+
+#### Murder 🔪
+*Combat-Grade Aggression*
+
+**Strengths:**
+- +8% Speed
+- +8% Acceleration
+- 35% chance for 2x upgrades (best catch-up mechanic!)
+- Built for destruction
+
+**Lore:** Combat-grade aggression core. Designed for violent wasteland supremacy. Aggressive upgrade protocol.
+
+### Common Factions (20% each)
+
+#### Game 🎮
+*Entertainment Heritage*
+
+**Strengths:**
+- +8% performance on WastelandSand
+- 25% chance for 2x upgrades
+- Entertainment tech specialist
+
+**Lore:** Built from entertainment technology. WastelandSand terrain specialist.
+
+#### Animal 🦎
+*Organic-Synthetic Hybrid*
+
+**Strengths:**
+- +6% to balanced stats
+- 25% chance for 2x upgrades
+- Versatile hybrid design
+
+**Lore:** Organic-synthetic hybrid design provides balanced, reliable performance.
+
+#### Industrial ⚙️
+*Reliable Workhorse*
+
+**Strengths:**
+- +5% Power Core
+- +5% Stability
+- 25% chance for 2x upgrades
+- Dependable performance
+
+**Lore:** Heavy machinery foundation. The reliable workhorse of the wasteland.
 
 ---
 
@@ -191,9 +320,11 @@ Robots require regular maintenance to maintain optimal performance.
 - **Below 50 Condition:** -10% to all race performance
 - **Below 25 Condition:** Cannot enter races (critical malfunction)
 
-**Faction modifiers:**
-- Wild Bot: 20% faster decay (chaotic systems)
-- God Class: 30% slower decay (superior construction)
+**Faction decay modifiers:**
+- Ultra-Rare: 40% slower decay (UltimateMaster, Golden, Ultimate)
+- Wild: 30% faster decay (chaotic systems)
+- Super-Rare: 20% slower decay (Blackhole, Dead, Master)
+- Rare/Common: Standard decay rate
 
 ⚠️ **Keep your bot healthy!** Decay runs every hour. Regular maintenance prevents performance degradation.
 

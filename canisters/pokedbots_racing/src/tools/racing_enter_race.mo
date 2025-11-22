@@ -177,7 +177,11 @@ module {
       };
 
       // Process payment using ICRC-2 transfer_from
-      let icpLedger = actor ("ryjl3-tyaaa-aaaaa-aaaba-cai") : actor {
+      let ledgerCanisterId = switch (ctx.icpLedgerCanisterId()) {
+        case (?id) { id };
+        case (null) { return ToolContext.makeError("ICP Ledger not configured", cb); };
+      };
+      let icpLedger = actor (Principal.toText(ledgerCanisterId)) : actor {
         icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
       };
 

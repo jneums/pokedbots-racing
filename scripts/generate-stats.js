@@ -56,6 +56,11 @@ function categorizeLegsForSpeed(legs) {
       contains(lower, '8 bit power') || contains(lower, 'cactus gold')) {
     return 75 + (hashText(legs) % 6);
   }
+  // Golden boost: Common Golden legs for speed
+  else if (contains(lower, 'gold') && (contains(lower, 'spiky') || contains(lower, 'power') || 
+           contains(lower, 'bendy') || contains(lower, 'mini'))) {
+    return 69 + (hashText(legs) % 4);
+  }
   // High (65-70): Ultimate terminator only (127 bots is rare enough)
   else if (contains(lower, 'ultimate terminator')) {
     return 67 + (hashText(legs) % 4);
@@ -97,6 +102,11 @@ function categorizeWingsForSpeed(wings) {
   if (contains(lower, 'master gold') || contains(lower, 'golden triple') || 
       contains(lower, 'black double angel') || contains(lower, 'wings: none')) {
     return 75 + (hashText(wings) % 6);
+  }
+  // Golden boost: Common Golden wings for speed (triangle up gold, angel wings gold)
+  else if (contains(lower, 'gold') && (contains(lower, 'triangle up') || contains(lower, 'angel wings') || 
+           contains(lower, 'ear muff'))) {
+    return 68 + (hashText(wings) % 4);
   }
   // High (65-70): Terminator variants only
   else if (contains(lower, 'terminator')) {
@@ -248,9 +258,14 @@ function categorizeBodyForPower(body) {
       contains(lower, 'master gold')) {
     return 75 + (hashText(body) % 6);
   }
-  // High (67-70): Ultimate variants
+  // Golden boost: Common Golden body traits (spiky gold, gold eyes, gold 8 bit, gold mega)
+  else if (contains(lower, 'gold eyes') || contains(lower, 'spiky gold') || 
+           contains(lower, 'gold 8 bit') || contains(lower, 'gold mega')) {
+    return 68 + (hashText(body) % 5);
+  }
+  // High (60-63): Ultimate variants (reduced from 67-70 to compress ultra-rares)
   else if (contains(lower, 'ultimate')) {
-    return 67 + (hashText(body) % 4);
+    return 60 + (hashText(body) % 4);
   }
   // Medium-High (55-58): Large, mega (non-controller), beast, tower, super
   else if ((contains(lower, 'large') && !contains(lower, 'controller')) || 
@@ -289,13 +304,18 @@ function categorizeArmsForPower(arms) {
       contains(lower, 'black king') || contains(lower, '8 bit lazers')) {
     return 75 + (hashText(arms) % 6);
   }
-  // High (67-70): Ultimate, murder arms gold
-  else if (contains(lower, 'ultimate') || contains(lower, 'murder arms gold')) {
-    return 67 + (hashText(arms) % 4);
+  // Golden boost: Common Golden arms (power arms rainbow lazers gold, rocket up gold, snippers gold)
+  else if (contains(lower, 'power arms rainbow lazers gold') || 
+           contains(lower, 'rocket up gold') || contains(lower, 'snippers gold')) {
+    return 70 + (hashText(arms) % 4);
   }
-  // Medium-High (55-58): Power arms, rainbow lazers
+  // High (60-63): Ultimate, murder arms gold (reduced from 67-70)
+  else if (contains(lower, 'ultimate') || contains(lower, 'murder arms gold')) {
+    return 60 + (hashText(arms) % 4);
+  }
+  // Medium-High (52-55): Power arms, rainbow lazers (reduced from 55-58)
   else if (contains(lower, 'power arms') || contains(lower, 'rainbow lazer')) {
-    return 55 + (hashText(arms) % 4);
+    return 52 + (hashText(arms) % 4);
   }
   // Medium (49-54): Rockets, claws, massive, lazers (non-rainbow)
   else if ((contains(lower, 'rocket') || contains(lower, 'claw') || 
@@ -329,9 +349,15 @@ function categorizeLegsForPower(legs) {
       contains(lower, 'tri eye gold') || contains(lower, 'gamers')) {
     return 75 + (hashText(legs) % 6);
   }
-  // High (67-70): Ultimate variants
+  // Golden boost: Common Golden legs (mini gold, spiky gold, bendy gold, cable gold, power gold)
+  else if ((contains(lower, 'gold') && (contains(lower, 'mini') || contains(lower, 'spiky') || 
+           contains(lower, 'bendy') || contains(lower, 'cable') || contains(lower, 'power'))) && 
+           !contains(lower, 'master')) {
+    return 69 + (hashText(legs) % 4);
+  }
+  // High (60-63): Ultimate variants (reduced from 67-70)
   else if (contains(lower, 'ultimate')) {
-    return 67 + (hashText(legs) % 4);
+    return 60 + (hashText(legs) % 4);
   }
   // Medium-High (55-58): Strong, chunky, super
   else if (contains(lower, 'strong') || contains(lower, 'chunky') || contains(lower, 'super')) {
@@ -362,6 +388,11 @@ function categorizeWingsForPower(wings) {
   if (contains(lower, 'master gold') || contains(lower, 'golden triple') || 
       contains(lower, 'black double angel')) {
     return 75 + (hashText(wings) % 6);
+  }
+  // Golden boost: Common Golden wings (angel wings gold, bear ears gold, ear muffs gold, triangle up gold)
+  else if (contains(lower, 'gold') && (contains(lower, 'angel wings') || contains(lower, 'bear ears') || 
+           contains(lower, 'ear muff') || contains(lower, 'triangle up'))) {
+    return 69 + (hashText(wings) % 4);
   }
   // High (67-70): Massive engines, power cells
   else if (contains(lower, 'massive engine') || contains(lower, 'power cell')) {
@@ -443,6 +474,11 @@ function categorizeArmsForAccel(arms) {
   if (contains(lower, 'master gold') || contains(lower, 'golden king') || 
       contains(lower, 'black king') || contains(lower, '8 bit lazers')) {
     return 75 + (hashText(arms) % 6);
+  }
+  // Golden boost: Power arms rainbow lazers gold, rocket up gold, snippers gold
+  else if (contains(lower, 'power arms rainbow lazers gold') || 
+           contains(lower, 'rocket up gold') || contains(lower, 'snippers gold')) {
+    return 70 + (hashText(arms) % 4);
   }
   // High (67-70): Ultimate, murder arms gold
   else if (contains(lower, 'ultimate') || contains(lower, 'murder arms gold')) {
@@ -569,6 +605,11 @@ function categorizeDriverForStability(driver) {
   if (contains(lower, 'master gold') || contains(lower, 'golden twin') || 
       contains(lower, 'tri eye gold') || contains(lower, 'gamers')) {
     return 75 + (hashText(driver) % 6);
+  }
+  // Golden boost: Common Golden drivers (gold snes, gold tounge, gold circuits, gold colour)
+  else if (contains(lower, 'gold') && (contains(lower, 'snes') || contains(lower, 'tounge') || 
+           contains(lower, 'circuit') || contains(lower, 'colour'))) {
+    return 69 + (hashText(driver) % 4);
   }
   // High (67-70): Ultimate, helmets, visors - best focus
   else if (contains(lower, 'ultimate') || contains(lower, 'helmet') || contains(lower, 'visor')) {
@@ -722,7 +763,7 @@ function categorizeArmsForStability(arms) {
   }
 }
 
-// Derive faction from Type trait
+// Derive faction from Type trait (returns actual Type value)
 function deriveFaction(traits) {
   // Convert trait array to map
   const traitMap = {};
@@ -733,70 +774,115 @@ function deriveFaction(traits) {
   // Find the type trait (ID 0)
   const typeValue = traitMap[0];
   
-  if (!typeValue) return 'BattleBot'; // Default
+  if (!typeValue) return 'Industrial'; // Default to most common
   
-  const lower = typeValue.toLowerCase();
-  
-  // Master tier (ultra rare)
-  if (lower === 'master' || lower === 'ultimate-master' || lower === 'ultimate') {
-    return 'Master';
-  }
-  // GodClass tier (rare specials)
-  else if (lower === 'golden' || lower === 'blackhole') {
-    return 'GodClass';
-  }
-  // WildBot tier (wild/animal types)
-  else if (lower === 'wild' || lower === 'animal' || lower === 'bee' || lower === 'dead') {
-    return 'WildBot';
-  }
-  // EntertainmentBot tier (fun/food/game)
-  else if (lower === 'food' || lower === 'game' || lower === 'retro') {
-    return 'EntertainmentBot';
-  }
-  // BattleBot tier (combat/industrial - most common)
-  else if (lower === 'industrial' || lower === 'box' || lower === 'murder' || lower === 'sports') {
-    return 'BattleBot';
-  }
-  // Default fallback
-  else {
-    return 'BattleBot';
-  }
+  // Return the actual Type value
+  return typeValue;
 }
 
-// Apply faction bonuses (from Motoko applyFactionBonus function)
+// Apply faction bonuses based on Type rarity and thematic fit
+// 25% reduction from original values to leave room for upgrades
+// Rarity tiers: Ultra-Rare (1-45), Super-Rare (244-640), Rare (717-999), Common (1654-2009)
 function applyFactionBonus(baseStat, faction, statType) {
   let bonus = 0;
   
   switch (faction) {
-    case 'Master':
-      if (statType === 'speed') bonus = 12;
-      else if (statType === 'powerCore') bonus = 12;
-      else bonus = 8;
+    // ===== ULTRA-RARE TIER (1-45 bots) - Elite tier, their own league =====
+    case 'Ultimate-master': // 1 bot - THE ULTIMATE
+      bonus = 6;
       break;
-    case 'GodClass':
-      bonus = 15; // +15 to all
-      break;
-    case 'BattleBot':
-      if (statType === 'powerCore') bonus = 8;
-      else if (statType === 'stability') bonus = 6;
+      
+    case 'Golden': // 27 bots - Premium engineering (already has gold trait bonuses)
+      if (statType === 'powerCore') bonus = 5;
+      else if (statType === 'stability') bonus = 4;
       else bonus = 3;
       break;
-    case 'EntertainmentBot':
-      if (statType === 'acceleration') bonus = 7;
-      else if (statType === 'speed') bonus = 5;
-      else bonus = 2;
+      
+    case 'Wild': // 5 bots - Unpredictable chaos
+      if (statType === 'acceleration') bonus = 8;
+      else if (statType === 'speed') bonus = 7;
+      else bonus = 5;
       break;
-    case 'WildBot':
-      if (statType === 'stability') bonus = 9;
-      else if (statType === 'acceleration') bonus = 6;
-      else bonus = 2;
+      
+    case 'Ultimate': // 45 bots - Combat excellence
+      if (statType === 'speed') bonus = 5;
+      else if (statType === 'powerCore') bonus = 5;
+      else bonus = 3;
+      break;
+    
+    // ===== SUPER-RARE TIER (244-640 bots) - Major bonuses =====
+    case 'Blackhole': // 244 bots - Gravity-defying power
+      if (statType === 'powerCore') bonus = 18;
+      else if (statType === 'acceleration') bonus = 16;
+      else bonus = 13;
+      break;
+      
+    case 'Dead': // 382 bots - Undead resilience
+      if (statType === 'stability') bonus = 13;
+      else if (statType === 'powerCore') bonus = 12;
+      else bonus = 9;
+      break;
+      
+    case 'Master': // 640 bots - Skilled operators
+      if (statType === 'speed') bonus = 14;
+      else if (statType === 'stability') bonus = 14;
+      else bonus = 11;
+      break;
+    
+    // ===== RARE TIER (717-999 bots) - Solid bonuses =====
+    case 'Bee': // 717 bots - Agile flyers
+      if (statType === 'acceleration') bonus = 10;
+      else if (statType === 'speed') bonus = 8;
+      else bonus = 6;
+      break;
+      
+    case 'Food': // 778 bots - Energy-rich cores
+      if (statType === 'powerCore') bonus = 11;
+      else if (statType === 'acceleration') bonus = 10;
+      else bonus = 8;
+      break;
+      
+    case 'Box': // 798 bots - Stable platforms
+      if (statType === 'stability') bonus = 7;
+      else if (statType === 'powerCore') bonus = 5;
+      else bonus = 3;
+      break;
+      
+    case 'Murder': // 999 bots - Aggressive power
+      if (statType === 'speed') bonus = 8;
+      else if (statType === 'powerCore') bonus = 8;
+      else bonus = 5;
+      break;
+    
+    // ===== COMMON TIER (1654-2009 bots) - Balanced bonuses =====
+    case 'Game': // 1654 bots - Precision controls
+      if (statType === 'acceleration') bonus = 3;
+      else if (statType === 'stability') bonus = 3;
+      else bonus = 1;
+      break;
+      
+    case 'Animal': // 1701 bots - Natural agility
+      if (statType === 'acceleration') bonus = 3;
+      else if (statType === 'speed') bonus = 2;
+      else bonus = 1;
+      break;
+      
+    case 'Industrial': // 2009 bots - Workhorse reliability
+      if (statType === 'powerCore') bonus = 0;
+      else if (statType === 'stability') bonus = 0;
+      else bonus = 0;
+      break;
+    
+    // Fallback
+    default:
+      bonus = 2;
       break;
   }
   
   return Math.min(100, baseStat + bonus);
 }
 
-// Main derivation function
+// Main derivation function (using 0-70 stat range instead of 30-100)
 function deriveStats(traits, faction) {
   // Convert trait array [[traitId, valueId], ...] to a map
   const traitMap = {};
@@ -825,37 +911,41 @@ function deriveStats(traits, faction) {
   const pinkBonus = hasPink ? 4 : 0;        // +4 to stability
   const blueBonus = hasBlue ? 5 : 0;        // +5 to power core
   
+  // STAT RANGE: 0-70 base (reduced from 30-100 for upgrade headroom)
+  // Categorization functions return 30-80, so we subtract 30 to get 0-50 range
+  const COMPRESSION_OFFSET = 30;
+  
   // Speed = Legs (40%) + Wings (30%) + Body (20%) + Arms (10%)
   const rawSpeed = 
-    categorizeLegsForSpeed(legs) * 0.4 +
-    categorizeWingsForSpeed(wings) * 0.3 +
-    categorizeBodyForSpeed(body) * 0.2 +
-    categorizeArmsForSpeed(arms) * 0.1;
-  const baseSpeed = Math.min(100, Math.floor(rawSpeed) + goldBonus + blackBonus);
+    (categorizeLegsForSpeed(legs) - COMPRESSION_OFFSET) * 0.4 +
+    (categorizeWingsForSpeed(wings) - COMPRESSION_OFFSET) * 0.3 +
+    (categorizeBodyForSpeed(body) - COMPRESSION_OFFSET) * 0.2 +
+    (categorizeArmsForSpeed(arms) - COMPRESSION_OFFSET) * 0.1;
+  const baseSpeed = Math.min(70, Math.max(0, Math.floor(rawSpeed) + goldBonus + blackBonus));
   
   // Power = Body (50%) + Arms (25%) + Legs (15%) + Wings (10%)
   const rawPower = 
-    categorizeBodyForPower(body) * 0.5 +
-    categorizeArmsForPower(arms) * 0.25 +
-    categorizeLegsForPower(legs) * 0.15 +
-    categorizeWingsForPower(wings) * 0.1;
-  const basePowerCore = Math.min(100, Math.floor(rawPower) + goldBonus + blueBonus + rustPenalty);
+    (categorizeBodyForPower(body) - COMPRESSION_OFFSET) * 0.5 +
+    (categorizeArmsForPower(arms) - COMPRESSION_OFFSET) * 0.25 +
+    (categorizeLegsForPower(legs) - COMPRESSION_OFFSET) * 0.15 +
+    (categorizeWingsForPower(wings) - COMPRESSION_OFFSET) * 0.1;
+  const basePowerCore = Math.min(70, Math.max(0, Math.floor(rawPower) + goldBonus + blueBonus + rustPenalty));
   
   // Acceleration = Legs (50%) + Arms (20%) + Wings (20%) + Body (10%)
   const rawAccel = 
-    categorizeLegsForAccel(legs) * 0.5 +
-    categorizeArmsForAccel(arms) * 0.2 +
-    categorizeWingsForAccel(wings) * 0.2 +
-    categorizeBodyForAccel(body) * 0.1;
-  const baseAcceleration = Math.min(100, Math.floor(rawAccel) + goldBonus + blackBonus);
+    (categorizeLegsForAccel(legs) - COMPRESSION_OFFSET) * 0.5 +
+    (categorizeArmsForAccel(arms) - COMPRESSION_OFFSET) * 0.2 +
+    (categorizeWingsForAccel(wings) - COMPRESSION_OFFSET) * 0.2 +
+    (categorizeBodyForAccel(body) - COMPRESSION_OFFSET) * 0.1;
+  const baseAcceleration = Math.min(70, Math.max(0, Math.floor(rawAccel) + goldBonus + blackBonus));
   
   // Stability = Driver (40%) + Body (30%) + Legs (20%) + Arms (10%)
   const rawStability = 
-    categorizeDriverForStability(driver) * 0.4 +
-    categorizeBodyForStability(body) * 0.3 +
-    categorizeLegsForStability(legs) * 0.2 +
-    categorizeArmsForStability(arms) * 0.1;
-  const baseStability = Math.min(100, Math.floor(rawStability) + goldBonus + pinkBonus + rustPenalty);
+    (categorizeDriverForStability(driver) - COMPRESSION_OFFSET) * 0.4 +
+    (categorizeBodyForStability(body) - COMPRESSION_OFFSET) * 0.3 +
+    (categorizeLegsForStability(legs) - COMPRESSION_OFFSET) * 0.2 +
+    (categorizeArmsForStability(arms) - COMPRESSION_OFFSET) * 0.1;
+  const baseStability = Math.min(70, Math.max(0, Math.floor(rawStability) + goldBonus + pinkBonus + rustPenalty));
   
   // Apply faction bonuses
   const speed = applyFactionBonus(baseSpeed, faction, 'speed');

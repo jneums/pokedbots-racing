@@ -83,11 +83,24 @@ module {
 
                   // Show faction
                   let factionEmoji = switch (stats.faction) {
-                    case (#BattleBot) { " | 🏆 BattleBot" };
-                    case (#EntertainmentBot) { " | 🎭 EntertainmentBot" };
-                    case (#WildBot) { " | 🌿 WildBot" };
-                    case (#GodClass) { " | 👑 GodClass" };
-                    case (#Master) { " | ⭐ Master" };
+                    // Ultra-Rare
+                    case (#UltimateMaster) { " | 👑 Ultimate-Master" };
+                    case (#Wild) { " | 🦾 Wild" };
+                    case (#Golden) { " | ✨ Golden" };
+                    case (#Ultimate) { " | ⚡ Ultimate" };
+                    // Super-Rare
+                    case (#Blackhole) { " | 🌌 Blackhole" };
+                    case (#Dead) { " | 💀 Dead" };
+                    case (#Master) { " | 🎯 Master" };
+                    // Rare
+                    case (#Bee) { " | 🐝 Bee" };
+                    case (#Food) { " | 🍔 Food" };
+                    case (#Box) { " | 📦 Box" };
+                    case (#Murder) { " | 🔪 Murder" };
+                    // Common
+                    case (#Game) { " | 🎮 Game" };
+                    case (#Animal) { " | 🦎 Animal" };
+                    case (#Industrial) { " | ⚙️ Industrial" };
                   };
                   msg #= factionEmoji # "\n";
 
@@ -122,25 +135,28 @@ module {
                   } else if (stats.wins >= 6 and stats.wins <= 9) {
                     "🥇 Elite (6-9 wins)";
                   } else {
-                    // 10+ wins
+                    // 10+ wins - check if eligible for SilentKlan (ultra-rare factions)
                     switch (stats.faction) {
-                      case (#GodClass) { "💀 SilentKlan (10+, God Class)" };
-                      case (#Master) { "💀 SilentKlan (10+, Master)" };
+                      case (#UltimateMaster or #Wild or #Golden or #Ultimate) {
+                        "💀 SilentKlan (10+, Ultra-Rare)";
+                      };
+                      case (#Blackhole or #Dead or #Master) {
+                        "💀 SilentKlan (10+, Super-Rare)";
+                      };
                       case (_) {
-                        "🏆 Elite+ (10+ wins, locked from SilentKlan)";
+                        "🏆 Elite+ (10+ wins, not eligible for SilentKlan)";
                       };
                     };
                   };
                   msg #= "   🏆 Class: " # raceClassText # "\n";
 
-                  // Show terrain/distance preferences
+                  // Show terrain preferences based on faction bonuses
                   msg #= "   🎯 Prefers: " # (
                     switch (stats.faction) {
-                      case (#BattleBot) { "ScrapHeaps" };
-                      case (#EntertainmentBot) { "MetalRoads" };
-                      case (#WildBot) { "WastelandSand" };
-                      case (#GodClass) { "All terrains" };
-                      case (#Master) { "MetalRoads" };
+                      case (#Blackhole) { "MetalRoads" };
+                      case (#Box) { "ScrapHeaps" };
+                      case (#Game) { "WastelandSand" };
+                      case (_) { "All" };
                     }
                   );
 

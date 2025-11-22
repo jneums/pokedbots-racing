@@ -14,6 +14,6 @@
     "rootDir": ".",
     "baseUrl": ".",
   },
-  "include": ["test/**/*"],
+  "include": ["test/**/*", "canisters/pokedbots_racing/test/tools.test.ts", "canisters/pokedbots_racing/test/prometheus.test.ts", "canisters/pokedbots_racing/test/mcp_registry_e2e.pic.test.ts"],
   "exclude": ["node_modules", "dist", ".dfx"]
 }

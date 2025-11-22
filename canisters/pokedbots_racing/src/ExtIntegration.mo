@@ -273,4 +273,11 @@ module {
     let accountBlob = AccountId.accountIdentifier(p, subBlob);
     Base16.encode(accountBlob);
   };
+
+  // Get the garage account ID for a user (where their NFTs are stored in the racing canister)
+  // This combines the racing canister principal with the user's garage subaccount
+  public func getGarageAccountId(racingCanisterId : Principal, userPrincipal : Principal) : AccountIdentifier {
+    let garageSubaccount = deriveGarageSubaccount(userPrincipal);
+    principalToAccountIdentifier(racingCanisterId, ?garageSubaccount);
+  };
 };

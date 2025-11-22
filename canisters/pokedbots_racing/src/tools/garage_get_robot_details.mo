@@ -104,11 +104,24 @@ module {
 
       // Helper functions for text conversion
       let factionText = switch (racingStats.faction) {
-        case (#BattleBot) { "BattleBot" };
-        case (#EntertainmentBot) { "EntertainmentBot" };
-        case (#WildBot) { "WildBot" };
-        case (#GodClass) { "GodClass" };
+        // Ultra-Rare
+        case (#UltimateMaster) { "Ultimate-Master" };
+        case (#Wild) { "Wild" };
+        case (#Golden) { "Golden" };
+        case (#Ultimate) { "Ultimate" };
+        // Super-Rare
+        case (#Blackhole) { "Blackhole" };
+        case (#Dead) { "Dead" };
         case (#Master) { "Master" };
+        // Rare
+        case (#Bee) { "Bee" };
+        case (#Food) { "Food" };
+        case (#Box) { "Box" };
+        case (#Murder) { "Murder" };
+        // Common
+        case (#Game) { "Game" };
+        case (#Animal) { "Animal" };
+        case (#Industrial) { "Industrial" };
       };
 
       let distanceText = switch (racingStats.preferredDistance) {

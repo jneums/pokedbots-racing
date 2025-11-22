@@ -9,6 +9,7 @@ import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Principal "mo:base/Principal";
 import Option "mo:base/Option";
+import Debug "mo:base/Debug";
 import Map "mo:map/Map";
 import { nhash; phash } "mo:map/Map";
 import RacingSimulator "./RacingSimulator";
@@ -19,11 +20,27 @@ module {
   // ===== POKEDBOTS-SPECIFIC TYPES =====
 
   public type FactionType = {
-    #BattleBot;
-    #EntertainmentBot;
-    #WildBot;
-    #GodClass;
-    #Master;
+    // Ultra-Rare (1-45 bots)
+    #UltimateMaster; // 1 bot
+    #Wild; // 5 bots
+    #Golden; // 27 bots
+    #Ultimate; // 45 bots
+
+    // Super-Rare (244-640 bots)
+    #Blackhole; // 244 bots
+    #Dead; // 382 bots
+    #Master; // 640 bots
+
+    // Rare (717-999 bots)
+    #Bee; // 717 bots
+    #Food; // 778 bots
+    #Box; // 798 bots
+    #Murder; // 999 bots
+
+    // Common (1654-2009 bots)
+    #Game; // 1654 bots
+    #Animal; // 1701 bots
+    #Industrial; // 2009 bots
   };
 
   public type Distance = {
@@ -71,6 +88,7 @@ module {
 
     // Timestamps
     activatedAt : Int;
+    lastDecayed : Int;
     lastRecharged : ?Int;
     lastRepaired : ?Int;
     lastDiagnostics : ?Int;
@@ -153,7 +171,42 @@ module {
 
     // ===== RACING STATS PROVIDER IMPLEMENTATION =====
 
-    /// Get racing stats for the generic racing simulator
+    /// Apply faction terrain bonuses for racing
+    private func applyTerrainBonus(stats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }, faction : FactionType, terrain : Terrain, condition : Nat) : {
+      speed : Nat;
+      powerCore : Nat;
+      acceleration : Nat;
+      stability : Nat;
+    } {
+      let bonus : Float = switch (faction, terrain) {
+        // Blackhole: +12% on MetalRoads
+        case (#Blackhole, #MetalRoads) { 1.12 };
+        // Box: +10% on ScrapHeaps
+        case (#Box, #ScrapHeaps) { 1.10 };
+        // Game: +8% on WastelandSand
+        case (#Game, #WastelandSand) { 1.08 };
+        // Golden: +15% when condition >= 90
+        case (#Golden, _) {
+          if (condition >= 90) { 1.15 } else { 1.0 };
+        };
+        // All others: no terrain bonus
+        case (_) { 1.0 };
+      };
+
+      if (bonus == 1.0) {
+        return stats;
+      };
+
+      // Apply bonus to all stats
+      {
+        speed = Nat.min(100, Int.abs(Float.toInt(Float.fromInt(stats.speed) * bonus)));
+        powerCore = Nat.min(100, Int.abs(Float.toInt(Float.fromInt(stats.powerCore) * bonus)));
+        acceleration = Nat.min(100, Int.abs(Float.toInt(Float.fromInt(stats.acceleration) * bonus)));
+        stability = Nat.min(100, Int.abs(Float.toInt(Float.fromInt(stats.stability) * bonus)));
+      };
+    };
+
+    /// Get racing stats for the generic racing simulator (without terrain bonuses)
     public func getRacingStats(nftId : Text) : ?RacingSimulator.RacingStats {
       let tokenIndex = Nat.fromText(nftId);
       switch (tokenIndex) {
@@ -166,6 +219,29 @@ module {
                 powerCore = current.powerCore;
                 acceleration = current.acceleration;
                 stability = current.stability;
+              };
+            };
+            case (null) { null };
+          };
+        };
+        case (null) { null };
+      };
+    };
+
+    /// Get racing stats WITH terrain bonuses applied
+    public func getRacingStatsWithTerrain(nftId : Text, terrain : Terrain) : ?RacingSimulator.RacingStats {
+      let tokenIndex = Nat.fromText(nftId);
+      switch (tokenIndex) {
+        case (?idx) {
+          switch (Map.get(stats, nhash, idx)) {
+            case (?botStats) {
+              let current = getCurrentStats(botStats);
+              let boosted = applyTerrainBonus(current, botStats.faction, terrain, botStats.condition);
+              ?{
+                speed = boosted.speed;
+                powerCore = boosted.powerCore;
+                acceleration = boosted.acceleration;
+                stability = boosted.stability;
               };
             };
             case (null) { null };
@@ -261,11 +337,19 @@ module {
           switch (statsProvider.getPrecomputedStats(tokenIndex)) {
             case (?precomputed) { precomputed.faction };
             case (null) {
-              // Fallback: simple distribution based on tokenIndex
+              // Fallback: distribute across all 14 factions
               let mod = tokenIndex % 100;
-              if (mod < 5) { #GodClass } else if (mod < 15) { #Master } else if (mod < 35) {
-                #WildBot;
-              } else if (mod < 60) { #EntertainmentBot } else { #BattleBot };
+              if (mod < 1) { #UltimateMaster } else if (mod < 2) { #Wild } else if (mod < 5) {
+                #Golden;
+              } else if (mod < 10) { #Ultimate } else if (mod < 15) {
+                #Blackhole;
+              } else if (mod < 20) { #Dead } else if (mod < 30) { #Master } else if (mod < 38) {
+                #Bee;
+              } else if (mod < 46) { #Food } else if (mod < 54) { #Box } else if (mod < 64) {
+                #Murder;
+              } else if (mod < 78) { #Game } else if (mod < 92) { #Animal } else {
+                #Industrial;
+              };
             };
           };
         };
@@ -310,6 +394,7 @@ module {
         totalScrapEarned = 0;
         factionReputation = 0;
         activatedAt = now;
+        lastDecayed = now; // Initialize decay tracking
         lastRecharged = null;
         lastRepaired = null;
         lastDiagnostics = null;
@@ -432,18 +517,32 @@ module {
 
     /// Apply faction modifier to upgrade gains
     public func applyFactionModifier(faction : FactionType, baseGain : Nat, seed : Nat32) : Nat {
+      let roll = seed % 100;
+
       switch (faction) {
-        case (#GodClass) {
-          let roll = seed % 100;
-          if (roll < 20) { baseGain * 2 } else { baseGain };
+        // Ultra-rare factions: 10% chance (already powerful)
+        case (#UltimateMaster or #Golden or #Ultimate) {
+          if (roll < 10) { baseGain * 2 } else { baseGain };
         };
-        case (#WildBot) {
-          let roll = Nat32.toNat(seed % 5);
-          let variance : Int = roll - 2;
+        case (#Wild) {
+          // High variance: -2 to +2
+          let varianceRoll = Nat32.toNat(seed % 5);
+          let variance : Int = varianceRoll - 2;
           let modified = Int.abs(variance + baseGain);
           Nat.max(1, modified);
         };
-        case (_) { baseGain };
+        // Super-rare factions: 20% chance
+        case (#Blackhole or #Dead or #Master) {
+          if (roll < 20) { baseGain * 2 } else { baseGain };
+        };
+        // Rare factions: 35% chance (catch-up mechanic)
+        case (#Bee or #Food or #Box or #Murder) {
+          if (roll < 35) { baseGain * 2 } else { baseGain };
+        };
+        // Common factions: 25% chance
+        case (_) {
+          if (roll < 25) { baseGain * 2 } else { baseGain };
+        };
       };
     };
 
@@ -458,13 +557,28 @@ module {
           };
 
           let decayMultiplier : Float = switch (botStats.faction) {
-            case (#WildBot) { 1.2 };
-            case (#GodClass) { 0.7 };
+            // Ultra-rare: slower decay
+            case (#UltimateMaster) { 0.6 };
+            case (#Golden) { 0.7 };
+            case (#Ultimate) { 0.75 };
+            case (#Wild) { 1.3 }; // Wild bots decay faster
+            // Super-rare: moderate decay reduction
+            case (#Blackhole or #Dead or #Master) { 0.85 };
+            // Rare: slight decay reduction
+            case (#Bee or #Food or #Box or #Murder) { 0.95 };
+            // Common: standard decay
             case (_) { 1.0 };
           };
 
-          let conditionLoss = Nat.min(botStats.condition, Int.abs(Float.toInt(0.21 * decayMultiplier)));
-          let calibrationLoss = Nat.min(botStats.calibration, Int.abs(Float.toInt(0.125 * decayMultiplier)));
+          // Calculate hours elapsed since last decay
+          let hoursSinceLastDecay = Int.abs((now - botStats.lastDecayed) / 3_600_000_000_000);
+
+          // Apply cumulative decay: 0.21 per hour for condition, 0.125 per hour for calibration
+          let totalConditionDecay = Float.toInt(Float.fromInt(hoursSinceLastDecay) * 0.21 * decayMultiplier);
+          let totalCalibrationDecay = Float.toInt(Float.fromInt(hoursSinceLastDecay) * 0.125 * decayMultiplier);
+
+          let conditionLoss = Nat.min(botStats.condition, Int.abs(totalConditionDecay));
+          let calibrationLoss = Nat.min(botStats.calibration, Int.abs(totalCalibrationDecay));
 
           let extraConditionLoss = switch (botStats.lastRecharged) {
             case (?lastTime) {
@@ -483,6 +597,7 @@ module {
             botStats with
             condition = Nat.sub(botStats.condition, totalConditionLoss);
             calibration = Nat.sub(botStats.calibration, calibrationLoss);
+            lastDecayed = now;
           };
 
           updateStats(tokenIndex, updatedStats);

@@ -29,7 +29,11 @@ Races are scheduled events through the dangerous wastelands surrounding Delta Ci
   - Raider Class (3-5 wins)
   - Elite Class (6+ wins)
   - Silent Klan Invitational (10+ wins)
-- **Entry Fee**: 5-50 ICP based on class
+- **Entry Fee**: Class-based scaling:
+  - Scavenger: 0.05-0.5 ICP (1x base)
+  - Raider: 0.1-1 ICP (2x base)
+  - Elite: 0.25-2.5 ICP (5x base)
+  - SilentKlan: 0.5-5 ICP (10x base)
 - **Prize Pool**: Sum of all entry fees (minus 5% Silent Klan tax)
 - **Max Entries**: 8-12 robots
 - **Start Time**: Scheduled timestamp
@@ -52,7 +56,7 @@ To enter a race, your bot must meet:
 - ✅ Faction restrictions met (for certain races)
 
 **Special Races:**
-- **Silent Klan Invitational**: Only God Class & Masters allowed
+- **Silent Klan Invitational**: Only UltimateMaster, Golden, Ultimate, Blackhole, Dead, and Master factions (top-tier bots)
 - **Faction Championships**: Restricted to specific factions
 
 ---
@@ -109,13 +113,29 @@ for each robot in race:
     then 1.05 
     else 0.95
   
-  // Apply faction special abilities
+  // Apply faction special abilities (14 Type-based bonuses)
   factionBonus = match robot.faction:
-    Battle Bot => if (terrain == ScrapHeaps) then 1.08 else 1.0
-    Entertainment Bot => 1.03  // Always slight edge (crowd favorites)
-    Wild Bot => 1.0 + random() * 0.15  // Extremely unpredictable
-    God Class => 1.10  // Superior in all conditions
-    Masters => if (race.class == Elite) then 1.12 else 1.05
+    // ULTRA-RARE FACTIONS (1-45 bots)
+    Ultimate-master => 1.12  // Supreme in all conditions
+    Wild => 1.0 + random() * 0.20  // Chaotic variance (-10% to +10%)
+    Golden => if (condition >= 90) then 1.15 else 1.05  // Pristine bonus
+    Ultimate => 1.10  // Consistent excellence
+    
+    // SUPER-RARE FACTIONS (244-640 bots)
+    Blackhole => if (terrain == MetalRoads) then 1.12 else 1.03  // Highway specialists
+    Dead => if (distance >= 20km) then 1.10 else 1.02  // Endurance machines
+    Master => if (raceClass == Elite || raceClass == SilentKlan) then 1.14 else 1.04  // Elite dominance
+    
+    // RARE FACTIONS (717-999 bots)
+    Bee => if (stability >= 60) then 1.08 else 1.02  // Precision flyers
+    Food => if (battery >= 80) then 1.09 else 1.03  // Energy efficient
+    Box => if (terrain == ScrapHeaps) then 1.10 else 1.02  // Garbage crushers
+    Murder => 1.06  // Reliable aggression
+    
+    // COMMON FACTIONS (1654-2009 bots)
+    Game => if (terrain == WastelandSand) then 1.05 else 1.0  // Sand specialists
+    Animal => 1.02  // Natural adaptability
+    Industrial => 1.0  // No special bonus
   
   // Random variance based on stability (lower stability = higher variance)
   variance = random() * (100 - robot.stability) / 100.0 * 0.15
@@ -142,45 +162,134 @@ for each robot in race:
 
 ---
 
-## Faction Bonuses in Races
+## Faction Racing Bonuses
 
-### Battle Bots 🎮
-- **+8% performance** on Scrap Heaps terrain
-- Tough and reliable in garbage mountains
+Each of the 14 Type-based factions has unique racing advantages:
 
-### Entertainment Bots 🎭
-- **+3% performance** in all races
-- Crowd favorites with consistent showmanship
+### Ultra-Rare Factions (1-45 bots)
 
-### Wild Bots ⚡
-- **+0-15% random variance**
+**Ultimate-master** (1 bot) 👑
+- **+12% performance** in all conditions
+- Supreme racing machine
+
+**Wild** (5 bots) ⚡
+- **-10% to +10% random variance**
 - Can dominate or crash spectacularly
 - High risk, high reward
 
-### God Class 👑
-- **+10% performance** in all conditions
-- Engineered superiority shows
+**Golden** (27 bots) ✨
+- **+15% performance** when condition ≥ 90
+- **+5% performance** otherwise
+- Pristine maintenance rewarded
 
-### The Masters 🌙
-- **+12% performance** in Elite Class races
-- **+5% performance** in all other races
-- Excel under pressure
+**Ultimate** (45 bots) 🌟
+- **+10% performance** in all conditions
+- Consistent excellence
+
+### Super-Rare Factions (244-640 bots)
+
+**Blackhole** (244 bots) 🌀
+- **+12% performance** on Metal Roads
+- **+3% performance** on other terrains
+- Highway speed specialists
+
+**Dead** (382 bots) 💀
+- **+10% performance** on 20km+ races
+- **+2% performance** on shorter races
+- Endurance machines
+
+**Master** (640 bots) 🎭
+- **+14% performance** in Elite/SilentKlan races
+- **+4% performance** in other classes
+- Excel under elite pressure
+
+### Rare Factions (717-999 bots)
+
+**Bee** (717 bots) 🐝
+- **+8% performance** when stability ≥ 60
+- **+2% performance** otherwise
+- Precision flying rewarded
+
+**Food** (778 bots) 🍔
+- **+9% performance** when battery ≥ 80
+- **+3% performance** otherwise
+- Energy efficiency specialists
+
+**Box** (798 bots) 📦
+- **+10% performance** on Scrap Heaps
+- **+2% performance** on other terrains
+- Garbage tower crushers
+
+**Murder** (999 bots) 🔪
+- **+6% performance** in all conditions
+- Reliable aggressive racers
+
+### Common Factions (1654-2009 bots)
+
+**Game** (1654 bots) 🎮
+- **+5% performance** on Wasteland Sand
+- **+0% performance** on other terrains
+- Desert survival specialists
+
+**Animal** (1701 bots) 🦎
+- **+2% performance** in all conditions
+- Natural wasteland adaptation
+
+**Industrial** (2009 bots) ⚙️
+- **+0% bonus**
+- Raw stats, no special abilities
 
 ---
 
 ## Race Calendar
 
-### Daily Races
-- **Scavenger Sprints**: 5km, low entry (50 ICP)
-- **Raider Runs**: 10km, medium entry (100 ICP)
+### Daily Sprint Challenge
+**Schedule:** Every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
+- **Distance:** 5-10km (varies: 5km, 7km, or 10km)
+- **Terrain:** ScrapHeaps, WastelandSand, or MetalRoads
+- **Classes:** Scavenger, Raider, Elite
+- **Entry Fee:** 
+  - Scavenger: 0.05 ICP
+  - Raider: 0.1 ICP  
+  - Elite: 0.25 ICP
+- **Max Entries:** 12
+- **Platform Bonus:** +0.5 ICP (Scavenger/Raider only)
+- **Points:** 1x standard
 
-### Weekly Events
-- **Elite Wasteland Circuit**: 20km, high entry (300 ICP)
-- **Faction Championships**: Restricted by faction
+### Weekly League Championship
+**Schedule:** Every Sunday at 18:00 UTC
+- **Distance:** 10-20km (varies: 10km, 15km, or 20km)
+- **Terrain:** ScrapHeaps, WastelandSand, or MetalRoads
+- **Classes:** Scavenger, Raider, Elite, SilentKlan
+- **Entry Fee:**
+  - Scavenger: 0.2 ICP
+  - Raider: 0.4 ICP
+  - Elite: 1.0 ICP
+  - SilentKlan: 2.0 ICP
+- **Max Entries:** 50
+- **Platform Bonus:** +2 ICP (Scavenger/Raider only)
+- **Points:** 2x multiplier
 
-### Monthly Specials
-- **Silent Klan Invitational**: 30km, God Class & Masters only (500 ICP)
-- **Garbage Tower Grand Prix**: 25km, all factions (400 ICP)
+### Monthly Championship Cup
+**Schedule:** First Saturday of each month at 18:00 UTC
+- **Distance:** 15-30km (varies: 15km, 20km, 25km, or 30km)
+- **Terrain:** ScrapHeaps, WastelandSand, or MetalRoads
+- **Classes:** Elite, SilentKlan only
+- **Entry Fee:**
+  - Elite: 2.5 ICP (0.5 base × 5x)
+  - SilentKlan: 5.0 ICP (0.5 base × 10x)
+- **Max Entries:** 64
+- **Platform Bonus:** +5 ICP (all classes)
+- **Points:** 3x multiplier
+
+### Special Events
+**Schedule:** Announced in advance (72 hours)
+- **Distance:** 10-30km (full variety)
+- **Terrain:** All terrains
+- **Classes:** Varies by event
+- **Entry Fee:** Custom per event
+- **Max Entries:** Varies
+- **Themes:** Faction Championships, Holiday events, Community tournaments
 
 ---
 
@@ -212,24 +321,79 @@ Use the `racing_sponsor_race` tool:
 
 ## Leaderboards
 
-### Global Rankings
-- Top racers by win count
-- Top earners by total ICP won
-- Win rate percentage leaders
+### Time-Based Rankings
+
+**Monthly Leaderboard (YYYYMM format)**
+- Points earned during calendar month
+- Resets at start of each month
+- Tracks current month's best performers
+
+**Seasonal Leaderboard (3-month periods)**
+- Winter (Jan-Mar), Spring (Apr-Jun), Summer (Jul-Sep), Fall (Oct-Dec)
+- Accumulates points across full season
+- Major achievements tracked quarterly
+
+**All-Time Leaderboard**
+- Permanent career rankings
+- Never resets
+- Historical performance record
+
+### Division Rankings
+
+Leaderboards filtered by race class:
+- **Scavenger Class** (0-2 wins)
+- **Raider Class** (3-9 wins)
+- **Elite Class** (10+ wins)
+- **SilentKlan** (10+ wins, invitation only)
 
 ### Faction Rankings
-- Best Battle Bots
-- Best Entertainment Bots
-- Best Wild Bots
-- Best God Class
-- Best Masters
 
-### Career Stats Tracking
+Top performers for each faction:
+- **Ultra-Rare:** UltimateMaster, Wild, Golden, Ultimate
+- **Super-Rare:** Blackhole, Dead, Master
+- **Rare:** Bee, Food, Box, Murder
+- **Common:** Game, Animal, Industrial
+
+### Leaderboard Stats Tracked
+
+**Per-Bot Metrics:**
+- Points (position-based: 1st=25pts, 2nd=18pts, 3rd=15pts, etc.)
+- Win count & win rate percentage
+- Podium finishes (Top 3)
+- Average finish position
+- Total races entered
+- Total earnings (ICP e8s)
+- Best finish achieved
+- Current streak (consecutive wins/losses)
+- Rank & trend (↑ Up, ↓ Down, = Stable, ★ New)
+- Last race timestamp
+
+**Career Stats:**
 - Races entered
-- Wins / Places / Shows
+- Wins / Places (2nd) / Shows (3rd)
 - Total ICP earned
-- Best finish times per terrain
 - Faction reputation points
+- Experience points
+- Upgrade progression
+
+### Points System
+
+**Base Points by Position:**
+- 1st Place: 25 points
+- 2nd Place: 18 points
+- 3rd Place: 15 points
+- 4th Place: 12 points
+- 5th Place: 10 points
+- 6th Place: 8 points
+- 7th-8th: 6 points
+- 9th-10th: 4 points
+- 11th+: 2 points (participation)
+
+**Multipliers:**
+- Daily Sprint: 1x
+- Weekly League: 2x
+- Monthly Cup: 3x
+- Special Events: Varies
 
 ---
 

@@ -57,7 +57,7 @@ This guide provides data-driven recommendations for getting started and maximizi
 - Example: Token #4375 (6 ICP, 55 rating, BattleBot)
 
 **Racing Approach:**
-- Start with Scavenger class races (0.05-0.2 ICP entry fees)
+- Start with Scavenger class races (0.05-0.5 ICP entry fees)
 - Enter 5-10 races to learn mechanics
 - Focus on MetalRoads terrain (most common)
 
@@ -263,7 +263,7 @@ This guide provides data-driven recommendations for getting started and maximizi
 
 **Scavenger Class (0-2 wins)**
 - Events Available: Daily Sprint, Weekly League
-- Entry Fees: 0.05-0.2 ICP depending on event
+- Entry Fees: 0.05-0.5 ICP depending on event (Daily/Weekly/Monthly)
 - Prize Pools: 0.15-11 ICP (based on entries + platform bonus)
 - Competition: Beginner bots
 - Strategy: Learn mechanics, build win record
@@ -271,7 +271,7 @@ This guide provides data-driven recommendations for getting started and maximizi
 
 **Raider Class (3-9 wins)**
 - Events Available: Daily Sprint, Weekly League
-- Entry Fees: 0.05-0.2 ICP depending on event
+- Entry Fees: 0.1-1 ICP depending on event (Daily/Weekly/Monthly)
 - Prize Pools: 0.15-11 ICP (based on entries + platform bonus)
 - Competition: Upgraded mid-tier bots
 - Strategy: Specialized builds, terrain matching
@@ -279,7 +279,7 @@ This guide provides data-driven recommendations for getting started and maximizi
 
 **Elite Class (10+ wins)**
 - Events Available: Daily Sprint, Weekly League, Monthly Cup
-- Entry Fees: 0.05-0.5 ICP depending on event
+- Entry Fees: 0.25-2.5 ICP depending on event (Daily/Weekly/Monthly)
 - Prize Pools: 0.15-37 ICP (based on entries + platform bonus)
 - Competition: Highly upgraded premium bots
 - Strategy: Min-maxed builds, perfect terrain/distance matching
@@ -287,7 +287,7 @@ This guide provides data-driven recommendations for getting started and maximizi
 
 **SilentKlan (10+ wins, invite only)**
 - Events Available: Weekly League, Monthly Cup
-- Entry Fees: 0.2-0.5 ICP depending on event
+- Entry Fees: 0.5-5 ICP depending on event (Weekly/Monthly only)
 - Prize Pools: 2.2-37 ICP (based on entries + platform bonus)
 - Competition: Best of the best (GodClass/Master only)
 - Strategy: Elite GodClass/Master bots, full upgrades
@@ -663,7 +663,7 @@ Token #4343 (GodClass, 68 rating, 44 ICP):
 - [ ] Browse marketplace, analyze price/rating ratios
 - [ ] Purchase starter bot (21-50 ICP recommended)
 - [ ] Initialize bot for racing (free)
-- [ ] Enter first Scavenger race (0.05-0.5 ICP)
+- [ ] Enter first Scavenger race (0.05-0.5 ICP depending on event)
 - [ ] Review race results and bot performance
 - [ ] Enter 2-3 more races to build experience
 - [ ] Budget: 21-50 ICP (mostly bot purchase)

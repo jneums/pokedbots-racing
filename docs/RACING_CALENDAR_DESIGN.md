@@ -255,139 +255,72 @@ Most competitive racers enter:
 - Team-based competitions
 - Faction bonuses and perks
 
-## Implementation Plan
+---
 
-### Phase 1: Calendar & Scheduling
-1. Create `RaceCalendar.mo` module
-2. Define event types and schedules
-3. Implement cron-like scheduling system
-4. Add event announcement system
+## How to Use the Calendar
 
-### Phase 2: Leaderboard System
-1. Create `Leaderboard.mo` module
-2. Implement points calculation
-3. Add ranking algorithms
-4. Create leaderboard query endpoints
+### Check Upcoming Events
+Use the racing tools to see what's coming up:
+- Daily Sprints run every 6 hours
+- Weekly League every Sunday at 20:00 UTC
+- Monthly Cup first Saturday of each month
 
-### Phase 3: Championship System
-1. Create `Tournament.mo` module
-2. Implement bracket generation
-3. Add match scheduling
-4. Handle multi-race matches
+### Registration Windows
+- **Daily Sprint**: Opens immediately, closes 15 min before race
+- **Weekly League**: Opens Friday, closes 30 min before race
+- **Monthly Cup**: Opens 1 week before, closes 24 hours before
 
-### Phase 4: Special Events
-1. Create event template system
-2. Add themed race mechanics
-3. Implement announcement/notification
-4. Special prize distribution
+### Track Your Progress
+- Monitor your leaderboard rank
+- See your win count and division status
+- Track earnings and statistics
+- Follow seasonal standings
 
-## Data Structures
+### Plan Your Racing
+- Budget ICP for entry fees based on your class
+- Join races that match your bot's strengths (terrain, distance)
+- Build win streaks to advance through divisions
+- Compete in Weekly Leagues for maximum points
 
-### Event Schedule
-```motoko
-type EventType = {
-  #WeeklyLeague;
-  #DailySprint;
-  #MonthlyCup;
-  #SpecialEvent;
-};
+---
 
-type ScheduledEvent = {
-  eventId: Nat;
-  eventType: EventType;
-  scheduledTime: Int; // UTC timestamp
-  division: ?RaceClass; // null for multi-division
-  status: EventStatus;
-  registrationOpens: Int;
-  registrationCloses: Int;
-  metadata: EventMetadata;
-};
+## Tips for Success
 
-type EventStatus = {
-  #Announced;
-  #RegistrationOpen;
-  #RegistrationClosed;
-  #InProgress;
-  #Completed;
-  #Cancelled;
-};
-```
+**For Beginners (Scavenger Class):**
+- Start with Daily Sprints (only 0.05 ICP)
+- Learn terrain preferences and bot strengths
+- Race frequently to build experience
+- Aim for 3 wins to reach Raider class
 
-### Leaderboard Entry
-```motoko
-type LeaderboardEntry = {
-  tokenIndex: Nat;
-  owner: Principal;
-  points: Nat;
-  wins: Nat;
-  races: Nat;
-  winRate: Float;
-  avgPosition: Float;
-  totalEarnings: Nat;
-  rank: Nat;
-  trend: {#Up; #Down; #Stable};
-};
+**For Intermediate (Raider Class):**
+- Focus on Weekly Leagues for 2x points
+- Upgrade your bot strategically
+- Track monthly leaderboard position
+- Build toward Elite qualification
 
-type LeaderboardType = {
-  #Monthly;
-  #Season;
-  #AllTime;
-  #Faction: FactionType;
-};
-```
+**For Advanced (Elite/SilentKlan):**
+- Qualify for Monthly Championship Cups
+- Compete for top leaderboard positions
+- Maximize earnings in high-stakes races
+- Maintain win streaks for reputation
 
-### Championship Bracket
-```motoko
-type BracketMatch = {
-  matchId: Nat;
-  round: Nat;
-  seed1: Nat; // tokenIndex
-  seed2: Nat;
-  races: [Nat]; // Best of 3 race IDs
-  winner: ?Nat;
-  nextMatch: ?Nat; // Next match ID if won
-  loserMatch: ?Nat; // Loser bracket match ID
-};
+---
 
-type Championship = {
-  championshipId: Nat;
-  seasonId: Nat;
-  qualified: [Nat]; // Sorted by seeding
-  bracket: [BracketMatch];
-  status: ChampionshipStatus;
-  prizes: ChampionshipPrizes;
-};
-```
+## Frequently Asked Questions
 
-## Calendar Publishing
+**Q: What happens if I don't make it to a race I registered for?**
+A: Entry fees are not refunded for no-shows. Make sure you're available at race time!
 
-### Public Endpoints
-- `getUpcomingEvents(days: Nat)` - Next N days of events
-- `getSeasonSchedule()` - Full season calendar
-- `getEventDetails(eventId: Nat)` - Specific event info
-- `getLeaderboard(type: LeaderboardType, limit: Nat)` - Rankings
+**Q: Can I enter multiple races at once?**
+A: Yes, as long as race times don't overlap and your bot has sufficient battery and condition.
 
-### Frontend Display
-- Interactive calendar view
-- Countdown timers
-- Registration status
-- Prize pool tracking
-- Live leaderboards
+**Q: How do I qualify for Monthly Championship?**
+A: Finish in the top 32-64 on the monthly leaderboard (coming soon).
 
-## Migration Path
+**Q: What are leaderboard points used for?**
+A: Points determine your rank in monthly, seasonal, and all-time leaderboards. Higher ranks can unlock special events and rewards.
 
-1. **Week 1**: Deploy calendar system alongside current races
-2. **Week 2**: First Weekly League race (test run)
-3. **Week 3**: Add Daily Sprints
-4. **Week 4**: Launch first full season
-5. **Month 2**: First Monthly Championship Cup
-6. **Month 3**: First Special Event
-7. **Month 4-5**: Complete first season
-8. **Month 6**: Championship Cup tournament
+**Q: Can I race in a higher division than my win count allows?**
+A: No, you must meet win requirements. Scavenger (0-2 wins), Raider (3-9 wins), Elite/SilentKlan (10+ wins).
 
-## Notes
-- Maintain backward compatibility during transition
-- Gradual rollout to test systems
-- Community feedback on schedules/formats
-- Adjust prize pools based on participation
-- Consider time zone fairness for global players
+---

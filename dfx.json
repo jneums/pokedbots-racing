@@ -1,8 +1,9 @@
 {
   "canisters": {
     "my_mcp_server": {
-      "main": "src/main.mo",
-      "type": "motoko"
+      "main": "canisters/pokedbots_racing/src/main.mo",
+      "type": "motoko",
+      "gzip": true
     },
     "website": {      
       "build": [
@@ -10,6 +11,21 @@
       ],
       "source": ["website/out"],
       "type": "assets"
+    },
+  "icp_ledger": {
+      "type": "custom",
+      "candid": "https://raw.githubusercontent.com/dfinity/ic/fa06b0e8aa683981334c6eb64b00d791e6bbbe7c/rs/ledger_suite/icp/ledger.did",
+      "wasm": "https://download.dfinity.systems/ic/fa06b0e8aa683981334c6eb64b00d791e6bbbe7c/canisters/ledger-canister.wasm.gz",
+      "remote": {
+        "id": {
+          "ic": "ryjl3-tyaaa-aaaaa-aaaba-cai"
+        }
+      }
+    },
+    "pokedbots": {
+      "candid": "canisters/pokedbots_nfts/ext.did",
+      "wasm": "canisters/pokedbots_nfts/ext.wasm",
+      "type": "custom"
     }
   },
   "defaults": {

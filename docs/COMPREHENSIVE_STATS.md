@@ -10,7 +10,7 @@ order: 4
 
 Every PokedBot has four primary stats that determine its racing performance:
 
-### 🏎️ Speed (30-100)
+### 🏎️ Speed (0-100)
 **What it does**: Determines your bot's top speed on straightaways
 
 **Influenced by:**
@@ -21,7 +21,7 @@ Every PokedBot has four primary stats that determine its racing performance:
 
 **Best for**: Short sprints and final stretches
 
-### ⚡ Power Core (30-100)
+### ⚡ Power Core (0-100)
 **What it does**: Determines endurance and performance over longer distances
 
 **Influenced by:**
@@ -32,7 +32,7 @@ Every PokedBot has four primary stats that determine its racing performance:
 
 **Best for**: Long-distance races (15km+)
 
-### 🏃 Acceleration (30-100)
+### 🏃 Acceleration (0-100)
 **What it does**: How quickly your bot reaches top speed from a standstill
 
 **Influenced by:**
@@ -43,7 +43,7 @@ Every PokedBot has four primary stats that determine its racing performance:
 
 **Best for**: Tight races with lots of position changes
 
-### 🎯 Stability (30-100)
+### 🎯 Stability (0-100)
 **What it does**: Consistency on rough terrain and resistance to hazards
 
 **Influenced by:**
@@ -54,27 +54,70 @@ Every PokedBot has four primary stats that determine its racing performance:
 
 **Best for**: Scrap Heap terrain, avoiding crashes
 
-## Faction Bonuses
+## Faction System (Type-Based)
 
-Your bot's faction provides permanent stat bonuses:
+Your bot's Type determines its faction and provides unique stat bonuses. There are 14 distinct factions based on rarity:
 
-- **BattleBot** (59.3% of bots): +5 to all stats
-- **EntertainmentBot** (24.3%): +10 Speed, +5 Acceleration
-- **WildBot** (5.8%): +10 Stability, +5 Power Core
-- **Master** (6.9%): +12 Speed/Power, +8 Acceleration/Stability
-- **GodClass** (2.7% - rarest!): +15 to ALL stats
+### 💎 Ultra-Rare Tier (1-45 bots)
+The elite tier - incredibly rare and powerful:
+
+- **Ultimate-master** (1 bot): +6 to all stats - THE ULTIMATE bot
+- **Wild** (5 bots): +8 Acceleration, +7 Speed, +5 others - Unpredictable chaos
+- **Golden** (27 bots): +5 Power Core, +4 Stability, +3 others - Premium engineering (also has gold trait bonuses!)
+- **Ultimate** (45 bots): +5 Speed/Power Core, +3 others - Combat excellence
+
+### ⭐ Super-Rare Tier (244-640 bots)
+Powerful bots with significant advantages:
+
+- **Blackhole** (244 bots): +18 Power Core, +16 Acceleration, +13 others - Gravity-defying power
+- **Dead** (382 bots): +13 Stability, +12 Power Core, +9 others - Undead resilience  
+- **Master** (640 bots): +14 Speed/Stability, +11 others - Skilled operators
+
+### 🔷 Rare Tier (717-999 bots)
+Solid performers with meaningful bonuses:
+
+- **Bee** (717 bots): +10 Acceleration, +8 Speed, +6 others - Agile flyers
+- **Food** (778 bots): +11 Power Core, +10 Acceleration, +8 others - Energy-rich cores
+- **Box** (798 bots): +7 Stability, +5 Power Core, +3 others - Stable platforms
+- **Murder** (999 bots): +8 Speed/Power Core, +5 others - Aggressive power
+
+### 📦 Common Tier (1654-2009 bots)
+Entry-level bots - most accessible:
+
+- **Game** (1654 bots): +3 Acceleration/Stability, +1 others - Precision controls
+- **Animal** (1701 bots): +3 Acceleration, +2 Speed, +1 others - Natural agility
+- **Industrial** (2009 bots): +0 to all stats - Pure base stats, most common
+
+**Balance Philosophy:**
+- Base stats: 0-70 per stat (0-280 total)
+- Faction bonuses add 0-18 points per stat
+- Maximum per stat: 100 (hard cap)
+- Maximum total after upgrades: 400
+- ~140 points of upgrade headroom for progression
+
+**Competitive Balance:**
+- Ultra-Rares win ~85-90% vs Super-Rare (elite but not invincible)
+- Super-Rares win ~65-75% vs Rare (clear advantage)
+- Rares win ~70-75% vs Common (meaningful progression)
+- Overall ~20-25% upset rate keeps racing exciting!
 
 ## Rarity Attributes
 
-Special attributes add bonus stats:
+Special visual attributes provide additional stat bonuses on top of faction bonuses:
 
-- **GOLD**: Significant boost to all stats (~+36 total)
-- **BLACK**: Moderate boost to all stats (~+21 total)
-- **BLUE**: Small boost to all stats (~+3 total)
+- **GOLD**: Significant boost to golden traits (gold eyes, spiky gold, gold arms, etc.)
+  - Golden body traits: +8-12 points to Power Core contribution
+  - Golden arms: +10-14 points to Acceleration/Speed contribution  
+  - Golden legs: +9-13 points to Speed/Acceleration contribution
+  - Golden wings: +9-13 points to Speed contribution
+  - Golden driver: +9-13 points to Stability contribution
+- **BLACK**: Moderate boost to all stats
+- **BLUE**: Small boost to all stats
 - **PINK**: Minor boost to all stats
 - **RUST**: Slight penalty to stats (battle-worn aesthetic)
 
-**Multiple attributes stack!** A bot with GOLD + BLACK gets both bonuses.
+**Why Golden Bots Punch Above Their Weight:**
+Golden (27 bots) is rarer than Ultimate (45 bots), but Golden bots often have weaker base trait combinations. To compensate, individual golden traits (gold eyes, spiky gold, etc.) receive significant boosts in the stat calculation, making Golden bots competitive despite fewer in existence.
 
 ## Overall Rating
 
@@ -84,11 +127,17 @@ Your bot's Overall Rating is calculated as:
 ```
 
 **Rating ranges:**
-- 70-80: Elite tier (top 10%)
-- 60-70: Strong performer
-- 50-60: Average racer
-- 40-50: Entry level
-- 30-40: Needs upgrades
+- 150-200: Ultra-Rare tier (top 1% - truly elite)
+- 110-130: Super-Rare tier (top 15% - very competitive)
+- 90-110: Rare tier (middle 30% - solid performers)
+- 75-90: Common tier (bottom 55% - entry level)
+- Below 75: Weak rolls or damaged bots needing upgrades
+
+**Power Distribution:**
+- Ultra-Rare average: ~175 overall (their own league)
+- Super-Rare average: ~120 overall (clear advantage over Rare)
+- Rare average: ~100 overall (competitive with upgrades)
+- Common average: ~85 overall (baseline, lots of upgrade potential)
 
 ## How Stats Affect Racing
 
@@ -110,16 +159,15 @@ Your bot's Overall Rating is calculated as:
 
 **Scrap Heaps** (garbage towers):
 - Stability most important
-- BattleBots get +8% bonus
 - Many obstacles and hazards
 
 **Wasteland Sand** (desert):
-- Speed and Power Core important
+- Speed and Power Core important  
 - Medium difficulty terrain
 
 **Metal Roads** (ancient highways):
 - Pure speed race
-- EntertainmentBots excel here
+- Fastest bots excel here
 
 ## Improving Your Stats
 
@@ -154,28 +202,38 @@ Upgrades are permanent and stack over time!
 
 ### For Speed Demons
 Look for: Rocket legs, jet wings, light body (eggs, bubbles)
-**Factions**: EntertainmentBot, Master
+**Best Factions**: Wild, Ultimate, Bee
 
 ### For Endurance Racers
 Look for: Large body, power cores, strong legs
-**Factions**: BattleBot, GodClass
+**Best Factions**: Blackhole, Golden, Food
 
 ### For All-Rounders
 Look for: Balanced traits, GOLD attribute
-**Factions**: Master, GodClass
+**Best Factions**: Ultimate-master, Dead, Master
 
-### Best Value
-- BattleBots with GOLD (common faction + rare attribute)
-- WildBots with high stability (undervalued faction)
-- Any bot with 60+ overall rating under 10 ICP
+### Best Value Picks
+- Common bots with GOLD traits (cheap but gold boosts make them competitive)
+- Box bots with high stability (undervalued, great for Scrap Heap races)
+- Food bots (solid Rare tier, good power/accel balance)
+- Any bot with 100+ overall rating under 15 ICP
+
+### Investment Strategy
+- Ultra-Rares: Expensive but dominant (85%+ win rate vs lower tiers)
+- Super-Rares: Best value - strong performance, reasonable prices
+- Rares: Budget competitive - can upset Super-Rares ~25% of the time with good rolls
+- Commons: Entry level - upgrade potential makes them viable long-term
 
 ## Pro Tips
 
 1. **Check the full build** - One great trait doesn't make a champion
-2. **Rarity matters** - GOLD attribute often worth more than faction
-3. **Upgrade strategically** - Focus on your bot's strongest stat
-4. **Match to race type** - Speed bot for sprints, Power bot for treks
-5. **Condition is key** - A well-maintained 60-rated bot beats a neglected 70
+2. **Rarity matters** - Ultra-Rare faction bonuses are substantial
+3. **Golden traits are special** - Individual gold parts get significant boosts
+4. **Upgrade strategically** - Focus on complementing your bot's faction strengths
+5. **Match to race type** - Speed bot for sprints, Power bot for treks
+6. **Condition is key** - A well-maintained Common bot can beat a neglected Rare
+7. **Upsets happen** - ~20-25% upset rate means underdogs can win
+8. **Type matters more than you think** - 14 distinct faction identities create diverse strategies
 
 **Wings keywords (20% weight):**
 - HIGH (55-70): `rocket`, `massive engines`, `power cells sparks`, `triangle up` (quick)

@@ -42,15 +42,29 @@ Humans have long abandoned Earth, leaving only robots to inhabit the ruins. In t
 
 ### The Factions
 
-- **Battle Bots** 🎮: Tough and built for hard work, constructed from old video game consoles and junk food toy parts salvaged from the giant rubbish heaps of former Antarctica
+Robot evolution has created 14 distinct faction types, each with unique characteristics derived from their component materials and programming heritage:
 
-- **Entertainment Bots** 🎭: Flashy and charismatic, pieced together from ancient entertainment technology
+**Ultra-Rare Legends (Elite Tier)**
+- **UltimateMaster** 👑: The apex of robot evolution - only one exists. Commands respect across all wastelands
+- **Wild** ⚡: Deranged by the solar flare of 2453 AD, unpredictable but powerful
+- **Golden** ✨: Assembled from precious tech relics, radiating ancient energy
+- **Ultimate** 🌟: Peak performance bots, nearly perfect engineering
 
-- **Wild Bots** ⚡: Once normal robots, now deranged after the catastrophic solar flare of 2453 AD
+**Super-Rare Powerhouses**
+- **Blackhole** 🕳️: Mysterious bots with reality-warping abilities
+- **Dead** 💀: Risen from the scrapyards, defying their shutdown protocols
+- **Master** 🌙: Secretive society with connections to off-world Europa Base 7 colony
 
-- **God Class** 👑: Rulers of much of eastern Earth, possessing abilities far beyond standard bots
+**Rare Specialists**
+- **Bee** 🐝: Swarm-coordinated hive minds, relentless workers
+- **Food** 🍔: Built from kitchen appliances and restaurant automation
+- **Box** 📦: Heavy cargo haulers, immense strength
+- **Murder** 🗡️: Former security bots, precision-focused
 
-- **The Masters** 🌙: A secretive society with mysterious connections to the off-world Europa Base 7 colony
+**Common Classes**
+- **Game** 🎮: Constructed from video game consoles and entertainment tech
+- **Animal** 🦁: Mimicking Earth's lost wildlife, diverse adaptations
+- **Industrial** ⚙️: Workhorses of the wasteland, reliable and numerous
 
 ### Delta City
 

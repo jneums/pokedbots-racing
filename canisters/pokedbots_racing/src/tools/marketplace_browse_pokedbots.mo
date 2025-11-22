@@ -24,7 +24,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("after", Json.obj([("type", Json.str("number")), ("description", Json.str("Show listings after this token index (pagination)"))])), ("faction", Json.obj([("type", Json.str("string")), ("description", Json.str("Filter by faction: BattleBot, EntertainmentBot, WildBot, GodClass, or Master")), ("enum", Json.arr([Json.str("BattleBot"), Json.str("EntertainmentBot"), Json.str("WildBot"), Json.str("GodClass"), Json.str("Master")]))])), ("minRating", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum overall rating (30-100)"))])), ("maxPrice", Json.obj([("type", Json.str("number")), ("description", Json.str("Maximum price in ICP"))])), ("minWins", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum number of race wins"))])), ("minWinRate", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum win rate percentage (0-100)"))])), ("sortBy", Json.obj([("type", Json.str("string")), ("description", Json.str("Sort results by: price, rating, winRate, or wins (default: price)")), ("enum", Json.arr([Json.str("price"), Json.str("rating"), Json.str("winRate"), Json.str("wins")]))])), ("sortDesc", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Sort descending (highest first). Default varies by sortBy."))]))])),
+      ("properties", Json.obj([("after", Json.obj([("type", Json.str("number")), ("description", Json.str("Show listings after this token index (pagination)"))])), ("faction", Json.obj([("type", Json.str("string")), ("description", Json.str("Filter by faction: UltimateMaster, Wild, Golden, Ultimate, Blackhole, Dead, Master, Bee, Food, Box, Murder, Game, Animal, or Industrial")), ("enum", Json.arr([Json.str("UltimateMaster"), Json.str("Wild"), Json.str("Golden"), Json.str("Ultimate"), Json.str("Blackhole"), Json.str("Dead"), Json.str("Master"), Json.str("Bee"), Json.str("Food"), Json.str("Box"), Json.str("Murder"), Json.str("Game"), Json.str("Animal"), Json.str("Industrial")]))])), ("minRating", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum overall rating (30-100)"))])), ("maxPrice", Json.obj([("type", Json.str("number")), ("description", Json.str("Maximum price in ICP"))])), ("minWins", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum number of race wins"))])), ("minWinRate", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum win rate percentage (0-100)"))])), ("sortBy", Json.obj([("type", Json.str("string")), ("description", Json.str("Sort results by: price, rating, winRate, or wins (default: price)")), ("enum", Json.arr([Json.str("price"), Json.str("rating"), Json.str("winRate"), Json.str("wins")]))])), ("sortDesc", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Sort descending (highest first). Default varies by sortBy."))]))])),
     ]);
     outputSchema = null;
   };
@@ -110,11 +110,24 @@ module {
             } else { 0.0 };
 
             let factionText = switch (stats.faction) {
-              case (#BattleBot) { "BattleBot" };
-              case (#EntertainmentBot) { "EntertainmentBot" };
-              case (#WildBot) { "WildBot" };
-              case (#GodClass) { "GodClass" };
+              // Ultra-Rare
+              case (#UltimateMaster) { "UltimateMaster" };
+              case (#Wild) { "Wild" };
+              case (#Golden) { "Golden" };
+              case (#Ultimate) { "Ultimate" };
+              // Super-Rare
+              case (#Blackhole) { "Blackhole" };
+              case (#Dead) { "Dead" };
               case (#Master) { "Master" };
+              // Rare
+              case (#Bee) { "Bee" };
+              case (#Food) { "Food" };
+              case (#Box) { "Box" };
+              case (#Murder) { "Murder" };
+              // Common
+              case (#Game) { "Game" };
+              case (#Animal) { "Animal" };
+              case (#Industrial) { "Industrial" };
             };
 
             let terrainText = switch (stats.preferredTerrain) {
@@ -163,32 +176,37 @@ module {
                 };
 
                 switch (getTrait("type")) {
-                  case (?"master") { #Master };
-                  case (?"ultimate-master") { #Master };
-                  case (?"ultimate") { #Master };
-                  case (?"golden") { #GodClass };
-                  case (?"blackhole") { #GodClass };
-                  case (?"wild") { #WildBot };
-                  case (?"animal") { #WildBot };
-                  case (?"bee") { #WildBot };
-                  case (?"dead") { #WildBot };
-                  case (?"food") { #EntertainmentBot };
-                  case (?"game") { #EntertainmentBot };
-                  case (?"retro") { #EntertainmentBot };
-                  case (?"industrial") { #BattleBot };
-                  case (?"box") { #BattleBot };
-                  case (?"murder") { #BattleBot };
-                  case (?"sports") { #BattleBot };
-                  case _ { #BattleBot };
+                  // Ultra-Rare (case-insensitive matching)
+                  case (?t) {
+                    let lowerType = Text.toLowercase(t);
+                    if (lowerType == "ultimate-master") { #UltimateMaster } else if (lowerType == "wild") {
+                      #Wild;
+                    } else if (lowerType == "golden") { #Golden } else if (lowerType == "ultimate") {
+                      #Ultimate;
+                    }
+                    // Super-Rare
+                    else if (lowerType == "blackhole") { #Blackhole } else if (lowerType == "dead") {
+                      #Dead;
+                    } else if (lowerType == "master") { #Master }
+                    // Rare
+                    else if (lowerType == "bee") {
+                      #Bee;
+                    } else if (lowerType == "food") { #Food } else if (lowerType == "box") {
+                      #Box;
+                    } else if (lowerType == "murder") { #Murder }
+                    // Common
+                    else if (lowerType == "game") {
+                      #Game;
+                    } else if (lowerType == "animal") { #Animal } else if (lowerType == "industrial") {
+                      #Industrial;
+                    } else { #Industrial };
+                  };
+                  case (null) { #Industrial };
                 };
               };
               case (null) {
-                // Fallback if no metadata
-                let tokenId = Nat32.toNat(tokenIndex);
-                let mod = tokenId % 100;
-                if (mod < 5) { #GodClass } else if (mod < 15) { #Master } else if (mod < 35) {
-                  #WildBot;
-                } else if (mod < 60) { #EntertainmentBot } else { #BattleBot };
+                // Fallback if no metadata - default to Industrial
+                #Industrial;
               };
             };
 
@@ -200,11 +218,24 @@ module {
             // Debug.print("Token " # Nat32.toText(tokenIndex) # " base stats: SPD=" # Nat.toText(baseStats.speed) # " PWR=" # Nat.toText(baseStats.powerCore) # " ACC=" # Nat.toText(baseStats.acceleration) # " STB=" # Nat.toText(baseStats.stability) # " AVG=" # Nat.toText(avgStat));
 
             let factionText = switch (derivedFaction) {
-              case (#BattleBot) { "BattleBot" };
-              case (#EntertainmentBot) { "EntertainmentBot" };
-              case (#WildBot) { "WildBot" };
-              case (#GodClass) { "GodClass" };
+              // Ultra-Rare
+              case (#UltimateMaster) { "UltimateMaster" };
+              case (#Wild) { "Wild" };
+              case (#Golden) { "Golden" };
+              case (#Ultimate) { "Ultimate" };
+              // Super-Rare
+              case (#Blackhole) { "Blackhole" };
+              case (#Dead) { "Dead" };
               case (#Master) { "Master" };
+              // Rare
+              case (#Bee) { "Bee" };
+              case (#Food) { "Food" };
+              case (#Box) { "Box" };
+              case (#Murder) { "Murder" };
+              // Common
+              case (#Game) { "Game" };
+              case (#Animal) { "Animal" };
+              case (#Industrial) { "Industrial" };
             };
 
             // Derive terrain preference from Background trait in metadata

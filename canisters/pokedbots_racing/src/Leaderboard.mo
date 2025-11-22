@@ -206,11 +206,24 @@ module {
     // Helper to convert faction to text key
     private func factionToText(faction : FactionType) : Text {
       switch (faction) {
-        case (#BattleBot) { "BattleBot" };
-        case (#EntertainmentBot) { "EntertainmentBot" };
-        case (#WildBot) { "WildBot" };
-        case (#GodClass) { "GodClass" };
+        // Ultra-Rare
+        case (#UltimateMaster) { "UltimateMaster" };
+        case (#Wild) { "Wild" };
+        case (#Golden) { "Golden" };
+        case (#Ultimate) { "Ultimate" };
+        // Super-Rare
+        case (#Blackhole) { "Blackhole" };
+        case (#Dead) { "Dead" };
         case (#Master) { "Master" };
+        // Rare
+        case (#Bee) { "Bee" };
+        case (#Food) { "Food" };
+        case (#Box) { "Box" };
+        case (#Murder) { "Murder" };
+        // Common
+        case (#Game) { "Game" };
+        case (#Animal) { "Animal" };
+        case (#Industrial) { "Industrial" };
       };
     };
 

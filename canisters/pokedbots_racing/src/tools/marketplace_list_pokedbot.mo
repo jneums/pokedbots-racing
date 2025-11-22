@@ -79,8 +79,10 @@ module {
         return ToolContext.makeError("Bot is already listed for sale", cb);
       };
 
-      // Check if bot is in a race
-      // TODO: Add check for active race entries when race manager is accessible
+      // Check if bot is in an active race
+      if (context.isInActiveRace(Nat32.toNat(tokenIndex))) {
+        return ToolContext.makeError("Cannot list bot while it's in an active race", cb);
+      };
 
       // Derive garage subaccount for the user (where the NFT is stored)
       let garageSubaccount = ExtIntegration.deriveGarageSubaccount(userPrincipal);

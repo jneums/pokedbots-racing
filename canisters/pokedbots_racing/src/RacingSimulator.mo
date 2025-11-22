@@ -99,6 +99,7 @@ module {
     results : ?[RaceResult];
     prizePool : Nat;
     platformTax : Nat; // 5% taken
+    platformBonus : Nat; // Platform bonus for Scavenger/Raider classes
     sponsors : [Sponsor];
   };
 
@@ -108,13 +109,13 @@ module {
   public type RacingStatsProvider = {
     /// Get current racing stats for an NFT
     getRacingStats : (nftId : Text) -> ?RacingStats;
-    
+
     /// Check if NFT can race (condition, battery, etc.)
     canRace : (nftId : Text) -> Bool;
-    
+
     /// Update post-race (optional - for collections that track career stats)
     recordRaceResult : (nftId : Text, position : Nat, racers : Nat, prize : Nat) -> ();
-    
+
     /// Deduct racing costs (battery drain, etc.)
     applyRaceCosts : (nftId : Text) -> ();
   };
@@ -122,17 +123,17 @@ module {
   // ===== RACE SIMULATION ENGINE =====
 
   public class RaceSimulator() {
-    
+
     /// Calculate race duration based on distance and terrain
     public func calculateRaceDuration(distance : Nat, terrain : Terrain) : Nat {
       let baseTime = distance * 30; // 30 seconds per km
-      
+
       let terrainMultiplier = switch (terrain) {
         case (#ScrapHeaps) { 1.3 };
         case (#WastelandSand) { 1.2 };
         case (#MetalRoads) { 1.0 };
       };
-      
+
       Int.abs(Float.toInt(Float.fromInt(baseTime) * terrainMultiplier));
     };
 
@@ -144,16 +145,16 @@ module {
     ) : Float {
       let distance = Float.fromInt(race.distance);
       let stats = participant.stats;
-      
+
       // Convert stats to floats
       let speed = Float.fromInt(stats.speed);
       let powerCore = Float.fromInt(stats.powerCore);
       let stability = Float.fromInt(stats.stability);
       let acceleration = Float.fromInt(stats.acceleration);
-      
+
       // Base time calculation (inverse of speed)
       let baseTime = distance * (100.0 / speed) * 30.0;
-      
+
       // Terrain modifier
       let terrainMod = switch (race.terrain) {
         case (#ScrapHeaps) {
@@ -166,7 +167,7 @@ module {
           1.0 + ((100.0 - acceleration) / 400.0); // Quick acceleration helps
         };
       };
-      
+
       // Distance modifier
       let distanceMod = if (race.distance < 10) {
         // Short sprint: acceleration + speed
@@ -178,10 +179,10 @@ module {
         // Medium: balanced
         1.0 - ((speed + powerCore + acceleration + stability - 160.0) / 1000.0);
       };
-      
+
       // Randomness (deterministic based on seed)
       let randomMod = 0.95 + (Float.fromInt(seed % 100) / 1000.0); // ±5%
-      
+
       // Final time
       let finalTime = baseTime * terrainMod * distanceMod * randomMod;
       Float.max(1.0, finalTime);
@@ -195,31 +196,31 @@ module {
       if (participants.size() < 2) {
         return null;
       };
-      
+
       // Calculate times
       var racerTimes : [(RacingParticipant, Float)] = [];
-      
+
       for (i in Iter.range(0, participants.size() - 1)) {
         let participant = participants[i];
         let seed = race.raceId * 1000 + i;
         let time = calculateRaceTime(race, participant, seed);
         racerTimes := Array.append(racerTimes, [(participant, time)]);
       };
-      
+
       // Sort by time
       let sorted = Array.sort<(RacingParticipant, Float)>(
         racerTimes,
         func(a, b) { Float.compare(a.1, b.1) },
       );
-      
+
       // Calculate prizes
       let netPrizePool = Nat.sub(race.prizePool, race.platformTax);
       var results : [RaceResult] = [];
-      
+
       for (i in Iter.range(0, sorted.size() - 1)) {
         let (participant, time) = sorted[i];
         let position = i + 1;
-        
+
         let prize = if (position == 1) {
           (netPrizePool * 475) / 1000; // 47.5%
         } else if (position == 2) {
@@ -231,7 +232,7 @@ module {
         } else {
           0;
         };
-        
+
         let result : RaceResult = {
           nftId = participant.nftId;
           owner = participant.owner;
@@ -239,10 +240,10 @@ module {
           finalTime = time;
           prizeAmount = prize;
         };
-        
+
         results := Array.append(results, [result]);
       };
-      
+
       ?results;
     };
   };
@@ -266,14 +267,14 @@ module {
           ["Highway of the Dead", "Ancient Asphalt Race", "Metal Road Mayhem", "Old World Sprint"];
         };
       };
-      
+
       let classPrefix = switch (raceClass) {
         case (#Scavenger) { "Scavenger" };
         case (#Raider) { "Raider" };
         case (#Elite) { "Elite" };
         case (#SilentKlan) { "Silent Klan Invitational" };
       };
-      
+
       let nameIndex = raceId % 4;
       let baseName = terrainNames[nameIndex];
       classPrefix # " " # baseName # " #" # Nat.toText(raceId);
@@ -287,15 +288,16 @@ module {
       entryFee : Nat,
       maxEntries : Nat,
       startTime : Int,
-      simulator : RaceSimulator,
+      platformBonus : Nat,
     ) : Race {
       let raceId = nextRaceId;
       nextRaceId += 1;
-      
+
       let now = Time.now();
       let entryDeadline = startTime - (30 * 60 * 1_000_000_000);
-      let duration = simulator.calculateRaceDuration(distance, terrain);
-      
+      let sim = RaceSimulator();
+      let duration = sim.calculateRaceDuration(distance, terrain);
+
       let race : Race = {
         raceId = raceId;
         name = generateRaceName(raceId, terrain, raceClass);
@@ -313,9 +315,10 @@ module {
         results = null;
         prizePool = 0;
         platformTax = 0;
+        platformBonus = platformBonus;
         sponsors = [];
       };
-      
+
       ignore Map.put(races, nhash, raceId, race);
       race;
     };
@@ -354,18 +357,18 @@ module {
             entryFee = race.entryFee;
             enteredAt = now;
           };
-          
+
           let newEntries = Array.append<RaceEntry>(race.entries, [entry]);
           let newPrizePool = race.prizePool + race.entryFee;
           let newTax = (newPrizePool * 5) / 100;
-          
+
           let updatedRace = {
             race with
             entries = newEntries;
             prizePool = newPrizePool;
             platformTax = newTax;
           };
-          
+
           ignore Map.put(races, nhash, raceId, updatedRace);
           ?updatedRace;
         };
@@ -385,25 +388,25 @@ module {
           if (race.status != #Upcoming) {
             return null;
           };
-          
+
           let sponsorEntry : Sponsor = {
             sponsor = sponsor;
             amount = amount;
             message = message;
             timestamp = Time.now();
           };
-          
+
           let newSponsors = Array.append<Sponsor>(race.sponsors, [sponsorEntry]);
           let newPrizePool = race.prizePool + amount;
           let newTax = (newPrizePool * 5) / 100;
-          
+
           let updatedRace = {
             race with
             sponsors = newSponsors;
             prizePool = newPrizePool;
             platformTax = newTax;
           };
-          
+
           ignore Map.put(races, nhash, raceId, updatedRace);
           ?updatedRace;
         };

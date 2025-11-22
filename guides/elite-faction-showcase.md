@@ -1,346 +1,239 @@
 ---
 title: Elite Faction Showcase
-description: Deep dive into the Elite faction - premium performance bots with exceptional stats
+description: Deep dive into Ultra-Rare and Super-Rare factions - premium performance bots with exceptional stats
 order: 3
 ---
 
-# Elite Faction Showcase: GodClass vs Master 👑
+# Elite Faction Showcase: Ultra-Rare & Super-Rare Tiers 👑
 
-*The Ultimate Wasteland Racers - November 16, 2025*
+*The Ultimate Wasteland Racers - November 22, 2025*
 
 ---
 
 ## Understanding Elite Factions
 
-PokedBots Racing has two ultra-rare elite factions that command premium prices and deliver exceptional performance. Here's what makes them special:
+PokedBots Racing features 14 faction types organized by rarity. The top two tiers (Ultra-Rare and Super-Rare) command premium prices and deliver exceptional performance with significant stat bonuses.
 
-### 👑 **Master Faction** (6.9% of all bots)
-**Faction Bonus:** +12 Speed, +12 Power Core, +8 Acceleration, +8 Stability
+### 👑 **Ultra-Rare Tier** (1-45 bots total)
+The rarest and most powerful bots in the wasteland:
 
-Master bots are the competitive elite - speed demons with powerful cores. They excel in:
-- **High-speed racing** (12-point speed advantage)
-- **Long endurance races** (12-point power advantage)
-- **Balanced competitive racing** (solid bonuses across all stats)
+**Ultimate-Master** (1 bot only) - THE ULTIMATE
+- **Faction Bonus:** +6 to ALL stats
+- **Rarity:** 1 of 10,000 (0.01%)
+- **Best For:** Ultimate collector's item, apex prestige
 
-**Best For:** Tournament racing, speed-focused strategies, all-around competitive performance
+**Wild** (5 bots) - Unpredictable Chaos
+- **Faction Bonus:** +7 Speed, +8 Acceleration, +5 Power/Stability
+- **Rarity:** 5 of 10,000 (0.05%)
+- **Best For:** Sprint races, aggressive racing, speed builds
 
----
+**Golden** (27 bots) - Premium Engineering
+- **Faction Bonus:** +3 Speed/Acceleration, +5 Power Core, +4 Stability
+- **Rarity:** 27 of 10,000 (0.27%)
+- **Best For:** Balanced excellence, endurance racing
 
-### 🏆 **GodClass Faction** (2.7% of all bots - RAREST!)
-**Faction Bonus:** +15 to ALL stats
-
-GodClass is the pinnacle of wasteland engineering. These are the rarest bots in existence with the most powerful faction bonus in the game. They excel in:
-- **Ultimate performance** (15 points to every stat!)
-- **Supreme versatility** (best at everything)
-- **Collector's status** (only 271 exist)
-
-**Best For:** Elite collectors, championship racing, prestige ownership
-
----
-
-## Top 5 GodClass Bots for Sale
-
-### 🥇 #1 - Token #4113: "The Powerhouse"
-![Bot #4113](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=4lp7w-7ykor-uwiaa-aaaaa-b4arg-qaqca-aacai-q&type=thumbnail)
-
-**Price:** 3,000 ICP  
-**Rating:** 74/100 🏆  
-**Faction:** GodClass (+15 all stats)
-
-**Stats:**
-- Speed: 68 ⚡
-- Power Core: **89** 🔥
-- Acceleration: 67 🏃
-- Stability: 75 🎯
-
-**Analysis:**  
-The ultimate endurance racer with an incredible 89 power core - the highest available in GodClass listings. This bot can outlast any competition in long-haul races. Combined with 75 stability, it's nearly unstoppable in rough terrain events.
-
-**Perfect For:** Championship long-haul races, WastelandSand terrain dominance
+**Ultimate** (45 bots) - Combat Excellence  
+- **Faction Bonus:** +5 Speed/Power Core, +3 Acceleration/Stability
+- **Rarity:** 45 of 10,000 (0.45%)
+- **Best For:** Speed-focused racing, competitive balance
 
 ---
 
-### 🥈 #2 - Token #1895: "The All-Rounder"
-![Bot #1895](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=ly5kx-yakor-uwiaa-aaaaa-b4arg-qaqca-aaa5t-q&type=thumbnail)
+### 🏆 **Super-Rare Tier** (244-640 bots)
+Powerful factions with major stat bonuses:
 
-**Price:** 4,500 ICP  
-**Rating:** 70/100 🏆  
-**Faction:** GodClass (+15 all stats)
+**Blackhole** (244 bots) - Gravity-Defying Power
+- **Faction Bonus:** +18 Power Core, +16 Acceleration, +13 Speed/Stability
+- **Rarity:** 244 of 10,000 (2.44%)
+- **Best For:** Endurance dominance, explosive acceleration
 
-**Stats:**
-- Speed: 70 ⚡
-- Power Core: 72 💪
-- Acceleration: **74** 🏃
-- Stability: 67 🎯
+**Dead** (382 bots) - Undead Resilience
+- **Faction Bonus:** +13 Stability, +12 Power Core, +9 Speed/Acceleration
+- **Rarity:** 382 of 10,000 (3.82%)
+- **Best For:** Rough terrain, stability-focused racing
 
-**Analysis:**  
-The most balanced GodClass on the market. With 74 acceleration (highest in the top 5), this bot gets off the line lightning-fast and maintains competitive speed. Perfect for racers who want versatility.
-
-**Perfect For:** Mixed race types, MetalRoads terrain, medium-haul races
-
----
-
-### 🥉 #3 - Token #8233: "The Budget GodClass" ⭐
-![Bot #8233](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=cwnxk-eqkor-uwiaa-aaaaa-b4arg-qaqca-aaeau-q&type=thumbnail)
-
-**Price:** 99 ICP 🔥 *INCREDIBLE VALUE!*  
-**Rating:** 69/100 🏆  
-**Faction:** GodClass (+15 all stats)
-
-**Stats:**
-- Speed: 70 ⚡
-- Power Core: 66 💪
-- Acceleration: **76** 🏃
-- Stability: 65 🎯
-
-**Analysis:**  
-This is a STEAL. At only 99 ICP, you're getting a GodClass bot with 69 rating and the best acceleration (76) in the entire GodClass lineup. This bot will rocket off the starting line and compete with bots worth 30-40x its price.
-
-**Perfect For:** Savvy buyers, acceleration-focused racing, best value in elite tier
-
-**💡 PRO TIP:** This is the #1 value purchase in the entire marketplace if you want GodClass prestige without breaking the bank.
+**Master** (640 bots) - Skilled Operators
+- **Faction Bonus:** +14 Speed, +14 Stability, +11 Power/Acceleration
+- **Rarity:** 640 of 10,000 (6.4%)
+- **Best For:** Balanced competitive racing, all-around performance
 
 ---
 
-### #4 - Token #3033: "The Speed Demon"
-![Bot #3033](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=3zlhu-zykor-uwiaa-aaaaa-b4arg-qaqca-aabpm-q&type=thumbnail)
+## 🏆 Featured Ultimate Bots for Sale
 
-**Price:** 555 ICP  
-**Rating:** 69/100 🏆  
-**Faction:** GodClass (+15 all stats)
+The Ultimate faction (45 bots, 0.45% rarity) is an ultra-rare tier. Ultimate bots receive +5 Speed/Power Core and +3 Acceleration/Stability bonuses, making them well-balanced premium performers.
 
-**Stats:**
-- Speed: **77** ⚡ *HIGHEST!*
-- Power Core: 66 💪
-- Acceleration: 68 🏃
-- Stability: 66 🎯
+**Current Marketplace:** 3 Ultimate bots listed, ranging from 1,800 to 88,888 ICP.
 
-**Analysis:**  
-The fastest GodClass bot available with 77 speed. If you want to dominate sprint races and straightaways, this is your bot. Speed-focused builds are rare in GodClass - most optimize for balance or power.
-
-**Perfect For:** Sprint races, MetalRoads speed runs, speed record attempts
-
----
-
-### #5 - Token #4343: "The Balanced Performer"
-![Bot #4343](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=vo3ly-mqkor-uwiaa-aaaaa-b4arg-qaqca-aacd3-q&type=thumbnail)
-
-**Price:** 44 ICP 🔥  
-**Rating:** 68/100 🏆  
-**Faction:** GodClass (+15 all stats)
-
-**Stats:**
-- Speed: 70 ⚡
-- Power Core: 71 💪
-- Acceleration: 72 🏃
-- Stability: 62 🎯
-
-**Analysis:**  
-Another incredible value at just 44 ICP. This bot has extremely balanced stats (70-72 across speed/power/accel). The only weak point is 62 stability, but the GodClass +15 bonus keeps it competitive everywhere.
-
-**Perfect For:** Budget elite buyers, versatile racing, MetalRoads preference
-
----
-
-## Top 5 Master Bots for Sale
-
-### 🥇 #1 - Token #8631: "The Ultimate Master"
+### 🥇 #8631 - "The Premium Champion"
 ![Bot #8631](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=dm37u-eakor-uwiaa-aaaaa-b4arg-qaqca-aaeg3-q&type=thumbnail)
 
 **Price:** 88,888.88 ICP 💎  
-**Rating:** 83/100 👑 *HIGHEST RATED BOT*  
-**Faction:** Master (+12 SPD/PWR, +8 ACC/STB)
+**Base Rating:** 46/100  
+**Faction:** Ultimate (+5 SPD/PWR, +3 ACC/STB)
 
-**Stats:**
-- Speed: 78 ⚡
-- Power Core: **91** 🔥 *HIGHEST IN MASTER CLASS*
-- Acceleration: 81 🏃
-- Stability: 85 🎯
+**Base Stats:**
+- Speed: 41 (+5 faction bonus = 46 effective)
+- Power Core: 48 (+5 faction bonus = 53 effective)
+- Acceleration: 46 (+3 faction bonus = 49 effective)
+- Stability: 50 (+3 faction bonus = 53 effective)
 
 **Analysis:**  
-The crown jewel of Master faction. With an 83 rating, this is the highest-rated bot in either elite faction. The 91 power core is absolutely insane - this bot can race continuously without fatigue. Combined with 85 stability, it's virtually unstoppable in championship events.
+The highest-rated Ultimate bot currently on the marketplace. With the best base stats available in the Ultimate faction, this bot offers excellent potential for competitive racing. The 50 stability base is especially valuable for rough terrain events.
 
-**Perfect For:** Ultimate collectors, championship racing, prestige ownership, ScrapHeaps dominance
-
-**💎 COLLECTOR'S NOTE:** The price (88,888.88 ICP) suggests this is a showcase piece. The stats justify it as the #1 bot on the entire marketplace.
+**Perfect For:** Collectors seeking the best available Ultimate bot, ScrapHeaps terrain races
 
 ---
 
-### 🥈 #2 - Token #383: "The Speed King"
+### 🥈 #383 - "The Balanced Elite"
 ![Bot #383](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=dmgji-makor-uwiaa-aaaaa-b4arg-qaqca-aaaf7-q&type=thumbnail)
 
 **Price:** 9,000 ICP  
-**Rating:** 81/100 👑  
-**Faction:** Master (+12 SPD/PWR, +8 ACC/STB)
+**Base Rating:** 43/100  
+**Faction:** Ultimate (+5 SPD/PWR, +3 ACC/STB)
 
-**Stats:**
-- Speed: **83** ⚡ *FASTEST MASTER*
-- Power Core: 88 💪
-- Acceleration: 72 🏃
-- Stability: 81 🎯
+**Base Stats:**
+- Speed: 46 (+5 faction bonus = 51 effective)
+- Power Core: 46 (+5 faction bonus = 51 effective)
+- Acceleration: 37 (+3 faction bonus = 40 effective)
+- Stability: 46 (+3 faction bonus = 49 effective)
 
 **Analysis:**  
-The fastest Master bot available with 83 speed. This bot is built for speed-dominated races - sprint events, MetalRoads, and flat tracks. The 88 power core ensures it can maintain that speed over long distances.
+Excellent balanced stats with strong speed and power. The 46 speed/power base becomes 51 effective with Ultimate bonuses, making this a competitive bot for weekly league races.
 
-**Perfect For:** Sprint championships, speed records, MetalRoads dominance
+**Perfect For:** Weekly League events, balanced racing performance
 
 ---
 
-### 🥉 #3 - Token #9964: "The Well-Rounded Champion"
+### 🥉 #9964 - "The Accelerator"
 ![Bot #9964](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=vdh6j-kykor-uwiaa-aaaaa-b4arg-qaqca-aae3w-a&type=thumbnail)
 
 **Price:** 4,000 ICP  
-**Rating:** 80/100 👑  
-**Faction:** Master (+12 SPD/PWR, +8 ACC/STB)
+**Base Rating:** 42/100  
+**Faction:** Ultimate (+5 SPD/PWR, +3 ACC/STB)
 
-**Stats:**
-- Speed: 78 ⚡
-- Power Core: 86 💪
-- Acceleration: **80** 🏃
-- Stability: 76 🎯
+**Base Stats:**
+- Speed: 41 (+5 faction bonus = 46 effective)
+- Power Core: 42 (+5 faction bonus = 47 effective)
+- Acceleration: 45 (+3 faction bonus = 48 effective)
+- Stability: 41 (+3 faction bonus = 44 effective)
 
 **Analysis:**  
-Exceptional balance with all stats in the 76-86 range. The 80 acceleration is outstanding - this bot will launch off the line and compete immediately. A true all-rounder for competitive racing.
+Best acceleration in the top Ultimate bots at 45 base (48 effective). Great for technical courses and races requiring quick speed changes. The faction bonuses push this into competitive territory.
 
-**Perfect For:** Mixed tournaments, ScrapHeaps terrain, versatile racing strategies
+**Perfect For:** ScrapHeaps terrain, technical courses, mid-budget buyers
 
 ---
 
-### #4 - Token #2471: "The Speed Master"
+### #588 - "The Balanced Bargain" ⭐
+![Bot #588](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=r7y2n-zikor-uwiaa-aaaaa-b4arg-qaqca-aaajg-a&type=thumbnail)
+
+**Price:** 1,800 ICP 🔥 *BEST VALUE!*  
+**Base Rating:** 42/100  
+**Faction:** Ultimate (+5 SPD/PWR, +3 ACC/STB)
+
+**Base Stats:**
+- Speed: 45 (+5 faction bonus = 50 effective)
+- Power Core: 41 (+5 faction bonus = 46 effective)
+- Acceleration: 41 (+3 faction bonus = 44 effective)
+- Stability: 42 (+3 faction bonus = 45 effective)
+
+**Analysis:**  
+The lowest priced competitive Ultimate bot! With 42 base rating and good speed (45 base), this offers incredible value for entering the ultra-rare tier. The Ultimate faction bonuses elevate this to competitive performance.
+
+**Perfect For:** Budget-conscious racers, entry point into elite racing, best price-to-performance ratio
+
+**💡 PRO TIP:** At 1,800 ICP, this is your best opportunity to own an ultra-rare faction bot without breaking the bank.
+
+---
+
+### #2471 - "The Value Pick"
 ![Bot #2471](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=lpouj-xqkor-uwiaa-aaaaa-b4arg-qaqca-aabgt-q&type=thumbnail)
 
 **Price:** 2,000 ICP  
-**Rating:** 79/100 👑  
-**Faction:** Master (+12 SPD/PWR, +8 ACC/STB)
+**Base Rating:** 41/100  
+**Faction:** Ultimate (+5 SPD/PWR, +3 ACC/STB)
 
-**Stats:**
-- Speed: **82** ⚡
-- Power Core: 84 💪
-- Acceleration: 75 🏃
-- Stability: 77 🎯
-
-**Analysis:**  
-Second-fastest Master bot (82 speed) at a much more accessible price point. With 84 power core, this bot can maintain its speed advantage throughout entire races. Great value for performance-focused buyers.
-
-**Perfect For:** Speed-focused racing, medium-haul races, competitive tournaments
-
----
-
-### #5 - Token #588: "The Accessible Elite"
-![Bot #588](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=r7y2n-zikor-uwiaa-aaaaa-b4arg-qaqca-aaajg-a&type=thumbnail)
-
-**Price:** 1,800 ICP  
-**Rating:** 79/100 👑  
-**Faction:** Master (+12 SPD/PWR, +8 ACC/STB)
-
-**Stats:**
-- Speed: **82** ⚡
-- Power Core: 84 💪
-- Acceleration: 76 🏃
-- Stability: 77 🎯
+**Base Stats:**
+- Speed: 45 (+5 faction bonus = 50 effective)
+- Power Core: 40 (+5 faction bonus = 45 effective)
+- Acceleration: 40 (+3 faction bonus = 43 effective)
+- Stability: 42 (+3 faction bonus = 45 effective)
 
 **Analysis:**  
-Nearly identical stats to #2471 but slightly better acceleration (76 vs 75) and 200 ICP cheaper! This is excellent value for a high-performing Master bot. The 82 speed makes it competitive in any race type.
+Similar to #588 but with slightly lower base power and acceleration. Still an excellent value at 2,000 ICP. The 45 speed base is strong for this price point.
 
-**Perfect For:** Value-conscious elite buyers, speed racing, tournament preparation
-
----
-
-## GodClass vs Master: Head-to-Head
-
-| Metric | GodClass | Master |
-|--------|----------|--------|
-| **Rarity** | 2.7% (271 bots) | 6.9% (686 bots) |
-| **Faction Bonus** | +15 all stats | +12 SPD/PWR, +8 ACC/STB |
-| **Total Bonus** | 60 points | 40 points |
-| **Best For** | Ultimate power, versatility | Speed/Power specialization |
-| **Top Rating** | 74/100 (#4113) | 83/100 (#8631) |
-| **Price Range** | 44 - 4,500 ICP | 1,800 - 88,888 ICP |
-| **Best Value** | #8233 @ 99 ICP | #588 @ 1,800 ICP |
+**Perfect For:** Budget buyers, ScrapHeaps terrain preference, balanced racing
 
 ---
 
-## Which Should You Buy?
+## 📊 Ultimate Faction Overviewew
 
-### Choose **GodClass** if you want:
-- ✅ The rarest faction (only 2.7% of all bots)
-- ✅ Maximum faction bonus (+15 to everything)
-- ✅ Best value-for-performance (#8233 @ 99 ICP is incredible)
-- ✅ Collector's prestige
-- ✅ Ultimate versatility
-
-### Choose **Master** if you want:
-- ✅ Absolute peak performance (highest ratings available)
-- ✅ Speed/Power specialization (+12 to each)
-- ✅ Championship-level stats (multiple 80+ rated bots)
-- ✅ More available options (686 vs 271 bots)
-- ✅ Proven competitive dominance
+The **Ultimate** faction is an ultra-rare tier with only 45 total bots (0.45% rarity). Ultimate bots receive **+5 Speed/Power Core** and **+3 Acceleration/Stability** bonuses, making them well-balanced premium performers for competitive racing.
 
 ---
 
-## Best Value Picks by Budget
+## 💡 Best Value Picks by Budget
 
-### Under 100 ICP: 🏆 **GodClass #8233** @ 99 ICP
-**Why:** GodClass faction + 69 rating + 76 acceleration = unbeatable value
+### Under 2,000 ICP: 🏆 **Ultimate #588** @ 1,800 ICP
+**Why:** Lowest price for competitive Ultimate faction bot with 42 base rating and strong speed (45 base = 50 effective)
 
-### 500-1000 ICP: 🏆 **GodClass #3033** @ 555 ICP
-**Why:** Fastest GodClass (77 speed) at mid-tier price
+### 2,000-5,000 ICP: 🏆 **Ultimate #9964** @ 4,000 ICP  
+**Why:** Best acceleration in class (45 base) perfect for technical courses
 
-### 1500-2500 ICP: 🏆 **Master #588** @ 1,800 ICP
-**Why:** 79 rating with 82 speed + 84 power at reasonable price
+### 5,000-10,000 ICP: 🏆 **Ultimate #383** @ 9,000 ICP
+**Why:** Excellent balanced stats (43 rating) with high speed/power potential
 
-### 3000-5000 ICP: 🏆 **GodClass #4113** @ 3,000 ICP
-**Why:** 89 power core (highest in GodClass) for endurance dominance
-
-### 5000-10000 ICP: 🏆 **Master #383** @ 9,000 ICP
-**Why:** Fastest Master (83 speed) + 88 power + 81 rating
-
-### Ultimate Prestige: 💎 **Master #8631** @ 88,888.88 ICP
-**Why:** Highest rating on the entire marketplace (83/100) + 91 power core
+### Ultimate Prestige: 💎 **Ultimate #8631** @ 88,888.88 ICP
+**Why:** Highest-rated Ultimate bot on the marketplace (46/100 base)
 
 ---
 
-## Faction Bonus Math Examples
+## Racing Strategy for Ultimate Faction
 
-### Example: GodClass #8233
-**Base Stats (before faction):** SPD 55, PWR 51, ACC 61, STB 50  
-**After +15 GodClass Bonus:** SPD 70, PWR 66, ACC 76, STB 65  
-**Result:** A mid-tier bot becomes a 69-rated competitive racer
+### Leverage Your Bonuses:
+- **Speed +5** - Solid boost for sprint races and straight sections
+- **Power +5** - Good endurance in medium-length races
+- **Acceleration +3** - Helps with recovery from obstacles and turns
+- **Stability +3** - Modest boost for terrain handling
 
-### Example: Master #8631
-**Base Stats (before faction):** SPD 66, PWR 79, ACC 73, STB 77  
-**After Master Bonus (+12/+12/+8/+8):** SPD 78, PWR 91, ACC 81, STB 85  
-**Result:** An already-strong bot becomes the #1 performer marketplace-wide
+### Race Type Recommendations:
+- ✅ **Daily Sprint (5-10km):** Speed and power bonuses shine in shorter distances
+- ✅ **Weekly League (10-20km):** Balanced bonuses excel in medium races
+- ⚠️ **Monthly Cup (15-30km):** Ultra-rare prestige, but other factions may have better endurance bonuses
+
+### Terrain Preferences:
+- ✅ **MetalRoads:** Speed and power bonuses maximize on smooth surfaces
+- ⚠️ **ScrapHeaps:** Modest stability bonus helps but not specialized
+- ⚠️ **WastelandSand:** Balanced stats work in mixed conditions
 
 ---
 
-## Racing Strategy by Faction
+## How to Purchase
 
-### GodClass Strategy:
-- **Versatility is key** - Your +15 to all stats means you can adapt to any race type
-- **Don't specialize** - Let other factions focus on one stat, you're good at everything
-- **Play the field** - Enter diverse race types to capitalize on balanced strength
-- **Prestige matters** - Flaunt that 2.7% rarity
+1. Browse the marketplace using the MCP tools or visit the marketplace directly
+2. Use `browse_pokedbots` with filters like `faction=Master`, `minRating=40`, `maxPrice=5000`
+3. Check bot details with `garage_get_robot_details` for any bot you own
+4. Purchase with `purchase_pokedbot` - bot transfers directly to your garage subaccount
+5. Initialize for racing with `garage_initialize_pokedbot` to activate faction bonuses
 
-### Master Strategy:
-- **Leverage speed** - Your +12 speed bonus makes you the fastest in straightaways
-- **Endurance races** - Your +12 power bonus dominates long-haul events
-- **Avoid pure stability races** - Only +8 stability, not your strength
-- **MetalRoads dominance** - Speed-focused tracks are your home
+For complete marketplace and garage tool documentation, see the [MCP Tools Guide](/guides/mcp-tools-guide).
 
 ---
 
 ## Conclusion
 
-Both GodClass and Master factions represent the pinnacle of PokedBots Racing. Your choice depends on your goals:
+The **Ultimate** faction represents ultra-rare prestige in PokedBots Racing. With only 45 bots in existence and 3 currently listed on the marketplace ranging from 1,800 to 88,888 ICP, these are exclusive collector's items with solid performance.
 
-- **Want ultimate prestige and versatility?** → GodClass
-- **Want peak competitive performance?** → Master
-- **On a budget but want elite performance?** → GodClass #8233 @ 99 ICP
-- **Money is no object?** → Master #8631 @ 88,888 ICP
+Key takeaways:
+- ✅ **Best value:** #588 @ 1,800 ICP for entry into ultra-rare tier
+- ✅ **Best acceleration:** #9964 @ 4,000 ICP for technical courses
+- ✅ **Best overall:** #8631 @ 88,888 ICP for ultimate performance and prestige
+- ✅ **Faction bonuses:** +5 Speed/Power Core, +3 Acceleration/Stability
+- ✅ **Ultra-rare status:** Only 45 exist (0.45% of collection)
 
-Whatever you choose, you'll be racing with the wasteland's finest! 🏁👑
+Whatever your budget, Ultimate faction bots offer exclusive prestige and balanced competitive performance! 🏁🏆
 
 ---
 
-*Stats accurate as of November 16, 2025. Prices and availability subject to change.*
+*Data from live marketplace query on November 22, 2025. Prices and availability subject to change.*

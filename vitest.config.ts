@@ -6,7 +6,7 @@ export default defineConfig({
     environment: 'node',
     testTimeout: 120000, // 2 minutes for canister tests
     hookTimeout: 120000,
-    include: ['test/**/*.test.ts'],
+    include: ['canisters/**/test/**/*.test.ts'],
     globalSetup: ['./test/global-setup.ts'],
   },
 });

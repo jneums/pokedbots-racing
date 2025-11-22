@@ -97,28 +97,72 @@ module {
       let faction = racingStats.faction;
 
       let factionText = switch (faction) {
-        case (#BattleBot) { "BattleBot" };
-        case (#EntertainmentBot) { "EntertainmentBot" };
-        case (#WildBot) { "WildBot" };
-        case (#GodClass) { "GodClass" };
+        // Ultra-Rare
+        case (#UltimateMaster) { "Ultimate-Master" };
+        case (#Wild) { "Wild" };
+        case (#Golden) { "Golden" };
+        case (#Ultimate) { "Ultimate" };
+        // Super-Rare
+        case (#Blackhole) { "Blackhole" };
+        case (#Dead) { "Dead" };
         case (#Master) { "Master" };
+        // Rare
+        case (#Bee) { "Bee" };
+        case (#Food) { "Food" };
+        case (#Box) { "Box" };
+        case (#Murder) { "Murder" };
+        // Common
+        case (#Game) { "Game" };
+        case (#Animal) { "Animal" };
+        case (#Industrial) { "Industrial" };
       };
 
       let factionMessage = switch (faction) {
-        case (#BattleBot) {
-          "Racing License Approved: Battle Bot class. Tough construction from video game console parts and junk food toys.";
+        // Ultra-Rare
+        case (#UltimateMaster) {
+          "🏆 Racing License Approved: ULTIMATE-MASTER TYPE! The rarest classification. Apex predator of the wasteland. Legendary status confirmed.";
         };
-        case (#EntertainmentBot) {
-          "Racing License Approved: Entertainment Bot class. Flashy and charismatic, built from ancient entertainment tech.";
+        case (#Wild) {
+          "🦾 Racing License Approved: WILD TYPE! Deranged systems from the 2453 solar flare. Unpredictable chaos engine. Ultra-rare classification.";
         };
-        case (#WildBot) {
-          "Racing License Approved: Wild Bot class. Deranged systems from the 2453 solar flare. Unpredictable performance.";
+        case (#Golden) {
+          "✨ Racing License Approved: GOLDEN TYPE! Superior golden-forged chassis. Delta City's elite. Ultra-rare classification.";
         };
-        case (#GodClass) {
-          "Racing License Approved: God Class! Superior abilities far beyond standard bots. Delta City's elite.";
+        case (#Ultimate) {
+          "⚡ Racing License Approved: ULTIMATE TYPE! Peak performance design. Advanced tech superiority. Ultra-rare classification.";
+        };
+        // Super-Rare
+        case (#Blackhole) {
+          "🌌 Racing License Approved: BLACKHOLE TYPE! Reality-warping MetalRoads specialist. Super-rare void tech classification.";
+        };
+        case (#Dead) {
+          "💀 Racing License Approved: DEAD TYPE! Resurrected from the scrap tombs. Eerie resilience. Super-rare classification.";
         };
         case (#Master) {
-          "Racing License Approved: Master class. Mysterious connection to Europa Base 7 colony.";
+          "🎯 Racing License Approved: MASTER TYPE! Mysterious Europa Base 7 connection. Elite performance. Super-rare classification.";
+        };
+        // Rare
+        case (#Bee) {
+          "🐝 Racing License Approved: BEE TYPE! Hive-mind acceleration systems. Swarm intelligence rare-class.";
+        };
+        case (#Food) {
+          "🍔 Racing License Approved: FOOD TYPE! Built from ancient fast-food machinery. Surprisingly durable rare-class.";
+        };
+        case (#Box) {
+          "📦 Racing License Approved: BOX TYPE! Scrap heap master. Recycled excellence. Rare-class classification.";
+        };
+        case (#Murder) {
+          "🔪 Racing License Approved: MURDER TYPE! Combat-grade aggression core. Built for destruction. Rare-class classification.";
+        };
+        // Common
+        case (#Game) {
+          "🎮 Racing License Approved: GAME TYPE! Entertainment tech heritage. WastelandSand specialist. Common classification.";
+        };
+        case (#Animal) {
+          "🦎 Racing License Approved: ANIMAL TYPE! Organic-synthetic hybrid design. Balanced performance. Common classification.";
+        };
+        case (#Industrial) {
+          "⚙️ Racing License Approved: INDUSTRIAL TYPE! Heavy machinery foundation. Reliable workhorse. Common classification.";
         };
       };
 

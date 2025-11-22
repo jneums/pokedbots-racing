@@ -137,7 +137,15 @@ module {
           return ToolContext.makeError("Insufficient parts. Needed: " # Nat.toText(partsNeeded) # " specific parts.", cb);
         };
       } else {
-        let icpLedger = actor ("ryjl3-tyaaa-aaaaa-aaaba-cai") : actor {
+        // Get ICP Ledger canister ID from context
+        let ledgerId = switch (ctx.icpLedgerCanisterId()) {
+          case (?id) { id };
+          case (null) {
+            return ToolContext.makeError("ICP Ledger not configured", cb);
+          };
+        };
+
+        let icpLedger = actor (Principal.toText(ledgerId)) : actor {
           icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
         };
         let totalCost = (partsNeeded * PART_PRICE_E8S) + TRANSFER_FEE;
@@ -191,9 +199,14 @@ module {
       ctx.garageManager.updateStats(tokenIndex, updatedStats);
 
       let expectedGain = switch (racingStats.faction) {
-        case (#GodClass) { "1-3 points (20% chance for 2x bonus!)" };
-        case (#WildBot) { "Unstable: Could range wildly" };
-        case (_) { "1-3 stat points" };
+        // Ultra-Rare: 10% chance for 2x
+        case (#UltimateMaster or #Wild or #Golden or #Ultimate) { "1-3 points (10% chance for 2x bonus!)" };
+        // Super-Rare: 20% chance for 2x
+        case (#Blackhole or #Dead or #Master) { "1-3 points (20% chance for 2x bonus!)" };
+        // Rare: 35% chance for 2x (CATCH-UP mechanic)
+        case (#Bee or #Food or #Box or #Murder) { "1-3 points (35% chance for 2x bonus!)" };
+        // Common: 25% chance for 2x
+        case (#Game or #Animal or #Industrial) { "1-3 points (25% chance for 2x bonus!)" };
       };
 
       let response = Json.obj([

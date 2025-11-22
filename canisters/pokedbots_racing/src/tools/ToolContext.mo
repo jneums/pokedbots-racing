@@ -27,6 +27,8 @@ module ToolContext {
     extCanister : ExtIntegration.ExtCanisterInterface;
     /// EXT canister ID (needed for encoding token identifiers)
     extCanisterId : Principal;
+    /// ICP Ledger canister ID (for payments)
+    icpLedgerCanisterId : () -> ?Principal;
     /// Get cached marketplace listings
     getMarketplaceListings : () -> async [(Nat32, ExtIntegration.Listing, ExtIntegration.Metadata)];
     /// Timer tool for scheduling actions
