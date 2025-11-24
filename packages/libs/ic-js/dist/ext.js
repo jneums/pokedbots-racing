@@ -1,0 +1,75 @@
+import { Principal } from '@icp-sdk/core/principal';
+export const to32bits = (num) => {
+    const b = new ArrayBuffer(4);
+    new DataView(b).setUint32(0, num);
+    return Array.from(new Uint8Array(b));
+};
+export const from32bits = (ba) => {
+    var value = 0;
+    for (var i = 0; i < 4; i++) {
+        value = (value << 8) | ba[i];
+    }
+    return value;
+};
+export const generatetokenIdentifier = (principal, index) => {
+    const padding = Buffer.from('\x0Atid');
+    const array = new Uint8Array([
+        ...padding,
+        ...Principal.fromText(principal).toUint8Array(),
+        ...to32bits(index),
+    ]);
+    return Principal.fromUint8Array(array).toText();
+};
+export const toHexString = (byteArray) => {
+    return Array.from(byteArray, (byte) => {
+        return ('0' + (byte & 0xff).toString(16)).slice(-2);
+    }).join('');
+};
+export const fromHexString = (hex) => {
+    if (hex.substr(0, 2) === '0x')
+        hex = hex.substr(2);
+    for (var bytes = [], c = 0; c < hex.length; c += 2)
+        bytes.push(parseInt(hex.substr(c, 2), 16));
+    return bytes;
+};
+export const decodeTokenId = (tid) => {
+    var p = Principal.fromText(tid).toUint8Array();
+    var padding = p.slice(0, 4);
+    if (toHexString(padding) !== toHexString(Buffer.from('\x0Atid'))) {
+        return {
+            index: 0,
+            canister: tid,
+            token: generatetokenIdentifier(tid, 0),
+        };
+    }
+    else {
+        const index = from32bits(p.slice(-4));
+        if (index === undefined) {
+            console.error(`Token index derived from ${tid} undefined`);
+        }
+        return {
+            index,
+            canister: Principal.fromUint8Array(new Uint8Array([...p.slice(4, -4)])).toText(),
+            token: tid,
+        };
+    }
+};
+export const generateExtAssetLink = (tokenId) => {
+    const { canister } = decodeTokenId(tokenId);
+    return `https://${canister}.raw.icp0.io/?tokenid=${tokenId}`;
+};
+export const generateExtThumbnailLink = (tokenId) => {
+    const { canister } = decodeTokenId(tokenId);
+    return `https://${canister}.raw.icp0.io/?tokenid=${tokenId}&type=thumbnail`;
+};
+export const getSubAccountArray = (s) => {
+    if (Array.isArray(s)) {
+        return s.concat(Array(32 - s.length).fill(0));
+    }
+    else {
+        //32 bit number only
+        return Array(28)
+            .fill(0)
+            .concat(to32bits(s ? s : 0));
+    }
+};

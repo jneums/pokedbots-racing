@@ -1,15 +1,19 @@
 {
   "canisters": {
-    "my_mcp_server": {
-      "main": "canisters/pokedbots_racing/src/main.mo",
+    "pokedbots_racing": {
+      "main": "packages/canisters/pokedbots_racing/src/main.mo",
       "type": "motoko",
-      "gzip": true
+      "gzip": true,
+      "declarations": {
+        "output": "packages/libs/declarations/src/generated/pokedbots_racing",
+        "node_compatibility": true
+      }
     },
     "website": {      
       "build": [
-        "cd website && npm run build"
+        "cd packages/apps/website && npm run build"
       ],
-      "source": ["website/out"],
+      "source": ["packages/apps/website/out"],
       "type": "assets"
     },
   "icp_ledger": {
@@ -22,10 +26,15 @@
         }
       }
     },
-    "pokedbots": {
-      "candid": "canisters/pokedbots_nfts/ext.did",
-      "wasm": "canisters/pokedbots_nfts/ext.wasm",
-      "type": "custom"
+    "pokedbots_nfts": {
+      "candid": "packages/canisters/pokedbots_nfts/ext.did",
+      "wasm": "packages/canisters/pokedbots_nfts/ext.wasm",
+      "type": "custom",
+      "remote": {
+        "id": {
+          "ic": "ryjl3-tyaaa-aaaaa-aaaba-cai"
+        }
+      }
     }
   },
   "defaults": {

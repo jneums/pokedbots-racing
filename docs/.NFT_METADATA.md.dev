@@ -29,7 +29,7 @@ dfx deploy
 
 2. Set the canister ID (if not using local):
 ```bash
-export CANISTER_ID=$(dfx canister id my_mcp_server)
+export CANISTER_ID=$(dfx canister id pokedbots_racing)
 ```
 
 3. Run the upload script:
@@ -48,33 +48,33 @@ The script will:
 
 #### Get metadata for a single NFT:
 ```bash
-dfx canister call my_mcp_server get_nft_metadata '(0)'
+dfx canister call pokedbots_racing get_nft_metadata '(0)'
 ```
 
 #### Get metadata for multiple NFTs:
 ```bash
-dfx canister call my_mcp_server get_nft_metadata_batch '(vec {0; 1; 2})'
+dfx canister call pokedbots_racing get_nft_metadata_batch '(vec {0; 1; 2})'
 ```
 
 #### Get paginated results:
 ```bash
-dfx canister call my_mcp_server get_nft_metadata_page '(0, 10)'
+dfx canister call pokedbots_racing get_nft_metadata_page '(0, 10)'
 ```
 
 #### Get total count:
 ```bash
-dfx canister call my_mcp_server get_total_nft_count '()'
+dfx canister call pokedbots_racing get_total_nft_count '()'
 ```
 
 #### Get all token IDs:
 ```bash
-dfx canister call my_mcp_server get_all_token_ids '()'
+dfx canister call pokedbots_racing get_all_token_ids '()'
 ```
 
 #### Get specific trait for an NFT:
 ```bash
-dfx canister call my_mcp_server get_nft_trait '(0, "Type")'
-dfx canister call my_mcp_server get_nft_trait '(0, "Body")'
+dfx canister call pokedbots_racing get_nft_trait '(0, "Type")'
+dfx canister call pokedbots_racing get_nft_trait '(0, "Body")'
 ```
 
 ## Public Methods
