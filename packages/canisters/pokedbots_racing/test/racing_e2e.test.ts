@@ -20,29 +20,29 @@ import { readFile } from 'node:fs/promises';
 import { AccountIdentifier } from '@icp-sdk/canisters/ledger/icp';
 
 // --- Import Racing Canister Types ---
-import { idlFactory as racingIdlFactory } from '../../../.dfx/local/canisters/pokedbots_racing/service.did.js';
-import type { _SERVICE as RacingService } from '../../../.dfx/local/canisters/pokedbots_racing/service.did.d.ts';
+import { idlFactory as racingIdlFactory } from '../../../../.dfx/local/canisters/pokedbots_racing/service.did.js';
+import type { _SERVICE as RacingService } from '../../../../.dfx/local/canisters/pokedbots_racing/service.did.d.ts';
 
 // --- Import ICP Ledger Types ---
-import { idlFactory as ledgerIdlFactory, init as ledgerInit } from '../../../.dfx/local/canisters/icp_ledger/service.did.js';
-import type { _SERVICE as LedgerService } from '../../../.dfx/local/canisters/icp_ledger/service.did.d.ts';
+import { idlFactory as ledgerIdlFactory, init as ledgerInit } from '../../../../.dfx/local/canisters/icp_ledger/service.did.js';
+import type { _SERVICE as LedgerService } from '../../../../.dfx/local/canisters/icp_ledger/service.did.d.ts';
 
 // --- Import PokedBots NFT Types ---
-import { idlFactory as pokedbotsIdlFactory, init as pokedbotsInit } from '../../../.dfx/local/canisters/pokedbots/service.did.js';
-import type { EXTNFT as PokedBotsService } from '../../../.dfx/local/canisters/pokedbots/service.did.d.ts';
+import { idlFactory as pokedbotsIdlFactory, init as pokedbotsInit } from '../../../../.dfx/local/canisters/pokedbots/service.did.js';
+import type { EXTNFT as PokedBotsService } from '../../../../.dfx/local/canisters/pokedbots/service.did.d.ts';
 
 // --- Wasm Paths ---
 const RACING_WASM_PATH = path.resolve(
   __dirname,
-  '../../../.dfx/local/canisters/pokedbots_racing/pokedbots_racing.wasm.gz',
+  '../../../../.dfx/local/canisters/pokedbots_racing/pokedbots_racing.wasm.gz',
 );
 const LEDGER_WASM_PATH = path.resolve(
   __dirname,
-  '../../../.dfx/local/canisters/icp_ledger/icp_ledger.wasm.gz',
+  '../../../../.dfx/local/canisters/icp_ledger/icp_ledger.wasm.gz',
 );
 const POKEDBOTS_WASM_PATH = path.resolve(
   __dirname,
-  '../../../.dfx/local/canisters/pokedbots/pokedbots.wasm',
+  '../../../../.dfx/local/canisters/pokedbots/pokedbots.wasm',
 );
 
 // --- Test Identities ---

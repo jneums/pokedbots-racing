@@ -26,7 +26,7 @@ import path from 'node:path';
 // Configure the path to your MCP server WASM
 const MCP_SERVER_WASM_PATH = path.resolve(
   __dirname,
-  '../../../.dfx/local/canisters/pokedbots_racing/pokedbots_racing.wasm.gz',
+  '../../../../.dfx/local/canisters/pokedbots_racing/pokedbots_racing.wasm.gz',
 );
 
 describe('MCP Server Requirements', () => {
