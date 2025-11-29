@@ -2104,11 +2104,9 @@ describe('PokedBots Racing E2E Tests', () => {
         
         console.log(`✅ Bot has preferred terrain: ${details.preferred_terrain}`);
         
-        // Verify faction influences terrain (from earlier investigation):
-        // - BattleBot: Prefers ScrapHeaps
-        // - EntertainmentBot: Various
-        // - WildBot: Random
-        // - GodClass/Master: Various
+        // Faction influences terrain preferences:
+        // Each bot's faction provides bonuses on specific terrain types
+        // See RacingSimulator.mo for detailed terrain bonuses by faction
         const faction = details.faction;
         console.log(`   Faction: ${faction}, Preferred Terrain: ${details.preferred_terrain}`);
         

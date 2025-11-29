@@ -1241,17 +1241,17 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     let garageSubaccount = ExtIntegration.deriveGarageSubaccount(userPrincipal);
     let garageAccountId = ExtIntegration.principalToAccountIdentifier(Principal.fromActor(self), ?garageSubaccount);
     let tokenId = ExtIntegration.encodeTokenIdentifier(tokenIndex, extCanisterId);
-    
+
     let ownerResult = try {
       let result = await extCanister.bearer(tokenId);
       switch (result) {
         case (#ok(owner)) { "Owner: " # owner };
-        case (#err(e)) { "Error: " # debug_show(e) };
+        case (#err(e)) { "Error: " # debug_show (e) };
       };
     } catch (e) {
       "Exception: " # Error.message(e);
     };
-    
+
     return {
       garageAccountId = garageAccountId;
       tokenIdentifier = tokenId;
@@ -1763,7 +1763,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   };
 
   // Get current season and month IDs
-  public query func get_current_periods() : async { seasonId : Nat; monthId : Nat } {
+  public query func get_current_periods() : async {
+    seasonId : Nat;
+    monthId : Nat;
+  } {
     {
       seasonId = leaderboardManager.getCurrentSeasonId();
       monthId = leaderboardManager.getCurrentMonthId();

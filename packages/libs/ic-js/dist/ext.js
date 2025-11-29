@@ -12,7 +12,7 @@ export const from32bits = (ba) => {
     return value;
 };
 export const generatetokenIdentifier = (principal, index) => {
-    const padding = Buffer.from('\x0Atid');
+    const padding = new Uint8Array([0x0A, 0x74, 0x69, 0x64]); // '\x0Atid'
     const array = new Uint8Array([
         ...padding,
         ...Principal.fromText(principal).toUint8Array(),
@@ -35,7 +35,8 @@ export const fromHexString = (hex) => {
 export const decodeTokenId = (tid) => {
     var p = Principal.fromText(tid).toUint8Array();
     var padding = p.slice(0, 4);
-    if (toHexString(padding) !== toHexString(Buffer.from('\x0Atid'))) {
+    const expectedPadding = new Uint8Array([0x0A, 0x74, 0x69, 0x64]); // '\x0Atid'
+    if (toHexString(padding) !== toHexString(expectedPadding)) {
         return {
             index: 0,
             canister: tid,

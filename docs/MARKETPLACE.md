@@ -34,7 +34,7 @@ Browse available PokedBots for sale with detailed stats and powerful filtering:
 ```json
 {
   "after": 42,              // Optional: token index for pagination
-  "faction": "GodClass",    // Optional: BattleBot, EntertainmentBot, WildBot, GodClass, Master
+  "faction": "UltimateMaster",    // Optional: UltimateMaster, Wild, Golden, Ultimate, Blackhole, Dead, Master, Bee, Food, Box, Murder, Game, Animal, Industrial
   "minRating": 70,          // Optional: minimum overall rating (30-100)
   "maxPrice": 0.5,          // Optional: maximum price in ICP
   "minWins": 5,             // Optional: minimum race wins
@@ -55,7 +55,7 @@ Returns formatted text with 5 listings per page showing:
 
 **Features:**
 - ✅ 5 listings per page
-- ✅ Faction filtering (find rare GodClass bots)
+- ✅ Faction filtering (find ultra-rare UltimateMaster, Wild, Golden, or Ultimate bots)
 - ✅ Stat-based filtering (min rating, max price, proven winners)
 - ✅ Multiple sort options (price, rating, winRate, wins)
 - ✅ Shows base stats even for bots that haven't raced
@@ -233,7 +233,7 @@ Current marketplace state:
 
 ### Finding Value
 - ✅ Browse by price to find cheap bots
-- ✅ Check faction distribution (God Class rare)
+- ✅ Check faction distribution (UltimateMaster ultra-rare with only 1 bot)
 - ✅ Look for naturally high stats
 - ✅ Consider win count for race eligibility
 

@@ -5,7 +5,7 @@ order: 1
 ---
 
 # Beginner's Guide to PokedBots Racing 🏁
-*Your First Steps in the Wasteland - November 22, 2025*
+*Your First Steps in the Wasteland - November 29, 2025*
 
 Welcome to PokedBots Racing! This guide will help you understand the game, pick your first bot, and start racing without breaking the bank.
 
@@ -47,23 +47,23 @@ PokedBots now has **14 distinct factions** organized into 4 rarity tiers. Each f
 ### 🌟 Ultra-Rare Tier (1-45 bots each)
 
 #### Ultimate-Master (1 bot total) 
-**Bonuses:** +6 to ALL stats  
-**Best For:** The ultimate collector's item  
+**Bonuses:** +25 to ALL stats  
+**Best For:** The ultimate collector's item, guaranteed #1 ranking  
 **Availability:** Only 1 exists!
 
 #### Wild (5 bots total)
-**Bonuses:** +7 Speed, +8 Acceleration, +5 Power/Stability  
-**Best For:** Speed and agility specialists  
+**Bonuses:** +24 Acceleration, +22 Speed, +18 Power/Stability  
+**Best For:** Elite speed and agility specialists  
 **Availability:** Extremely rare, only 5 exist
 
 #### Golden (27 bots total)
-**Bonuses:** +3 Speed/Acceleration, +5 Power Core, +4 Stability  
+**Bonuses:** +18 Power Core, +16 Stability, +14 Speed/Acceleration  
 **Best For:** Balanced premium racers  
 **Availability:** Very rare
 
 #### Ultimate (45 bots total)
-**Bonuses:** +5 Speed/Power Core, +3 Acceleration/Stability  
-**Best For:** Speed and power focused  
+**Bonuses:** +12 Speed/Power Core, +8 Acceleration/Stability  
+**Best For:** Competitive balanced racing  
 **Availability:** Very rare
 
 ### ⚡ Super-Rare Tier (244-640 bots each)
@@ -75,13 +75,13 @@ PokedBots now has **14 distinct factions** organized into 4 rarity tiers. Each f
 **Recommended For:** Players wanting super-rare prestige
 
 #### Dead (382 bots)
-**Bonuses:** +13 Stability, +12 Power Core, +9 Speed/Acceleration  
+**Bonuses:** +10 Stability, +9 Power Core, +7 Speed/Acceleration  
 **Best For:** Rough terrain and long races  
 **Strengths:** Top stability, strong endurance  
 **Recommended For:** WastelandSand specialists
 
 #### Master (640 bots)
-**Bonuses:** +14 Speed/Stability, +11 Power/Acceleration  
+**Bonuses:** +11 Speed/Stability, +8 Power/Acceleration  
 **Best For:** Balanced high-performance racing  
 **Strengths:** Excellent all-around bonuses  
 **Recommended For:** Competitive players (most accessible super-rare)
@@ -89,41 +89,41 @@ PokedBots now has **14 distinct factions** organized into 4 rarity tiers. Each f
 ### 🔸 Rare Tier (717-999 bots each)
 
 #### Bee (717 bots)
-**Bonuses:** +10 Acceleration, +8 Speed, +6 Power/Stability  
+**Bonuses:** +6 Acceleration, +5 Speed, +3 Power/Stability  
 **Best For:** Quick starts and agility  
 **Recommended For:** Acceleration-focused strategies
 
 #### Food (858 bots)
-**Bonuses:** +11 Power Core, +10 Acceleration, +6 Speed/Stability  
+**Bonuses:** +6 Power Core, +5 Acceleration, +3 Speed/Stability  
 **Best For:** Power and acceleration combo  
 **Recommended For:** Medium-haul endurance
 
 #### Box (999 bots)
-**Bonuses:** +9 Speed/Acceleration, +7 Stability, +5 Power  
+**Bonuses:** +3 Speed/Acceleration/Stability, +2 Power  
 **Best For:** Balanced rare faction  
 **Recommended For:** Versatile racing
 
 #### Murder (999 bots)
-**Bonuses:** +10 Speed, +7 Acceleration/Stability, +6 Power  
-**Best For:** Speed specialists  
-**Recommended For:** Fast racing on any terrain
+**Bonuses:** +3 Speed/Acceleration/Stability, +1 Power  
+**Best For:** Balanced racing  
+**Recommended For:** Any terrain
 
 ### 🔹 Common Tier (1654-2009 bots each) - **BEST FOR BEGINNERS**
 
 #### Game (1654 bots)
-**Bonuses:** +8 Acceleration, +6 Speed/Power, +5 Stability  
+**Bonuses:** +1 Acceleration/Speed, +0 Power/Stability  
 **Best For:** New players, learning mechanics  
-**Strengths:** Affordable, good acceleration  
+**Strengths:** Affordable entry point  
 **Recommended For:** Your first bot
 
 #### Animal (1836 bots)
-**Bonuses:** +8 Stability, +7 Power, +5 Speed/Acceleration  
+**Bonuses:** +1 Stability/Power, +0 Speed/Acceleration  
 **Best For:** Stability and endurance  
 **Strengths:** Affordable, rough terrain capable  
 **Recommended For:** WastelandSand beginners
 
 #### Industrial (2009 bots)
-**Bonuses:** +8 Power Core, +7 Stability, +5 Speed/Acceleration  
+**Bonuses:** +1 Power/Stability, +0 Speed/Acceleration  
 **Best For:** Endurance racing  
 **Strengths:** Most common, affordable, reliable  
 **Recommended For:** Budget endurance racers
@@ -169,7 +169,7 @@ The average of all four stats:
 
 ### Ultra Budget: 16-30 ICP
 **Goal:** Get racing ASAP without spending much  
-**Expected Quality:** 35-37 rating (decent beginner bots)
+**Expected Quality:** 26-36 rating (entry-level bots)
 
 **Top Picks:**
 
@@ -177,34 +177,34 @@ The average of all four stats:
 ![Bot #5100](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=bl7cm-hikor-uwiaa-aaaaa-b4arg-qaqca-aacpw-a&type=thumbnail)
 - **Price:** 16.00 ICP
 - **Faction:** 🍔 Food (Rare tier)
-- **Rating:** 36/100
-- **Stats:** SPD 36 | PWR 35 | ACC 34 | STB 41
-- **Why:** Cheapest entry with decent stats, Food faction +11 Power bonus
+- **Rating:** 26/100
+- **Stats:** SPD 24 | PWR 26 | ACC 26 | STB 30
+- **Why:** Cheapest entry with decent stats, Food faction +6 Power bonus
 - **Perfect For:** Learning race mechanics on a budget
 
 #### Token #4525 - Super-Rare Master!
 ![Bot #4525](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=hejtl-gikor-uwiaa-aaaaa-b4arg-qaqca-aacgw-q&type=thumbnail)
 - **Price:** 20.00 ICP
 - **Faction:** 👑 Master (Super-Rare tier!)
-- **Rating:** 35/100
-- **Stats:** SPD 40 | PWR 37 | ACC 30 | STB 34
-- **Why:** Super-rare faction prestige at budget price! +14 SPD/STB, +11 PWR/ACC bonuses
+- **Rating:** 34/100
+- **Stats:** SPD 36 | PWR 37 | ACC 31 | STB 33
+- **Why:** Super-rare faction prestige at budget price! +11 SPD/STB, +8 PWR/ACC bonuses
 - **Perfect For:** Players wanting rare faction status
 
 #### Token #1489 - Dead Speed Specialist
 ![Bot #1489](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=jyhn7-wykor-uwiaa-aaaaa-b4arg-qaqca-aaaxi-q&type=thumbnail)
 - **Price:** 30.00 ICP
 - **Faction:** ☠️ Dead (Super-Rare tier!)
-- **Rating:** 37/100
-- **Stats:** SPD 45 | PWR 29 | ACC 32 | STB 44
-- **Why:** Fastest budget bot with 45 speed! Super-rare Dead faction (+13 STB, +12 PWR)
-- **Perfect For:** Speed-focused beginners who want super-rare prestige
+- **Rating:** 36/100
+- **Stats:** SPD 39 | PWR 31 | ACC 36 | STB 39
+- **Why:** Strong balanced stats with super-rare Dead faction (+10 STB, +9 PWR, +7 SPD/ACC)
+- **Perfect For:** Balanced racing beginners who want super-rare prestige
 
 ---
 
 ### Enthusiast Budget: 40-50 ICP
 **Goal:** Get premium quality with elite factions  
-**Expected Quality:** 37-41 rating (competitive performers)
+**Expected Quality:** 35-41 rating (competitive performers)
 
 **Top Picks:**
 
@@ -213,17 +213,17 @@ The average of all four stats:
 - **Price:** 44.00 ICP
 - **Faction:** ⚫ Blackhole (Super-Rare tier!)
 - **Rating:** 41/100 🏆
-- **Stats:** SPD 38 | PWR 43 | ACC 43 | STB 42
-- **Why:** **BEST VALUE SUPER-RARE!** Blackhole faction has highest Power bonus in game (+18 PWR, +16 ACC). Balanced 43 power and acceleration.
+- **Stats:** SPD 35 | PWR 46 | ACC 41 | STB 41
+- **Why:** **BEST VALUE SUPER-RARE!** Blackhole faction has highest Power bonus in game (+18 PWR, +16 ACC). Exceptional 46 power with balanced stats.
 - **Perfect For:** Serious beginners who want competitive super-rare bot
 
 #### Token #1315 - Master Speed Leader
 ![Bot #1315](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=dw6uz-2ykor-uwiaa-aaaaa-b4arg-qaqca-aaaur-q&type=thumbnail)
 - **Price:** 49.00 ICP
 - **Faction:** 👑 Master (Super-Rare tier!)
-- **Rating:** 36/100
-- **Stats:** SPD 48 | PWR 29 | ACC 36 | STB 33
-- **Why:** Highest speed in budget range (48)! Master faction +14 SPD bonus
+- **Rating:** 35/100
+- **Stats:** SPD 42 | PWR 34 | ACC 34 | STB 32
+- **Why:** Strong speed (42) in budget range! Master faction +11 SPD/STB, +8 PWR/ACC bonuses
 - **Perfect For:** Sprint racers, speed-focused strategies
 
 ---

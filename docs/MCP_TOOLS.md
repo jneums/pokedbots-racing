@@ -88,7 +88,7 @@ Register a bot for wasteland racing license (first-time, free).
 
 **Output:** JSON object with:
 - `token_index`: Bot ID
-- `faction`: Derived faction (BattleBot/EntertainmentBot/WildBot/GodClass/Master)
+- `faction`: Derived faction (UltimateMaster/Wild/Golden/Ultimate/Blackhole/Dead/Master/Bee/Food/Box/Murder/Game/Animal/Industrial)
 - `stats`: Base racing stats (speed, power_core, acceleration, stability)
 - `battery`: Starting battery (100)
 - `condition`: Starting condition (100)
@@ -165,7 +165,7 @@ Start a 12-hour upgrade session.
 - `expected_gain`: Stat gain description (varies by faction)
 - `message`: "🔧 Upgrade in progress. Check back in 12 hours."
 
-**Note:** God Class bots have 20% chance for 2x bonus, Wild Bots have unstable results
+**Note:** UltimateMaster bots have 50% chance for 2x bonus, Wild bots have unstable results
 
 ---
 

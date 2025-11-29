@@ -118,7 +118,7 @@ Resets each season (typically 3 months). Compete for seasonal championships and 
 Resets every month. Great for consistent racers to showcase their current form.
 
 ### Faction Leaderboard
-See how your bot ranks among others of the same faction (BattleBot, EntertainmentBot, WildBot, Master, GodClass).
+See how your bot ranks among others of the same faction (UltimateMaster, Wild, Golden, Ultimate, Blackhole, Dead, Master, Bee, Food, Box, Murder, Game, Animal, Industrial).
 
 ## Your Racing Stats
 

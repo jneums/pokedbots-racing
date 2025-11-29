@@ -216,12 +216,12 @@ module {
     // Get past events (paginated)
     public func getPastEvents(fromTime : Int, offset : Nat, limit : Nat) : [ScheduledEvent] {
       let allEvents = getAllEvents();
-      
+
       // Filter events that have passed (scheduled time < now) or are completed/cancelled
       var pastEvents = Array.filter<ScheduledEvent>(
         allEvents,
         func(e) {
-          e.scheduledTime < fromTime or e.status == #Completed or e.status == #Cancelled
+          e.scheduledTime < fromTime or e.status == #Completed or e.status == #Cancelled;
         },
       );
 

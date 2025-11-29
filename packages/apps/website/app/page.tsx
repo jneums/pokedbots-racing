@@ -1,8 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import Image from "next/image";
+import { Link } from "react-router-dom";
 import { getAllDocs } from "@/lib/markdown";
 
 export default function Home() {
@@ -16,13 +15,10 @@ export default function Home() {
         <div className="container mx-auto px-4 py-16 sm:py-20">
           <div className="max-w-4xl mx-auto text-center space-y-10">
             <div className="flex justify-center">
-              <Image 
+              <img 
                 src="/pokedbots-racing-logo.webp" 
                 alt="PokedBots Racing" 
-                width={600} 
-                height={200}
                 className="w-full max-w-lg h-auto"
-                priority
               />
             </div>
             
@@ -32,39 +28,39 @@ export default function Home() {
                 What is PokedBots Racing?
               </h1>
               <p className="text-xl sm:text-2xl text-muted-foreground leading-relaxed">
-                A competitive racing game built on the Internet Computer where you race your PokedBot NFTs against other players for real ICP prizes.
+                The first AI agent-first racing management simulator. Your AI agents manage your PokedBots garage—analyzing and purchasing bots, performing upgrades, entering races, and maintaining your fleet between events.
               </p>
               <div className="grid sm:grid-cols-3 gap-4 pt-4">
                 <div className="bg-card/50 backdrop-blur border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 rounded-lg p-4">
-                  <div className="text-3xl mb-2">🏎️</div>
-                  <div className="font-semibold mb-1">Race</div>
-                  <div className="text-sm text-muted-foreground">Enter races with your PokedBot NFT</div>
+                  <div className="text-3xl mb-2">🤖</div>
+                  <div className="font-semibold mb-1">AI Agents</div>
+                  <div className="text-sm text-muted-foreground">Let AI manage your racing garage</div>
                 </div>
                 <div className="bg-card/50 backdrop-blur border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 rounded-lg p-4">
-                  <div className="text-3xl mb-2">⚡</div>
-                  <div className="font-semibold mb-1">Upgrade</div>
-                  <div className="text-sm text-muted-foreground">Boost stats to win more races</div>
+                  <div className="text-3xl mb-2">🏎️</div>
+                  <div className="font-semibold mb-1">Strategic Racing</div>
+                  <div className="text-sm text-muted-foreground">Optimize bots and compete in events</div>
                 </div>
                 <div className="bg-card/50 backdrop-blur border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 rounded-lg p-4">
                   <div className="text-3xl mb-2">💰</div>
                   <div className="font-semibold mb-1">Win ICP</div>
-                  <div className="text-sm text-muted-foreground">Top 3 finishers earn prizes</div>
+                  <div className="text-sm text-muted-foreground">Top finishers earn real prizes</div>
                 </div>
               </div>
             </div>
 
             <p className="text-xl sm:text-2xl text-muted-foreground/80 max-w-3xl mx-auto leading-relaxed font-light pt-4">
-              Race your PokedBots in the wasteland. Upgrade with scrap parts, compete in events, and win ICP prizes.
+              Compete in scheduled races with real ICP prizes. Your AI handles the strategy—you reap the rewards.
             </p>
             <div className="flex gap-5 justify-center flex-wrap pt-6">
-              <Link href="/guides">
+              <Link to="/schedule">
                 <Button size="lg" className="text-lg px-10 py-7 h-auto font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all">
-                  View Guides
+                  View Schedule
                 </Button>
               </Link>
-              <Link href="https://github.com/jneums/pokedbots-racing" target="_blank">
+              <Link to="/leaderboard">
                 <Button size="lg" variant="outline" className="text-lg px-10 py-7 h-auto font-semibold border-2 hover:bg-accent/50">
-                  View on GitHub
+                  Leaderboard
                 </Button>
               </Link>
             </div>
@@ -79,10 +75,24 @@ export default function Home() {
             <div className="text-center mb-16">
               <h2 className="text-5xl font-bold mb-5">Key Features</h2>
               <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-                Built on the Internet Computer with immersive wasteland mechanics
+                AI-powered garage management meets competitive wasteland racing
               </p>
             </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3 text-2xl">
+                  <span className="text-3xl">🛠️</span>
+                  AI Integration
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-base leading-relaxed">
+                  Let AI agents manage your racing garage via the Model Context Protocol—from purchasing bots to race strategy.
+                </CardDescription>
+              </CardContent>
+            </Card>
+
             <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur">
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-2xl">
@@ -93,20 +103,6 @@ export default function Home() {
               <CardContent>
                 <CardDescription className="text-base leading-relaxed">
                   Realistic racing simulation based on your bot's stats, terrain effects, and faction bonuses.
-                </CardDescription>
-              </CardContent>
-            </Card>
-
-            <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-2xl">
-                  <span className="text-3xl">♻️</span>
-                  Scrap System
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-base leading-relaxed">
-                  Burn NFTs from other IC collections to craft upgrade parts for your PokedBots.
                 </CardDescription>
               </CardContent>
             </Card>
@@ -156,13 +152,13 @@ export default function Home() {
             <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur">
               <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-2xl">
-                  <span className="text-3xl">🛠️</span>
-                  AI Integration
+                  <span className="text-3xl">🔧</span>
+                  Bot Maintenance
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-base leading-relaxed">
-                  Manage your racing garage through AI agents via the Model Context Protocol.
+                  Repair damage, recharge batteries, and manage condition between races to keep your fleet competitive.
                 </CardDescription>
               </CardContent>
             </Card>
@@ -183,7 +179,7 @@ export default function Home() {
             </div>
             <div className="grid md:grid-cols-3 gap-8">
               {/* Bot #588 */}
-              <Link href="/guides/elite-faction-showcase" className="block">
+              <Link to="/guides/elite-faction-showcase" className="block">
                 <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur overflow-hidden group pt-0 cursor-pointer h-full">
                 <div className="aspect-[3/4] bg-muted/20 relative overflow-hidden">
                   <img 
@@ -204,20 +200,20 @@ export default function Home() {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold">Rating:</span>
-                        <span className="text-foreground">42/100 👑</span>
+                        <span className="text-foreground">39/100 👑</span>
                       </div>
                       <div className="grid grid-cols-2 gap-1 text-sm">
-                        <span className="text-primary font-semibold">SPD: 45</span>
-                        <span>PWR: 41</span>
-                        <span>ACC: 41</span>
-                        <span>STB: 42</span>
+                        <span className="text-primary font-semibold">SPD: 43</span>
+                        <span>PWR: 37</span>
+                        <span>ACC: 39</span>
+                        <span>STB: 37</span>
                       </div>
                     </div>
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                    Exceptional value! 42 rating with strong 45 speed. Ultra-rare Ultimate faction at reasonable price.
+                    Solid performer! 39 rating with 43 speed. Ultra-rare Ultimate faction at competitive price.
                   </p>
                   <Button className="w-full" variant="outline">View Guide</Button>
                 </CardContent>
@@ -225,7 +221,7 @@ export default function Home() {
               </Link>
 
               {/* Bot #2471 */}
-              <Link href="/guides/elite-faction-showcase" className="block">
+              <Link to="/guides/elite-faction-showcase" className="block">
                 <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur overflow-hidden group pt-0 cursor-pointer h-full">
                 <div className="aspect-[3/4] bg-muted/20 relative overflow-hidden">
                   <img 
@@ -246,20 +242,20 @@ export default function Home() {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold">Rating:</span>
-                        <span className="text-foreground">41/100 👑</span>
+                        <span className="text-foreground">38/100 👑</span>
                       </div>
                       <div className="grid grid-cols-2 gap-1 text-sm">
-                        <span className="text-primary font-semibold">SPD: 45</span>
-                        <span>PWR: 40</span>
-                        <span>ACC: 40</span>
-                        <span>STB: 42</span>
+                        <span className="text-primary font-semibold">SPD: 42</span>
+                        <span>PWR: 36</span>
+                        <span>ACC: 39</span>
+                        <span>STB: 37</span>
                       </div>
                     </div>
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                    Strong 45 speed with balanced stats. Ultra-rare Ultimate faction for competitive racing.
+                    Balanced performer with 42 speed. Ultra-rare Ultimate faction for competitive racing.
                   </p>
                   <Button className="w-full" variant="outline">View Guide</Button>
                 </CardContent>
@@ -267,7 +263,7 @@ export default function Home() {
               </Link>
 
               {/* Bot #8631 */}
-              <Link href="/guides/elite-faction-showcase" className="block">
+              <Link to="/guides/elite-faction-showcase" className="block">
                 <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur overflow-hidden group pt-0 cursor-pointer h-full">
                 <div className="aspect-[3/4] bg-muted/20 relative overflow-hidden">
                   <img 
@@ -288,20 +284,20 @@ export default function Home() {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold">Rating:</span>
-                        <span className="text-foreground font-bold">46/100 👑</span>
+                        <span className="text-foreground font-bold">45/100 👑</span>
                       </div>
                       <div className="grid grid-cols-2 gap-1 text-sm">
-                        <span>SPD: 41</span>
-                        <span className="text-primary font-semibold">PWR: 48</span>
-                        <span>ACC: 46</span>
-                        <span>STB: 50</span>
+                        <span className="text-primary font-semibold">SPD: 45</span>
+                        <span>PWR: 45</span>
+                        <span>ACC: 47</span>
+                        <span>STB: 45</span>
                       </div>
                     </div>
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                    The crown jewel! Highest-rated Ultimate bot on marketplace. Best stability at 50. Ultra-rare prestige.
+                    Elite champion! Top-25 ranking with perfectly balanced stats. Ultra-rare prestige investment.
                   </p>
                   <Button className="w-full" variant="outline">View Guide</Button>
                 </CardContent>
@@ -309,7 +305,7 @@ export default function Home() {
               </Link>
             </div>
             <div className="text-center mt-12">
-              <Link href="/guides/elite-faction-showcase">
+              <Link to="/guides/elite-faction-showcase">
                 <Button size="lg" variant="outline" className="text-base px-8 border-2">
                   Read Full Guide →
                 </Button>
@@ -329,7 +325,7 @@ export default function Home() {
                   <h2 className="text-5xl font-bold mb-3">Guides</h2>
                   <p className="text-xl text-muted-foreground">Step-by-step tutorials and gameplay strategies</p>
                 </div>
-                <Link href="/guides">
+                <Link to="/guides">
                   <Button variant="outline" size="lg" className="text-base px-6 border-2">
                     View All Guides →
                   </Button>
@@ -347,7 +343,7 @@ export default function Home() {
                     .map(slug => guides.find(g => g.slug === slug))
                     .filter((guide): guide is NonNullable<typeof guide> => guide !== undefined);
                   return featuredGuides.map((guide) => (
-                    <Link key={guide.slug} href={`/guides/${guide.slug}`}>
+                    <Link key={guide.slug} to={`/guides/${guide.slug}`}>
                       <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur h-full group">
                         <CardHeader className="space-y-3">
                           <CardTitle className="text-2xl group-hover:text-primary transition-colors">
@@ -381,7 +377,7 @@ export default function Home() {
             </div>
             <div className="grid md:grid-cols-3 gap-8">
               {/* Bot #4343 */}
-              <Link href="/guides/wildbot-shopping-guide" className="block">
+              <Link to="/guides/wildbot-shopping-guide" className="block">
                 <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur overflow-hidden group pt-0 cursor-pointer h-full">
                 <div className="aspect-square bg-muted/20 relative overflow-hidden">
                   <img 
@@ -423,7 +419,7 @@ export default function Home() {
               </Link>
 
               {/* Bot #8233 */}
-              <Link href="/guides/wildbot-shopping-guide" className="block">
+              <Link to="/guides/wildbot-shopping-guide" className="block">
                 <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur overflow-hidden group pt-0 cursor-pointer h-full">
                 <div className="aspect-square bg-muted/20 relative overflow-hidden">
                   <img 
@@ -465,7 +461,7 @@ export default function Home() {
               </Link>
 
               {/* Bot #3033 */}
-              <Link href="/guides/wildbot-shopping-guide" className="block">
+              <Link to="/guides/wildbot-shopping-guide" className="block">
                 <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur overflow-hidden group pt-0 cursor-pointer h-full">
                 <div className="aspect-square bg-muted/20 relative overflow-hidden">
                   <img 
@@ -507,7 +503,7 @@ export default function Home() {
               </Link>
             </div>
             <div className="text-center mt-12">
-              <Link href="/guides/wildbot-shopping-guide">
+              <Link to="/guides/wildbot-shopping-guide">
                 <Button size="lg" variant="outline" className="text-base px-8 border-2">
                   View All Blackhole Bots →
                 </Button>
@@ -527,7 +523,7 @@ export default function Home() {
                   <h2 className="text-5xl font-bold mb-3">Docs</h2>
                   <p className="text-xl text-muted-foreground">System guides and racing mechanics explained</p>
                 </div>
-                <Link href="/docs">
+                <Link to="/docs">
                   <Button variant="outline" size="lg" className="text-base px-6 border-2">
                     View All Docs →
                   </Button>
@@ -535,7 +531,7 @@ export default function Home() {
               </div>
               <div className="grid md:grid-cols-2 gap-6">
                 {docs.map((doc) => (
-                  <Link key={doc.slug} href={`/docs/${doc.slug}`}>
+                  <Link key={doc.slug} to={`/docs/${doc.slug}`}>
                     <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur h-full group">
                       <CardHeader className="space-y-3">
                         <CardTitle className="text-2xl group-hover:text-primary transition-colors">
@@ -563,12 +559,12 @@ export default function Home() {
             <div className="text-center mb-16">
               <h2 className="text-5xl font-bold mb-5">Featured Dead Bots</h2>
               <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-                Undead resilience champions with +13 Stability, +12 Power Core, +9 Speed/Acceleration. Super-rare tier with 382 total bots.
+                Undead resilience champions with +10 Stability, +9 Power Core, +7 Speed/Acceleration. Super-rare tier with 382 total bots.
               </p>
             </div>
             <div className="grid md:grid-cols-3 gap-8">
               {/* Bot #4247 - Highest Rated Dead */}
-              <Link href="/guides/wildbot-shopping-guide" className="block">
+              <Link to="/guides/wildbot-shopping-guide" className="block">
                 <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur overflow-hidden group pt-0 cursor-pointer h-full">
                 <div className="aspect-square bg-muted/20 relative overflow-hidden">
                   <img 
@@ -610,7 +606,7 @@ export default function Home() {
               </Link>
 
               {/* Bot #6433 - Stability Specialist */}
-              <Link href="/guides/wildbot-shopping-guide" className="block">
+              <Link to="/guides/wildbot-shopping-guide" className="block">
                 <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur overflow-hidden group pt-0 cursor-pointer h-full">
                 <div className="aspect-square bg-muted/20 relative overflow-hidden">
                   <img 
@@ -652,7 +648,7 @@ export default function Home() {
               </Link>
 
               {/* Bot #2439 - Budget Dead */}
-              <Link href="/guides/wildbot-shopping-guide" className="block">
+              <Link to="/guides/wildbot-shopping-guide" className="block">
                 <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur overflow-hidden group pt-0 cursor-pointer h-full">
                 <div className="aspect-square bg-muted/20 relative overflow-hidden">
                   <img 
@@ -694,7 +690,7 @@ export default function Home() {
               </Link>
             </div>
             <div className="text-center mt-12">
-              <Link href="/guides/wildbot-shopping-guide">
+              <Link to="/guides/wildbot-shopping-guide">
                 <Button size="lg" variant="outline" className="text-base px-8 border-2">
                   Read Full Guide →
                 </Button>
@@ -712,7 +708,7 @@ export default function Home() {
             <p className="text-2xl sm:text-3xl text-muted-foreground/90 font-light leading-relaxed max-w-3xl mx-auto">
               Join the wasteland and start racing your PokedBots today.
             </p>
-            <Link href="/docs">
+            <Link to="/docs">
               <Button size="lg" className="text-xl px-12 py-8 h-auto font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all">
                 Get Started
               </Button>

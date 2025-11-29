@@ -13,7 +13,7 @@
       "build": [
         "cd packages/apps/website && npm run build"
       ],
-      "source": ["packages/apps/website/out"],
+      "source": ["packages/apps/website/dist"],
       "type": "assets"
     },
   "icp_ledger": {

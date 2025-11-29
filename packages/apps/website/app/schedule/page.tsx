@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -182,7 +182,7 @@ function EventCard({ event }: { event: ScheduledEvent }) {
         </div>
 
         {/* View Details Button */}
-        <Link href={`/schedule/${event.eventId}`} className="block mt-4">
+        <Link to={`/schedule/${event.eventId}`} className="block mt-4">
           <Button className="w-full" variant="default">
             View Race Details →
           </Button>

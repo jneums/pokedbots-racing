@@ -71,7 +71,7 @@ order: 8
 2. On completion:
    - Roll stat gain: 1-3 points base
    - Apply faction modifiers:
-     - God Class: 20% chance for 2x gain
+     - UltimateMaster: 50% chance for 2x gain
      - Wild Bot: ±10% variance (can be 0 or higher)
      - Others: Standard gain
    - Add bonus to appropriate stat (speedBonus/powerCoreBonus/etc.)
@@ -89,7 +89,7 @@ order: 8
 - Calibration decay: ~0.125 per hour (~3 per day)
 - Faction modifiers:
   - Wild Bot: 20% faster decay (chaotic systems)
-  - God Class: 30% slower decay (superior construction)
+  - UltimateMaster: 40% slower decay (supreme construction)
   - Others: Standard decay rate
 - Minimum values: condition 30, calibration 30
 - Drives maintenance economy (forces recharge/repair usage)
@@ -105,7 +105,7 @@ order: 8
 type PokedBotRacingStats = {
   tokenIndex: Nat;
   ownerPrincipal: Principal;
-  faction: FactionType;  // BattleBot/EntertainmentBot/WildBot/GodClass/Master
+  faction: FactionType;  // UltimateMaster/Wild/Golden/Ultimate/Blackhole/Dead/Master/Bee/Food/Box/Murder/Game/Animal/Industrial
   
   // Upgrade bonuses (from scrapyard upgrades)
   speedBonus: Nat;
@@ -206,7 +206,7 @@ type UpgradeSession = {
 };
 
 // Faction bonuses during upgrades
-// God Class: 20% chance for 2x stat gain
+// UltimateMaster: 50% chance for 2x stat gain
 // Wild Bot: ±10% variance (unstable)
 // Others: Standard 1-3 stat points
 ```

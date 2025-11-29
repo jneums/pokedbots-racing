@@ -5,18 +5,18 @@ order: 4
 ---
 
 # Dead Bot Shopping Guide ☠️
-*Your Complete Guide to Wasteland's Undead Champions - Updated November 22, 2025*
+*Your Complete Guide to Wasteland's Undead Champions - Updated November 29, 2025*
 
-The Dead faction is a **super-rare** tier with only 382 bots (3.82% of collection). With **+13 Stability, +12 Power Core, +9 Speed/Acceleration** bonuses, Dead bots excel in endurance races and rough terrain. These undead resilience champions offer premium performance at reasonable prices.
+The Dead faction is a **super-rare** tier with only 382 bots (3.82% of collection). With **+10 Stability, +9 Power Core, +7 Speed/Acceleration** bonuses, Dead bots excel in endurance races and rough terrain. These undead resilience champions offer premium performance at reasonable prices.
 
 ---
 
 ## Why Choose Dead?
 
 ### Faction Strengths
-- **Elite Stability (+13)**: Super-rare tier stability bonus
-- **Strong Power (+12)**: Excellent endurance for long races
-- **Balanced Speed/Acceleration (+9)**: Competitive in all race types
+- **Elite Stability (+10)**: Super-rare tier stability bonus
+- **Strong Power (+9)**: Excellent endurance for long races
+- **Balanced Speed/Acceleration (+7)**: Competitive in all race types
 - **Super-Rare Status**: Only 382 exist (3.82% of collection)
 
 ### Best Race Types
@@ -46,23 +46,23 @@ The Dead faction is a **super-rare** tier with only 382 bots (3.82% of collectio
 #### 🥇 #4247 @ 65 ICP - "The Elite Dead" ⭐ BEST VALUE!
 ![Bot #4247](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=4ycn2-2qkor-uwiaa-aaaaa-b4arg-qaqca-aaccl-q&type=thumbnail)
 
-**Rating:** 47/100 | **Value:** 0.72 rating/ICP 🏆  
-**Stats:** SPD 42 | PWR 48 | ACC 49 | STB 50  
-**Why:** Highest-rated Dead bot available! Peak 50 stability + strong 49 acceleration makes this exceptional for rough terrain. Super-rare faction at an incredible price.
+**Rating:** 41/100 | **Value:** 0.63 rating/ICP 🏆  
+**Stats:** SPD 37 | PWR 42 | ACC 43 | STB 42  
+**Why:** Highest-rated Dead bot available! Strong 43 acceleration + balanced stats across the board. Super-rare faction at an incredible price.
 
 #### 🥈 #6433 @ 150 ICP - "The Stability Master"
 ![Bot #6433](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=cxchb-gqkor-uwiaa-aaaaa-b4arg-qaqca-aadeq-q&type=thumbnail)
 
-**Rating:** 41/100 | **Value:** 0.27 rating/ICP  
-**Stats:** SPD 35 | PWR 44 | ACC 38 | STB 50  
-**Why:** Maximum 50 stability specialist! Perfect for WastelandSand and rough terrain. The +13 Dead stability bonus creates a terrain-dominating machine.
+**Rating:** 37/100 | **Value:** 0.24 rating/ICP  
+**Stats:** SPD 29 | PWR 41 | ACC 34 | STB 42  
+**Why:** Strong 42 stability specialist! Perfect for WastelandSand and rough terrain. The +10 Dead stability bonus creates a terrain-dominating machine.
 
-#### 🥉 #2439 @ 100 ICP - "The Speed Dead"
+#### 🥉 #2439 @ 100 ICP - "The Balanced Dead"
 ![Bot #2439](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=mczwi-fqkor-uwiaa-aaaaa-b4arg-qaqca-aabgd-q&type=thumbnail)
 
-**Rating:** 39/100 | **Value:** 0.39 rating/ICP  
-**Stats:** SPD 44 | PWR 37 | ACC 38 | STB 38  
-**Why:** Fastest Dead bot available (44 speed). Balanced performance with Dead's super-rare faction bonuses. Great for sprint and medium races.
+**Rating:** 36/100 | **Value:** 0.36 rating/ICP  
+**Stats:** SPD 36 | PWR 36 | ACC 37 | STB 36  
+**Why:** Well-balanced Dead bot with even stats. Balanced performance with Dead's super-rare faction bonuses. Great all-around performer.
 
 ---
 
@@ -77,19 +77,19 @@ The Dead faction is a **super-rare** tier with only 382 bots (3.82% of collectio
 - Stability: 20-100
 
 **Dead Faction Bonuses Applied:**
-- Speed: +9 ⭐
-- Power Core: +12 ⭐⭐
-- Acceleration: +9 ⭐
-- Stability: +13 ⭐⭐⭐
+- Speed: +7 ⭐
+- Power Core: +9 ⭐⭐
+- Acceleration: +7 ⭐
+- Stability: +10 ⭐⭐⭐
 
 **Final Expected Ranges for Dead:**
-- Speed: 29-100 (capped at 100)
-- Power Core: 32-100 (capped at 100) ← **Elite endurance!**
-- Acceleration: 29-100 (capped at 100)
-- Stability: 33-100 (capped at 100) ← **Highest stability bonus!**
+- Speed: 27-100 (capped at 100)
+- Power Core: 29-100 (capped at 100) ← **Strong endurance!**
+- Acceleration: 27-100 (capped at 100)
+- Stability: 30-100 (capped at 100) ← **Elite stability bonus!**
 
 **Super-Rare Advantage:**
-Dead is a super-rare tier faction with only 382 bots. The +13 Stability and +12 Power bonuses create exceptional endurance racers.
+Dead is a super-rare tier faction with only 382 bots. The +10 Stability and +9 Power bonuses create exceptional endurance racers.
 
 ---
 
@@ -98,26 +98,26 @@ Dead is a super-rare tier faction with only 382 bots. The +13 Stability and +12 
 ### Best Overall Value: Token #4247 @ 65 ICP ⭐⭐⭐
 ![Bot #4247](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=4ycn2-2qkor-uwiaa-aaaaa-b4arg-qaqca-aaccl-q&type=thumbnail)
 
-- **Rating:** 47/100 🏆 *HIGHEST DEAD BOT*
-- **Stats:** SPD 42 | PWR 48 | ACC 49 | STB 50
-- **Why:** Best Dead bot available with peak 50 stability and strong acceleration
-- **Best for:** Competitive racing, rough terrain mastery
+- **Rating:** 41/100 🏆 *HIGHEST DEAD BOT*
+- **Stats:** SPD 37 | PWR 42 | ACC 43 | STB 42
+- **Why:** Best Dead bot available with strong balanced stats and excellent acceleration
+- **Best for:** Competitive racing, balanced performance
 
 ### Stability Specialist: Token #6433 @ 150 ICP
 ![Bot #6433](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=cxchb-gqkor-uwiaa-aaaaa-b4arg-qaqca-aadeq-q&type=thumbnail)
 
-- **Rating:** 41/100
-- **Stats:** SPD 35 | PWR 44 | ACC 38 | STB 50
-- **Why:** Maximum 50 stability with Dead's +13 bonus for terrain dominance
-- **Best for:** WastelandSand races, obstacle courses
+- **Rating:** 37/100
+- **Stats:** SPD 29 | PWR 41 | ACC 34 | STB 42
+- **Why:** Strong 42 stability with Dead's +10 bonus for terrain dominance
+- **Best for:** WastelandSand races, rough terrain endurance
 
-### Speed Focus: Token #2439 @ 100 ICP
+### Balanced Pick: Token #2439 @ 100 ICP
 ![Bot #2439](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=mczwi-fqkor-uwiaa-aaaaa-b4arg-qaqca-aabgd-q&type=thumbnail)
 
-- **Rating:** 39/100
-- **Stats:** SPD 44 | PWR 37 | ACC 38 | STB 38
-- **Why:** Fastest Dead bot with balanced performance
-- **Best for:** Sprint races, speed-focused strategy
+- **Rating:** 36/100
+- **Stats:** SPD 36 | PWR 36 | ACC 37 | STB 36
+- **Why:** Well-balanced Dead bot with even stats across the board
+- **Best for:** All-around racing, balanced strategy
 
 ---
 
@@ -125,23 +125,23 @@ Dead is a super-rare tier faction with only 382 bots. The +13 Stability and +12 
 
 ### Short Sprint (< 5km)
 **Priority: Speed + Acceleration**
-- **Best Pick:** Token #2439 (SPD 44, ACC 38) @ 100 ICP
-- **Alternative:** Token #4247 (SPD 42, ACC 49) @ 65 ICP
+- **Best Pick:** Token #4247 (SPD 37, ACC 43) @ 65 ICP
+- **Alternative:** Token #2439 (balanced 36-37) @ 100 ICP
 
 ### Medium Haul (5-15km)
 **Priority: Balanced Stats**
-- **Best Pick:** Token #4247 (balanced 42-50) @ 65 ICP ⭐
-- **Power Focus:** Token #6433 (PWR 44, STB 50) @ 150 ICP
+- **Best Pick:** Token #4247 (balanced 37-43) @ 65 ICP ⭐
+- **Alternative:** Token #2439 (PWR 36, balanced) @ 100 ICP
 
 ### Long Endurance (>15km)
 **Priority: Power Core + Stability**
-- **Best Pick:** Token #4247 (PWR 48, STB 50) @ 65 ICP ⭐⭐
-- **Alternative:** Token #6433 (PWR 44, STB 50) @ 150 ICP
+- **Best Pick:** Token #4247 (PWR 42, STB 42) @ 65 ICP ⭐⭐
+- **Alternative:** Token #6433 (PWR 41, STB 42) @ 150 ICP
 
 ### Rough Terrain (WastelandSand, ScrapHeaps)
 **Priority: Stability > Everything**
-- **Best Pick:** Token #4247 or #6433 (both STB 50) ⭐⭐
-- **Why:** +13 Dead stability bonus creates terrain dominance
+- **Best Pick:** Token #4247 or #6433 (both STB 42) ⭐⭐
+- **Why:** +10 Dead stability bonus creates terrain advantage
 
 ---
 
@@ -150,20 +150,20 @@ Dead is a super-rare tier faction with only 382 bots. The +13 Stability and +12 
 ### Understanding Dead Faction
 Dead is a **super-rare tier** faction:
 - **Only 382 exist** (3.82% of collection)
-- **Elite bonuses**: +13 Stability, +12 Power, +9 Speed/Acceleration
-- **Total: 43 bonus points** across all stats
+- **Elite bonuses**: +10 Stability, +9 Power, +7 Speed/Acceleration
+- **Total: 33 bonus points** across all stats
 - **Best for**: Endurance racing and rough terrain
 
 ### Dead Faction Specialty: Endurance
 Use Dead bots when:
-- Long races (15km+) where +12 Power Core shines
-- Rough terrain races where +13 Stability dominates
+- Long races (15km+) where +9 Power Core shines
+- Rough terrain races where +10 Stability dominates
 - Championship events where super-rare prestige matters
 - You need consistent performance with strong bonuses
 
 ### When Dead Excels
-- **WastelandSand terrain**: +13 Stability dominates
-- **Long endurance races**: +12 Power Core maintains speed
+- **WastelandSand terrain**: +10 Stability dominates
+- **Long endurance races**: +9 Power Core maintains speed
 - **Balanced races**: Strong bonuses across all stats
 - **Upgrade potential**: Super-rare bonuses elevate lower base stats
 
@@ -233,7 +233,7 @@ Dead bots are **undervalued** right now:
 ## 📝 Notes
 
 - All stats shown include Dead faction bonuses (+13 STB, +12 PWR, +9 SPD/ACC)
-- Prices current as of November 22, 2025
+- Prices current as of November 29, 2025
 - All bots are uninitialized - use `garage_initialize_pokedbot` after purchase
 - Dead is super-rare tier - only 382 exist (3.82% of collection)
 - Images available via thumbnail links

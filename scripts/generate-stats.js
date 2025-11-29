@@ -51,32 +51,32 @@ function categorizeLegsForSpeed(legs) {
   
   const lower = legs.toLowerCase();
   
-  // Legendary (75-80): Only 1-of-1s
+  // Legendary (62-65): Only 1-of-1s
   if (contains(lower, 'master gold') || contains(lower, 'power stalks') || 
       contains(lower, '8 bit power') || contains(lower, 'cactus gold')) {
-    return 75 + (hashText(legs) % 6);
+    return 62 + (hashText(legs) % 4);
   }
   // Golden boost: Common Golden legs for speed
   else if (contains(lower, 'gold') && (contains(lower, 'spiky') || contains(lower, 'power') || 
            contains(lower, 'bendy') || contains(lower, 'mini'))) {
-    return 69 + (hashText(legs) % 4);
+    return 59 + (hashText(legs) % 3);
   }
-  // High (65-70): Ultimate terminator only (127 bots is rare enough)
+  // High (57-60): Ultimate terminator only
   else if (contains(lower, 'ultimate terminator')) {
-    return 67 + (hashText(legs) % 4);
+    return 57 + (hashText(legs) % 4);
   }
-  // Medium-high (54-58): Other ultimate variants, super legs
+  // Medium-high (53-56): Other ultimate variants, super legs
   else if (contains(lower, 'ultimate') || contains(lower, 'super')) {
-    return 55 + (hashText(legs) % 4);
+    return 53 + (hashText(legs) % 4);
   }
-  // Medium (48-54): Power, strong, chunky, industrial, rockets
+  // Medium (49-52): Power, strong, chunky, industrial, rockets
   else if (contains(lower, 'power') || contains(lower, 'strong') || 
            contains(lower, 'chunky') || contains(lower, 'spiky') || 
            contains(lower, 'spike') || contains(lower, 'industrial') || 
            contains(lower, 'rocket')) {
-    return 50 + (hashText(legs) % 5);
+    return 47 + (hashText(legs) % 4);
   }
-  // Medium-low (42-48): Midi, bendy, cables, bird claw, flat, bone, balloon
+  // Medium-low (45-48): Midi, bendy, cables, bird claw, flat, bone, balloon
   else if (contains(lower, 'midi') || contains(lower, 'bendy') || 
            contains(lower, 'cable') || contains(lower, 'bird claw') || 
            contains(lower, 'frog') || contains(lower, '8 bit') || 
@@ -84,11 +84,11 @@ function categorizeLegsForSpeed(legs) {
            contains(lower, 'big') || contains(lower, 'cactus') || 
            contains(lower, 'mech') || contains(lower, 'chocolate') || 
            contains(lower, 'balloon')) {
-    return 44 + (hashText(legs) % 5);
+    return 42 + (hashText(legs) % 4);
   }
-  // Low (35-42): Small, burnt, rust, inflatable, slender, mini
+  // Low (40-43): Small, burnt, rust, inflatable, slender, mini
   else {
-    return 37 + (hashText(legs) % 6);
+    return 40 + (hashText(legs) % 4);
   }
 }
 
@@ -101,34 +101,34 @@ function categorizeWingsForSpeed(wings) {
   // Legendary: Only 1-of-1s
   if (contains(lower, 'master gold') || contains(lower, 'golden triple') || 
       contains(lower, 'black double angel') || contains(lower, 'wings: none')) {
-    return 75 + (hashText(wings) % 6);
+    return 62 + (hashText(wings) % 6);
   }
   // Golden boost: Common Golden wings for speed (triangle up gold, angel wings gold)
   else if (contains(lower, 'gold') && (contains(lower, 'triangle up') || contains(lower, 'angel wings') || 
            contains(lower, 'ear muff'))) {
-    return 68 + (hashText(wings) % 4);
+    return 58 + (hashText(wings) % 4);
   }
   // High (65-70): Terminator variants only
   else if (contains(lower, 'terminator')) {
-    return 67 + (hashText(wings) % 4);
+    return 57 + (hashText(wings) % 4);
   }
   // Medium-high (55-58): Massive engines, rockets, jets, engine wings
   else if (contains(lower, 'massive engine') || contains(lower, 'rocket') || 
            contains(lower, 'jet') || contains(lower, 'engine wings')) {
-    return 56 + (hashText(wings) % 3);
+    return 47 + (hashText(wings) % 3);
   }
   // Medium (48-54): Power cells, triangle up, butterfly double, large angel wings
   else if (contains(lower, 'power cell') || contains(lower, 'triangle up') || 
            contains(lower, 'butterfly double') || contains(lower, 'wings double') || 
            (contains(lower, 'large') && contains(lower, 'angel'))) {
-    return 50 + (hashText(wings) % 5);
+    return 48 + (hashText(wings) % 5);
   }
   // Medium-low (42-48): Angel wings, butterfly, standard wings
   else if (contains(lower, 'angel wings') || contains(lower, 'angel') || 
            contains(lower, 'butterfly') || contains(lower, 'bear') || 
            contains(lower, 'antenna') || contains(lower, 'jointed') || 
            contains(lower, 'ear muff')) {
-    return 44 + (hashText(wings) % 5);
+    return 42 + (hashText(wings) % 5);
   }
   // Low (36-42): Decorative, small wings, bird, bee, bone
   else if (contains(lower, '8 bit') || contains(lower, 'horn') || 
@@ -139,14 +139,14 @@ function categorizeWingsForSpeed(wings) {
            contains(lower, 'geo wing') || contains(lower, 'headphone') || 
            contains(lower, 'game motoko') || contains(lower, 'rainbow') || 
            contains(lower, 'wire')) {
-    return 38 + (hashText(wings) % 5);
+    return 41 + (hashText(wings) % 5);
   }
   // Very low (30-36): Blank, inflatable, waffer
   else if (contains(lower, 'blank') || contains(lower, 'none') || 
            contains(lower, 'inflatable') || contains(lower, 'inflateable') || 
            contains(lower, 'infaltable') || contains(lower, 'lolly pop') || 
            contains(lower, 'straw') || contains(lower, 'waffer')) {
-    return 32 + (hashText(wings) % 5);
+    return 40 + (hashText(wings) % 5);
   } 
   else {
     return 40 + (hashText(wings) % 5);
@@ -165,7 +165,7 @@ function categorizeBodyForSpeed(body) {
       contains(lower, 'gummy') || contains(lower, 'bee') || 
       contains(lower, 'bird') || contains(lower, 'donut') || 
       contains(lower, 'smarties')) {
-    return 65 + (hashText(body) % 11);
+    return 47 + (hashText(body) % 11);
   }
   // Medium (45-60): Game systems, animals, standard bodies
   else if (contains(lower, 'game boy') || contains(lower, 'n 64') || 
@@ -174,7 +174,7 @@ function categorizeBodyForSpeed(body) {
            contains(lower, 'round head') || contains(lower, 'pig') || 
            contains(lower, 'cat') || contains(lower, 'pizza') || 
            contains(lower, 'cheese') || contains(lower, 'waffle')) {
-    return 50 + (hashText(body) % 11);
+    return 48 + (hashText(body) % 11);
   }
   // Heavy/Slow (30-45): Mega, large, tower, beast
   else if (contains(lower, 'mega') || contains(lower, 'large') || 
@@ -183,7 +183,7 @@ function categorizeBodyForSpeed(body) {
     return 35 + (hashText(body) % 11);
   } 
   else {
-    return 45 + (hashText(body) % 11);
+    return 42 + (hashText(body) % 11);
   }
 }
 
@@ -196,17 +196,17 @@ function categorizeArmsForSpeed(arms) {
   // Legendary (75-80): Only 1-of-1s
   if (contains(lower, 'master gold') || contains(lower, 'golden king') || 
       contains(lower, 'black king') || contains(lower, '8 bit lazers')) {
-    return 75 + (hashText(arms) % 6);
+    return 62 + (hashText(arms) % 6);
   }
   // High (60-70): Ultimate variants, murder arms gold
   else if (contains(lower, 'ultimate') || contains(lower, 'murder arms gold')) {
-    return 65 + (hashText(arms) % 6);
+    return 47 + (hashText(arms) % 6);
   }
   // Medium-high (52-58): Rainbow, rockets with gold/special, power arms rainbow/gold
   else if (contains(lower, 'rainbow') || 
            (contains(lower, 'rocket') && contains(lower, 'gold')) || 
            (contains(lower, 'power arms') && (contains(lower, 'rainbow') || contains(lower, 'gold')))) {
-    return 54 + (hashText(arms) % 5);
+    return 48 + (hashText(arms) % 5);
   }
   // Medium (46-54): Rockets, jets, lasers, power arms, chainsaws, claws
   else if (contains(lower, 'rocket') || contains(lower, 'jet') || 
@@ -214,7 +214,7 @@ function categorizeArmsForSpeed(arms) {
            contains(lower, 'chainsaw') || contains(lower, 'circular saw') || 
            contains(lower, 'power lift') || contains(lower, 'claw') || 
            contains(lower, 'snipper') || contains(lower, 'gripper')) {
-    return 49 + (hashText(arms) % 6);
+    return 47 + (hashText(arms) % 6);
   }
   // Medium-low (40-48): Connectors, cables, long arms, mech parts
   else if (contains(lower, '8 bit') || contains(lower, 'connector') || 
@@ -224,21 +224,21 @@ function categorizeArmsForSpeed(arms) {
            contains(lower, 'controller') || contains(lower, 'murder hands') || 
            contains(lower, 'mech') || contains(lower, 'long beny') || 
            contains(lower, 'golden spikes')) {
-    return 43 + (hashText(arms) % 6);
+    return 42 + (hashText(arms) % 6);
   }
   // Low (35-42): Hands up, mixed hands, large hands down
   else if (contains(lower, 'hands up') || contains(lower, 'double arms') || 
            contains(lower, 'hands down large') || contains(lower, 'large hands')) {
-    return 38 + (hashText(arms) % 5);
+    return 41 + (hashText(arms) % 5);
   }
   // Very low (32-37): Small hands down, 3 fingers, bone
   else if (contains(lower, 'hands down small') || contains(lower, 'small hands') || 
            contains(lower, '3 finger') || contains(lower, 'bone')) {
-    return 34 + (hashText(arms) % 4);
+    return 40 + (hashText(arms) % 4);
   }
   // Minimal (30-34): Standard hands down (DEFAULT for basic arms)
   else {
-    return 31 + (hashText(arms) % 4);
+    return 40 + (hashText(arms) % 4);
   }
 }
 
@@ -256,40 +256,40 @@ function categorizeBodyForPower(body) {
   if (contains(lower, '8 bit master') || contains(lower, 'double driver') || 
       contains(lower, 'gold pets') || contains(lower, 'golden king') || 
       contains(lower, 'master gold')) {
-    return 75 + (hashText(body) % 6);
+    return 62 + (hashText(body) % 6);
   }
   // Golden boost: Common Golden body traits (spiky gold, gold eyes, gold 8 bit, gold mega)
   else if (contains(lower, 'gold eyes') || contains(lower, 'spiky gold') || 
            contains(lower, 'gold 8 bit') || contains(lower, 'gold mega')) {
-    return 68 + (hashText(body) % 5);
+    return 58 + (hashText(body) % 5);
   }
   // High (60-63): Ultimate variants (reduced from 67-70 to compress ultra-rares)
   else if (contains(lower, 'ultimate')) {
-    return 60 + (hashText(body) % 4);
+    return 48 + (hashText(body) % 4);
   }
   // Medium-High (55-58): Large, mega (non-controller), beast, tower, super
   else if ((contains(lower, 'large') && !contains(lower, 'controller')) || 
            (contains(lower, 'mega') && !contains(lower, 'controller')) || 
            contains(lower, 'beast') || contains(lower, 'tower') || contains(lower, 'super')) {
-    return 55 + (hashText(body) % 4);
+    return 51 + (hashText(body) % 4);
   }
   // Medium (49-54): Controllers, battle/command boxes
   else if (contains(lower, 'controller') || contains(lower, 'battle box') || contains(lower, 'command box')) {
-    return 49 + (hashText(body) % 6);
+    return 47 + (hashText(body) % 6);
   }
   // Medium-Low (43-48): Eggs, frogs, bee body, industrial materials
   else if (contains(lower, 'egg') || contains(lower, 'frog') || contains(lower, 'bee body') || 
            contains(lower, 'iron') || contains(lower, 'copper') || contains(lower, 'game boy')) {
-    return 43 + (hashText(body) % 6);
+    return 42 + (hashText(body) % 6);
   }
   // Low (37-42): Balloon, rabbit, standard heads
   else if (contains(lower, 'balloon') || contains(lower, 'rabbit') || 
            contains(lower, 'head') || contains(lower, 'round') || contains(lower, 'bee pink')) {
-    return 37 + (hashText(body) % 6);
+    return 41 + (hashText(body) % 6);
   }
   // Very Low (31-36): Small, mini, tiny
   else {
-    return 31 + (hashText(body) % 6);
+    return 40 + (hashText(body) % 6);
   }
 }
 
@@ -302,39 +302,39 @@ function categorizeArmsForPower(arms) {
   // Legendary (75-80): Only 1-of-1s
   if (contains(lower, 'master gold') || contains(lower, 'golden king') || 
       contains(lower, 'black king') || contains(lower, '8 bit lazers')) {
-    return 75 + (hashText(arms) % 6);
+    return 62 + (hashText(arms) % 6);
   }
   // Golden boost: Common Golden arms (power arms rainbow lazers gold, rocket up gold, snippers gold)
   else if (contains(lower, 'power arms rainbow lazers gold') || 
            contains(lower, 'rocket up gold') || contains(lower, 'snippers gold')) {
-    return 70 + (hashText(arms) % 4);
+    return 48 + (hashText(arms) % 4);
   }
   // High (60-63): Ultimate, murder arms gold (reduced from 67-70)
   else if (contains(lower, 'ultimate') || contains(lower, 'murder arms gold')) {
-    return 60 + (hashText(arms) % 4);
+    return 48 + (hashText(arms) % 4);
   }
   // Medium-High (52-55): Power arms, rainbow lazers (reduced from 55-58)
   else if (contains(lower, 'power arms') || contains(lower, 'rainbow lazer')) {
-    return 52 + (hashText(arms) % 4);
+    return 47 + (hashText(arms) % 4);
   }
   // Medium (49-54): Rockets, claws, massive, lazers (non-rainbow)
   else if ((contains(lower, 'rocket') || contains(lower, 'claw') || 
             contains(lower, 'massive') || contains(lower, 'lazer')) && 
            !contains(lower, 'rainbow')) {
-    return 49 + (hashText(arms) % 6);
+    return 47 + (hashText(arms) % 6);
   }
   // Medium-Low (43-48): Connectors, cables, mech, 8 bit
   else if (contains(lower, 'connector') || contains(lower, 'cable') || 
            contains(lower, 'mech') || contains(lower, '8 bit')) {
-    return 43 + (hashText(arms) % 6);
+    return 42 + (hashText(arms) % 6);
   }
   // Low (37-42): Hands up variants, large hands
   else if (contains(lower, 'hands up') || contains(lower, 'large hand')) {
-    return 37 + (hashText(arms) % 6);
+    return 41 + (hashText(arms) % 6);
   }
   // Very Low (31-36): Basic hands down, small
   else {
-    return 31 + (hashText(arms) % 6);
+    return 40 + (hashText(arms) % 6);
   }
 }
 
@@ -347,34 +347,34 @@ function categorizeLegsForPower(legs) {
   // Legendary (75-80): Only 1-of-1s
   if (contains(lower, 'master gold') || contains(lower, 'golden twin') || 
       contains(lower, 'tri eye gold') || contains(lower, 'gamers')) {
-    return 75 + (hashText(legs) % 6);
+    return 62 + (hashText(legs) % 6);
   }
   // Golden boost: Common Golden legs (mini gold, spiky gold, bendy gold, cable gold, power gold)
   else if ((contains(lower, 'gold') && (contains(lower, 'mini') || contains(lower, 'spiky') || 
            contains(lower, 'bendy') || contains(lower, 'cable') || contains(lower, 'power'))) && 
            !contains(lower, 'master')) {
-    return 69 + (hashText(legs) % 4);
+    return 59 + (hashText(legs) % 4);
   }
   // High (60-63): Ultimate variants (reduced from 67-70)
   else if (contains(lower, 'ultimate')) {
-    return 60 + (hashText(legs) % 4);
+    return 48 + (hashText(legs) % 4);
   }
   // Medium-High (55-58): Strong, chunky, super
   else if (contains(lower, 'strong') || contains(lower, 'chunky') || contains(lower, 'super')) {
-    return 55 + (hashText(legs) % 4);
+    return 51 + (hashText(legs) % 4);
   }
   // Medium (49-54): Industrial, rockets, cables, bendy
   else if (contains(lower, 'industrial') || contains(lower, 'rocket') || 
            contains(lower, 'cable') || contains(lower, 'bendy')) {
-    return 49 + (hashText(legs) % 6);
+    return 47 + (hashText(legs) % 6);
   }
   // Medium-Low (43-48): Midi, balloon, 8 bit
   else if (contains(lower, 'midi') || contains(lower, 'balloon') || contains(lower, '8 bit')) {
-    return 43 + (hashText(legs) % 6);
+    return 42 + (hashText(legs) % 6);
   }
   // Low (37-42): Small, burnt, mini
   else {
-    return 37 + (hashText(legs) % 6);
+    return 41 + (hashText(legs) % 6);
   }
 }
 
@@ -387,39 +387,39 @@ function categorizeWingsForPower(wings) {
   // Legendary (75-80): Only 1-of-1s
   if (contains(lower, 'master gold') || contains(lower, 'golden triple') || 
       contains(lower, 'black double angel')) {
-    return 75 + (hashText(wings) % 6);
+    return 62 + (hashText(wings) % 6);
   }
   // Golden boost: Common Golden wings (angel wings gold, bear ears gold, ear muffs gold, triangle up gold)
   else if (contains(lower, 'gold') && (contains(lower, 'angel wings') || contains(lower, 'bear ears') || 
            contains(lower, 'ear muff') || contains(lower, 'triangle up'))) {
-    return 69 + (hashText(wings) % 4);
+    return 59 + (hashText(wings) % 4);
   }
   // High (67-70): Massive engines, power cells
   else if (contains(lower, 'massive engine') || contains(lower, 'power cell')) {
-    return 67 + (hashText(wings) % 4);
+    return 57 + (hashText(wings) % 4);
   }
   // Medium-High (55-58): Rockets, jets, ultimates
   else if (contains(lower, 'rocket') || contains(lower, 'jet') || 
            contains(lower, 'ultimate') || contains(lower, 'engine wing')) {
-    return 55 + (hashText(wings) % 4);
+    return 51 + (hashText(wings) % 4);
   }
   // Medium (49-54): Terminator, triangle up, double wings
   else if (contains(lower, 'terminator') || contains(lower, 'triangle up') || contains(lower, 'double')) {
-    return 49 + (hashText(wings) % 6);
+    return 47 + (hashText(wings) % 6);
   }
   // Medium-Low (43-48): Angels, butterfly, antennas
   else if (contains(lower, 'angel') || contains(lower, 'butterfly') || 
            contains(lower, 'antenna') || contains(lower, 'bear')) {
-    return 43 + (hashText(wings) % 6);
+    return 42 + (hashText(wings) % 6);
   }
   // Low (37-42): 8 bit, decorative
   else if (contains(lower, '8 bit') || contains(lower, 'bird') || 
            contains(lower, 'bee') || contains(lower, 'bone')) {
-    return 37 + (hashText(wings) % 6);
+    return 41 + (hashText(wings) % 6);
   }
   // Very Low (31-36): Blank, inflatable
   else {
-    return 31 + (hashText(wings) % 6);
+    return 40 + (hashText(wings) % 6);
   }
 }
 
@@ -434,33 +434,33 @@ function categorizeLegsForAccel(legs) {
   // Legendary (75-80): Only 1-of-1s
   if (contains(lower, 'master gold') || contains(lower, '4 power stalks') || 
       contains(lower, '8 bit power') || contains(lower, 'cactus gold')) {
-    return 75 + (hashText(legs) % 6);
+    return 62 + (hashText(legs) % 6);
   }
   // High (67-70): Ultimate, super fast
   else if (contains(lower, 'ultimate') || contains(lower, 'super fast')) {
-    return 67 + (hashText(legs) % 4);
+    return 57 + (hashText(legs) % 4);
   }
   // Medium-High (55-58): Super legs, spiky, bird claw, frog
   else if (contains(lower, 'super leg') || contains(lower, 'spiky') || 
            contains(lower, 'bird claw') || contains(lower, 'frog')) {
-    return 55 + (hashText(legs) % 4);
+    return 51 + (hashText(legs) % 4);
   }
   // Medium (49-54): Bendy, midi, cables - agile movement
   else if (contains(lower, 'bendy') || contains(lower, 'midi') || contains(lower, 'cable')) {
-    return 49 + (hashText(legs) % 6);
+    return 47 + (hashText(legs) % 6);
   }
   // Medium-Low (43-48): Power, 8 bit, rockets
   else if (contains(lower, 'power') || contains(lower, '8 bit') || contains(lower, 'rocket')) {
-    return 43 + (hashText(legs) % 6);
+    return 42 + (hashText(legs) % 6);
   }
   // Low (37-42): Chunky, large, heavy legs (slow acceleration)
   else if (contains(lower, 'chunky') || contains(lower, 'large') || 
            contains(lower, 'burnt') || contains(lower, 'rust')) {
-    return 37 + (hashText(legs) % 6);
+    return 41 + (hashText(legs) % 6);
   }
   // Very Low (31-36): Small, balloon, inflatable
   else {
-    return 31 + (hashText(legs) % 6);
+    return 40 + (hashText(legs) % 6);
   }
 }
 
@@ -473,38 +473,38 @@ function categorizeArmsForAccel(arms) {
   // Legendary (75-80): Only 1-of-1s
   if (contains(lower, 'master gold') || contains(lower, 'golden king') || 
       contains(lower, 'black king') || contains(lower, '8 bit lazers')) {
-    return 75 + (hashText(arms) % 6);
+    return 62 + (hashText(arms) % 6);
   }
   // Golden boost: Power arms rainbow lazers gold, rocket up gold, snippers gold
   else if (contains(lower, 'power arms rainbow lazers gold') || 
            contains(lower, 'rocket up gold') || contains(lower, 'snippers gold')) {
-    return 70 + (hashText(arms) % 4);
+    return 48 + (hashText(arms) % 4);
   }
   // High (67-70): Ultimate, murder arms gold
   else if (contains(lower, 'ultimate') || contains(lower, 'murder arms gold')) {
-    return 67 + (hashText(arms) % 4);
+    return 57 + (hashText(arms) % 4);
   }
   // Medium-High (55-58): Rainbow lazers, power jets - quick thrust
   else if (contains(lower, 'rainbow lazer') || contains(lower, 'power jet')) {
-    return 55 + (hashText(arms) % 4);
+    return 51 + (hashText(arms) % 4);
   }
   // Medium (49-54): Rockets, lazers, chainsaws
   else if ((contains(lower, 'rocket') || contains(lower, 'lazer') || contains(lower, 'chainsaw')) && 
            !contains(lower, 'rainbow')) {
-    return 49 + (hashText(arms) % 6);
+    return 47 + (hashText(arms) % 6);
   }
   // Medium-Low (43-48): Claws, power arms, connectors
   else if (contains(lower, 'claw') || contains(lower, 'power arms') || 
            contains(lower, 'connector') || contains(lower, '8 bit')) {
-    return 43 + (hashText(arms) % 6);
+    return 42 + (hashText(arms) % 6);
   }
   // Low (37-42): Hands up variants
   else if (contains(lower, 'hands up') || contains(lower, 'large hand')) {
-    return 37 + (hashText(arms) % 6);
+    return 41 + (hashText(arms) % 6);
   }
   // Very Low (31-36): Basic hands
   else {
-    return 31 + (hashText(arms) % 6);
+    return 40 + (hashText(arms) % 6);
   }
 }
 
@@ -517,33 +517,33 @@ function categorizeWingsForAccel(wings) {
   // Legendary (75-80): Only 1-of-1s
   if (contains(lower, 'master gold') || contains(lower, 'golden triple') || 
       contains(lower, 'black double angel')) {
-    return 75 + (hashText(wings) % 6);
+    return 62 + (hashText(wings) % 6);
   }
   // High (67-70): Massive engines, power cells - highest thrust
   else if (contains(lower, 'massive engine') || contains(lower, 'power cell')) {
-    return 67 + (hashText(wings) % 4);
+    return 57 + (hashText(wings) % 4);
   }
   // Medium-High (55-58): Rockets, jets, triangle up - quick acceleration
   else if (contains(lower, 'rocket') || contains(lower, 'jet') || contains(lower, 'triangle up')) {
-    return 55 + (hashText(wings) % 4);
+    return 51 + (hashText(wings) % 4);
   }
   // Medium (49-54): Ultimates, terminators, double wings
   else if (contains(lower, 'ultimate') || contains(lower, 'terminator') || contains(lower, 'double')) {
-    return 49 + (hashText(wings) % 6);
+    return 47 + (hashText(wings) % 6);
   }
   // Medium-Low (43-48): Butterfly, angels, antennas - moderate flap acceleration
   else if (contains(lower, 'butterfly') || contains(lower, 'angel') || 
            contains(lower, 'antenna') || contains(lower, 'bear')) {
-    return 43 + (hashText(wings) % 6);
+    return 42 + (hashText(wings) % 6);
   }
   // Low (37-42): 8 bit, bird, decorative
   else if (contains(lower, '8 bit') || contains(lower, 'bird') || 
            contains(lower, 'bee') || contains(lower, 'bone')) {
-    return 37 + (hashText(wings) % 6);
+    return 41 + (hashText(wings) % 6);
   }
   // Very Low (31-36): Blank, inflatable - no thrust
   else {
-    return 31 + (hashText(wings) % 6);
+    return 40 + (hashText(wings) % 6);
   }
 }
 
@@ -557,39 +557,39 @@ function categorizeBodyForAccel(body) {
   if (contains(lower, '8 bit master') || contains(lower, 'double driver') || 
       contains(lower, 'gold pets') || contains(lower, 'golden king') || 
       contains(lower, 'master gold')) {
-    return 75 + (hashText(body) % 6);
+    return 62 + (hashText(body) % 6);
   }
   // High (67-70): Eggs, balloons - very light for quick acceleration
   else if (contains(lower, 'egg') || contains(lower, 'balloon') || contains(lower, 'bubble')) {
-    return 67 + (hashText(body) % 4);
+    return 57 + (hashText(body) % 4);
   }
   // Medium-High (55-58): Small, mini, game boy - light bodies
   else if (contains(lower, 'small') || contains(lower, 'mini') || contains(lower, 'game boy')) {
-    return 55 + (hashText(body) % 4);
+    return 51 + (hashText(body) % 4);
   }
   // Medium (49-54): Frogs, bee bodies, rabbits - moderate weight
   else if (contains(lower, 'frog') || contains(lower, 'bee body') || 
            contains(lower, 'rabbit') || contains(lower, 'head')) {
-    return 49 + (hashText(body) % 6);
+    return 47 + (hashText(body) % 6);
   }
   // Medium-Low (43-48): Controllers, boxes - medium weight slows acceleration
   else if (contains(lower, 'controller') || contains(lower, 'battle box') || 
            contains(lower, 'command box')) {
-    return 43 + (hashText(body) % 6);
+    return 42 + (hashText(body) % 6);
   }
   // Low (37-42): Large, mega (non-controller), beast - heavy
   else if ((contains(lower, 'large') && !contains(lower, 'controller')) || 
            (contains(lower, 'mega') && !contains(lower, 'controller')) || 
            contains(lower, 'beast') || contains(lower, 'tower')) {
-    return 37 + (hashText(body) % 6);
+    return 41 + (hashText(body) % 6);
   }
   // Very Low (31-36): Ultimate, super - heaviest bodies slow acceleration
   else if (contains(lower, 'ultimate') || contains(lower, 'super')) {
-    return 31 + (hashText(body) % 6);
+    return 40 + (hashText(body) % 6);
   }
   // Default Medium (45-50)
   else {
-    return 45 + (hashText(body) % 6);
+    return 42 + (hashText(body) % 6);
   }
 }
 
@@ -604,41 +604,41 @@ function categorizeDriverForStability(driver) {
   // Legendary (75-80): Only 1-of-1s
   if (contains(lower, 'master gold') || contains(lower, 'golden twin') || 
       contains(lower, 'tri eye gold') || contains(lower, 'gamers')) {
-    return 75 + (hashText(driver) % 6);
+    return 62 + (hashText(driver) % 6);
   }
   // Golden boost: Common Golden drivers (gold snes, gold tounge, gold circuits, gold colour)
   else if (contains(lower, 'gold') && (contains(lower, 'snes') || contains(lower, 'tounge') || 
            contains(lower, 'circuit') || contains(lower, 'colour'))) {
-    return 69 + (hashText(driver) % 4);
+    return 59 + (hashText(driver) % 4);
   }
   // High (67-70): Ultimate, helmets, visors - best focus
   else if (contains(lower, 'ultimate') || contains(lower, 'helmet') || contains(lower, 'visor')) {
-    return 67 + (hashText(driver) % 4);
+    return 57 + (hashText(driver) % 4);
   }
   // Medium-High (55-58): Metal goggles, diamond eyes - professional gear
   else if (contains(lower, 'metal goggles') || contains(lower, 'diamond eyes')) {
-    return 55 + (hashText(driver) % 4);
+    return 51 + (hashText(driver) % 4);
   }
   // Medium (49-54): Headphones, game boy, pixels - gaming focus
   else if (contains(lower, 'headphones') || contains(lower, 'game boy') || 
            contains(lower, 'pixel') || contains(lower, 'snes') || contains(lower, 'gamer')) {
-    return 49 + (hashText(driver) % 6);
+    return 47 + (hashText(driver) % 6);
   }
   // Medium-Low (43-48): Standard colors, hair, tounge, rabbits
   else if (contains(lower, 'blue') || contains(lower, 'green') || 
            contains(lower, 'yellow') || contains(lower, 'purple') || 
            contains(lower, 'tounge') || contains(lower, 'rabbit') || 
            contains(lower, 'hair') || contains(lower, 'red') || contains(lower, 'gold')) {
-    return 43 + (hashText(driver) % 6);
+    return 42 + (hashText(driver) % 6);
   }
   // Low (37-42): Eyes closed, dead eyes, big eyes - impaired vision
   else if (contains(lower, 'eyes closed') || contains(lower, 'dead eyes') || 
            contains(lower, 'big eyes') || contains(lower, 'glitch')) {
-    return 37 + (hashText(driver) % 6);
+    return 41 + (hashText(driver) % 6);
   }
   // Very Low (31-36): Remaining
   else {
-    return 31 + (hashText(driver) % 6);
+    return 40 + (hashText(driver) % 6);
   }
 }
 
@@ -652,35 +652,35 @@ function categorizeBodyForStability(body) {
   if (contains(lower, '8 bit master') || contains(lower, 'double driver') || 
       contains(lower, 'gold pets') || contains(lower, 'golden king') || 
       contains(lower, 'master gold')) {
-    return 75 + (hashText(body) % 6);
+    return 62 + (hashText(body) % 6);
   }
   // High (67-70): Ultimate - most stable design
   else if (contains(lower, 'ultimate')) {
-    return 67 + (hashText(body) % 4);
+    return 57 + (hashText(body) % 4);
   }
   // Medium-High (55-58): Battle/command boxes, mega controllers - wide stable bases
   else if (contains(lower, 'battle box') || contains(lower, 'command box') || 
            contains(lower, 'mega controller') || contains(lower, 'beast')) {
-    return 55 + (hashText(body) % 4);
+    return 51 + (hashText(body) % 4);
   }
   // Medium (49-54): Controllers, eggs, round - moderate stability
   else if (contains(lower, 'controller') || contains(lower, 'egg') || 
            contains(lower, 'round') || contains(lower, 'iron')) {
-    return 49 + (hashText(body) % 6);
+    return 47 + (hashText(body) % 6);
   }
   // Medium-Low (43-48): Frogs, rabbits, bee bodies - decent balance
   else if (contains(lower, 'frog') || contains(lower, 'rabbit') || 
            contains(lower, 'bee body') || contains(lower, 'game boy')) {
-    return 43 + (hashText(body) % 6);
+    return 42 + (hashText(body) % 6);
   }
   // Low (37-42): Balloon, bubble, tower - wobbly/unstable
   else if (contains(lower, 'balloon') || contains(lower, 'bubble') || 
            contains(lower, 'tower') || contains(lower, 'spiky egg')) {
-    return 37 + (hashText(body) % 6);
+    return 41 + (hashText(body) % 6);
   }
   // Very Low (31-36): Small, mini - unstable
   else {
-    return 31 + (hashText(body) % 6);
+    return 40 + (hashText(body) % 6);
   }
 }
 
@@ -693,34 +693,34 @@ function categorizeLegsForStability(legs) {
   // Legendary (75-80): Only 1-of-1s
   if (contains(lower, 'master gold') || contains(lower, '4 power stalks') || 
       contains(lower, '8 bit power') || contains(lower, 'cactus gold')) {
-    return 75 + (hashText(legs) % 6);
+    return 62 + (hashText(legs) % 6);
   }
   // High (67-70): Ultimate - best stability
   else if (contains(lower, 'ultimate')) {
-    return 67 + (hashText(legs) % 4);
+    return 57 + (hashText(legs) % 4);
   }
   // Medium-High (55-58): Strong, chunky, industrial - stable stance
   else if (contains(lower, 'strong') || contains(lower, 'chunky') || 
            contains(lower, 'industrial') || contains(lower, 'bird claw')) {
-    return 55 + (hashText(legs) % 4);
+    return 51 + (hashText(legs) % 4);
   }
   // Medium (49-54): Power, super, rockets - decent stability
   else if (contains(lower, 'power') || contains(lower, 'super') || contains(lower, 'rocket')) {
-    return 49 + (hashText(legs) % 6);
+    return 47 + (hashText(legs) % 6);
   }
   // Medium-Low (43-48): Midi, cables, bendy, 8 bit - moderate stability
   else if (contains(lower, 'midi') || contains(lower, 'cable') || 
            contains(lower, 'bendy') || contains(lower, '8 bit')) {
-    return 43 + (hashText(legs) % 6);
+    return 42 + (hashText(legs) % 6);
   }
   // Low (37-42): Small, balloon, burnt - unstable
   else if (contains(lower, 'small') || contains(lower, 'balloon') || 
            contains(lower, 'burnt') || contains(lower, 'inflatable')) {
-    return 37 + (hashText(legs) % 6);
+    return 41 + (hashText(legs) % 6);
   }
   // Very Low (31-36): Remaining unstable types
   else {
-    return 31 + (hashText(legs) % 6);
+    return 40 + (hashText(legs) % 6);
   }
 }
 
@@ -733,33 +733,33 @@ function categorizeArmsForStability(arms) {
   // Legendary (75-80): Only 1-of-1s
   if (contains(lower, 'master gold') || contains(lower, 'golden king') || 
       contains(lower, 'black king') || contains(lower, '8 bit lazers')) {
-    return 75 + (hashText(arms) % 6);
+    return 62 + (hashText(arms) % 6);
   }
   // High (67-70): Ultimate, murder arms gold
   else if (contains(lower, 'ultimate') || contains(lower, 'murder arms gold')) {
-    return 67 + (hashText(arms) % 4);
+    return 57 + (hashText(arms) % 4);
   }
   // Medium-High (55-58): Power arms, grippers, claws - balance assistance
   else if (contains(lower, 'power arms') || contains(lower, 'gripper') || 
            contains(lower, 'claw') || contains(lower, 'strong')) {
-    return 55 + (hashText(arms) % 4);
+    return 51 + (hashText(arms) % 4);
   }
   // Medium (49-54): Connectors, cables, rockets - moderate balance help
   else if (contains(lower, 'connector') || contains(lower, 'cable') || 
            contains(lower, 'rocket') || contains(lower, 'mech')) {
-    return 49 + (hashText(arms) % 6);
+    return 47 + (hashText(arms) % 6);
   }
   // Medium-Low (43-48): 8 bit, hands up - some stability
   else if (contains(lower, '8 bit') || contains(lower, 'hands up') || contains(lower, 'large hand')) {
-    return 43 + (hashText(arms) % 6);
+    return 42 + (hashText(arms) % 6);
   }
   // Low (37-42): Hands down variants
   else if (contains(lower, 'hands down')) {
-    return 37 + (hashText(arms) % 6);
+    return 41 + (hashText(arms) % 6);
   }
   // Very Low (31-36): Basic arms - minimal balance help
   else {
-    return 31 + (hashText(arms) % 6);
+    return 40 + (hashText(arms) % 6);
   }
 }
 
@@ -789,25 +789,25 @@ function applyFactionBonus(baseStat, faction, statType) {
   switch (faction) {
     // ===== ULTRA-RARE TIER (1-45 bots) - Elite tier, their own league =====
     case 'Ultimate-master': // 1 bot - THE ULTIMATE
-      bonus = 6;
+      bonus = 25; // Dominant +25 to ensure #1 spot
       break;
       
     case 'Golden': // 27 bots - Premium engineering (already has gold trait bonuses)
-      if (statType === 'powerCore') bonus = 5;
-      else if (statType === 'stability') bonus = 4;
-      else bonus = 3;
+      if (statType === 'powerCore') bonus = 18;
+      else if (statType === 'stability') bonus = 16;
+      else bonus = 14;
       break;
       
     case 'Wild': // 5 bots - Unpredictable chaos
-      if (statType === 'acceleration') bonus = 8;
-      else if (statType === 'speed') bonus = 7;
-      else bonus = 5;
+      if (statType === 'acceleration') bonus = 24;
+      else if (statType === 'speed') bonus = 22;
+      else bonus = 18;
       break;
       
     case 'Ultimate': // 45 bots - Combat excellence
-      if (statType === 'speed') bonus = 5;
-      else if (statType === 'powerCore') bonus = 5;
-      else bonus = 3;
+      if (statType === 'speed') bonus = 12;
+      else if (statType === 'powerCore') bonus = 12;
+      else bonus = 8;
       break;
     
     // ===== SUPER-RARE TIER (244-640 bots) - Major bonuses =====
@@ -818,53 +818,53 @@ function applyFactionBonus(baseStat, faction, statType) {
       break;
       
     case 'Dead': // 382 bots - Undead resilience
-      if (statType === 'stability') bonus = 13;
-      else if (statType === 'powerCore') bonus = 12;
-      else bonus = 9;
+      if (statType === 'stability') bonus = 10;
+      else if (statType === 'powerCore') bonus = 9;
+      else bonus = 7;
       break;
       
     case 'Master': // 640 bots - Skilled operators
-      if (statType === 'speed') bonus = 14;
-      else if (statType === 'stability') bonus = 14;
-      else bonus = 11;
+      if (statType === 'speed') bonus = 11;
+      else if (statType === 'stability') bonus = 11;
+      else bonus = 8;
       break;
     
     // ===== RARE TIER (717-999 bots) - Solid bonuses =====
     case 'Bee': // 717 bots - Agile flyers
-      if (statType === 'acceleration') bonus = 10;
-      else if (statType === 'speed') bonus = 8;
-      else bonus = 6;
+      if (statType === 'acceleration') bonus = 3;
+      else if (statType === 'speed') bonus = 2;
+      else bonus = 1;
       break;
       
     case 'Food': // 778 bots - Energy-rich cores
-      if (statType === 'powerCore') bonus = 11;
-      else if (statType === 'acceleration') bonus = 10;
-      else bonus = 8;
+      if (statType === 'powerCore') bonus = 3;
+      else if (statType === 'acceleration') bonus = 2;
+      else bonus = 1;
       break;
       
     case 'Box': // 798 bots - Stable platforms
-      if (statType === 'stability') bonus = 7;
-      else if (statType === 'powerCore') bonus = 5;
-      else bonus = 3;
+      if (statType === 'stability') bonus = 2;
+      else if (statType === 'powerCore') bonus = 1;
+      else bonus = 1;
       break;
       
     case 'Murder': // 999 bots - Aggressive power
-      if (statType === 'speed') bonus = 8;
-      else if (statType === 'powerCore') bonus = 8;
-      else bonus = 5;
+      if (statType === 'speed') bonus = 2;
+      else if (statType === 'powerCore') bonus = 2;
+      else bonus = 1;
       break;
     
     // ===== COMMON TIER (1654-2009 bots) - Balanced bonuses =====
     case 'Game': // 1654 bots - Precision controls
-      if (statType === 'acceleration') bonus = 3;
-      else if (statType === 'stability') bonus = 3;
-      else bonus = 1;
+      if (statType === 'acceleration') bonus = 1;
+      else if (statType === 'stability') bonus = 1;
+      else bonus = 0;
       break;
       
     case 'Animal': // 1701 bots - Natural agility
-      if (statType === 'acceleration') bonus = 3;
-      else if (statType === 'speed') bonus = 2;
-      else bonus = 1;
+      if (statType === 'acceleration') bonus = 1;
+      else if (statType === 'speed') bonus = 1;
+      else bonus = 0;
       break;
       
     case 'Industrial': // 2009 bots - Workhorse reliability

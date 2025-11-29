@@ -1,6 +1,6 @@
+@import "prism-themes/themes/prism-nord.css";
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
-@import "prism-themes/themes/prism-nord.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -80,37 +80,37 @@
 }
 
 .dark {
-  --background: oklch(0.12 0.01 250);
-  --foreground: oklch(0.94 0.005 250);
-  --card: oklch(0.18 0.015 250);
-  --card-foreground: oklch(0.94 0.005 250);
-  --popover: oklch(0.18 0.015 250);
-  --popover-foreground: oklch(0.94 0.005 250);
-  --primary: oklch(0.82 0.11 200);
-  --primary-foreground: oklch(0.15 0.02 250);
-  --secondary: oklch(0.25 0.02 250);
-  --secondary-foreground: oklch(0.94 0.005 250);
-  --muted: oklch(0.25 0.02 250);
-  --muted-foreground: oklch(0.65 0.01 250);
-  --accent: oklch(0.30 0.03 260);
-  --accent-foreground: oklch(0.94 0.005 250);
-  --destructive: oklch(0.65 0.20 25);
-  --border: oklch(0.30 0.02 250);
-  --input: oklch(0.30 0.02 250);
-  --ring: oklch(0.82 0.11 200);
-  --chart-1: oklch(0.60 0.22 260);
-  --chart-2: oklch(0.65 0.18 180);
-  --chart-3: oklch(0.70 0.16 120);
-  --chart-4: oklch(0.68 0.20 300);
-  --chart-5: oklch(0.72 0.18 60);
-  --sidebar: oklch(0.18 0.015 250);
-  --sidebar-foreground: oklch(0.94 0.005 250);
-  --sidebar-primary: oklch(0.82 0.11 200);
-  --sidebar-primary-foreground: oklch(0.15 0.02 250);
-  --sidebar-accent: oklch(0.25 0.02 250);
-  --sidebar-accent-foreground: oklch(0.94 0.005 250);
-  --sidebar-border: oklch(0.30 0.02 250);
-  --sidebar-ring: oklch(0.82 0.11 200);
+  --background: oklch(0.10 0.02 40);
+  --foreground: oklch(0.95 0.01 60);
+  --card: oklch(0.16 0.025 35);
+  --card-foreground: oklch(0.95 0.01 60);
+  --popover: oklch(0.16 0.025 35);
+  --popover-foreground: oklch(0.95 0.01 60);
+  --primary: oklch(0.65 0.12 70);
+  --primary-foreground: #080300;
+  --secondary: oklch(0.24 0.03 35);
+  --secondary-foreground: oklch(0.95 0.01 60);
+  --muted: oklch(0.24 0.03 35);
+  --muted-foreground: oklch(0.62 0.02 45);
+  --accent: oklch(0.28 0.04 50);
+  --accent-foreground: oklch(0.95 0.01 60);
+  --destructive: oklch(0.60 0.22 20);
+  --border: oklch(0.28 0.03 40);
+  --input: oklch(0.28 0.03 40);
+  --ring: oklch(0.65 0.12 70);
+  --chart-1: oklch(0.70 0.18 55);
+  --chart-2: oklch(0.65 0.16 25);
+  --chart-3: oklch(0.60 0.14 70);
+  --chart-4: oklch(0.68 0.20 85);
+  --chart-5: oklch(0.58 0.18 15);
+  --sidebar: oklch(0.16 0.025 35);
+  --sidebar-foreground: oklch(0.95 0.01 60);
+  --sidebar-primary: oklch(0.65 0.12 70);
+  --sidebar-primary-foreground: #080300;
+  --sidebar-accent: oklch(0.24 0.03 35);
+  --sidebar-accent-foreground: oklch(0.95 0.01 60);
+  --sidebar-border: oklch(0.28 0.03 40);
+  --sidebar-ring: oklch(0.65 0.12 70);
   --radius: 0.75rem;
 }
 
@@ -141,7 +141,7 @@
   /* Markdown content styling */
   .markdown-content {
     line-height: 1.75;
-    color: oklch(0.94 0.005 250);
+    color: oklch(0.95 0.01 60);
   }
   
   .markdown-content h1,
@@ -150,19 +150,19 @@
   .markdown-content h4,
   .markdown-content h5,
   .markdown-content h6 {
-    color: oklch(0.94 0.005 250);
+    color: oklch(0.95 0.01 60);
   }
   
   .markdown-content p,
   .markdown-content li,
   .markdown-content td,
   .markdown-content th {
-    color: oklch(0.94 0.005 250);
+    color: oklch(0.95 0.01 60);
   }
   
   .markdown-content code:not(pre code) {
-    background-color: oklch(0.25 0.02 250);
-    border: 1px solid oklch(0.30 0.02 250);
+    background-color: oklch(0.24 0.03 35);
+    border: 1px solid oklch(0.28 0.03 40);
     border-radius: 0.25rem;
     padding: 0.125rem 0.375rem;
     font-size: 0.875em;
@@ -170,8 +170,8 @@
   }
   
   .markdown-content pre {
-    background-color: oklch(0.15 0.015 250) !important;
-    border: 1px solid oklch(0.30 0.02 250);
+    background-color: oklch(0.13 0.02 35) !important;
+    border: 1px solid oklch(0.28 0.03 40);
     border-radius: 0.5rem;
     padding: 1rem !important;
     overflow-x: auto;
@@ -198,7 +198,7 @@
   
   .markdown-content table th,
   .markdown-content table td {
-    border: 1px solid oklch(0.30 0.02 250);
+    border: 1px solid oklch(0.28 0.03 40);
     padding: 0.75rem !important;
     text-align: left;
     white-space: nowrap;
@@ -217,31 +217,31 @@
   }
   
   .markdown-content table th {
-    background-color: oklch(0.20 0.015 250);
+    background-color: oklch(0.18 0.025 35);
     font-weight: 600;
   }
   
   .markdown-content table tr:nth-child(even) {
-    background-color: oklch(0.16 0.015 250);
+    background-color: oklch(0.14 0.02 35);
   }
   
   /* Override prose-invert colors */
   .prose-invert {
-    --tw-prose-body: oklch(0.94 0.005 250) !important;
-    --tw-prose-headings: oklch(0.94 0.005 250) !important;
-    --tw-prose-lead: oklch(0.94 0.005 250) !important;
-    --tw-prose-links: oklch(0.82 0.11 200) !important;
-    --tw-prose-bold: oklch(0.94 0.005 250) !important;
-    --tw-prose-counters: oklch(0.94 0.005 250) !important;
-    --tw-prose-bullets: oklch(0.94 0.005 250) !important;
-    --tw-prose-hr: oklch(0.30 0.02 250) !important;
-    --tw-prose-quotes: oklch(0.94 0.005 250) !important;
-    --tw-prose-quote-borders: oklch(0.30 0.02 250) !important;
-    --tw-prose-captions: oklch(0.94 0.005 250) !important;
-    --tw-prose-code: oklch(0.94 0.005 250) !important;
-    --tw-prose-pre-code: oklch(0.94 0.005 250) !important;
-    --tw-prose-pre-bg: oklch(0.15 0.015 250) !important;
-    --tw-prose-th-borders: oklch(0.30 0.02 250) !important;
-    --tw-prose-td-borders: oklch(0.30 0.02 250) !important;
+    --tw-prose-body: oklch(0.95 0.01 60) !important;
+    --tw-prose-headings: oklch(0.95 0.01 60) !important;
+    --tw-prose-lead: oklch(0.95 0.01 60) !important;
+    --tw-prose-links: oklch(0.65 0.12 70) !important;
+    --tw-prose-bold: oklch(0.95 0.01 60) !important;
+    --tw-prose-counters: oklch(0.95 0.01 60) !important;
+    --tw-prose-bullets: oklch(0.95 0.01 60) !important;
+    --tw-prose-hr: oklch(0.28 0.03 40) !important;
+    --tw-prose-quotes: oklch(0.95 0.01 60) !important;
+    --tw-prose-quote-borders: oklch(0.28 0.03 40) !important;
+    --tw-prose-captions: oklch(0.95 0.01 60) !important;
+    --tw-prose-code: oklch(0.95 0.01 60) !important;
+    --tw-prose-pre-code: oklch(0.95 0.01 60) !important;
+    --tw-prose-pre-bg: oklch(0.13 0.02 35) !important;
+    --tw-prose-th-borders: oklch(0.28 0.03 40) !important;
+    --tw-prose-td-borders: oklch(0.28 0.03 40) !important;
   }
 }

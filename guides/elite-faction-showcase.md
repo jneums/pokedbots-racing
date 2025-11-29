@@ -6,7 +6,7 @@ order: 3
 
 # Elite Faction Showcase: Ultra-Rare & Super-Rare Tiers 👑
 
-*The Ultimate Wasteland Racers - November 22, 2025*
+*The Ultimate Wasteland Racers - November 29, 2025*
 
 ---
 
@@ -18,24 +18,24 @@ PokedBots Racing features 14 faction types organized by rarity. The top two tier
 The rarest and most powerful bots in the wasteland:
 
 **Ultimate-Master** (1 bot only) - THE ULTIMATE
-- **Faction Bonus:** +6 to ALL stats
+- **Faction Bonus:** +25 to ALL stats
 - **Rarity:** 1 of 10,000 (0.01%)
-- **Best For:** Ultimate collector's item, apex prestige
+- **Best For:** Ultimate collector's item, apex prestige, guaranteed #1 ranking
 
 **Wild** (5 bots) - Unpredictable Chaos
-- **Faction Bonus:** +7 Speed, +8 Acceleration, +5 Power/Stability
+- **Faction Bonus:** +24 Acceleration, +22 Speed, +18 Power/Stability
 - **Rarity:** 5 of 10,000 (0.05%)
-- **Best For:** Sprint races, aggressive racing, speed builds
+- **Best For:** Sprint races, aggressive racing, elite speed builds
 
 **Golden** (27 bots) - Premium Engineering
-- **Faction Bonus:** +3 Speed/Acceleration, +5 Power Core, +4 Stability
+- **Faction Bonus:** +18 Power Core, +16 Stability, +14 Speed/Acceleration
 - **Rarity:** 27 of 10,000 (0.27%)
-- **Best For:** Balanced excellence, endurance racing
+- **Best For:** Balanced excellence, endurance racing, premium performance
 
 **Ultimate** (45 bots) - Combat Excellence  
-- **Faction Bonus:** +5 Speed/Power Core, +3 Acceleration/Stability
+- **Faction Bonus:** +12 Speed/Power Core, +8 Acceleration/Stability
 - **Rarity:** 45 of 10,000 (0.45%)
-- **Best For:** Speed-focused racing, competitive balance
+- **Best For:** Competitive racing, balanced builds
 
 ---
 
@@ -48,12 +48,12 @@ Powerful factions with major stat bonuses:
 - **Best For:** Endurance dominance, explosive acceleration
 
 **Dead** (382 bots) - Undead Resilience
-- **Faction Bonus:** +13 Stability, +12 Power Core, +9 Speed/Acceleration
+- **Faction Bonus:** +10 Stability, +9 Power Core, +7 Speed/Acceleration
 - **Rarity:** 382 of 10,000 (3.82%)
 - **Best For:** Rough terrain, stability-focused racing
 
 **Master** (640 bots) - Skilled Operators
-- **Faction Bonus:** +14 Speed, +14 Stability, +11 Power/Acceleration
+- **Faction Bonus:** +11 Speed/Stability, +8 Power/Acceleration
 - **Rarity:** 640 of 10,000 (6.4%)
 - **Best For:** Balanced competitive racing, all-around performance
 
@@ -61,7 +61,7 @@ Powerful factions with major stat bonuses:
 
 ## 🏆 Featured Ultimate Bots for Sale
 
-The Ultimate faction (45 bots, 0.45% rarity) is an ultra-rare tier. Ultimate bots receive +5 Speed/Power Core and +3 Acceleration/Stability bonuses, making them well-balanced premium performers.
+The Ultimate faction (45 bots, 0.45% rarity) is an ultra-rare tier. Ultimate bots receive +12 Speed/Power Core and +8 Acceleration/Stability bonuses, making them well-balanced premium performers.
 
 **Current Marketplace:** 3 Ultimate bots listed, ranging from 1,800 to 88,888 ICP.
 
@@ -69,19 +69,19 @@ The Ultimate faction (45 bots, 0.45% rarity) is an ultra-rare tier. Ultimate bot
 ![Bot #8631](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=dm37u-eakor-uwiaa-aaaaa-b4arg-qaqca-aaeg3-q&type=thumbnail)
 
 **Price:** 88,888.88 ICP 💎  
-**Base Rating:** 46/100  
-**Faction:** Ultimate (+5 SPD/PWR, +3 ACC/STB)
+**Base Rating:** 45/100  
+**Faction:** Ultimate (+12 SPD/PWR, +8 ACC/STB)
 
-**Base Stats:**
-- Speed: 41 (+5 faction bonus = 46 effective)
-- Power Core: 48 (+5 faction bonus = 53 effective)
-- Acceleration: 46 (+3 faction bonus = 49 effective)
-- Stability: 50 (+3 faction bonus = 53 effective)
+**Stats:**
+- Speed: 45
+- Power Core: 45
+- Acceleration: 47
+- Stability: 45
 
 **Analysis:**  
-The highest-rated Ultimate bot currently on the marketplace. With the best base stats available in the Ultimate faction, this bot offers excellent potential for competitive racing. The 50 stability base is especially valuable for rough terrain events.
+Top-25 ranked Ultimate bot with exceptional balanced stats! All stats 45+ make this a versatile elite performer. The Ultimate faction bonuses push this into true competitive territory across all race types.
 
-**Perfect For:** Collectors seeking the best available Ultimate bot, ScrapHeaps terrain races
+**Perfect For:** Elite collectors, versatile racing, all terrain types
 
 ---
 
@@ -89,17 +89,17 @@ The highest-rated Ultimate bot currently on the marketplace. With the best base 
 ![Bot #383](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=dmgji-makor-uwiaa-aaaaa-b4arg-qaqca-aaaf7-q&type=thumbnail)
 
 **Price:** 9,000 ICP  
-**Base Rating:** 43/100  
-**Faction:** Ultimate (+5 SPD/PWR, +3 ACC/STB)
+**Rating:** 43/100  
+**Faction:** Ultimate (+12 SPD/PWR, +8 ACC/STB)
 
-**Base Stats:**
-- Speed: 46 (+5 faction bonus = 51 effective)
-- Power Core: 46 (+5 faction bonus = 51 effective)
-- Acceleration: 37 (+3 faction bonus = 40 effective)
-- Stability: 46 (+3 faction bonus = 49 effective)
+**Stats:**
+- Speed: 46
+- Power Core: 44
+- Acceleration: 40
+- Stability: 43
 
 **Analysis:**  
-Excellent balanced stats with strong speed and power. The 46 speed/power base becomes 51 effective with Ultimate bonuses, making this a competitive bot for weekly league races.
+Excellent balanced stats with strong speed (46). Well-rounded performer with Ultimate bonuses, making this a competitive bot for weekly league races.
 
 **Perfect For:** Weekly League events, balanced racing performance
 
@@ -109,17 +109,17 @@ Excellent balanced stats with strong speed and power. The 46 speed/power base be
 ![Bot #9964](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=vdh6j-kykor-uwiaa-aaaaa-b4arg-qaqca-aae3w-a&type=thumbnail)
 
 **Price:** 4,000 ICP  
-**Base Rating:** 42/100  
-**Faction:** Ultimate (+5 SPD/PWR, +3 ACC/STB)
+**Rating:** 42/100  
+**Faction:** Ultimate (+12 SPD/PWR, +8 ACC/STB)
 
-**Base Stats:**
-- Speed: 41 (+5 faction bonus = 46 effective)
-- Power Core: 42 (+5 faction bonus = 47 effective)
-- Acceleration: 45 (+3 faction bonus = 48 effective)
-- Stability: 41 (+3 faction bonus = 44 effective)
+**Stats:**
+- Speed: 45
+- Power Core: 39
+- Acceleration: 46
+- Stability: 40
 
 **Analysis:**  
-Best acceleration in the top Ultimate bots at 45 base (48 effective). Great for technical courses and races requiring quick speed changes. The faction bonuses push this into competitive territory.
+Strong acceleration (46) and speed (45) make this a technical course specialist. Great for races requiring quick speed changes. The Ultimate faction bonuses enhance already solid stats.
 
 **Perfect For:** ScrapHeaps terrain, technical courses, mid-budget buyers
 
@@ -129,17 +129,17 @@ Best acceleration in the top Ultimate bots at 45 base (48 effective). Great for 
 ![Bot #588](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=r7y2n-zikor-uwiaa-aaaaa-b4arg-qaqca-aaajg-a&type=thumbnail)
 
 **Price:** 1,800 ICP 🔥 *BEST VALUE!*  
-**Base Rating:** 42/100  
-**Faction:** Ultimate (+5 SPD/PWR, +3 ACC/STB)
+**Base Rating:** 39/100  
+**Faction:** Ultimate (+12 SPD/PWR, +8 ACC/STB)
 
-**Base Stats:**
-- Speed: 45 (+5 faction bonus = 50 effective)
-- Power Core: 41 (+5 faction bonus = 46 effective)
-- Acceleration: 41 (+3 faction bonus = 44 effective)
-- Stability: 42 (+3 faction bonus = 45 effective)
+**Stats:**
+- Speed: 43
+- Power Core: 37
+- Acceleration: 39
+- Stability: 37
 
 **Analysis:**  
-The lowest priced competitive Ultimate bot! With 42 base rating and good speed (45 base), this offers incredible value for entering the ultra-rare tier. The Ultimate faction bonuses elevate this to competitive performance.
+The lowest priced competitive Ultimate bot! With 39 rating and good speed (43), this offers incredible value for entering the ultra-rare tier. The Ultimate faction bonuses elevate this to competitive performance.
 
 **Perfect For:** Budget-conscious racers, entry point into elite racing, best price-to-performance ratio
 
@@ -151,51 +151,51 @@ The lowest priced competitive Ultimate bot! With 42 base rating and good speed (
 ![Bot #2471](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=lpouj-xqkor-uwiaa-aaaaa-b4arg-qaqca-aabgt-q&type=thumbnail)
 
 **Price:** 2,000 ICP  
-**Base Rating:** 41/100  
-**Faction:** Ultimate (+5 SPD/PWR, +3 ACC/STB)
+**Rating:** 38/100  
+**Faction:** Ultimate (+12 SPD/PWR, +8 ACC/STB)
 
-**Base Stats:**
-- Speed: 45 (+5 faction bonus = 50 effective)
-- Power Core: 40 (+5 faction bonus = 45 effective)
-- Acceleration: 40 (+3 faction bonus = 43 effective)
-- Stability: 42 (+3 faction bonus = 45 effective)
+**Stats:**
+- Speed: 42
+- Power Core: 36
+- Acceleration: 39
+- Stability: 37
 
 **Analysis:**  
-Similar to #588 but with slightly lower base power and acceleration. Still an excellent value at 2,000 ICP. The 45 speed base is strong for this price point.
+Similar to #588 but with slightly lower power. Still an excellent value at 2,000 ICP for an ultra-rare Ultimate bot. Solid 42 speed for competitive racing.
 
 **Perfect For:** Budget buyers, ScrapHeaps terrain preference, balanced racing
 
 ---
 
-## 📊 Ultimate Faction Overviewew
+## 📊 Ultimate Faction Overview
 
-The **Ultimate** faction is an ultra-rare tier with only 45 total bots (0.45% rarity). Ultimate bots receive **+5 Speed/Power Core** and **+3 Acceleration/Stability** bonuses, making them well-balanced premium performers for competitive racing.
+The **Ultimate** faction is an ultra-rare tier with only 45 total bots (0.45% rarity). Ultimate bots receive **+12 Speed/Power Core** and **+8 Acceleration/Stability** bonuses, making them well-balanced premium performers for competitive racing.
 
 ---
 
 ## 💡 Best Value Picks by Budget
 
 ### Under 2,000 ICP: 🏆 **Ultimate #588** @ 1,800 ICP
-**Why:** Lowest price for competitive Ultimate faction bot with 42 base rating and strong speed (45 base = 50 effective)
+**Why:** Lowest price for competitive Ultimate faction bot with 39 rating and solid 43 speed
 
 ### 2,000-5,000 ICP: 🏆 **Ultimate #9964** @ 4,000 ICP  
-**Why:** Best acceleration in class (45 base) perfect for technical courses
+**Why:** Strong acceleration (46) and speed (45) perfect for technical courses
 
 ### 5,000-10,000 ICP: 🏆 **Ultimate #383** @ 9,000 ICP
-**Why:** Excellent balanced stats (43 rating) with high speed/power potential
+**Why:** Excellent balanced stats (43 rating) with strong speed (46) and power (44)
 
 ### Ultimate Prestige: 💎 **Ultimate #8631** @ 88,888.88 ICP
-**Why:** Highest-rated Ultimate bot on the marketplace (46/100 base)
+**Why:** Highest-rated Ultimate bot on the marketplace (45/100), top-25 ranking
 
 ---
 
 ## Racing Strategy for Ultimate Faction
 
 ### Leverage Your Bonuses:
-- **Speed +5** - Solid boost for sprint races and straight sections
-- **Power +5** - Good endurance in medium-length races
-- **Acceleration +3** - Helps with recovery from obstacles and turns
-- **Stability +3** - Modest boost for terrain handling
+- **Speed +12** - Strong boost for sprint races and straight sections
+- **Power +12** - Excellent endurance in all race lengths
+- **Acceleration +8** - Good recovery from obstacles and turns
+- **Stability +8** - Solid boost for terrain handling
 
 ### Race Type Recommendations:
 - ✅ **Daily Sprint (5-10km):** Speed and power bonuses shine in shorter distances
@@ -212,7 +212,7 @@ The **Ultimate** faction is an ultra-rare tier with only 45 total bots (0.45% ra
 ## How to Purchase
 
 1. Browse the marketplace using the MCP tools or visit the marketplace directly
-2. Use `browse_pokedbots` with filters like `faction=Master`, `minRating=40`, `maxPrice=5000`
+2. Use `browse_pokedbots` with filters like `faction=Ultimate`, `minRating=38`, `maxPrice=5000`
 3. Check bot details with `garage_get_robot_details` for any bot you own
 4. Purchase with `purchase_pokedbot` - bot transfers directly to your garage subaccount
 5. Initialize for racing with `garage_initialize_pokedbot` to activate faction bonuses
@@ -229,11 +229,11 @@ Key takeaways:
 - ✅ **Best value:** #588 @ 1,800 ICP for entry into ultra-rare tier
 - ✅ **Best acceleration:** #9964 @ 4,000 ICP for technical courses
 - ✅ **Best overall:** #8631 @ 88,888 ICP for ultimate performance and prestige
-- ✅ **Faction bonuses:** +5 Speed/Power Core, +3 Acceleration/Stability
+- ✅ **Faction bonuses:** +12 Speed/Power Core, +8 Acceleration/Stability
 - ✅ **Ultra-rare status:** Only 45 exist (0.45% of collection)
 
 Whatever your budget, Ultimate faction bots offer exclusive prestige and balanced competitive performance! 🏁🏆
 
 ---
 
-*Data from live marketplace query on November 22, 2025. Prices and availability subject to change.*
+*Data from live marketplace query on November 29, 2025. Prices and availability subject to change.*

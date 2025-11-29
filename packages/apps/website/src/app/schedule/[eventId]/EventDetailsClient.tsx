@@ -1,12 +1,9 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useGetEventDetails, useGetRaceById } from "@/hooks/useRacing";
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
-import Image from 'next/image';
 
 function formatICP(amount: bigint): string {
   const icp = Number(amount) / 100_000_000;
@@ -108,12 +105,10 @@ function RaceCard({ raceId }: { raceId: bigint }) {
                 
                 return (
                   <div key={idx} className="flex items-center gap-3 p-2 bg-card/50 border border-primary/10 rounded">
-                    <Image
+                    <img
                       src={imageUrl}
                       alt={`Bot #${entry.nftId}`}
-                      width={32}
-                      height={32}
-                      className="rounded border-2 border-primary/30"
+                      className="w-8 h-8 rounded border-2 border-primary/30"
                     />
                     <div className="flex-1">
                       <p className="text-sm font-semibold">PokedBot #{entry.nftId}</p>
@@ -146,12 +141,10 @@ function RaceCard({ raceId }: { raceId: bigint }) {
                       {idx === 2 && '🥉'}
                       {idx > 2 && `#${idx + 1}`}
                     </div>
-                    <Image
+                    <img
                       src={imageUrl}
                       alt={`Bot #${result.nftId}`}
-                      width={40}
-                      height={40}
-                      className="rounded border-2 border-primary/40"
+                      className="w-10 h-10 rounded border-2 border-primary/40"
                     />
                     <div className="flex-1">
                       <p className="font-semibold">PokedBot #{result.nftId}</p>
@@ -178,7 +171,7 @@ function RaceCard({ raceId }: { raceId: bigint }) {
 }
 
 export function EventDetailsClient({ eventId }: { eventId: string }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { data: event } = useGetEventDetails(Number(eventId));
 
   if (!event) {
@@ -189,6 +182,30 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
     );
   }
 
+  // Determine the actual status based on time and completion
+  const now = Date.now() * 1_000_000; // Convert to nanoseconds
+  const isPast = Number(event.scheduledTime) < now;
+  const isCompleted = 'Completed' in event.status;
+  
+  const getStatusBadge = () => {
+    if ('Cancelled' in event.status) {
+      return <Badge variant="destructive">Cancelled</Badge>;
+    }
+    if (isCompleted || isPast) {
+      return <Badge variant="secondary">Completed</Badge>;
+    }
+    if ('InProgress' in event.status) {
+      return <Badge className="bg-orange-500">In Progress</Badge>;
+    }
+    if ('RegistrationClosed' in event.status) {
+      return <Badge variant="outline">Registration Closed</Badge>;
+    }
+    if ('RegistrationOpen' in event.status) {
+      return <Badge className="bg-green-500">Registration Open</Badge>;
+    }
+    return <Badge>Announced</Badge>;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-16">
@@ -196,7 +213,7 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
           {/* Back Button */}
           <Button 
             variant="ghost" 
-            onClick={() => router.push('/schedule')}
+            onClick={() => navigate('/schedule')}
             className="mb-6"
           >
             ← Back to Schedule
@@ -208,14 +225,7 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
             <p className="text-lg text-muted-foreground mb-4">{event.metadata.description}</p>
             <div className="flex gap-4 items-center text-sm text-muted-foreground">
               <span>🕒 {formatDate(event.scheduledTime)}</span>
-              <Badge>
-                {'Announced' in event.status && 'Announced'}
-                {'RegistrationOpen' in event.status && 'Registration Open'}
-                {'RegistrationClosed' in event.status && 'Registration Closed'}
-                {'InProgress' in event.status && 'In Progress'}
-                {'Completed' in event.status && 'Completed'}
-                {'Cancelled' in event.status && 'Cancelled'}
-              </Badge>
+              {getStatusBadge()}
             </div>
           </div>
 

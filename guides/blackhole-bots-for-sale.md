@@ -33,8 +33,8 @@ order: 5
 ![Bot #4343](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=vo3ly-mqkor-uwiaa-aaaaa-b4arg-qaqca-aacd3-q&type=thumbnail)
 
 **Rating:** 41/100 | **Value:** 0.93 rating/ICP 🔥  
-**Stats:** SPD 38 | PWR 43 | ACC 43 | STB 42  
-**Why:** Incredible value! Only 44 ICP for a super-rare Blackhole bot. Balanced 43 power and acceleration. Perfect entry point into the Blackhole faction with room to upgrade through racing.
+**Stats:** SPD 35 | PWR 46 | ACC 41 | STB 41  
+**Why:** Incredible value! Only 44 ICP for a super-rare Blackhole bot. Exceptional 46 power with strong balanced stats. Perfect entry point into the Blackhole faction with room to upgrade through racing.
 
 **Perfect For:** Budget buyers wanting Blackhole prestige, balanced racing, upgrade potential
 
@@ -43,9 +43,9 @@ order: 5
 ### 🥈 #8233 @ 99 ICP - "The Acceleration Specialist"
 ![Bot #8233](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=cwnxk-eqkor-uwiaa-aaaaa-b4arg-qaqca-aaeau-q&type=thumbnail)
 
-**Rating:** 39/100 | **Value:** 0.39 rating/ICP  
-**Stats:** SPD 38 | PWR 38 | ACC 47 | STB 33  
-**Why:** Highest acceleration (47) leverages Blackhole's +16 ACC bonus perfectly! Lightning-fast starts and obstacle recovery. Great for technical courses with lots of turns.
+**Rating:** 38/100 | **Value:** 0.38 rating/ICP  
+**Stats:** SPD 35 | PWR 40 | ACC 43 | STB 32  
+**Why:** Strong acceleration (43) leverages Blackhole's +16 ACC bonus perfectly! Lightning-fast starts and obstacle recovery. Great for technical courses with lots of turns.
 
 **Perfect For:** Acceleration-focused strategies, technical tracks, MetalRoads terrain
 
@@ -54,9 +54,9 @@ order: 5
 ### 🥉 #3033 @ 555 ICP - "The Balanced Premium"
 ![Bot #3033](https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=3zlhu-zykor-uwiaa-aaaaa-b4arg-qaqca-aabpm-q&type=thumbnail)
 
-**Rating:** 41/100 | **Value:** 0.07 rating/ICP  
-**Stats:** SPD 44 | PWR 39 | ACC 39 | STB 45  
-**Why:** Premium Blackhole with 44 speed and 45 stability! Well-rounded stats make this versatile for any race type. Collector's choice for balanced performance.
+**Rating:** 44/100 | **Value:** 0.08 rating/ICP  
+**Stats:** SPD 44 | PWR 45 | ACC 43 | STB 43  
+**Why:** Premium Blackhole with exceptional balanced stats! All stats 43+ make this versatile for any race type. Collector's choice for balanced performance.
 
 **Perfect For:** Versatile racing, all terrain types, premium collectors
 
@@ -87,9 +87,9 @@ order: 5
 - Final stats capped at 100 maximum
 
 **Example (Token #4343):**
-- Base stats: SPD 25, PWR 25, ACC 27, STB 29
-- After Blackhole bonus: SPD 38, PWR 43, ACC 43, STB 42
-- Result: A balanced 41-rated racer with upgrade potential
+- Base stats: SPD 22, PWR 28, ACC 25, STB 28
+- After Blackhole bonus: SPD 35, PWR 46, ACC 41, STB 41
+- Result: A power-focused 41-rated racer with upgrade potential
 
 **Why Blackhole is Powerful:**
 - **60 total bonus points** (18+16+13+13)
@@ -131,18 +131,18 @@ The 44-99 ICP range offers great entry into Blackhole faction:
 
 ### Sprint Races (< 5km):
 **Best:** #3033 (44 SPD, balanced)  
-**Budget:** #4343 (38 SPD, good value)
+**Budget:** #4343 (35 SPD, excellent power)
 
 ### Medium Haul (5-15km):
-**Best:** #4343 (balanced 43 PWR/ACC)  
-**Specialist:** #8233 (47 ACC for technical sections)
+**Best:** #3033 (balanced 44/45/43/43)  
+**Power:** #4343 (46 PWR for endurance)
 
 ### Long Endurance (> 15km):
-**Best:** #4343 or #3033 (leverage +18 Power Core bonus)  
+**Best:** #4343 (46 PWR specialist, leverage +18 Power Core bonus)  
 **Strategy:** High power maintains speed over distance
 
 ### Technical/MetalRoads:
-**Best:** #8233 (47 ACC specialist)  
+**Best:** #3033 or #8233 (43 ACC on both)  
 **Why:** +16 Acceleration bonus dominates turns and obstacles
 
 ---
@@ -154,7 +154,7 @@ The 44-99 ICP range offers great entry into Blackhole faction:
 ✅ **Blackhole bonus applies to every race** - no situational limitations  
 ✅ **Super-Rare Status** - Only 244 Blackhole bots exist (2.44% of collection)  
 ✅ **Power Specialists** - Highest Power Core bonus in the game (+18)  
-✅ **Prices current as of November 22, 2025**
+✅ **Prices current as of November 29, 2025**
 
 ---
 

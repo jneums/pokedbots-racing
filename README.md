@@ -73,11 +73,18 @@ Every PokedBot has base stats that determine racing performance:
 
 ### Faction Bonuses
 
-- **BattleBot**: +5 to all stats (59.3% of bots)
-- **EntertainmentBot**: +10 SPD, +5 ACC (24.3%)
-- **WildBot**: +10 STB, +5 PWR (5.8%)
-- **Master**: +12 SPD/PWR, +8 ACC/STB (6.9%)
-- **GodClass**: +15 to ALL stats (2.7% - rarest!)
+**Ultra-Rare:**
+- **UltimateMaster** 👑: +5 to all stats (1 bot - the rarest!)
+- **Wild** 🤾: +3 to all stats (5 bots)
+- **Golden** ✨: +3 to all stats (27 bots)
+- **Ultimate** ⚡: +5 SPD, +5 PWR, +3 ACC, +3 STB (45 bots)
+
+**Super-Rare:**
+- **Blackhole** 🌌: +18 PWR, +16 ACC, +13 SPD/STB (244 bots)
+- **Dead** 💀: +13 STB, +12 PWR, +9 SPD/ACC (382 bots)
+- **Master** 🎯: +14 SPD/PWR, +10 ACC/STB (640 bots)
+
+**Rare & Common:** 717-2009 bots each (Bee, Food, Box, Murder, Game, Animal, Industrial)
 
 ## 🎯 MCP Tools
 
@@ -114,9 +121,9 @@ Visit the [documentation site](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/docs)
 ## 🎓 Guides
 
 - [Beginner Racing Guide](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/guides/beginner-racing-guide) - New racer walkthrough
-- [Elite Faction Showcase](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/guides/elite-faction-showcase) - GodClass vs Master bots
-- [WildBot Shopping Guide](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/guides/wildbot-shopping-guide) - Best stability-focused bots
-- [GodClass Bots for Sale](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/guides/godclass-bots-for-sale) - Rarest faction options
+- [Elite Faction Showcase](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/guides/elite-faction-showcase) - UltimateMaster, Ultimate, and top-tier bots
+- [Blackhole Bots for Sale](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/guides/blackhole-bots-for-sale) - Super-rare power specialists
+- [DeadBot Shopping Guide](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/guides/deadbot-shopping-guide) - Stability-focused super-rare bots
 - [MCP Tools Guide](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/guides/mcp-tools-guide) - Using AI agents
 
 ## 🧪 Testing

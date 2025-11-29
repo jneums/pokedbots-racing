@@ -318,7 +318,7 @@ let newStat = min(currentStat + actualGain, 100);
 ```
 
 **Faction Bonuses:**
-- **God Class** 👑: Difficulty multipliers reduced by 20% (easier to upgrade high stats)
+- **UltimateMaster** 👑: Difficulty multipliers reduced by 40% (easier to upgrade high stats)
 - **Wild Bot** ⚡: +10% random variance on stat gains (±1-2 instead of fixed)
 
 ---

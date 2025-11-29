@@ -247,9 +247,9 @@ module {
     let quotes = [
       "💀 \"In the wasteland, only the strongest circuits survive.\" - Delta City Mechanic",
       "⚡ \"Race fast, die young, leave a rusty chassis.\" - Wild Bot Proverb",
-      "👑 \"We are the inheritors of Earth's machines. We are perfection.\" - God Class Manifesto",
-      "🎭 \"Every race is a performance. Make it spectacular.\" - Entertainment Bot Creed",
-      "⚔️ \"Built for war, racing for glory.\" - BattleBot Code",
+      "👑 \"We are the masters of steel. We are perfection.\" - Ultimate Manifesto",
+      "🎮 \"Every race is a game. Play to win.\" - Game Bot Philosophy",
+      "🔪 \"Built for destruction, racing for dominance.\" - Murder Bot Creed",
       "🌍 \"The old world died. We race through its bones.\" - Wasteland Saying",
       "🔧 \"A well-maintained bot is a dangerous bot.\" - Garage Master Wisdom",
       "🏁 \"The Silent Klan sees all. They control the races.\" - Delta City Rumor",
