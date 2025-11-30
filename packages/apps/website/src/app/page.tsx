@@ -726,13 +726,13 @@ export default function Home() {
                       </CardDescription>
                       <div className="mt-4 flex items-center gap-2">
                         <div className="flex-1 p-3 bg-muted rounded-lg text-sm font-mono break-all">
-                          https://ilyol-uqaaa-aaaai-q34kq-cai.icp0.io/mcp
+                          https://p6nop-vyaaa-aaaai-q4djq-cai.icp0.io/mcp
                         </div>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => {
-                            navigator.clipboard.writeText('https://ilyol-uqaaa-aaaai-q34kq-cai.icp0.io/mcp');
+                            navigator.clipboard.writeText('https://p6nop-vyaaa-aaaai-q4djq-cai.icp0.io/mcp');
                           }}
                           className="shrink-0"
                         >
@@ -763,7 +763,7 @@ export default function Home() {
                         </p>
                       </CardDescription>
                       <div className="mt-4">
-                        <a href="https://prometheusprotocol.org/app/io.github.jneums.final-score" target="_blank" rel="noopener noreferrer">
+                        <a href="https://prometheusprotocol.org/app/io.github.jneums.pokedbots-racing" target="_blank" rel="noopener noreferrer">
                           <Button className="gap-2">
                             Open Prometheus Protocol
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -61,7 +61,7 @@ export default function App() {
               <div className="flex items-center gap-1">
                 <span>Live on</span>
                 <a 
-                  href="https://prometheusprotocol.org/app/io.github.jneums.final-score" 
+                  href="https://prometheusprotocol.org/app/io.github.jneums.pokedbots-racing" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-primary hover:text-primary/80 transition-colors inline-flex items-center gap-1"
@@ -91,7 +91,7 @@ export default function App() {
             <div className="inline-flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 bg-primary/5 border border-primary/20 rounded-lg">
               <span className="text-xs sm:text-sm text-muted-foreground font-medium whitespace-nowrap">MCP URL</span>
               <code className="text-xs sm:text-sm font-mono text-foreground">
-                https://ilyol-uqaaa-aaaai-q34kq-cai.icp0.io/mcp
+                https://p6nop-vyaaa-aaaai-q4djq-cai.icp0.io/mcp
               </code>
             </div>
           </div>

@@ -6,6 +6,10 @@
       "headers": {
         "x-api-key": "5c32744e220c4cd4ed16e790f960ffb2e40d501a4e3ade98fe01e04d3c5c81c4"
       }
+    },
+    "pokedbots-racing": {
+      "type": "http",
+      "url": "https://p6nop-vyaaa-aaaai-q4djq-cai.icp0.io/mcp"
     }
   }
 }
