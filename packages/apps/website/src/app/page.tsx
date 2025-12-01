@@ -530,22 +530,33 @@ export default function Home() {
                 </Link>
               </div>
               <div className="grid md:grid-cols-2 gap-6">
-                {docs.map((doc) => (
-                  <Link key={doc.slug} to={`/docs/${doc.slug}`}>
-                    <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur h-full group">
-                      <CardHeader className="space-y-3">
-                        <CardTitle className="text-2xl group-hover:text-primary transition-colors">
-                          {doc.metadata.title || doc.slug}
-                        </CardTitle>
-                        {doc.metadata.description && (
-                          <CardDescription className="text-base leading-relaxed">
-                            {doc.metadata.description}
-                          </CardDescription>
-                        )}
-                      </CardHeader>
-                    </Card>
-                  </Link>
-                ))}
+                {(() => {
+                  const featuredSlugs = [
+                    'OVERVIEW',
+                    'MCP_TOOLS',
+                    'RACING_SYSTEM',
+                    'GARAGE_SYSTEM'
+                  ];
+                  const featuredDocs = featuredSlugs
+                    .map(slug => docs.find(d => d.slug === slug))
+                    .filter((doc): doc is NonNullable<typeof doc> => doc !== undefined);
+                  return featuredDocs.map((doc) => (
+                    <Link key={doc.slug} to={`/docs/${doc.slug}`}>
+                      <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur h-full group">
+                        <CardHeader className="space-y-3">
+                          <CardTitle className="text-2xl group-hover:text-primary transition-colors">
+                            {doc.metadata.title || doc.slug}
+                          </CardTitle>
+                          {doc.metadata.description && (
+                            <CardDescription className="text-base leading-relaxed">
+                              {doc.metadata.description}
+                            </CardDescription>
+                          )}
+                        </CardHeader>
+                      </Card>
+                    </Link>
+                  ));
+                })()}
               </div>
             </div>
           </div>
