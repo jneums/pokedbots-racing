@@ -4,18 +4,21 @@
       "type": "http",
       "url": "https://3od6b-qiaaa-aaaai-q37ma-cai.icp0.io/mcp",
       "headers": {
-        "x-api-key": "5c32744e220c4cd4ed16e790f960ffb2e40d501a4e3ade98fe01e04d3c5c81c4"
+        "x-api-key": ""
       }
     },
     "pokedbots-racing": {
       "type": "http",
-      "url": "https://p6nop-vyaaa-aaaai-q4djq-cai.icp0.io/mcp"
+      "url": "https://p6nop-vyaaa-aaaai-q4djq-cai.icp0.io/mcp",
+      "headers": {
+        "x-api-key": ""
+      }
     },
     "ext-wallet": {
       "type": "http",
       "url": "https://j3gvq-uyaaa-aaaai-q4d7q-cai.icp0.io/mcp",
       "headers": {
-        "x-api-key": "dd2c989ec5ebc574beb2a987e46e65c0d239538364731c2eefa6a4297c412d16"
+        "x-api-key": ""
       }
     }
   }
