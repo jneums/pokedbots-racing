@@ -18,18 +18,18 @@ import ExtIntegration "../ExtIntegration";
 import WastelandFlavor "WastelandFlavor";
 
 module {
-  let PART_PRICE_E8S = 3330000 : Nat; // 0.033 ICP per part (testing value, production is 333000000 = 3.33 ICP)
+  let PART_PRICE_E8S = 1_000_000 : Nat; // 0.01 ICP per part (100 parts = 1 ICP)
   let TRANSFER_FEE = 10000 : Nat;
   let UPGRADE_DURATION : Int = 43200000000000; // 12 hours in nanoseconds
 
   public func config() : McpTypes.Tool = {
     name = "garage_upgrade_robot";
     title = ?"Upgrade Robot";
-    description = ?"Start an upgrade session. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability). Costs parts or ICP (progressive cost). Takes 12 hours.";
+    description = ?"Start an upgrade session. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability). Pay with parts (earned from racing) or ICP (progressive cost). Takes 12 hours.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("The token index of the PokedBot"))])), ("upgrade_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Velocity"), Json.str("PowerCore"), Json.str("Thruster"), Json.str("Gyro")])), ("description", Json.str("The type of upgrade"))])), ("use_parts", Json.obj([("type", Json.str("boolean")), ("description", Json.str("If true, use parts from inventory. If false, pay ICP."))]))])),
+      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("The token index of the PokedBot"))])), ("upgrade_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Velocity"), Json.str("PowerCore"), Json.str("Thruster"), Json.str("Gyro")])), ("description", Json.str("The type of upgrade"))])), ("payment_method", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("parts"), Json.str("icp")])), ("description", Json.str("Payment method: parts (from inventory) or icp (ICRC-2 approval required)"))]))])),
       ("required", Json.arr([Json.str("token_index"), Json.str("upgrade_type")])),
     ]);
     outputSchema = null;
@@ -58,9 +58,9 @@ module {
         case (?t) { t };
       };
 
-      let useParts = switch (Result.toOption(Json.getAsBool(_args, "use_parts"))) {
-        case (null) { false };
-        case (?b) { b };
+      let paymentMethod = switch (Result.toOption(Json.getAsText(_args, "payment_method"))) {
+        case (null) { "parts" }; // Default to parts (earned from racing)
+        case (?method) { method };
       };
 
       // Verify ownership via EXT (source of truth)
@@ -128,12 +128,12 @@ module {
       };
 
       // Handle payment
-      if (useParts) {
+      if (paymentMethod == "parts") {
         if (not ctx.garageManager.removeParts(user, partType, partsNeeded)) {
-          // Try universal parts? For now, strict check.
-          return ToolContext.makeError("Insufficient parts. Needed: " # Nat.toText(partsNeeded) # " specific parts.", cb);
+          return ToolContext.makeError("Insufficient parts. Needed: " # Nat.toText(partsNeeded) # " " # debug_show (partType) # ". Race on appropriate terrain to earn them!", cb);
         };
       } else {
+        // ICP payment
         // Get ICP Ledger canister ID from context
         let ledgerId = switch (ctx.icpLedgerCanisterId()) {
           case (?id) { id };

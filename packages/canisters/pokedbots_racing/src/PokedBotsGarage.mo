@@ -83,7 +83,7 @@ module {
     wins : Nat;
     places : Nat;
     shows : Nat;
-    totalScrapEarned : Nat;
+    totalScrapEarned : Nat; // Total ICP earnings from races (legacy naming)
     factionReputation : Nat;
     eloRating : Nat; // ELO rating for skill-based matchmaking (default 1500)
 
@@ -287,7 +287,7 @@ module {
                 shows = if (position == 3) { botStats.shows + 1 } else {
                   botStats.shows;
                 };
-                totalScrapEarned = botStats.totalScrapEarned + prize;
+                totalScrapEarned = botStats.totalScrapEarned + prize; // Tracks total ICP earnings
                 experience = botStats.experience + (if (position == 1) { 20 } else if (position <= 3) { 10 } else { 5 });
                 factionReputation = botStats.factionReputation + (if (position == 1) { 10 } else if (position <= 3) { 5 } else { 2 });
                 lastRaced = ?Time.now();
@@ -662,57 +662,44 @@ module {
       };
     };
 
-    // ===== DECAY SYSTEM =====
+    // ===== BATTERY RECHARGE SYSTEM =====
 
-    /// Apply hourly decay
-    public func applyDecay(tokenIndex : Nat, now : Int) : ?PokedBotRacingStats {
+    /// Apply hourly battery recharge
+    public func applyRecharge(tokenIndex : Nat, now : Int) : ?PokedBotRacingStats {
       switch (getStats(tokenIndex)) {
         case (?botStats) {
           if (Option.isSome(botStats.upgradeEndsAt)) {
             return ?botStats;
           };
 
-          let decayMultiplier : Float = switch (botStats.faction) {
-            // Ultra-rare: slower decay
-            case (#UltimateMaster) { 0.6 };
-            case (#Golden) { 0.7 };
-            case (#Ultimate) { 0.75 };
-            case (#Wild) { 1.3 }; // Wild bots decay faster
-            // Super-rare: moderate decay reduction
-            case (#Blackhole or #Dead or #Master) { 0.85 };
-            // Rare: slight decay reduction
-            case (#Bee or #Food or #Box or #Murder) { 0.95 };
-            // Common: standard decay
+          let rechargeMultiplier : Float = switch (botStats.faction) {
+            // Ultra-rare: faster recharge
+            case (#UltimateMaster) { 1.4 };
+            case (#Golden) { 1.3 };
+            case (#Ultimate) { 1.25 };
+            case (#Wild) { 0.7 }; // Wild bots recharge slower
+            // Super-rare: moderate recharge boost
+            case (#Blackhole or #Dead or #Master) { 1.15 };
+            // Rare: slight recharge boost
+            case (#Bee or #Food or #Box or #Murder) { 1.05 };
+            // Common: standard recharge
             case (_) { 1.0 };
           };
 
           // Calculate hours elapsed since last decay
           let hoursSinceLastDecay = Int.abs((now - botStats.lastDecayed) / 3_600_000_000_000);
 
-          // Apply cumulative decay: 0.21 per hour for condition, 0.15 per hour for battery
-          let totalConditionDecay = Float.toInt(Float.fromInt(hoursSinceLastDecay) * 0.21 * decayMultiplier);
-          let totalBatteryDecay = Float.toInt(Float.fromInt(hoursSinceLastDecay) * 0.15 * decayMultiplier);
+          // Battery recharges naturally over time: +0.3 per hour (instead of decaying)
+          // This means ~33 hours to recover 10 battery (one race worth)
+          // Condition stays the same (only degrades during actual racing)
+          let totalBatteryRecharge = Float.toInt(Float.fromInt(hoursSinceLastDecay) * 0.3 * rechargeMultiplier);
 
-          let conditionLoss = Nat.min(botStats.condition, Int.abs(totalConditionDecay));
-          let batteryLoss = Nat.min(botStats.battery, Int.abs(totalBatteryDecay));
-
-          let extraConditionLoss = switch (botStats.lastRecharged) {
-            case (?lastTime) {
-              let hoursSinceRecharge = (now - lastTime) / 3_600_000_000_000;
-              if (hoursSinceRecharge > 48) { 1 } else { 0 };
-            };
-            case (null) {
-              let hoursSinceActivation = (now - botStats.activatedAt) / 3_600_000_000_000;
-              if (hoursSinceActivation > 48) { 1 } else { 0 };
-            };
-          };
-
-          let totalConditionLoss = Nat.min(botStats.condition, conditionLoss + extraConditionLoss);
+          // Cap battery at 100
+          let newBattery = Nat.min(100, botStats.battery + Int.abs(totalBatteryRecharge));
 
           let updatedStats = {
             botStats with
-            condition = Nat.sub(botStats.condition, totalConditionLoss);
-            battery = Nat.sub(botStats.battery, batteryLoss);
+            battery = newBattery;
             lastDecayed = now;
           };
 
@@ -723,13 +710,13 @@ module {
       };
     };
 
-    /// Apply decay to all bots
-    public func applyDecayToAll(now : Int) : Nat {
+    /// Apply battery recharge to all bots
+    public func applyRechargeToAll(now : Int) : Nat {
       let allBots = Map.entries(stats);
       var decayedCount : Nat = 0;
 
       for ((tokenIndex, _) in allBots) {
-        switch (applyDecay(tokenIndex, now)) {
+        switch (applyRecharge(tokenIndex, now)) {
           case (?_) { decayedCount += 1 };
           case (null) {};
         };
@@ -796,6 +783,7 @@ module {
             thrusterKits = 0;
             gyroModules = 0;
             universalParts = 0;
+            scrap = 0;
           };
           ignore Map.put(userInventories, phash, user, newInv);
           newInv;
@@ -847,10 +835,10 @@ module {
             { inv with thrusterKits = inv.thrusterKits - amount };
           };
           case (#GyroModule) {
-            { inv with gyroModules = inv.gyroModules - amount };
+            { inv with gyroModules = Nat.sub(inv.gyroModules, amount) };
           };
           case (#UniversalPart) {
-            { inv with universalParts = inv.universalParts - amount };
+            { inv with universalParts = Nat.sub(inv.universalParts, amount) };
           };
         };
         ignore Map.put(userInventories, phash, user, updatedInv);
@@ -861,13 +849,14 @@ module {
     };
 
     /// Calculate upgrade cost based on current upgrade count
-    /// Progressive cost: 3 -> 5 -> 8 -> 12 -> 18 -> 25
+    /// Original scrap progression: 100 -> 200 -> 300 -> 900 -> 2700 -> 8100 parts (at 100 parts = 1 ICP)
+    /// ICP equivalent: 1.0 -> 2.0 -> 3.0 -> 9.0 -> 27.0 -> 81.0 ICP
     public func calculateUpgradeCost(currentUpgradeCount : Nat) : Nat {
-      if (currentUpgradeCount == 0) { 3 } else if (currentUpgradeCount == 1) {
-        5;
-      } else if (currentUpgradeCount == 2) { 8 } else if (currentUpgradeCount == 3) {
-        12;
-      } else if (currentUpgradeCount == 4) { 18 } else { 25 };
+      if (currentUpgradeCount == 0) { 100 } else if (currentUpgradeCount == 1) {
+        200;
+      } else if (currentUpgradeCount == 2) { 300 } else if (currentUpgradeCount == 3) {
+        900;
+      } else if (currentUpgradeCount == 4) { 2700 } else { 8100 };
     };
 
     // ===== STABLE STORAGE =====

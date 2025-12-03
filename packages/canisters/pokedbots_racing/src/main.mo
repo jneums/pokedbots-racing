@@ -67,59 +67,34 @@ import IcpLedger "IcpLedger";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
 
-// // Migration function to remove calibration field from existing bot stats
+// // Migration to remove scrap field from UserInventory
 // (
 //   with migration = func(
 //     old_state : {
-//       stable_racing_stats : Map.Map<Nat, { tokenIndex : Nat; ownerPrincipal : Principal; faction : PokedBotsGarage.FactionType; speedBonus : Nat; powerCoreBonus : Nat; accelerationBonus : Nat; stabilityBonus : Nat; speedUpgrades : Nat; powerCoreUpgrades : Nat; accelerationUpgrades : Nat; stabilityUpgrades : Nat; battery : Nat; condition : Nat; calibration : Nat; experience : Nat; preferredDistance : PokedBotsGarage.Distance; preferredTerrain : RacingSimulator.Terrain; racesEntered : Nat; wins : Nat; places : Nat; shows : Nat; totalScrapEarned : Nat; factionReputation : Nat; eloRating : Nat; activatedAt : Int; lastDecayed : Int; lastRecharged : ?Int; lastRepaired : ?Int; lastDiagnostics : ?Int; lastRaced : ?Int; upgradeEndsAt : ?Int; listedForSale : Bool }>;
+//       stable_user_inventories : Map.Map<Principal, { owner : Principal; speedChips : Nat; powerCoreFragments : Nat; thrusterKits : Nat; gyroModules : Nat; universalParts : Nat; scrap : Nat }>;
 //     }
 //   ) : {
-//     stable_racing_stats : Map.Map<Nat, PokedBotsGarage.PokedBotRacingStats>;
+//     stable_user_inventories : Map.Map<Principal, PokedBotsGarage.UserInventory>;
 //   } {
-//     // Migrate bot stats: remove calibration field
-//     let new_stats = Map.new<Nat, PokedBotsGarage.PokedBotRacingStats>();
+//     // Remove scrap field from all user inventories
+//     let new_inventories = Map.new<Principal, PokedBotsGarage.UserInventory>();
 
-//     for ((tokenIndex, oldStats) in Map.entries(old_state.stable_racing_stats)) {
-//       let newStats : PokedBotsGarage.PokedBotRacingStats = {
-//         tokenIndex = oldStats.tokenIndex;
-//         ownerPrincipal = oldStats.ownerPrincipal;
-//         faction = oldStats.faction;
-//         speedBonus = oldStats.speedBonus;
-//         powerCoreBonus = oldStats.powerCoreBonus;
-//         accelerationBonus = oldStats.accelerationBonus;
-//         stabilityBonus = oldStats.stabilityBonus;
-//         speedUpgrades = oldStats.speedUpgrades;
-//         powerCoreUpgrades = oldStats.powerCoreUpgrades;
-//         accelerationUpgrades = oldStats.accelerationUpgrades;
-//         stabilityUpgrades = oldStats.stabilityUpgrades;
-//         battery = oldStats.battery;
-//         condition = oldStats.condition;
-//         // calibration field REMOVED
-//         experience = oldStats.experience;
-//         preferredDistance = oldStats.preferredDistance;
-//         preferredTerrain = oldStats.preferredTerrain;
-//         racesEntered = oldStats.racesEntered;
-//         wins = oldStats.wins;
-//         places = oldStats.places;
-//         shows = oldStats.shows;
-//         totalScrapEarned = oldStats.totalScrapEarned;
-//         factionReputation = oldStats.factionReputation;
-//         eloRating = oldStats.eloRating;
-//         activatedAt = oldStats.activatedAt;
-//         lastDecayed = oldStats.lastDecayed;
-//         lastRecharged = oldStats.lastRecharged;
-//         lastRepaired = oldStats.lastRepaired;
-//         lastDiagnostics = oldStats.lastDiagnostics;
-//         lastRaced = oldStats.lastRaced;
-//         upgradeEndsAt = oldStats.upgradeEndsAt;
-//         listedForSale = oldStats.listedForSale;
+//     for ((principal, oldInv) in Map.entries(old_state.stable_user_inventories)) {
+//       let newInv : PokedBotsGarage.UserInventory = {
+//         owner = oldInv.owner;
+//         speedChips = oldInv.speedChips;
+//         powerCoreFragments = oldInv.powerCoreFragments;
+//         thrusterKits = oldInv.thrusterKits;
+//         gyroModules = oldInv.gyroModules;
+//         universalParts = oldInv.universalParts;
+//         // scrap field removed
 //       };
 
-//       Map.set(new_stats, Map.nhash, tokenIndex, newStats);
+//       Map.set(new_inventories, Map.phash, principal, newInv);
 //     };
 
 //     {
-//       stable_racing_stats = new_stats;
+//       stable_user_inventories = new_inventories;
 //     };
 //   }
 // )
@@ -163,8 +138,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   let stable_alltime_board = Map.new<Nat, Leaderboard.LeaderboardEntry>();
   let stable_faction_boards = Map.new<Text, Map.Map<Nat, Leaderboard.LeaderboardEntry>>();
 
-  // Stable state for decay tracking
-  var stable_last_decay_time : Int = 0;
+  // Stable state for battery recharge tracking
+  var stable_last_recharge_time : Int = 0;
 
   // Constants
   let TRANSFER_FEE : Nat = 10_000; // 0.0001 ICP
@@ -527,26 +502,26 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     actionId;
   };
 
-  // Handle hourly decay (self-rescheduling timer)
-  func handleDailyDecay<system>(_actionId : TT.ActionId, _action : TT.Action) : TT.ActionId {
-    Debug.print("Hourly decay handler triggered");
+  // Handle hourly battery recharge (self-rescheduling timer)
+  func handleHourlyRecharge<system>(_actionId : TT.ActionId, _action : TT.Action) : TT.ActionId {
+    Debug.print("Hourly battery recharge handler triggered");
 
     let now = Time.now();
-    let botsDecayed = garageManager.applyDecayToAll(now);
-    stable_last_decay_time := now;
+    let botsRecharged = garageManager.applyRechargeToAll(now);
+    stable_last_recharge_time := now;
 
-    Debug.print("Applied decay to " # debug_show (botsDecayed) # " bots");
+    Debug.print("Applied battery recharge to " # debug_show (botsRecharged) # " bots");
 
-    // Schedule next decay in 1 hour
-    let nextDecayTime = now + (60 * 60 * 1_000_000_000); // 1 hour in nanoseconds
+    // Schedule next recharge in 1 hour
+    let nextRechargeTime = now + (60 * 60 * 1_000_000_000); // 1 hour in nanoseconds
     let nextActionId = tt().setActionSync<system>(
-      Int.abs(nextDecayTime),
+      Int.abs(nextRechargeTime),
       {
-        actionType = "daily_decay";
+        actionType = "hourly_recharge";
         params = to_candid (());
       },
     );
-    Debug.print("Scheduled next decay for " # debug_show (nextDecayTime));
+    Debug.print("Scheduled next recharge for " # debug_show (nextRechargeTime));
 
     nextActionId;
   };
@@ -949,6 +924,55 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                     result.prizeAmount,
                   );
 
+                  // Award parts based on race terrain and position
+                  // Terrain determines which part drops:
+                  // - MetalRoads: SpeedChips (speed is key on roads)
+                  // - ScrapHeaps: PowerCells (power to push through debris)
+                  // - WastelandSand: ThrusterKits/GyroModules alternating (accel/stability in sand)
+
+                  let partType : PokedBotsGarage.PartType = switch (race.terrain) {
+                    case (#MetalRoads) { #SpeedChip };
+                    case (#ScrapHeaps) { #PowerCoreFragment };
+                    case (#WastelandSand) {
+                      // Alternate between Thruster and Gyro based on race ID
+                      if (raceId % 2 == 0) { #ThrusterKit } else { #GyroModule };
+                    };
+                  };
+
+                  // Base parts awarded by race class (matches original scrap system: 1 scrap = 1 part)
+                  // First upgrade costs 100 parts, achievable in ~7-15 Scavenger races
+                  let baseParts : Nat = switch (race.raceClass) {
+                    case (#Scavenger) { 5 }; // Entry: 2.5-15 parts per race (winner: 15, participation: 2.5)
+                    case (#Raider) { 12 }; // Mid: 6-36 parts per race (winner: 36)
+                    case (#Elite) { 25 }; // High: 12.5-75 parts per race (winner: 75)
+                    case (#SilentKlan) { 50 }; // Top: 25-150 parts per race (winner: 150)
+                  };
+
+                  // Position multiplier (winner gets most, last place gets least)
+                  let positionMultiplier : Float = if (result.position == 1) {
+                    3.0; // Winner: 3x
+                  } else if (result.position == 2) {
+                    2.0; // Second: 2x
+                  } else if (result.position == 3) {
+                    1.5; // Third: 1.5x
+                  } else if (result.position <= 5) {
+                    1.0; // Top 5: 1x
+                  } else {
+                    0.5; // Everyone else: 0.5x (participation)
+                  };
+
+                  let partsEarned = Int.abs(Float.toInt(Float.fromInt(baseParts) * positionMultiplier));
+                  garageManager.addParts(result.owner, partType, partsEarned);
+
+                  let partName = switch (partType) {
+                    case (#SpeedChip) { "SpeedChips" };
+                    case (#PowerCoreFragment) { "PowerCells" };
+                    case (#ThrusterKit) { "ThrusterKits" };
+                    case (#GyroModule) { "GyroModules" };
+                    case (#UniversalPart) { "UniversalParts" };
+                  };
+                  Debug.print("Awarded " # debug_show (partsEarned) # " " # partName # " to " # Principal.toText(result.owner));
+
                   // Apply race costs (battery drain and condition wear based on race)
                   garageManager.applyRaceCosts(result.nftId, race.distance, race.terrain, result.position);
 
@@ -1025,26 +1049,26 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   };
 
   tt().registerExecutionListenerSync(?"upgrade_complete", handleUpgradeCompletion);
-  tt().registerExecutionListenerSync(?"daily_decay", handleDailyDecay);
+  tt().registerExecutionListenerSync(?"hourly_recharge", handleHourlyRecharge);
   tt().registerExecutionListenerSync(?"race_create", handleRaceCreation);
   tt().registerExecutionListenerSync(?"race_start", handleRaceStart);
   tt().registerExecutionListenerSync(?"race_finish", handleRaceFinish);
   tt().registerExecutionListenerAsync(?"prize_distribution", handlePrizeDistribution);
 
-  // Initialize decay timer on deployment (inline to avoid postinit issues)
+  // Initialize battery recharge timer on deployment (inline to avoid postinit issues)
   ignore do {
     let existingDecayActions = tt().getActionsByFilter(#ByType("daily_decay"));
     if (existingDecayActions.size() == 0) {
       let now = Time.now();
-      let firstDecayTime = Int.abs(now + (60 * 60 * 1_000_000_000)); // 1 hour from now
+      let firstRechargeTime = Int.abs(now + (60 * 60 * 1_000_000_000)); // 1 hour from now
       ignore tt().setActionSync<system>(
-        firstDecayTime,
+        firstRechargeTime,
         {
           actionType = "daily_decay";
           params = "";
         },
       );
-      Debug.print("Decay timer initialized for first execution at " # debug_show (firstDecayTime));
+      Debug.print("Battery recharge timer initialized for first execution at " # debug_show (firstRechargeTime));
     };
   };
 
@@ -2154,48 +2178,48 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     // Re-register all timer handlers after upgrade
     tt().registerExecutionListenerSync(?"upgrade_complete", handleUpgradeCompletion);
-    tt().registerExecutionListenerSync(?"daily_decay", handleDailyDecay);
+    tt().registerExecutionListenerSync(?"hourly_recharge", handleHourlyRecharge);
     tt().registerExecutionListenerSync(?"race_create", handleRaceCreation);
     tt().registerExecutionListenerSync(?"race_start", handleRaceStart);
     tt().registerExecutionListenerSync(?"race_finish", handleRaceFinish);
     tt().registerExecutionListenerAsync(?"prize_distribution", handlePrizeDistribution);
 
-    initializeDecayTimer<system>();
+    initializeRechargeTimer<system>();
     initializeRaceCreationTimer<system>();
   };
 
-  // Initialize the decay timer (called on postupgrade or first install)
-  func initializeDecayTimer<system>() {
-    // Check if we already have a decay timer scheduled
-    let existingActions = tt().getActionsByFilter(#ByType("daily_decay"));
+  // Initialize the hourly battery recharge timer (called on postupgrade or first install)
+  func initializeRechargeTimer<system>() {
+    // Check if we already have a recharge timer scheduled
+    let existingActions = tt().getActionsByFilter(#ByType("hourly_recharge"));
     if (existingActions.size() == 0) {
-      // No decay timer exists, schedule the first one
+      // No recharge timer exists, schedule the first one
       let now = Time.now();
-      let firstDecayTime = if (stable_last_decay_time == 0) {
-        // First install, schedule decay in 1 hour
+      let firstRechargeTime = if (stable_last_recharge_time == 0) {
+        // First install, schedule recharge in 1 hour
         Int.abs(now + (60 * 60 * 1_000_000_000));
       } else {
-        // After upgrade, schedule based on last decay
-        let timeSinceLastDecay = now - stable_last_decay_time;
+        // After upgrade, schedule based on last recharge
+        let timeSinceLastRecharge = now - stable_last_recharge_time;
         let hourInNs = 60 * 60 * 1_000_000_000;
-        if (timeSinceLastDecay >= hourInNs) {
+        if (timeSinceLastRecharge >= hourInNs) {
           // Overdue, schedule immediately
           Int.abs(now + 60_000_000_000); // 1 minute from now
         } else {
           // Schedule at next 1-hour mark
-          Int.abs(stable_last_decay_time + hourInNs);
+          Int.abs(stable_last_recharge_time + hourInNs);
         };
       };
 
       ignore tt().setActionSync<system>(
-        firstDecayTime,
+        firstRechargeTime,
         {
-          actionType = "daily_decay";
+          actionType = "hourly_recharge";
           params = to_candid (());
         },
       );
 
-      Debug.print("Decay timer already exists, skipping initialization");
+      Debug.print("Recharge timer already exists, skipping initialization");
     };
   };
 

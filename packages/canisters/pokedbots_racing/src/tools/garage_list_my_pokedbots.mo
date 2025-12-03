@@ -53,12 +53,12 @@ module {
             var msg = "🤖 Your Garage\n\n";
 
             // Add inventory summary
-            msg #= "📦 Inventory:\n";
-            msg #= "   • Speed Chips: " # Nat.toText(inventory.speedChips) # "\n";
-            msg #= "   • Power Cells: " # Nat.toText(inventory.powerCoreFragments) # "\n";
-            msg #= "   • Thruster Parts: " # Nat.toText(inventory.thrusterKits) # "\n";
-            msg #= "   • Gyro Units: " # Nat.toText(inventory.gyroModules) # "\n";
-            msg #= "   • Universal Parts: " # Nat.toText(inventory.universalParts) # "\n\n";
+            msg #= "📦 Parts Inventory (earned from racing):\n";
+            msg #= "   🏎️  Speed Chips: " # Nat.toText(inventory.speedChips) # " (from MetalRoads races)\n";
+            msg #= "   ⚡ Power Cells: " # Nat.toText(inventory.powerCoreFragments) # " (from ScrapHeaps races)\n";
+            msg #= "   🚀 Thruster Kits: " # Nat.toText(inventory.thrusterKits) # " (from WastelandSand races)\n";
+            msg #= "   🎯 Gyro Units: " # Nat.toText(inventory.gyroModules) # " (from WastelandSand races)\n";
+            msg #= "   ⭐ Universal Parts: " # Nat.toText(inventory.universalParts) # "\n\n";
 
             msg #= "Found " # Nat32.toText(Nat32.fromNat(tokens.size())) # " PokedBot(s)\n\n";
 

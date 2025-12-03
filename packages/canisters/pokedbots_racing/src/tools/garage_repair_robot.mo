@@ -15,7 +15,7 @@ import IcpLedger "../IcpLedger";
 import ExtIntegration "../ExtIntegration";
 
 module {
-  let REPAIR_COST = 5000000 : Nat; // 0.05 ICP (reduced for testing)
+  let REPAIR_COST = 5000000 : Nat; // 0.05 ICP
   let TRANSFER_FEE = 10000 : Nat;
   let REPAIR_COOLDOWN : Int = 43200000000000; // 12 hours in nanoseconds
 
