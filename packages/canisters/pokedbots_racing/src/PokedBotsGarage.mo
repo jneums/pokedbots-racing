@@ -783,7 +783,6 @@ module {
             thrusterKits = 0;
             gyroModules = 0;
             universalParts = 0;
-            scrap = 0;
           };
           ignore Map.put(userInventories, phash, user, newInv);
           newInv;
