@@ -10,6 +10,13 @@
     "pokedbots-racing": {
       "type": "http",
       "url": "https://p6nop-vyaaa-aaaai-q4djq-cai.icp0.io/mcp"
+    },
+    "ext-wallet": {
+      "type": "http",
+      "url": "https://j3gvq-uyaaa-aaaai-q4d7q-cai.icp0.io/mcp",
+      "headers": {
+        "x-api-key": "dd2c989ec5ebc574beb2a987e46e65c0d239538364731c2eefa6a4297c412d16"
+      }
     }
   }
 }

@@ -9,6 +9,7 @@ import DocsListPage from './app/docs/page';
 import DocPage from './app/docs/[slug]/page';
 import GuidesListPage from './app/guides/page';
 import GuidePage from './app/guides/[slug]/page';
+import BotDetailsPage from './app/bot/[tokenIndex]/page';
 
 import { configure as configureIcJs } from '@pokedbots-racing/ic-js';
 
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/schedule" element={<SchedulePage />} />
           <Route path="/schedule/:eventId" element={<EventDetailsPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/bot/:tokenIndex" element={<BotDetailsPage />} />
           <Route path="/docs" element={<DocsListPage />} />
           <Route path="/docs/:slug" element={<DocPage />} />
           <Route path="/guides" element={<GuidesListPage />} />

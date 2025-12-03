@@ -90,10 +90,7 @@ module {
         case (?stats) { stats };
       };
 
-      if (racingStats.battery < 30 or racingStats.condition < 50) {
-        return ToolContext.makeError("Battery must be > 30 and condition > 50", cb);
-      };
-
+      // Upgrades can be started at any battery/condition level
       let now = Time.now();
       switch (racingStats.upgradeEndsAt) {
         case (?endsAt) {
@@ -200,13 +197,21 @@ module {
 
       let expectedGain = switch (racingStats.faction) {
         // Ultra-Rare: 10% chance for 2x
-        case (#UltimateMaster or #Wild or #Golden or #Ultimate) { "1-3 points (10% chance for 2x bonus!)" };
+        case (#UltimateMaster or #Wild or #Golden or #Ultimate) {
+          "1-3 points (10% chance for 2x bonus!)";
+        };
         // Super-Rare: 20% chance for 2x
-        case (#Blackhole or #Dead or #Master) { "1-3 points (20% chance for 2x bonus!)" };
+        case (#Blackhole or #Dead or #Master) {
+          "1-3 points (20% chance for 2x bonus!)";
+        };
         // Rare: 35% chance for 2x (CATCH-UP mechanic)
-        case (#Bee or #Food or #Box or #Murder) { "1-3 points (35% chance for 2x bonus!)" };
+        case (#Bee or #Food or #Box or #Murder) {
+          "1-3 points (35% chance for 2x bonus!)";
+        };
         // Common: 25% chance for 2x
-        case (#Game or #Animal or #Industrial) { "1-3 points (25% chance for 2x bonus!)" };
+        case (#Game or #Animal or #Industrial) {
+          "1-3 points (25% chance for 2x bonus!)";
+        };
       };
 
       let response = Json.obj([

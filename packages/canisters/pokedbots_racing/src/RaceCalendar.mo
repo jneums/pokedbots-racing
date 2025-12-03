@@ -162,6 +162,31 @@ module {
       metadata : EventMetadata,
       now : Int,
     ) : ScheduledEvent {
+      // Check for duplicate event at this time (within 5 minute tolerance)
+      let FIVE_MINUTES_NS : Int = 5 * 60 * 1_000_000_000;
+      let allEvents = getAllEvents();
+      
+      for (existingEvent in allEvents.vals()) {
+        // Check if there's already an event of this type at approximately this time
+        let timeDiff = Int.abs(existingEvent.scheduledTime - scheduledTime);
+        if (timeDiff < FIVE_MINUTES_NS) {
+          // Check if it's the same event type
+          let sameType = switch (eventType, existingEvent.eventType) {
+            case (#WeeklyLeague, #WeeklyLeague) { true };
+            case (#DailySprint, #DailySprint) { true };
+            case (#MonthlyCup, #MonthlyCup) { true };
+            case (#SpecialEvent(a), #SpecialEvent(b)) { a == b };
+            case _ { false };
+          };
+          
+          if (sameType) {
+            // Return the existing event instead of creating a duplicate
+            return existingEvent;
+          };
+        };
+      };
+
+      // No duplicate found, create new event
       let eventId = nextEventId;
       nextEventId += 1;
 
@@ -282,6 +307,14 @@ module {
           };
         },
       );
+    };
+
+    // Delete event by ID
+    public func deleteEvent(eventId : Nat) : Bool {
+      switch (Map.remove(events, nhash, eventId)) {
+        case (?_) { true };
+        case (null) { false };
+      };
     };
 
     // Update event status

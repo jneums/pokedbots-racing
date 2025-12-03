@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,15 @@ function RaceCard({ raceId }: { raceId: bigint }) {
 
   const prizePool = race.entries.reduce((sum: number, entry: any) => sum + Number(entry.entryFee), 0) + Number(race.platformBonus);
   const entryCount = race.entries.length;
+  
+  // Get class name from race name
+  const getClassName = (name: string): string => {
+    if (name.includes('Scavenger')) return 'Scavenger';
+    if (name.includes('Raider')) return 'Raider';
+    if (name.includes('Elite')) return 'Elite';
+    if (name.includes('SilentKlan') || name.includes('Silent Klan')) return 'SilentKlan';
+    return 'Unknown';
+  };
 
   return (
     <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur">
@@ -67,8 +76,13 @@ function RaceCard({ raceId }: { raceId: bigint }) {
             </CardDescription>
           </div>
           <div className="text-right">
-            <p className="text-sm text-muted-foreground">Start Time</p>
-            <p className="font-semibold">{formatDate(race.startTime)}</p>
+            <p className="text-sm text-muted-foreground">Status</p>
+            <p className="font-semibold text-primary">
+              {'Upcoming' in race.status && '⏳ Upcoming'}
+              {'InProgress' in race.status && '🏁 Racing'}
+              {'Completed' in race.status && '✅ Done'}
+              {'Cancelled' in race.status && '❌ Cancelled'}
+            </p>
           </div>
         </div>
       </CardHeader>
@@ -76,21 +90,17 @@ function RaceCard({ raceId }: { raceId: bigint }) {
         {/* Race Stats */}
         <div className="grid grid-cols-3 gap-3">
           <div className="text-center p-3 bg-card/50 border border-primary/20 rounded-lg">
+            <p className="text-xs text-muted-foreground mb-1">Entry Fee</p>
+            <p className="text-base font-bold text-primary">{formatICP(race.entryFee)}</p>
+            <p className="text-xs text-muted-foreground mt-1">{getClassName(race.name)}</p>
+          </div>
+          <div className="text-center p-3 bg-card/50 border border-primary/20 rounded-lg">
             <p className="text-xs text-muted-foreground mb-1">Prize Pool</p>
             <p className="text-base font-bold text-primary">{formatICP(BigInt(prizePool))}</p>
           </div>
           <div className="text-center p-3 bg-card/50 border border-primary/20 rounded-lg">
             <p className="text-xs text-muted-foreground mb-1">Entries</p>
             <p className="text-base font-bold text-primary">{entryCount}</p>
-          </div>
-          <div className="text-center p-3 bg-card/50 border border-primary/20 rounded-lg">
-            <p className="text-xs text-muted-foreground mb-1">Status</p>
-            <p className="text-base font-bold text-primary">
-              {'Upcoming' in race.status && '⏳ Upcoming'}
-              {'InProgress' in race.status && '🏁 Racing'}
-              {'Completed' in race.status && '✅ Done'}
-              {'Cancelled' in race.status && '❌ Cancelled'}
-            </p>
           </div>
         </div>
 
@@ -104,20 +114,22 @@ function RaceCard({ raceId }: { raceId: bigint }) {
                 const imageUrl = generateExtThumbnailLink(tokenId);
                 
                 return (
-                  <div key={idx} className="flex items-center gap-3 p-2 bg-card/50 border border-primary/10 rounded">
-                    <img
-                      src={imageUrl}
-                      alt={`Bot #${entry.nftId}`}
-                      className="w-8 h-8 rounded border-2 border-primary/30"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold">PokedBot #{entry.nftId}</p>
-                      <p className="text-xs text-muted-foreground">Entry Fee: {formatICP(entry.entryFee)}</p>
+                  <Link key={idx} to={`/bot/${entry.nftId}`} className="block hover:bg-card/70 transition-colors rounded">
+                    <div className="flex items-center gap-3 p-2 bg-card/50 border border-primary/10 rounded">
+                      <img
+                        src={imageUrl}
+                        alt={`Bot #${entry.nftId}`}
+                        className="w-8 h-8 rounded border-2 border-primary/30"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold">PokedBot #{entry.nftId}</p>
+                        <p className="text-xs text-muted-foreground">Entry Fee: {formatICP(entry.entryFee)}</p>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        #{idx + 1}
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      #{idx + 1}
-                    </Badge>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -132,34 +144,45 @@ function RaceCard({ raceId }: { raceId: bigint }) {
               {race.results[0].map((result: any, idx: number) => {
                 const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(result.nftId));
                 const imageUrl = generateExtThumbnailLink(tokenId);
+                const winnerTime = race.results?.[0]?.[0]?.finalTime;
+                const timeGap = idx > 0 && winnerTime ? (result.finalTime - winnerTime).toFixed(2) : null;
                 
                 return (
-                  <div key={idx} className="flex items-center gap-3 p-3 bg-card border-2 border-primary/20 rounded-lg">
-                    <div className="text-2xl font-bold w-8">
-                      {idx === 0 && '🥇'}
-                      {idx === 1 && '🥈'}
-                      {idx === 2 && '🥉'}
-                      {idx > 2 && `#${idx + 1}`}
-                    </div>
-                    <img
-                      src={imageUrl}
-                      alt={`Bot #${result.nftId}`}
-                      className="w-10 h-10 rounded border-2 border-primary/40"
-                    />
-                    <div className="flex-1">
-                      <p className="font-semibold">PokedBot #{result.nftId}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {result.completionTime !== undefined ? `Time: ${result.completionTime.toString()}s` : 'Position ' + (idx + 1)}
-                      </p>
-                    </div>
-                    {result.prizeAmount !== undefined && result.prizeAmount > 0n && (
-                      <div className="text-right">
-                        <p className="text-sm text-green-500 font-bold">
-                          +{formatICP(result.prizeAmount)}
+                  <Link key={idx} to={`/bot/${result.nftId}`} className="block hover:bg-card/70 transition-colors rounded-lg">
+                    <div className="flex items-center gap-3 p-3 bg-card border-2 border-primary/20 rounded-lg">
+                      <div className="text-2xl font-bold w-8">
+                        {idx === 0 && '🥇'}
+                        {idx === 1 && '🥈'}
+                        {idx === 2 && '🥉'}
+                        {idx > 2 && `#${idx + 1}`}
+                      </div>
+                      <img
+                        src={imageUrl}
+                        alt={`Bot #${result.nftId}`}
+                        className="w-10 h-10 rounded border-2 border-primary/40"
+                      />
+                      <div className="flex-1">
+                        <p className="font-semibold">PokedBot #{result.nftId}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {result.finalTime !== undefined ? (
+                            <>
+                              {result.finalTime.toFixed(2)}s
+                              {timeGap && <span className="text-xs ml-1">(+{timeGap}s)</span>}
+                            </>
+                          ) : (
+                            `Position ${idx + 1}`
+                          )}
                         </p>
                       </div>
-                    )}
-                  </div>
+                      {result.prizeAmount !== undefined && result.prizeAmount > 0n && (
+                        <div className="text-right">
+                          <p className="text-sm text-green-500 font-bold">
+                            +{formatICP(result.prizeAmount)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </Link>
                 );
               })}
             </div>
@@ -235,14 +258,10 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
               <CardTitle>Event Details</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-card/50 border border-primary/20 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Entry Fee</p>
-                  <p className="text-xl font-bold text-primary">{formatICP(event.metadata.entryFee)}</p>
-                </div>
-                <div className="text-center p-4 bg-card/50 border border-primary/20 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Bonus Pool</p>
-                  <p className="text-xl font-bold text-primary">{formatICP(event.metadata.prizePoolBonus)}</p>
+                  <p className="text-sm text-muted-foreground mb-1">Start Time</p>
+                  <p className="text-base font-bold text-primary">{formatDate(event.scheduledTime)}</p>
                 </div>
                 <div className="text-center p-4 bg-card/50 border border-primary/20 rounded-lg">
                   <p className="text-sm text-muted-foreground mb-1">Total Races</p>
@@ -259,9 +278,30 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
           {/* Races */}
           <div className="space-y-6">
             <h2 className="text-2xl font-bold">Races</h2>
-            {event.raceIds.map((raceId: bigint) => (
-              <RaceCard key={raceId.toString()} raceId={raceId} />
-            ))}
+            
+            {event.raceIds.length === 0 ? (
+              <Card className="border-2 border-primary/20 bg-card/50 backdrop-blur">
+                <CardContent className="py-12 text-center">
+                  <div className="space-y-4">
+                    <div className="text-6xl">📅</div>
+                    <h3 className="text-xl font-semibold">Races Not Yet Created</h3>
+                    <p className="text-muted-foreground max-w-md mx-auto">
+                      Races for this event will be created automatically one week before the event date. 
+                      Check back closer to the event to see the race schedule and register your bots!
+                    </p>
+                    <div className="pt-4">
+                      <p className="text-sm text-muted-foreground">
+                        Event starts: <span className="font-semibold text-primary">{formatDate(event.scheduledTime)}</span>
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              event.raceIds.map((raceId: bigint) => (
+                <RaceCard key={raceId.toString()} raceId={raceId} />
+              ))
+            )}
           </div>
         </div>
       </div>

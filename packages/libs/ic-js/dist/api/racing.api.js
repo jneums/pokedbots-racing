@@ -55,3 +55,14 @@ export const getRaceById = async (raceId, identity) => {
     const result = await racingActor.get_race_by_id(BigInt(raceId));
     return result.length > 0 ? (result[0] ?? null) : null;
 };
+/**
+ * Fetches public profile details for a specific PokedBot.
+ * @param tokenIndex The token index of the bot
+ * @param identity Optional identity to use for the actor
+ * @returns The bot profile if found, null otherwise
+ */
+export const getBotProfile = async (tokenIndex, identity) => {
+    const racingActor = getRacingActor(identity);
+    const result = await racingActor.get_bot_profile(BigInt(tokenIndex));
+    return result.length > 0 ? (result[0] ?? null) : null;
+};

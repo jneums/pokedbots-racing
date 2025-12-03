@@ -81,20 +81,15 @@ module {
       let status = ctx.garageManager.getBotStatus(racingStats);
       let canRace = ctx.garageManager.canRace(Nat.toText(tokenIndex));
 
-      // Determine race class bracket
-      let raceClass = if (racingStats.wins <= 2) {
-        "Scavenger (0-2 wins)";
-      } else if (racingStats.wins >= 3 and racingStats.wins <= 5) {
-        "Raider (3-5 wins)";
-      } else if (racingStats.wins >= 6 and racingStats.wins <= 9) {
-        "Elite (6-9 wins)";
+      // Determine race class bracket (ELO-based)
+      let raceClass = if (racingStats.eloRating >= 1800) {
+        "SilentKlan (1800+ ELO)";
+      } else if (racingStats.eloRating >= 1600) {
+        "Elite (1600-1799 ELO)";
+      } else if (racingStats.eloRating >= 1400) {
+        "Raider (1400-1599 ELO)";
       } else {
-        // 10+ wins
-        switch (racingStats.faction) {
-          case (#GodClass) { "SilentKlan (10+ wins, God Class)" };
-          case (#Master) { "SilentKlan (10+ wins, Master)" };
-          case (_) { "Elite+ (10+ wins, locked from SilentKlan)" };
-        };
+        "Scavenger (<1400 ELO)";
       };
 
       // Get wasteland flavor text
@@ -194,7 +189,7 @@ module {
         ("faction", Json.str(factionText)),
         ("inventory", inventoryJson),
         ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability)), ("base_speed", Json.int(baseStats.speed)), ("base_power_core", Json.int(baseStats.powerCore)), ("base_acceleration", Json.int(baseStats.acceleration)), ("base_stability", Json.int(baseStats.stability)), ("speed_bonus", Json.int(racingStats.speedBonus)), ("power_core_bonus", Json.int(racingStats.powerCoreBonus)), ("acceleration_bonus", Json.int(racingStats.accelerationBonus)), ("stability_bonus", Json.int(racingStats.stabilityBonus)), ("speed_upgrades", Json.int(racingStats.speedUpgrades)), ("power_core_upgrades", Json.int(racingStats.powerCoreUpgrades)), ("acceleration_upgrades", Json.int(racingStats.accelerationUpgrades)), ("stability_upgrades", Json.int(racingStats.stabilityUpgrades))])),
-        ("condition", Json.obj([("battery", Json.int(racingStats.battery)), ("condition", Json.int(racingStats.condition)), ("calibration", Json.int(racingStats.calibration)), ("status", Json.str(status)), ("status_message", Json.str(statusFlavor))])),
+        ("condition", Json.obj([("battery", Json.int(racingStats.battery)), ("condition", Json.int(racingStats.condition)), ("status", Json.str(status)), ("status_message", Json.str(statusFlavor))])),
         ("career", Json.obj([("races_entered", Json.int(racingStats.racesEntered)), ("wins", Json.int(racingStats.wins)), ("places", Json.int(racingStats.places)), ("shows", Json.int(racingStats.shows)), ("total_scrap_earned", Json.int(racingStats.totalScrapEarned)), ("faction_reputation", Json.int(racingStats.factionReputation)), ("reputation_tier", Json.str(reputationTier))])),
         ("overall_rating", Json.int(overallRating)),
         ("can_race", Json.bool(canRace)),

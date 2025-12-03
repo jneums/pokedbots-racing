@@ -127,6 +127,7 @@ export interface McpServer {
       'ownerResult' : string,
     }
   >,
+  'debug_create_test_race' : ActorMethod<[bigint], string>,
   'debug_preview_stats' : ActorMethod<
     [bigint],
     {
@@ -161,8 +162,10 @@ export interface McpServer {
   >,
   'debug_seed_leaderboard' : ActorMethod<[bigint], string>,
   'decode_token_identifier' : ActorMethod<[string], bigint>,
+  'delete_events_and_races' : ActorMethod<[Array<bigint>], string>,
   'emergency_clear_all_timers' : ActorMethod<[], bigint>,
   'encode_token_identifier' : ActorMethod<[number], string>,
+  'force_finish_race' : ActorMethod<[bigint], string>,
   'force_release_lock' : ActorMethod<[], [] | [Time]>,
   'force_system_timer_cancel' : ActorMethod<[], boolean>,
   'get_actions_by_filter' : ActorMethod<[ActionFilter], Array<ActionDetail>>,
@@ -181,6 +184,31 @@ export interface McpServer {
     ]
   >,
   'get_base_stats_count' : ActorMethod<[], bigint>,
+  'get_bot_profile' : ActorMethod<
+    [bigint],
+    [] | [
+      {
+        'tokenIndex' : bigint,
+        'isInitialized' : boolean,
+        'eloRating' : bigint,
+        'stats' : {
+          'stability' : bigint,
+          'speed' : bigint,
+          'overallRating' : bigint,
+          'acceleration' : bigint,
+          'powerCore' : bigint,
+        },
+        'faction' : FactionType,
+        'career' : {
+          'wins' : bigint,
+          'podiums' : bigint,
+          'racesEntered' : bigint,
+          'totalEarnings' : bigint,
+        },
+        'raceClass' : RaceClass,
+      }
+    ]
+  >,
   'get_current_periods' : ActorMethod<
     [],
     { 'seasonId' : bigint, 'monthId' : bigint }
@@ -243,6 +271,8 @@ export interface McpServer {
     [{ 'context' : Uint8Array | number[], 'response' : HttpRequestResult }],
     HttpRequestResult
   >,
+  'trigger_race_start' : ActorMethod<[bigint], string>,
+  'trigger_stuck_races' : ActorMethod<[], string>,
   'upload_base_stats_batch' : ActorMethod<
     [
       Array<
@@ -273,6 +303,7 @@ export interface Race {
   'duration' : bigint,
   'terrain' : Terrain,
   'platformTax' : bigint,
+  'minEntries' : bigint,
   'name' : string,
   'createdAt' : bigint,
   'results' : [] | [Array<RaceResult>],

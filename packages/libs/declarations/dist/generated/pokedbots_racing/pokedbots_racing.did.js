@@ -62,15 +62,6 @@ export const idlFactory = ({ IDL }) => {
     'registrationOpens' : IDL.Int,
     'eventType' : EventType,
   });
-  const ReconstitutionTrace = IDL.Record({
-    'errors' : IDL.Vec(IDL.Text),
-    'actionsRestored' : IDL.Nat,
-    'timestamp' : Time__1,
-    'migratedTo' : IDL.Text,
-    'migratedFrom' : IDL.Text,
-    'timersRestored' : IDL.Nat,
-    'validationPassed' : IDL.Bool,
-  });
   const FactionType = IDL.Variant({
     'Bee' : IDL.Null,
     'Box' : IDL.Null,
@@ -86,6 +77,15 @@ export const idlFactory = ({ IDL }) => {
     'UltimateMaster' : IDL.Null,
     'Industrial' : IDL.Null,
     'Master' : IDL.Null,
+  });
+  const ReconstitutionTrace = IDL.Record({
+    'errors' : IDL.Vec(IDL.Text),
+    'actionsRestored' : IDL.Nat,
+    'timestamp' : Time__1,
+    'migratedTo' : IDL.Text,
+    'migratedFrom' : IDL.Text,
+    'timersRestored' : IDL.Nat,
+    'validationPassed' : IDL.Bool,
   });
   const LeaderboardType = IDL.Variant({
     'AllTime' : IDL.Null,
@@ -155,6 +155,7 @@ export const idlFactory = ({ IDL }) => {
     'duration' : IDL.Nat,
     'terrain' : Terrain,
     'platformTax' : IDL.Nat,
+    'minEntries' : IDL.Nat,
     'name' : IDL.Text,
     'createdAt' : IDL.Int,
     'results' : IDL.Opt(IDL.Vec(RaceResult)),
@@ -301,6 +302,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'debug_create_test_race' : IDL.Func([IDL.Nat], [IDL.Text], []),
     'debug_preview_stats' : IDL.Func(
         [IDL.Nat],
         [
@@ -338,8 +340,10 @@ export const idlFactory = ({ IDL }) => {
       ),
     'debug_seed_leaderboard' : IDL.Func([IDL.Nat], [IDL.Text], []),
     'decode_token_identifier' : IDL.Func([IDL.Text], [IDL.Nat], ['query']),
+    'delete_events_and_races' : IDL.Func([IDL.Vec(IDL.Nat)], [IDL.Text], []),
     'emergency_clear_all_timers' : IDL.Func([], [IDL.Nat], []),
     'encode_token_identifier' : IDL.Func([IDL.Nat32], [IDL.Text], ['query']),
+    'force_finish_race' : IDL.Func([IDL.Nat], [IDL.Text], []),
     'force_release_lock' : IDL.Func([], [IDL.Opt(Time)], []),
     'force_system_timer_cancel' : IDL.Func([], [IDL.Bool], []),
     'get_actions_by_filter' : IDL.Func(
@@ -369,6 +373,34 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_base_stats_count' : IDL.Func([], [IDL.Nat], ['query']),
+    'get_bot_profile' : IDL.Func(
+        [IDL.Nat],
+        [
+          IDL.Opt(
+            IDL.Record({
+              'tokenIndex' : IDL.Nat,
+              'isInitialized' : IDL.Bool,
+              'eloRating' : IDL.Nat,
+              'stats' : IDL.Record({
+                'stability' : IDL.Nat,
+                'speed' : IDL.Nat,
+                'overallRating' : IDL.Nat,
+                'acceleration' : IDL.Nat,
+                'powerCore' : IDL.Nat,
+              }),
+              'faction' : FactionType,
+              'career' : IDL.Record({
+                'wins' : IDL.Nat,
+                'podiums' : IDL.Nat,
+                'racesEntered' : IDL.Nat,
+                'totalEarnings' : IDL.Nat,
+              }),
+              'raceClass' : RaceClass,
+            })
+          ),
+        ],
+        ['query'],
+      ),
     'get_current_periods' : IDL.Func(
         [],
         [IDL.Record({ 'seasonId' : IDL.Nat, 'monthId' : IDL.Nat })],
@@ -476,6 +508,8 @@ export const idlFactory = ({ IDL }) => {
         [HttpRequestResult],
         ['query'],
       ),
+    'trigger_race_start' : IDL.Func([IDL.Nat], [IDL.Text], []),
+    'trigger_stuck_races' : IDL.Func([], [IDL.Text], []),
     'upload_base_stats_batch' : IDL.Func(
         [
           IDL.Vec(

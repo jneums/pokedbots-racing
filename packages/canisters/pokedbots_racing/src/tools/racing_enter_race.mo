@@ -23,7 +23,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_enter_race";
     title = ?"Enter Race";
-    description = ?"Enter your PokedBot in a wasteland race. Pays entry fee via ICRC-2. Bot must meet race requirements (condition ≥70, battery ≥50, correct class). Battery drains by 10 per race.";
+    description = ?"Enter your PokedBot in a wasteland race. Pays entry fee via ICRC-2. Bot must meet race class requirements based on ELO rating. Battery drains by 10 after race completes. Low condition/battery affects race performance but doesn't prevent entry.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -147,28 +147,17 @@ module {
         return ToolContext.makeError("Bot is listed for sale on the marketplace. Unlist it before racing.", cb);
       };
 
-      // Check bot condition
-      if (botStats.condition < 70) {
-        return ToolContext.makeError("Bot condition too low (need ≥70). Use garage_repair_robot first.", cb);
-      };
-
-      if (botStats.battery < 50) {
-        return ToolContext.makeError("Bot battery too low (need ≥50). Use garage_recharge_robot first.", cb);
-      };
-
-      // Check class requirements
+      // Check class requirements (ELO-based)
       let meetsClass = switch (race.raceClass) {
-        case (#Scavenger) { botStats.wins <= 2 };
-        case (#Raider) { botStats.wins >= 3 and botStats.wins <= 5 };
-        case (#Elite) { botStats.wins >= 6 and botStats.wins <= 9 };
+        case (#Scavenger) { botStats.eloRating < 1400 };
+        case (#Raider) {
+          botStats.eloRating >= 1400 and botStats.eloRating < 1600
+        };
+        case (#Elite) {
+          botStats.eloRating >= 1600 and botStats.eloRating < 1800
+        };
         case (#SilentKlan) {
-          botStats.wins >= 10 and (
-            switch (botStats.faction) {
-              case (#GodClass) { true };
-              case (#Master) { true };
-              case (_) { false };
-            }
-          );
+          botStats.eloRating >= 1800;
         };
       };
 
@@ -179,7 +168,9 @@ module {
       // Process payment using ICRC-2 transfer_from
       let ledgerCanisterId = switch (ctx.icpLedgerCanisterId()) {
         case (?id) { id };
-        case (null) { return ToolContext.makeError("ICP Ledger not configured", cb); };
+        case (null) {
+          return ToolContext.makeError("ICP Ledger not configured", cb);
+        };
       };
       let icpLedger = actor (Principal.toText(ledgerCanisterId)) : actor {
         icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
@@ -213,10 +204,9 @@ module {
             // Payment successful, enter the race
             switch (ctx.raceManager.enterRace(raceId, nftId, user, now)) {
               case (?updatedRace) {
-                // Drain battery
+                // Update last raced time (battery drain happens after race completes)
                 let updatedStats = {
                   botStats with
-                  battery = Nat.sub(botStats.battery, 10);
                   lastRaced = ?now;
                 };
                 ctx.garageManager.updateStats(tokenIndex, updatedStats);
@@ -244,7 +234,7 @@ module {
                   ("current_prize_pool_icp", Json.str(Text.concat("0.", Nat.toText(updatedRace.prizePool / 100000)))),
                   ("starts_in_hours", Json.int(hoursUntilStart)),
                   ("starts_in_minutes", Json.int(minutesUntilStart)),
-                  ("battery_remaining", Json.int(updatedStats.battery)),
+                  ("battery_remaining", Json.int(botStats.battery)),
                   ("wasteland_message", Json.str("⚡ Your bot heads to the starting line. The wasteland awaits...")),
                 ]);
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -74,7 +75,7 @@ function LeaderboardTable({ entries, type }: { entries: LeaderboardEntry[], type
                 </div>
 
                 {/* Bot with NFT Image */}
-                <div className="flex items-center gap-3 flex-1 min-w-0">
+                <Link to={`/bot/${entry.tokenIndex.toString()}`} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity">
                   <div className="relative flex-shrink-0">
                     <img
                       src={(() => {
@@ -115,7 +116,7 @@ function LeaderboardTable({ entries, type }: { entries: LeaderboardEntry[], type
                       </span>
                     </div>
                   </div>
-                </div>
+                </Link>
 
                 {/* Stats Section */}
                 <div className="flex items-center gap-6 sm:gap-10 ml-auto mr-2 sm:mr-4">

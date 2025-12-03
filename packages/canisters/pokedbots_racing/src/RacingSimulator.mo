@@ -90,6 +90,7 @@ module {
     raceClass : RaceClass;
     entryFee : Nat; // ICP e8s
     maxEntries : Nat;
+    minEntries : Nat; // Minimum entries to run
     startTime : Int;
     duration : Nat; // seconds
     entryDeadline : Int;
@@ -116,8 +117,8 @@ module {
     /// Update post-race (optional - for collections that track career stats)
     recordRaceResult : (nftId : Text, position : Nat, racers : Nat, prize : Nat) -> ();
 
-    /// Deduct racing costs (battery drain, etc.)
-    applyRaceCosts : (nftId : Text) -> ();
+    /// Deduct racing costs (battery drain and condition wear based on race difficulty)
+    applyRaceCosts : (nftId : Text, distance : Nat, terrain : Terrain, position : Nat) -> ();
   };
 
   // ===== RACE SIMULATION ENGINE =====
@@ -155,36 +156,67 @@ module {
       // Base time calculation (inverse of speed)
       let baseTime = distance * (100.0 / speed) * 30.0;
 
-      // Terrain modifier
+      // Terrain modifier - MORE IMPACTFUL (20-50% variation)
       let terrainMod = switch (race.terrain) {
         case (#ScrapHeaps) {
-          1.0 + ((100.0 - stability) / 200.0); // Stability matters most
+          1.0 + ((100.0 - stability) / 150.0); // Stability matters most (up to +67%)
         };
         case (#WastelandSand) {
-          1.0 + ((100.0 - powerCore) / 300.0); // Endurance matters
+          1.0 + ((100.0 - powerCore) / 200.0); // Endurance matters (up to +50%)
         };
         case (#MetalRoads) {
-          1.0 + ((100.0 - acceleration) / 400.0); // Quick acceleration helps
+          1.0 + ((100.0 - acceleration) / 250.0); // Quick acceleration helps (up to +40%)
         };
       };
 
-      // Distance modifier
+      // Distance modifier - MORE PRONOUNCED STAT INTERACTIONS
       let distanceMod = if (race.distance < 10) {
-        // Short sprint: acceleration + speed
-        1.0 - ((acceleration + speed - 60.0) / 500.0);
+        // Short sprint: acceleration + speed dominate
+        1.0 - ((acceleration + speed - 60.0) / 350.0);
       } else if (race.distance > 20) {
-        // Long trek: powerCore + stability
-        1.0 - ((powerCore + stability - 60.0) / 500.0);
+        // Long trek: powerCore + stability critical
+        1.0 - ((powerCore + stability - 60.0) / 350.0);
       } else {
-        // Medium: balanced
-        1.0 - ((speed + powerCore + acceleration + stability - 160.0) / 1000.0);
+        // Medium: all stats matter
+        1.0 - ((speed + powerCore + acceleration + stability - 160.0) / 700.0);
       };
 
-      // Randomness (deterministic based on seed)
-      let randomMod = 0.95 + (Float.fromInt(seed % 100) / 1000.0); // ±5%
+      // Better pseudo-random using multiple hash-like operations
+      // Mix race ID, participant stats, and position for uniqueness
+      let raceSeed = (race.raceId * 31337 + 12345) % 100000;
+      let statMix = (stats.speed * 7 + stats.powerCore * 11 + stats.acceleration * 13 + stats.stability * 17) % 10000;
+      let mixedSeed = (seed * 2654435761 + raceSeed + statMix) % 1000000;
 
-      // Final time
-      let finalTime = baseTime * terrainMod * distanceMod * randomMod;
+      // Race-specific chaos factor (±15%) - varies by race
+      let raceChaosValue = (mixedSeed / 7) % 1000;
+      let raceChaos = 0.85 + (Float.fromInt(raceChaosValue) / 3333.0); // 0.85 to 1.15
+
+      // Per-bot randomness (±20%) - varies by bot AND position
+      let botRandomValue = (mixedSeed / 11) % 1000;
+      let botRandom = 0.80 + (Float.fromInt(botRandomValue) / 2500.0); // 0.80 to 1.20
+
+      // Position-based variance (±10%) - starting position luck
+      let positionValue = (mixedSeed / 13) % 1000;
+      let positionBonus = 0.90 + (Float.fromInt(positionValue) / 5000.0); // 0.90 to 1.10
+
+      // Stat interaction bonus (synergy between complementary stats)
+      let statSynergy = if (
+        (speed > 80 and acceleration > 80) or // Speed demons
+        (powerCore > 80 and stability > 80) or // Endurance tanks
+        (speed > 75 and powerCore > 75 and acceleration > 75 and stability > 75) // Well-rounded
+      ) {
+        0.95; // 5% bonus for synergistic builds
+      } else if (
+        (speed < 40 and powerCore < 40) or // Double weakness
+        (acceleration < 40 and stability < 40),
+      ) {
+        1.08; // 8% penalty for double weaknesses
+      } else {
+        1.0;
+      };
+
+      // Final time with all modifiers
+      let finalTime = baseTime * terrainMod * distanceMod * raceChaos * botRandom * positionBonus * statSynergy;
       Float.max(1.0, finalTime);
     };
 
@@ -197,12 +229,16 @@ module {
         return null;
       };
 
+      // Use race start time as additional entropy for race-specific variance
+      let raceTimeSeed = Int.abs(race.startTime / 1_000_000_000); // Convert to seconds
+      let combinedSeed = race.raceId + raceTimeSeed;
+
       // Calculate times
       var racerTimes : [(RacingParticipant, Float)] = [];
 
       for (i in Iter.range(0, participants.size() - 1)) {
         let participant = participants[i];
-        let seed = race.raceId * 1000 + i;
+        let seed = combinedSeed * 1000 + i;
         let time = calculateRaceTime(race, participant, seed);
         racerTimes := Array.append(racerTimes, [(participant, time)]);
       };
@@ -213,8 +249,9 @@ module {
         func(a, b) { Float.compare(a.1, b.1) },
       );
 
-      // Calculate prizes
-      let netPrizePool = Nat.sub(race.prizePool, race.platformTax);
+      // Calculate prizes (include platform bonus + entry fees - tax)
+      let totalPool = race.prizePool + race.platformBonus;
+      let netPrizePool = Nat.sub(totalPool, race.platformTax);
       var results : [RaceResult] = [];
 
       for (i in Iter.range(0, sorted.size() - 1)) {
@@ -287,14 +324,15 @@ module {
       raceClass : RaceClass,
       entryFee : Nat,
       maxEntries : Nat,
+      minEntries : Nat,
       startTime : Int,
       platformBonus : Nat,
+      entryDeadline : Int,
     ) : Race {
       let raceId = nextRaceId;
       nextRaceId += 1;
 
       let now = Time.now();
-      let entryDeadline = startTime - (30 * 60 * 1_000_000_000);
       let sim = RaceSimulator();
       let duration = sim.calculateRaceDuration(distance, terrain);
 
@@ -306,6 +344,7 @@ module {
         raceClass = raceClass;
         entryFee = entryFee;
         maxEntries = maxEntries;
+        minEntries = minEntries;
         startTime = startTime;
         duration = duration;
         entryDeadline = entryDeadline;

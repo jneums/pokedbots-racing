@@ -164,6 +164,7 @@ type Race =
    entryDeadline: int;
    entryFee: nat;
    maxEntries: nat;
+   minEntries: nat;
    name: text;
    platformBonus: nat;
    platformTax: nat;
@@ -203,6 +204,7 @@ type McpServer =
        ownerResult: text;
        tokenIdentifier: text;
      });
+   debug_create_test_race: (startInMinutes: nat) -> (text);
    /// Debug: Preview what stats would be derived for a token index
    /// Shows both metadata-based and fallback stats for comparison
    debug_preview_stats: (tokenIndex: nat) ->
@@ -238,9 +240,11 @@ type McpServer =
    debug_seed_leaderboard: (count: nat) -> (text);
    /// Decode EXT token identifier to get token index (public query)
    decode_token_identifier: (tokenIdentifier: text) -> (nat) query;
+   delete_events_and_races: (eventIds: vec nat) -> (text);
    emergency_clear_all_timers: () -> (nat);
    /// Encode token index to EXT token identifier (public query)
    encode_token_identifier: (tokenIndex: nat32) -> (text) query;
+   force_finish_race: (raceId: nat) -> (text);
    force_release_lock: () -> (opt Time);
    force_system_timer_cancel: () -> (bool);
    get_actions_by_filter: (filter: ActionFilter) -> (vec ActionDetail) query;
@@ -259,6 +263,31 @@ type McpServer =
       }) query;
    /// Get total count of pre-computed base stats
    get_base_stats_count: () -> (nat) query;
+   /// Get public bot profile (stats + career, no sensitive info like battery/condition)
+   get_bot_profile: (tokenIndex: nat) ->
+    (opt
+      record {
+        career:
+         record {
+           podiums: nat;
+           racesEntered: nat;
+           totalEarnings: nat;
+           wins: nat;
+         };
+        eloRating: nat;
+        faction: FactionType;
+        isInitialized: bool;
+        raceClass: RaceClass;
+        stats:
+         record {
+           acceleration: nat;
+           overallRating: nat;
+           powerCore: nat;
+           speed: nat;
+           stability: nat;
+         };
+        tokenIndex: nat;
+      }) query;
    get_current_periods: () -> (record {
                                  monthId: nat;
                                  seasonId: nat;
@@ -346,6 +375,8 @@ type McpServer =
        context: blob;
        response: HttpRequestResult;
      }) -> (HttpRequestResult) query;
+   trigger_race_start: (raceId: nat) -> (text);
+   trigger_stuck_races: () -> (text);
    /// Upload a batch of pre-computed base stats
    upload_base_stats_batch: (batch:
     vec

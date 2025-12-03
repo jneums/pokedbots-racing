@@ -23,8 +23,8 @@ module {
 
   public func config() : McpTypes.Tool = {
     name = "garage_recharge_robot";
-    title = ?"Recharge Robot";
-    description = ?"Recharge a robot to restore condition and battery. Costs 10 ICP + 0.0001 ICP transfer fee. Restores 20 Condition and 10 Battery. Cooldown: 6 hours. Requires ICRC-2 approval.";
+    title = ?"Recharge Robot Battery";
+    description = ?"Recharge a robot's battery. Costs 0.1 ICP + 0.0001 ICP transfer fee. Restores 50 Battery. Does NOT restore condition (use garage_repair_robot for that). Cooldown: 6 hours. Requires ICRC-2 approval.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -138,14 +138,12 @@ module {
             return ToolContext.makeError(errorMsg, cb);
           };
           case (#Ok(blockIndex)) {
-            // Payment successful, update stats
-            let conditionRestored = Nat.min(20, 100 - racingStats.condition);
-            let batteryRestored = Nat.min(10, 100 - racingStats.battery);
+            // Payment successful, update battery only
+            let batteryRestored = Nat.min(50, 100 - racingStats.battery);
 
             let updatedStats = {
               racingStats with
-              condition = Nat.min(100, racingStats.condition + 20);
-              battery = Nat.min(100, racingStats.battery + 10);
+              battery = Nat.min(100, racingStats.battery + 50);
               lastRecharged = ?now;
             };
 
@@ -153,15 +151,13 @@ module {
 
             let response = Json.obj([
               ("token_index", Json.int(tokenIndex)),
-              ("action", Json.str("Recharge")),
+              ("action", Json.str("Recharge Battery")),
               ("payment", Json.obj([("amount", Json.str("0.1 ICP")), ("fee", Json.str("0.0001 ICP")), ("total", Json.str("0.1001 ICP")), ("block_index", Json.int(blockIndex))])),
-              ("condition_restored", Json.int(conditionRestored)),
               ("battery_restored", Json.int(batteryRestored)),
-              ("new_condition", Json.int(updatedStats.condition)),
               ("new_battery", Json.int(updatedStats.battery)),
-              ("cost_icp", Json.int(10)),
+              ("cost_icp", Json.str("0.1")),
               ("next_available_hours", Json.int(6)),
-              ("message", Json.str("Power cells recharged. Systems nominal.")),
+              ("message", Json.str("⚡ Power cells recharged. Battery at " # Nat.toText(updatedStats.battery) # "%")),
             ]);
 
             ToolContext.makeSuccess(response, cb);

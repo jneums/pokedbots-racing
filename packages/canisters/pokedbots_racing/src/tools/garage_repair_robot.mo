@@ -21,8 +21,8 @@ module {
 
   public func config() : McpTypes.Tool = {
     name = "garage_repair_robot";
-    title = ?"Repair Robot";
-    description = ?"Repair a robot to restore condition. Costs 5 ICP + 0.0001 ICP transfer fee. Restores 10 Condition. Cooldown: 12 hours.";
+    title = ?"Repair Robot Condition";
+    description = ?"Repair a robot to restore condition. Costs 0.05 ICP + 0.0001 ICP transfer fee. Restores 30 Condition. Cooldown: 12 hours.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -118,9 +118,11 @@ module {
             return ToolContext.makeError("Payment failed", cb);
           };
           case (#Ok(blockIndex)) {
+            let conditionRestored = Nat.min(30, 100 - racingStats.condition);
+
             let updatedStats = {
               racingStats with
-              condition = Nat.min(100, racingStats.condition + 10);
+              condition = Nat.min(100, racingStats.condition + 30);
               lastRepaired = ?now;
             };
 
@@ -128,11 +130,11 @@ module {
 
             let response = Json.obj([
               ("token_index", Json.int(tokenIndex)),
-              ("action", Json.str("Repair")),
-              ("condition_restored", Json.int(10)),
+              ("action", Json.str("Repair Condition")),
+              ("condition_restored", Json.int(conditionRestored)),
               ("new_condition", Json.int(updatedStats.condition)),
-              ("cost_icp", Json.int(5)),
-              ("message", Json.str("Repairs complete")),
+              ("cost_icp", Json.str("0.05")),
+              ("message", Json.str("🔧 Repairs complete. Condition at " # Nat.toText(updatedStats.condition) # "%")),
             ]);
 
             ToolContext.makeSuccess(response, cb);

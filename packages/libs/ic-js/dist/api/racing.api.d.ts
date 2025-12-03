@@ -38,3 +38,10 @@ export declare const getEventDetails: (eventId: number, identity?: Identity) => 
  * @returns The Race if found, null otherwise
  */
 export declare const getRaceById: (raceId: number, identity?: Identity) => Promise<Race | null>;
+/**
+ * Fetches public profile details for a specific PokedBot.
+ * @param tokenIndex The token index of the bot
+ * @param identity Optional identity to use for the actor
+ * @returns The bot profile if found, null otherwise
+ */
+export declare const getBotProfile: (tokenIndex: number, identity?: Identity) => Promise<any>;

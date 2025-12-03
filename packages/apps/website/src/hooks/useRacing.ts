@@ -1,5 +1,3 @@
-// packages/apps/website/hooks/useRacing.ts
-
 import { useQuery } from '@tanstack/react-query';
 import {
   getUpcomingEvents,
@@ -7,6 +5,7 @@ import {
   getPastEvents,
   getEventDetails,
   getRaceById,
+  getBotProfile,
   type ScheduledEvent,
   type Race,
 } from '@pokedbots-racing/ic-js';
@@ -22,6 +21,7 @@ export const useGetUpcomingEvents = (daysAhead?: number) => {
     queryFn: async () => {
       return getUpcomingEvents(daysAhead);
     },
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 };
 
@@ -64,6 +64,7 @@ export const useGetEventDetails = (eventId: number | null) => {
       return getEventDetails(eventId);
     },
     enabled: eventId !== null,
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 };
 
@@ -80,5 +81,22 @@ export const useGetRaceById = (raceId: number | null) => {
       return getRaceById(raceId);
     },
     enabled: raceId !== null,
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+};
+
+/**
+ * React Query hook to fetch public profile for a specific bot.
+ */
+export const useGetBotProfile = (tokenIndex: number | null) => {
+  return useQuery<any>({
+    queryKey: ['botProfile', tokenIndex],
+    queryFn: () => {
+      if (tokenIndex === null) {
+        return null;
+      }
+      return getBotProfile(tokenIndex);
+    },
+    enabled: tokenIndex !== null,
   });
 };

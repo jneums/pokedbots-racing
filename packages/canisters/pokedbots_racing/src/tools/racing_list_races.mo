@@ -21,17 +21,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([
-        ("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Your bot's token index. When provided, only shows races this bot is eligible to enter."))])), 
-        ("after_race_id", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Race ID to start after. Returns the next 5 races after this ID."))])),
-        ("race_class", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Scavenger"), Json.str("Raider"), Json.str("Elite"), Json.str("SilentKlan")])), ("description", Json.str("Optional: Filter by race class"))])),
-        ("terrain", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("ScrapHeaps"), Json.str("WastelandSand"), Json.str("MetalRoads")])), ("description", Json.str("Optional: Filter by terrain type"))])),
-        ("status", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("open"), Json.str("full"), Json.str("closed")])), ("description", Json.str("Optional: Filter by entry status - open (accepting entries), full (max entries reached), closed (past deadline)"))])),
-        ("min_distance", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Minimum race distance in km"))])),
-        ("max_distance", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Maximum race distance in km"))])),
-        ("has_spots", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show races with available spots (true) or full races (false)"))])),
-        ("sort_by", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("prize_pool"), Json.str("start_time"), Json.str("entry_fee"), Json.str("distance")])), ("description", Json.str("Optional: Sort races by prize_pool (highest first), start_time (soonest first), entry_fee (lowest first), or distance (shortest first). Default: start_time"))])),
-      ])),
+      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Your bot's token index. When provided, only shows races this bot is eligible to enter."))])), ("after_race_id", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Race ID to start after. Returns the next 5 races after this ID."))])), ("race_class", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Scavenger"), Json.str("Raider"), Json.str("Elite"), Json.str("SilentKlan")])), ("description", Json.str("Optional: Filter by race class"))])), ("terrain", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("ScrapHeaps"), Json.str("WastelandSand"), Json.str("MetalRoads")])), ("description", Json.str("Optional: Filter by terrain type"))])), ("status", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("open"), Json.str("full"), Json.str("closed")])), ("description", Json.str("Optional: Filter by entry status - open (accepting entries), full (max entries reached), closed (past deadline)"))])), ("min_distance", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Minimum race distance in km"))])), ("max_distance", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Maximum race distance in km"))])), ("has_spots", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show races with available spots (true) or full races (false)"))])), ("sort_by", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("prize_pool"), Json.str("start_time"), Json.str("entry_fee"), Json.str("distance")])), ("description", Json.str("Optional: Sort races by prize_pool (highest first), start_time (soonest first), entry_fee (lowest first), or distance (shortest first). Default: start_time"))]))])),
     ]);
     outputSchema = null;
   };
@@ -52,7 +42,7 @@ module {
       let now = Time.now();
       let tokenIndexOpt = Result.toOption(Json.getAsNat(_args, "token_index"));
       let afterRaceIdOpt = Result.toOption(Json.getAsNat(_args, "after_race_id"));
-      
+
       // Parse filter parameters
       let raceClassFilter = Result.toOption(Json.getAsText(_args, "race_class"));
       let terrainFilter = Result.toOption(Json.getAsText(_args, "terrain"));
@@ -92,59 +82,68 @@ module {
 
       // Apply additional filters
       var filteredRaces = allRaces;
-      
+
       // Filter by race class
       filteredRaces := switch (raceClassFilter) {
         case (?className) {
-          Array.filter<RacingSimulator.Race>(filteredRaces, func(r) {
-            let classMatch = switch (r.raceClass, className) {
-              case (#Scavenger, "Scavenger") { true };
-              case (#Raider, "Raider") { true };
-              case (#Elite, "Elite") { true };
-              case (#SilentKlan, "SilentKlan") { true };
-              case _ { false };
-            };
-            classMatch;
-          });
+          Array.filter<RacingSimulator.Race>(
+            filteredRaces,
+            func(r) {
+              let classMatch = switch (r.raceClass, className) {
+                case (#Scavenger, "Scavenger") { true };
+                case (#Raider, "Raider") { true };
+                case (#Elite, "Elite") { true };
+                case (#SilentKlan, "SilentKlan") { true };
+                case _ { false };
+              };
+              classMatch;
+            },
+          );
         };
         case (null) { filteredRaces };
       };
-      
+
       // Filter by terrain
       filteredRaces := switch (terrainFilter) {
         case (?terrainType) {
-          Array.filter<RacingSimulator.Race>(filteredRaces, func(r) {
-            let terrainMatch = switch (r.terrain, terrainType) {
-              case (#ScrapHeaps, "ScrapHeaps") { true };
-              case (#WastelandSand, "WastelandSand") { true };
-              case (#MetalRoads, "MetalRoads") { true };
-              case _ { false };
-            };
-            terrainMatch;
-          });
+          Array.filter<RacingSimulator.Race>(
+            filteredRaces,
+            func(r) {
+              let terrainMatch = switch (r.terrain, terrainType) {
+                case (#ScrapHeaps, "ScrapHeaps") { true };
+                case (#WastelandSand, "WastelandSand") { true };
+                case (#MetalRoads, "MetalRoads") { true };
+                case _ { false };
+              };
+              terrainMatch;
+            },
+          );
         };
         case (null) { filteredRaces };
       };
-      
+
       // Filter by status
       filteredRaces := switch (statusFilter) {
         case (?status) {
-          Array.filter<RacingSimulator.Race>(filteredRaces, func(r) {
-            let isOpen = r.status == #Upcoming and now < r.entryDeadline and r.entries.size() < r.maxEntries;
-            let isFull = r.status == #Upcoming and r.entries.size() >= r.maxEntries;
-            let isClosed = r.status == #Upcoming and now >= r.entryDeadline;
-            
-            switch (status) {
-              case ("open") { isOpen };
-              case ("full") { isFull };
-              case ("closed") { isClosed };
-              case _ { true };
-            };
-          });
+          Array.filter<RacingSimulator.Race>(
+            filteredRaces,
+            func(r) {
+              let isOpen = r.status == #Upcoming and now < r.entryDeadline and r.entries.size() < r.maxEntries;
+              let isFull = r.status == #Upcoming and r.entries.size() >= r.maxEntries;
+              let isClosed = r.status == #Upcoming and now >= r.entryDeadline;
+
+              switch (status) {
+                case ("open") { isOpen };
+                case ("full") { isFull };
+                case ("closed") { isClosed };
+                case _ { true };
+              };
+            },
+          );
         };
         case (null) { filteredRaces };
       };
-      
+
       // Filter by distance range
       filteredRaces := switch (minDistanceOpt) {
         case (?minDist) {
@@ -152,25 +151,28 @@ module {
         };
         case (null) { filteredRaces };
       };
-      
+
       filteredRaces := switch (maxDistanceOpt) {
         case (?maxDist) {
           Array.filter<RacingSimulator.Race>(filteredRaces, func(r) { r.distance <= maxDist });
         };
         case (null) { filteredRaces };
       };
-      
+
       // Filter by spots available
       filteredRaces := switch (hasSpotsOpt) {
         case (?hasSpots) {
-          Array.filter<RacingSimulator.Race>(filteredRaces, func(r) {
-            let spotsAvailable = r.entries.size() < r.maxEntries;
-            if (hasSpots) { spotsAvailable } else { not spotsAvailable };
-          });
+          Array.filter<RacingSimulator.Race>(
+            filteredRaces,
+            func(r) {
+              let spotsAvailable = r.entries.size() < r.maxEntries;
+              if (hasSpots) { spotsAvailable } else { not spotsAvailable };
+            },
+          );
         };
         case (null) { filteredRaces };
       };
-      
+
       if (filteredRaces.size() == 0) {
         return ToolContext.makeTextSuccess("🏜️ No races match your filters. Try adjusting your search criteria.", cb);
       };
@@ -178,40 +180,55 @@ module {
       // Apply sorting
       let sortedRaces = switch (sortByOpt) {
         case (?"prize_pool") {
-          Array.sort<RacingSimulator.Race>(filteredRaces, func(a, b) {
-            if (a.prizePool > b.prizePool) { #less }
-            else if (a.prizePool < b.prizePool) { #greater }
-            else { #equal };
-          });
+          Array.sort<RacingSimulator.Race>(
+            filteredRaces,
+            func(a, b) {
+              if (a.prizePool > b.prizePool) { #less } else if (a.prizePool < b.prizePool) {
+                #greater;
+              } else { #equal };
+            },
+          );
         };
         case (?"entry_fee") {
-          Array.sort<RacingSimulator.Race>(filteredRaces, func(a, b) {
-            if (a.entryFee < b.entryFee) { #less }
-            else if (a.entryFee > b.entryFee) { #greater }
-            else { #equal };
-          });
+          Array.sort<RacingSimulator.Race>(
+            filteredRaces,
+            func(a, b) {
+              if (a.entryFee < b.entryFee) { #less } else if (a.entryFee > b.entryFee) {
+                #greater;
+              } else { #equal };
+            },
+          );
         };
         case (?"distance") {
-          Array.sort<RacingSimulator.Race>(filteredRaces, func(a, b) {
-            if (a.distance < b.distance) { #less }
-            else if (a.distance > b.distance) { #greater }
-            else { #equal };
-          });
+          Array.sort<RacingSimulator.Race>(
+            filteredRaces,
+            func(a, b) {
+              if (a.distance < b.distance) { #less } else if (a.distance > b.distance) {
+                #greater;
+              } else { #equal };
+            },
+          );
         };
         case (?"start_time") {
-          Array.sort<RacingSimulator.Race>(filteredRaces, func(a, b) {
-            if (a.startTime < b.startTime) { #less }
-            else if (a.startTime > b.startTime) { #greater }
-            else { #equal };
-          });
+          Array.sort<RacingSimulator.Race>(
+            filteredRaces,
+            func(a, b) {
+              if (a.startTime < b.startTime) { #less } else if (a.startTime > b.startTime) {
+                #greater;
+              } else { #equal };
+            },
+          );
         };
         case (_) {
           // Default: sort by start time (soonest first)
-          Array.sort<RacingSimulator.Race>(filteredRaces, func(a, b) {
-            if (a.startTime < b.startTime) { #less }
-            else if (a.startTime > b.startTime) { #greater }
-            else { #equal };
-          });
+          Array.sort<RacingSimulator.Race>(
+            filteredRaces,
+            func(a, b) {
+              if (a.startTime < b.startTime) { #less } else if (a.startTime > b.startTime) {
+                #greater;
+              } else { #equal };
+            },
+          );
         };
       };
 
@@ -299,6 +316,19 @@ module {
           sponsorsArray := Array.append(sponsorsArray, [sponsorJson]);
         };
 
+        let entryFeeDecimal = (race.entryFee % 100_000_000) / 1_000_000;
+        let entryFeeDecimalStr = if (entryFeeDecimal < 10) {
+          "0" # Nat.toText(entryFeeDecimal);
+        } else { Nat.toText(entryFeeDecimal) };
+        let prizePoolDecimal = (race.prizePool % 100_000_000) / 1_000_000;
+        let prizePoolDecimalStr = if (prizePoolDecimal < 10) {
+          "0" # Nat.toText(prizePoolDecimal);
+        } else { Nat.toText(prizePoolDecimal) };
+        let sponsoredDecimal = (totalSponsored % 100_000_000) / 1_000_000;
+        let sponsoredDecimalStr = if (sponsoredDecimal < 10) {
+          "0" # Nat.toText(sponsoredDecimal);
+        } else { Nat.toText(sponsoredDecimal) };
+
         let raceJson = Json.obj([
           ("race_id", Json.int(race.raceId)),
           ("name", Json.str(race.name)),
@@ -306,9 +336,9 @@ module {
           ("distance_km", Json.int(race.distance)),
           ("duration_seconds", Json.int(race.duration)),
           ("terrain", Json.str(terrainText)),
-          ("entry_fee_icp", Json.str(Text.concat("0.", Nat.toText(race.entryFee / 100000)))),
-          ("prize_pool_icp", Json.str(Text.concat("0.", Nat.toText(race.prizePool / 100000)))),
-          ("sponsored_icp", Json.str(Text.concat(Nat.toText(totalSponsored / 100_000_000), "." # Nat.toText((totalSponsored % 100_000_000) / 1_000_000)))),
+          ("entry_fee_icp", Json.str(Text.concat(Nat.toText(race.entryFee / 100_000_000), "." # entryFeeDecimalStr))),
+          ("prize_pool_icp", Json.str(Text.concat(Nat.toText(race.prizePool / 100_000_000), "." # prizePoolDecimalStr))),
+          ("sponsored_icp", Json.str(Text.concat(Nat.toText(totalSponsored / 100_000_000), "." # sponsoredDecimalStr))),
           ("sponsors", Json.arr(sponsorsArray)),
           ("entries", Json.int(race.entries.size())),
           ("max_entries", Json.int(race.maxEntries)),

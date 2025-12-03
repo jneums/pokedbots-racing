@@ -127,28 +127,17 @@ module {
                     msg #= "   🏁 Record: No races yet\n";
                   };
 
-                  // Show race class bracket
-                  let raceClassText = if (stats.wins <= 2) {
-                    "🥉 Scavenger (0-2 wins)";
-                  } else if (stats.wins >= 3 and stats.wins <= 5) {
-                    "🥈 Raider (3-5 wins)";
-                  } else if (stats.wins >= 6 and stats.wins <= 9) {
-                    "🥇 Elite (6-9 wins)";
+                  // Show race class bracket (ELO-based)
+                  let raceClassText = if (stats.eloRating >= 1800) {
+                    "💀 SilentKlan (1800+ ELO)";
+                  } else if (stats.eloRating >= 1600) {
+                    "🥇 Elite (1600-1799 ELO)";
+                  } else if (stats.eloRating >= 1400) {
+                    "🥈 Raider (1400-1599 ELO)";
                   } else {
-                    // 10+ wins - check if eligible for SilentKlan (ultra-rare factions)
-                    switch (stats.faction) {
-                      case (#UltimateMaster or #Wild or #Golden or #Ultimate) {
-                        "💀 SilentKlan (10+, Ultra-Rare)";
-                      };
-                      case (#Blackhole or #Dead or #Master) {
-                        "💀 SilentKlan (10+, Super-Rare)";
-                      };
-                      case (_) {
-                        "🏆 Elite+ (10+ wins, not eligible for SilentKlan)";
-                      };
-                    };
+                    "🥉 Scavenger (<1400 ELO)";
                   };
-                  msg #= "   🏆 Class: " # raceClassText # "\n";
+                  msg #= "   🏆 Class: " # raceClassText # " | ELO: " # Nat.toText(stats.eloRating) # "\n";
 
                   // Show terrain preferences based on faction bonuses
                   msg #= "   🎯 Prefers: " # (

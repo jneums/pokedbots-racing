@@ -104,9 +104,11 @@ function EventCard({ event, isPastEvent = false }: { event: ScheduledEvent; isPa
   const totalPrizePool = Number(event.metadata.prizePoolBonus) + 
                          (Number(event.metadata.entryFee) * Number(event.raceIds.length));
 
-  const isOpen = 'RegistrationOpen' in event.status;
+  const now = new Date();
+  const registrationClosesDate = new Date(Number(event.registrationCloses) / 1_000_000);
+  const isRegistrationOpen = now < registrationClosesDate && 'RegistrationOpen' in event.status;
+  
   const isUpcoming = 'Announced' in event.status;
-  const isCompleted = 'Completed' in event.status || isPastEvent;
 
   return (
     <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur">
@@ -128,7 +130,7 @@ function EventCard({ event, isPastEvent = false }: { event: ScheduledEvent; isPa
             </CardDescription>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span>🕒 {formatDate(event.scheduledTime)}</span>
-              {isOpen && !isPastEvent && (
+              {isRegistrationOpen && !isPastEvent && (
                 <span className="text-green-500 font-semibold">
                   Closes {formatRelativeTime(event.registrationCloses)}
                 </span>

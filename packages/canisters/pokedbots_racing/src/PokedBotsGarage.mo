@@ -13,6 +13,7 @@ import Debug "mo:base/Debug";
 import Map "mo:map/Map";
 import { nhash; phash } "mo:map/Map";
 import RacingSimulator "./RacingSimulator";
+import ELO "./ELO";
 
 /// PokedBotsGarage - Collection-Specific Racing Logic
 /// Handles PokedBots NFT stats, factions, upgrades, and marketplace integration
@@ -71,7 +72,6 @@ module {
     // Dynamic stats
     battery : Nat;
     condition : Nat;
-    calibration : Nat;
     experience : Nat;
 
     // Preferences
@@ -85,6 +85,7 @@ module {
     shows : Nat;
     totalScrapEarned : Nat;
     factionReputation : Nat;
+    eloRating : Nat; // ELO rating for skill-based matchmaking (default 1500)
 
     // Timestamps
     activatedAt : Int;
@@ -300,16 +301,97 @@ module {
       };
     };
 
-    /// Apply race costs (battery drain)
-    public func applyRaceCosts(nftId : Text) {
+    /// Calculate and apply ELO changes for all race participants
+    /// Should be called once with all race results before individual recordRaceResult calls
+    public func applyRaceEloChanges(results : [(Text, Nat)]) {
+      // results: [(nftId, position)]
+
+      // Convert to format needed for ELO calculation: (tokenIndex, currentElo, racesEntered, position)
+      let eloInputs = Array.mapFilter<(Text, Nat), (Nat, Nat, Nat, Nat)>(
+        results,
+        func((nftId, position) : (Text, Nat)) : ?(Nat, Nat, Nat, Nat) {
+          switch (Nat.fromText(nftId)) {
+            case (?tokenIndex) {
+              switch (Map.get(stats, nhash, tokenIndex)) {
+                case (?botStats) {
+                  ?(tokenIndex, botStats.eloRating, botStats.racesEntered, position);
+                };
+                case (null) { null };
+              };
+            };
+            case (null) { null };
+          };
+        },
+      );
+
+      // Calculate ELO changes for all participants
+      let eloChanges = ELO.calculateMultiBotEloChanges(eloInputs);
+
+      // Apply ELO changes to each bot
+      for ((tokenIndex, eloChange) in eloChanges.vals()) {
+        switch (Map.get(stats, nhash, tokenIndex)) {
+          case (?botStats) {
+            let newElo = ELO.applyEloChange(botStats.eloRating, eloChange);
+            let updatedStats = {
+              botStats with
+              eloRating = newElo;
+            };
+            updateStats(tokenIndex, updatedStats);
+          };
+          case (null) {};
+        };
+      };
+    };
+
+    /// Apply race costs (battery drain and condition wear)
+    /// Costs scale with distance, terrain difficulty, and finishing position
+    public func applyRaceCosts(nftId : Text, distance : Nat, terrain : RacingSimulator.Terrain, position : Nat) {
       let tokenIndex = Nat.fromText(nftId);
       switch (tokenIndex) {
         case (?idx) {
           switch (Map.get(stats, nhash, idx)) {
             case (?botStats) {
+              // Battery drain scales with distance
+              // Base: 10 for short (5km), 15 for medium (15km), 20 for long (25km+)
+              let baseBatteryDrain = if (distance < 10) { 10 } else if (distance < 20) {
+                15;
+              } else { 20 };
+
+              // Terrain modifier for battery
+              let terrainBatteryMod = switch (terrain) {
+                case (#ScrapHeaps) { 1.2 }; // Rough terrain = +20% drain
+                case (#WastelandSand) { 1.1 }; // Sandy = +10% drain
+                case (#MetalRoads) { 1.0 }; // Smooth roads = normal
+              };
+
+              let totalBatteryDrain = Float.toInt(Float.fromInt(baseBatteryDrain) * terrainBatteryMod);
+              let finalBatteryDrain = Nat.min(botStats.battery, Int.abs(totalBatteryDrain));
+
+              // Condition wear scales with distance and finishing position
+              // Winners take less damage (better racing line), losers take more
+              let baseConditionWear = if (distance < 10) { 3 } else if (distance < 20) {
+                5;
+              } else { 7 };
+
+              // Position penalty (1st = 0.8x, 2nd = 1.0x, 3rd = 1.2x, 4th+ = 1.4x)
+              let positionMod = if (position == 1) { 0.8 } else if (position == 2) {
+                1.0;
+              } else if (position == 3) { 1.2 } else { 1.4 };
+
+              // Terrain modifier for condition
+              let terrainConditionMod = switch (terrain) {
+                case (#ScrapHeaps) { 1.5 }; // Very rough = +50% wear
+                case (#WastelandSand) { 1.2 }; // Moderate = +20% wear
+                case (#MetalRoads) { 1.0 }; // Smooth = normal
+              };
+
+              let totalConditionWear = Float.toInt(Float.fromInt(baseConditionWear) * positionMod * terrainConditionMod);
+              let finalConditionWear = Nat.min(botStats.condition, Int.abs(totalConditionWear));
+
               let updatedStats = {
                 botStats with
-                battery = Nat.sub(botStats.battery, 10);
+                battery = Nat.sub(botStats.battery, finalBatteryDrain);
+                condition = Nat.sub(botStats.condition, finalConditionWear);
               };
               updateStats(idx, updatedStats);
             };
@@ -374,7 +456,6 @@ module {
         stabilityUpgrades = 0;
         battery = 100;
         condition = 100;
-        calibration = 50;
         experience = 0;
         preferredDistance = derivePreferredDistance(baseStats.powerCore, baseStats.speed);
         preferredTerrain = switch (metadata) {
@@ -393,6 +474,7 @@ module {
         shows = 0;
         totalScrapEarned = 0;
         factionReputation = 0;
+        eloRating = 1500; // Start all bots at 1500 ELO
         activatedAt = now;
         lastDecayed = now; // Initialize decay tracking
         lastRecharged = null;
@@ -469,11 +551,45 @@ module {
       stability : Nat;
     } {
       let base = getBaseStats(botStats.tokenIndex);
+
+      // Apply battery penalty to speed and acceleration (energy-dependent stats)
+      // 100% battery = no penalty, 50% battery = -15% stats, 0% battery = -30% stats
+      let batteryPenalty = if (botStats.battery >= 80) {
+        1.0;
+      } else if (botStats.battery >= 50) {
+        // Linear scale from 1.0 to 0.85 between 80-50 battery
+        1.0 - ((80.0 - Float.fromInt(botStats.battery)) / 30.0) * 0.15;
+      } else {
+        // Linear scale from 0.85 to 0.70 between 50-0 battery
+        0.85 - (Float.fromInt(50 - botStats.battery) / 50.0) * 0.15;
+      };
+
+      // Apply condition penalty to powerCore and stability (mechanical wear stats)
+      // 100% condition = no penalty, 70% condition = -10% stats, 25% condition = -30% stats
+      let conditionPenalty = if (botStats.condition >= 90) {
+        1.0;
+      } else if (botStats.condition >= 70) {
+        // Linear scale from 1.0 to 0.90 between 90-70 condition
+        1.0 - ((90.0 - Float.fromInt(botStats.condition)) / 20.0) * 0.10;
+      } else if (botStats.condition >= 25) {
+        // Linear scale from 0.90 to 0.70 between 70-25 condition
+        0.90 - ((70.0 - Float.fromInt(botStats.condition)) / 45.0) * 0.20;
+      } else {
+        // Critical condition: 25% or below = 30% penalty
+        0.70;
+      };
+
+      // Apply penalties to appropriate stats
+      let speedWithPenalty = Float.toInt(Float.fromInt(base.speed + botStats.speedBonus) * batteryPenalty);
+      let accelerationWithPenalty = Float.toInt(Float.fromInt(base.acceleration + botStats.accelerationBonus) * batteryPenalty);
+      let powerCoreWithPenalty = Float.toInt(Float.fromInt(base.powerCore + botStats.powerCoreBonus) * conditionPenalty);
+      let stabilityWithPenalty = Float.toInt(Float.fromInt(base.stability + botStats.stabilityBonus) * conditionPenalty);
+
       {
-        speed = Nat.min(100, base.speed + botStats.speedBonus);
-        powerCore = Nat.min(100, base.powerCore + botStats.powerCoreBonus);
-        acceleration = Nat.min(100, base.acceleration + botStats.accelerationBonus);
-        stability = Nat.min(100, base.stability + botStats.stabilityBonus);
+        speed = Nat.min(100, Int.abs(speedWithPenalty));
+        powerCore = Nat.min(100, Int.abs(powerCoreWithPenalty));
+        acceleration = Nat.min(100, Int.abs(accelerationWithPenalty));
+        stability = Nat.min(100, Int.abs(stabilityWithPenalty));
       };
     };
 
@@ -573,12 +689,12 @@ module {
           // Calculate hours elapsed since last decay
           let hoursSinceLastDecay = Int.abs((now - botStats.lastDecayed) / 3_600_000_000_000);
 
-          // Apply cumulative decay: 0.21 per hour for condition, 0.125 per hour for calibration
+          // Apply cumulative decay: 0.21 per hour for condition, 0.15 per hour for battery
           let totalConditionDecay = Float.toInt(Float.fromInt(hoursSinceLastDecay) * 0.21 * decayMultiplier);
-          let totalCalibrationDecay = Float.toInt(Float.fromInt(hoursSinceLastDecay) * 0.125 * decayMultiplier);
+          let totalBatteryDecay = Float.toInt(Float.fromInt(hoursSinceLastDecay) * 0.15 * decayMultiplier);
 
           let conditionLoss = Nat.min(botStats.condition, Int.abs(totalConditionDecay));
-          let calibrationLoss = Nat.min(botStats.calibration, Int.abs(totalCalibrationDecay));
+          let batteryLoss = Nat.min(botStats.battery, Int.abs(totalBatteryDecay));
 
           let extraConditionLoss = switch (botStats.lastRecharged) {
             case (?lastTime) {
@@ -596,7 +712,7 @@ module {
           let updatedStats = {
             botStats with
             condition = Nat.sub(botStats.condition, totalConditionLoss);
-            calibration = Nat.sub(botStats.calibration, calibrationLoss);
+            battery = Nat.sub(botStats.battery, batteryLoss);
             lastDecayed = now;
           };
 

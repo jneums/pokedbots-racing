@@ -176,7 +176,6 @@ module {
         ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability))])),
         ("battery", Json.int(racingStats.battery)),
         ("condition", Json.int(racingStats.condition)),
-        ("calibration", Json.int(racingStats.calibration)),
         ("status", Json.str("Racing license registered! Ready for wasteland competition.")),
         ("license_status", Json.str("REGISTERED")),
         ("faction_message", Json.str(factionMessage)),
