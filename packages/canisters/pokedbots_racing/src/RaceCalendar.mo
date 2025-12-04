@@ -165,7 +165,7 @@ module {
       // Check for duplicate event at this time (within 5 minute tolerance)
       let FIVE_MINUTES_NS : Int = 5 * 60 * 1_000_000_000;
       let allEvents = getAllEvents();
-      
+
       for (existingEvent in allEvents.vals()) {
         // Check if there's already an event of this type at approximately this time
         let timeDiff = Int.abs(existingEvent.scheduledTime - scheduledTime);
@@ -178,7 +178,7 @@ module {
             case (#SpecialEvent(a), #SpecialEvent(b)) { a == b };
             case _ { false };
           };
-          
+
           if (sameType) {
             // Return the existing event instead of creating a duplicate
             return existingEvent;
@@ -211,6 +211,18 @@ module {
     // Get event by ID
     public func getEvent(eventId : Nat) : ?ScheduledEvent {
       Map.get(events, nhash, eventId);
+    };
+
+    // Get event by race ID
+    public func getEventByRaceId(raceId : Nat) : ?ScheduledEvent {
+      for (event in Map.vals(events)) {
+        for (rid in event.raceIds.vals()) {
+          if (rid == raceId) {
+            return ?event;
+          };
+        };
+      };
+      null;
     };
 
     // Get all events

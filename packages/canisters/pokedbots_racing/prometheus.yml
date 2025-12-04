@@ -25,9 +25,11 @@ submission:
       Race PokedBots NFTs for real ICP prizes in Daily, Weekly, and Monthly
       events
     - >-
-      Four racing divisions with automatic promotion based on career wins (0-2
-      wins → 3-9 wins → 10+ wins)
-    - Strategic bot upgrades with transparent part costs (10-83 ICP per upgrade)
+      ELO-based ranking system with four competitive divisions: Scavenger
+      (<1400), Raider (1400-1599), Elite (1600-1799), SilentKlan (1800+)
+    - >-
+      Strategic bot upgrades with progressive ICP costs (1 ICP for first
+      upgrade, increases with each level)
     - >-
       14 unique factions with balanced bonuses (UltimateMaster +25, Wild +18-24,
       Golden +14-18, etc.)
@@ -54,5 +56,5 @@ submission:
     gallery_images:
       - >-
         https://github.com/jneums/pokedbots-racing/releases/download/v1.0.2-assets/banner-pokedbots-racing.webp
-  git_commit: a6a1b684486fe0d245d8e7480dab7614b225e27e
+  git_commit: 3653a72c4851af84bb566bc5cf061a5f74e027cc
   wasm_path: ./out/out_Linux_x86_64.wasm

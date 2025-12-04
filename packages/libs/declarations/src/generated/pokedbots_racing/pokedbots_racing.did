@@ -277,6 +277,8 @@ type McpServer =
         eloRating: nat;
         faction: FactionType;
         isInitialized: bool;
+        name: opt text;
+        owner: opt principal;
         raceClass: RaceClass;
         stats:
          record {
@@ -288,6 +290,25 @@ type McpServer =
          };
         tokenIndex: nat;
       }) query;
+   get_bot_race_history: (tokenIndex: nat, limit: nat, afterRaceId:
+    opt nat) ->
+    (record {
+       hasMore: bool;
+       nextRaceId: opt nat;
+       races:
+        vec
+         record {
+           eventId: nat;
+           eventName: text;
+           finalTime: opt float64;
+           position: nat;
+           prizeAmount: nat;
+           raceId: nat;
+           raceName: text;
+           scheduledTime: int;
+           totalRacers: nat;
+         };
+     }) query;
    get_current_periods: () -> (record {
                                  monthId: nat;
                                  seasonId: nat;

@@ -177,7 +177,7 @@ module {
                   ("race_name", Json.str(updatedRace.name)),
                   ("race_class", Json.str(classText)),
                   ("your_contribution_icp", Json.str(Text.concat(Nat.toText(amountE8s / 100_000_000), "." # Nat.toText((amountE8s % 100_000_000) / 1_000_000)))),
-                  ("new_prize_pool_icp", Json.str(Text.concat(Nat.toText(updatedRace.prizePool / 100_000_000), "." # Nat.toText((updatedRace.prizePool % 100_000_000) / 1_000_000)))),
+                  ("new_prize_pool_icp", Json.str(Text.concat(Nat.toText((updatedRace.prizePool + updatedRace.platformBonus) / 100_000_000), "." # Nat.toText(((updatedRace.prizePool + updatedRace.platformBonus) % 100_000_000) / 1_000_000)))),
                   ("total_sponsors", Json.int(updatedRace.sponsors.size())),
                   ("entries_so_far", Json.int(updatedRace.entries.size())),
                   ("max_entries", Json.int(updatedRace.maxEntries)),

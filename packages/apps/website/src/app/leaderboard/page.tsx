@@ -10,6 +10,7 @@ import {
   useGetAllTimeLeaderboard,
   type LeaderboardEntry,
 } from "@/hooks/useLeaderboard";
+import { useGetBotProfile } from "@/hooks/useRacing";
 import { generatetokenIdentifier, generateExtThumbnailLink } from "@pokedbots-racing/ic-js";
 
 function formatICP(amount: bigint): string {
@@ -19,6 +20,16 @@ function formatICP(amount: bigint): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,
   }).format(icp) + ' ICP';
+}
+
+function BotName({ tokenIndex }: { tokenIndex: number }) {
+  const { data: botProfile } = useGetBotProfile(tokenIndex);
+  
+  if (botProfile?.name && botProfile.name.length > 0 && botProfile.name[0]) {
+    return <>PokedBot #{tokenIndex} - {botProfile.name[0]}</>;
+  }
+  
+  return <>PokedBot #{tokenIndex}</>;
 }
 
 function formatPrincipal(principal: string): string {
@@ -105,7 +116,7 @@ function LeaderboardTable({ entries, type }: { entries: LeaderboardEntry[], type
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="font-bold text-sm sm:text-base">
-                      PokedBot #{entry.tokenIndex.toString()}
+                      <BotName tokenIndex={Number(entry.tokenIndex)} />
                     </div>
                     <div className="text-xs sm:text-sm text-muted-foreground mt-1 flex items-center gap-2">
                       <span>{entry.races.toString()} races</span>

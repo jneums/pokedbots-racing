@@ -6,6 +6,7 @@ import {
   getEventDetails,
   getRaceById,
   getBotProfile,
+  getBotRaceHistory,
   type ScheduledEvent,
   type Race,
 } from '@pokedbots-racing/ic-js';
@@ -96,6 +97,22 @@ export const useGetBotProfile = (tokenIndex: number | null) => {
         return null;
       }
       return getBotProfile(tokenIndex);
+    },
+    enabled: tokenIndex !== null,
+  });
+};
+
+/**
+ * React Query hook to fetch race history for a specific bot.
+ */
+export const useGetBotRaceHistory = (tokenIndex: number | null, limit: number = 10, afterRaceId?: number) => {
+  return useQuery<{ races: Array<any>, hasMore: boolean, nextRaceId: number | null }>({
+    queryKey: ['botRaceHistory', tokenIndex, limit, afterRaceId],
+    queryFn: () => {
+      if (tokenIndex === null) {
+        return { races: [], hasMore: false, nextRaceId: null };
+      }
+      return getBotRaceHistory(tokenIndex, limit, afterRaceId);
     },
     enabled: tokenIndex !== null,
   });

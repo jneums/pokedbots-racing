@@ -25,7 +25,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_upgrade_robot";
     title = ?"Upgrade Robot";
-    description = ?"Start an upgrade session. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability). Pay with parts (earned from racing) or ICP (progressive cost). Takes 12 hours.";
+    description = ?"Start an upgrade session. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability). Pay with parts (earned from racing) or ICP (progressive cost). Takes 12 hours. Use garage_get_robot_details to see the exact parts and ICP cost for each upgrade type in the 'upgrade_costs' field.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -152,7 +152,7 @@ module {
             from = { owner = user; subaccount = null };
             to = { owner = ctx.canisterPrincipal; subaccount = null };
             amount = totalCost;
-            fee = ?TRANSFER_FEE;
+            fee = null;
             memo = null;
             created_at_time = null;
             spender_subaccount = null;

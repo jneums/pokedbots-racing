@@ -6,3 +6,5 @@ node_modules
 .prometheus
 out/
 .vscode/
+dist/
+build/

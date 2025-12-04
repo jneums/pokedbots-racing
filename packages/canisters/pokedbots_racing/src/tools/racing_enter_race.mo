@@ -23,7 +23,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_enter_race";
     title = ?"Enter Race";
-    description = ?"Enter your PokedBot in a wasteland race. Pays entry fee via ICRC-2. Bot must meet race class requirements based on ELO rating. Battery drains by 10 after race completes. Low condition/battery affects race performance but doesn't prevent entry.";
+    description = ?"Enter your PokedBot in a wasteland race. Pays entry fee via ICRC-2. Bot must meet race class requirements based on ELO rating. Bots can race while upgrading.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -88,12 +88,18 @@ module {
         case (?r) { r };
       };
 
-      // Get bot stats
+      // Get bot stats and verify registered owner
       let botStats = switch (ctx.garageManager.getStats(tokenIndex)) {
         case (null) {
-          return ToolContext.makeError("This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first.", cb);
+          return ToolContext.makeError("This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first to register it.", cb);
         };
-        case (?stats) { stats };
+        case (?stats) {
+          // Verify caller is the registered owner
+          if (not Principal.equal(stats.ownerPrincipal, user)) {
+            return ToolContext.makeError("This PokedBot is registered to a different owner. Please use garage_initialize_pokedbot to register it to your account.", cb);
+          };
+          stats;
+        };
       };
 
       let now = Time.now();
@@ -130,21 +136,6 @@ module {
         if (entry.nftId == nftId) {
           return ToolContext.makeError("Bot already entered in this race", cb);
         };
-      };
-
-      // Check if bot has upgrade in progress
-      switch (botStats.upgradeEndsAt) {
-        case (?endsAt) {
-          if (now < endsAt) {
-            return ToolContext.makeError("Bot is currently being upgraded. Wait for upgrade to complete before racing.", cb);
-          };
-        };
-        case (null) {};
-      };
-
-      // Check if bot is listed for sale
-      if (botStats.listedForSale) {
-        return ToolContext.makeError("Bot is listed for sale on the marketplace. Unlist it before racing.", cb);
       };
 
       // Check class requirements (ELO-based)
@@ -231,7 +222,7 @@ module {
                   ("total_entries", Json.int(updatedRace.entries.size())),
                   ("max_entries", Json.int(race.maxEntries)),
                   ("entry_fee_paid_icp", Json.str(Text.concat("0.", Nat.toText(race.entryFee / 100000)))),
-                  ("current_prize_pool_icp", Json.str(Text.concat("0.", Nat.toText(updatedRace.prizePool / 100000)))),
+                  ("current_prize_pool_icp", Json.str(Text.concat("0.", Nat.toText((updatedRace.prizePool + updatedRace.platformBonus) / 100000)))),
                   ("starts_in_hours", Json.int(hoursUntilStart)),
                   ("starts_in_minutes", Json.int(minutesUntilStart)),
                   ("battery_remaining", Json.int(botStats.battery)),

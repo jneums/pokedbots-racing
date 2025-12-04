@@ -45,3 +45,16 @@ export declare const getRaceById: (raceId: number, identity?: Identity) => Promi
  * @returns The bot profile if found, null otherwise
  */
 export declare const getBotProfile: (tokenIndex: number, identity?: Identity) => Promise<any>;
+/**
+ * Fetches race history for a specific bot with cursor-based pagination.
+ * @param tokenIndex The token index of the bot
+ * @param limit Maximum number of races to return
+ * @param afterRaceId Optional cursor - race ID to start after for pagination
+ * @param identity Optional identity to use for the actor
+ * @returns Race history with pagination info
+ */
+export declare const getBotRaceHistory: (tokenIndex: number, limit?: number, afterRaceId?: number, identity?: Identity) => Promise<{
+    races: Array<any>;
+    hasMore: boolean;
+    nextRaceId: number | null;
+}>;

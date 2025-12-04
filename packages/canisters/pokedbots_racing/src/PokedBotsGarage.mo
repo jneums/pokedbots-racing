@@ -56,6 +56,7 @@ module {
     tokenIndex : Nat;
     ownerPrincipal : Principal;
     faction : FactionType;
+    name : ?Text; // Optional custom name for the bot
 
     // Upgrade bonuses
     speedBonus : Nat;
@@ -252,15 +253,13 @@ module {
       };
     };
 
-    /// Check if bot can race
+    /// Check if bot can race (always true if initialized)
     public func canRace(nftId : Text) : Bool {
       let tokenIndex = Nat.fromText(nftId);
       switch (tokenIndex) {
         case (?idx) {
           switch (Map.get(stats, nhash, idx)) {
-            case (?botStats) {
-              botStats.condition >= 70 and botStats.battery >= 50 and Option.isNull(botStats.upgradeEndsAt) and not botStats.listedForSale;
-            };
+            case (?botStats) { true };
             case (null) { false };
           };
         };
@@ -409,6 +408,7 @@ module {
       tokenIndex : Nat,
       owner : Principal,
       factionOverride : ?FactionType,
+      customName : ?Text,
     ) : PokedBotRacingStats {
       let metadata = statsProvider.getNFTMetadata(tokenIndex);
 
@@ -446,6 +446,7 @@ module {
         tokenIndex = tokenIndex;
         ownerPrincipal = owner;
         faction = faction;
+        name = customName;
         speedBonus = 0;
         powerCoreBonus = 0;
         accelerationBonus = 0;
@@ -497,6 +498,30 @@ module {
     /// Update stats
     public func updateStats(tokenIndex : Nat, newStats : PokedBotRacingStats) {
       ignore Map.put(stats, nhash, tokenIndex, newStats);
+    };
+
+    /// Update bot name
+    public func updateBotName(tokenIndex : Nat, newName : ?Text) : ?PokedBotRacingStats {
+      switch (getStats(tokenIndex)) {
+        case (null) { null };
+        case (?botStats) {
+          let updatedStats = { botStats with name = newName };
+          updateStats(tokenIndex, updatedStats);
+          ?updatedStats;
+        };
+      };
+    };
+
+    /// Update bot owner (for transfers)
+    public func updateBotOwner(tokenIndex : Nat, newOwner : Principal) : ?PokedBotRacingStats {
+      switch (getStats(tokenIndex)) {
+        case (null) { null };
+        case (?botStats) {
+          let updatedStats = { botStats with ownerPrincipal = newOwner };
+          updateStats(tokenIndex, updatedStats);
+          ?updatedStats;
+        };
+      };
     };
 
     /// Check if initialized

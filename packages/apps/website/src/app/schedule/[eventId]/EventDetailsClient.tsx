@@ -2,7 +2,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useGetEventDetails, useGetRaceById } from "@/hooks/useRacing";
+import { useGetEventDetails, useGetRaceById, useGetBotProfile } from "@/hooks/useRacing";
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
 
 function formatICP(amount: bigint): string {
@@ -38,6 +38,16 @@ function getTerrainIcon(terrain: any): string {
   return '🏁';
 }
 
+function BotName({ tokenIndex }: { tokenIndex: number }) {
+  const { data: botProfile } = useGetBotProfile(tokenIndex);
+  
+  if (botProfile?.name && botProfile.name.length > 0 && botProfile.name[0]) {
+    return <>PokedBot #{tokenIndex} - {botProfile.name[0]}</>;
+  }
+  
+  return <>PokedBot #{tokenIndex}</>;
+}
+
 function RaceCard({ raceId }: { raceId: bigint }) {
   const { data: race } = useGetRaceById(Number(raceId));
 
@@ -51,7 +61,7 @@ function RaceCard({ raceId }: { raceId: bigint }) {
     );
   }
 
-  const prizePool = race.entries.reduce((sum: number, entry: any) => sum + Number(entry.entryFee), 0) + Number(race.platformBonus);
+  const prizePool = Number(race.prizePool) + Number(race.platformBonus);
   const entryCount = race.entries.length;
   
   // Get class name from race name
@@ -119,17 +129,52 @@ function RaceCard({ raceId }: { raceId: bigint }) {
                       <img
                         src={imageUrl}
                         alt={`Bot #${entry.nftId}`}
-                        className="w-8 h-8 rounded border-2 border-primary/30"
+                        className="w-10 h-10 rounded border-2 border-primary/30"
                       />
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold">PokedBot #{entry.nftId}</p>
-                        <p className="text-xs text-muted-foreground">Entry Fee: {formatICP(entry.entryFee)}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold"><BotName tokenIndex={Number(entry.nftId)} /></p>
                       </div>
                       <Badge variant="outline" className="text-xs">
                         #{idx + 1}
                       </Badge>
                     </div>
                   </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Sponsors List */}
+        {race.sponsors && race.sponsors.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">Sponsors ({race.sponsors.length}):</p>
+            <div className="grid grid-cols-1 gap-2">
+              {race.sponsors.map((sponsor: any, idx: number) => {
+                const sponsorPrincipal = sponsor.sponsor.toString();
+                const formatPrincipal = (principal: string): string => {
+                  if (principal.length <= 12) return principal;
+                  return `${principal.slice(0, 6)}...${principal.slice(-4)}`;
+                };
+                
+                return (
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-card/50 border border-primary/20 rounded-lg">
+                    <img
+                      src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${sponsorPrincipal}`}
+                      alt="Sponsor avatar"
+                      className="w-10 h-10 rounded-full border-2 border-primary/30"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold font-mono truncate">{formatPrincipal(sponsorPrincipal)}</p>
+                      {sponsor.message && sponsor.message.length > 0 && sponsor.message[0] && (
+                        <p className="text-xs text-muted-foreground italic mt-1">&quot;{sponsor.message[0]}&quot;</p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-green-500">+{formatICP(sponsor.amount)}</p>
+                      <p className="text-xs text-muted-foreground">Sponsored</p>
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -159,10 +204,10 @@ function RaceCard({ raceId }: { raceId: bigint }) {
                       <img
                         src={imageUrl}
                         alt={`Bot #${result.nftId}`}
-                        className="w-10 h-10 rounded border-2 border-primary/40"
+                        className="w-12 h-12 rounded border-2 border-primary/40"
                       />
-                      <div className="flex-1">
-                        <p className="font-semibold">PokedBot #{result.nftId}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold"><BotName tokenIndex={Number(result.nftId)} /></p>
                         <p className="text-sm text-muted-foreground">
                           {result.finalTime !== undefined ? (
                             <>
@@ -209,6 +254,7 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
   const now = Date.now() * 1_000_000; // Convert to nanoseconds
   const isPast = Number(event.scheduledTime) < now;
   const isCompleted = 'Completed' in event.status;
+  const registrationClosed = Number(event.registrationCloses) < now;
   
   const getStatusBadge = () => {
     if ('Cancelled' in event.status) {
@@ -220,10 +266,11 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
     if ('InProgress' in event.status) {
       return <Badge className="bg-orange-500">In Progress</Badge>;
     }
-    if ('RegistrationClosed' in event.status) {
+    // Check actual registration time, not just status
+    if (registrationClosed || 'RegistrationClosed' in event.status) {
       return <Badge variant="outline">Registration Closed</Badge>;
     }
-    if ('RegistrationOpen' in event.status) {
+    if ('RegistrationOpen' in event.status && !registrationClosed) {
       return <Badge className="bg-green-500">Registration Open</Badge>;
     }
     return <Badge>Announced</Badge>;

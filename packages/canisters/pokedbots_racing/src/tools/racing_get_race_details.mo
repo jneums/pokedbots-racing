@@ -125,7 +125,10 @@ module {
               let entryFeeDecimalStr = if (entryFeeDecimal < 10) {
                 "0" # Nat.toText(entryFeeDecimal);
               } else { Nat.toText(entryFeeDecimal) };
-              let prizePoolDecimal = (race.prizePool % 100_000_000) / 1_000_000;
+              
+              // Total prize pool includes entry fees, sponsorships, and platform bonus
+              let totalPrizePool = race.prizePool + race.platformBonus;
+              let prizePoolDecimal = (totalPrizePool % 100_000_000) / 1_000_000;
               let prizePoolDecimalStr = if (prizePoolDecimal < 10) {
                 "0" # Nat.toText(prizePoolDecimal);
               } else { Nat.toText(prizePoolDecimal) };
@@ -139,7 +142,8 @@ module {
                 ("terrain", Json.str(terrainText)),
                 ("duration_seconds", Json.int(race.duration)),
                 ("entry_fee_icp", Json.str(Text.concat(Nat.toText(race.entryFee / 100_000_000), "." # entryFeeDecimalStr))),
-                ("prize_pool_icp", Json.str(Text.concat(Nat.toText(race.prizePool / 100_000_000), "." # prizePoolDecimalStr))),
+                ("prize_pool_icp", Json.str(Text.concat(Nat.toText(totalPrizePool / 100_000_000), "." # prizePoolDecimalStr))),
+                ("platform_bonus_icp", Json.str(Text.concat(Nat.toText(race.platformBonus / 100_000_000), "." # Nat.toText((race.platformBonus % 100_000_000) / 1_000_000)))),
                 ("min_entries", Json.int(race.minEntries)),
                 ("max_entries", Json.int(race.maxEntries)),
                 ("current_entries", Json.int(race.entries.size())),

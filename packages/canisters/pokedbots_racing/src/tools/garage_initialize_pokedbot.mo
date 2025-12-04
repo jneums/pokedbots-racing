@@ -20,7 +20,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("The token index of the PokedBot to register for racing (e.g., 4079)"))]))])),
+      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("The token index of the PokedBot to register for racing (e.g., 4079)"))])), ("name", Json.obj([("type", Json.str("string")), ("description", Json.str("Optional: Custom name for your bot (max 30 characters). Can be changed later by re-registering."))]))])),
       ("required", Json.arr([Json.str("token_index")])),
     ]);
     outputSchema = null;
@@ -48,20 +48,66 @@ module {
         case (?idx) { idx };
       };
 
+      // Parse optional name
+      let customName = switch (Result.toOption(Json.getAsText(_args, "name"))) {
+        case (null) { null };
+        case (?name) {
+          if (Text.size(name) > 30) {
+            return ToolContext.makeError("Bot name must be 30 characters or less", cb);
+          };
+          ?name;
+        };
+      };
+
       let tokenIndexNat32 = Nat32.fromNat(tokenIndex);
 
-      // Check if already registered by this user
+      // Check if already registered
       switch (ctx.garageManager.getStats(tokenIndex)) {
         case (?existingStats) {
-          // If already initialized by the same user, just return their stats
+          // If already initialized by the same user, allow renaming
           if (Principal.equal(existingStats.ownerPrincipal, user)) {
-            return ToolContext.makeError("This PokedBot already has a racing license. Use garage_get_robot_details to view its stats.", cb);
+            // Update just the name if provided
+            switch (customName) {
+              case (?newName) {
+                let _ = ctx.garageManager.updateBotName(tokenIndex, ?newName);
+                return ToolContext.makeTextSuccess("✅ Bot renamed to: " # newName, cb);
+              };
+              case (null) {
+                return ToolContext.makeError("This PokedBot already has a racing license. Use garage_get_robot_details to view its stats, or provide a 'name' to rename it.", cb);
+              };
+            };
           };
-          // If owned by someone else, allow re-initialization for the new owner
-          // (This handles the transfer case)
+          // If owned by someone else, verify new ownership and update owner
+          // (This handles the transfer case - preserve all stats except owner)
+          
+          // Verify ownership via EXT canister
+          let garageSubaccount = ExtIntegration.deriveGarageSubaccount(user);
+          let garageAccountId = ExtIntegration.principalToAccountIdentifier(ctx.canisterPrincipal, ?garageSubaccount);
+
+          let ownerResult = try {
+            await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(tokenIndexNat32, ctx.extCanisterId));
+          } catch (_) {
+            return ToolContext.makeError("Failed to verify ownership", cb);
+          };
+
+          switch (ownerResult) {
+            case (#err(_)) {
+              return ToolContext.makeError("This PokedBot does not exist.", cb);
+            };
+            case (#ok(currentOwner)) {
+              if (currentOwner != garageAccountId) {
+                return ToolContext.makeError("You do not own this PokedBot. It must be in your garage to register.", cb);
+              };
+            };
+          };
+
+          // Update owner (transfer case) - preserve all other stats
+          let _ = ctx.garageManager.updateBotOwner(tokenIndex, user);
+          
+          return ToolContext.makeTextSuccess("🔄 **OWNERSHIP UPDATED**\n\nPokedBot #" # Nat.toText(tokenIndex) # " has been registered to your account. All racing stats and upgrades have been preserved.", cb);
         };
         case (null) {
-          // Not yet initialized - proceed with initialization
+          // Not yet initialized - proceed with first-time initialization
         };
       };
 
@@ -91,6 +137,7 @@ module {
         tokenIndex,
         user,
         null, // Let it auto-derive faction from metadata
+        customName,
       );
 
       // Get faction for display
@@ -172,6 +219,7 @@ module {
       // Build JSON response
       let response = Json.obj([
         ("token_index", Json.int(tokenIndex)),
+        ("name", switch (customName) { case (?n) { Json.str(n) }; case (null) { Json.nullable() } }),
         ("faction", Json.str(factionText)),
         ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability))])),
         ("battery", Json.int(racingStats.battery)),

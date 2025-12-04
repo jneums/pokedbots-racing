@@ -1,10 +1,10 @@
 'use client';
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useGetBotProfile } from '@/hooks/useRacing';
+import { useGetBotProfile, useGetBotRaceHistory } from '@/hooks/useRacing';
 import { generatetokenIdentifier, generateExtThumbnailLink, generateExtAssetLink } from '@pokedbots-racing/ic-js';
 
 function formatICP(amount: bigint): string {
@@ -43,6 +43,7 @@ function getRaceClassBadge(raceClass: any): string {
 export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
   const navigate = useNavigate();
   const { data: profile, isLoading } = useGetBotProfile(Number(tokenIndex));
+  const { data: raceHistory, isLoading: historyLoading } = useGetBotRaceHistory(Number(tokenIndex), 10);
 
   if (isLoading || !profile) {
     return (
@@ -67,6 +68,12 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
   const winRate = racesEntered > 0
     ? ((wins / racesEntered) * 100).toFixed(1)
     : '0';
+
+  const ownerPrincipal = profile.owner?.toString();
+  const formatPrincipal = (principal: string): string => {
+    if (principal.length <= 12) return principal;
+    return `${principal.slice(0, 6)}...${principal.slice(-4)}`;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -95,7 +102,10 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
             </div>
 
             <div className="flex-1">
-              <h1 className="text-4xl font-bold mb-2">PokedBot #{tokenIndex}</h1>
+              <h1 className="text-4xl font-bold mb-2">
+                {profile.name && profile.name.length > 0 && profile.name[0] ? `PokedBot #${tokenIndex} - ${profile.name[0]}` : `PokedBot #${tokenIndex}`}
+              </h1>
+              
               <div className="flex gap-2 mb-4">
                 <Badge className={`bg-gradient-to-r ${getFactionColor(faction)} text-white`}>
                   {faction}
@@ -179,7 +189,78 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
                   <span className="text-muted-foreground">💰 Total Earnings</span>
                   <span className="font-bold">{formatICP(totalEarnings)} ICP</span>
                 </div>
+                {ownerPrincipal && (
+                  <div className="flex justify-between items-center p-3 bg-card/50 border border-primary/20 rounded-lg">
+                    <span className="text-muted-foreground">👤 Registered Owner</span>
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${ownerPrincipal}`}
+                        alt="Owner avatar"
+                        className="w-6 h-6 rounded-full border border-primary/30"
+                      />
+                      <span className="font-mono text-sm">{formatPrincipal(ownerPrincipal)}</span>
+                    </div>
+                  </div>
+                )}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Race History */}
+          <Card className="border-2 border-primary/20 mt-8">
+            <CardHeader>
+              <CardTitle>Race History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {historyLoading ? (
+                <p className="text-center text-muted-foreground">Loading race history...</p>
+              ) : !raceHistory || raceHistory.races.length === 0 ? (
+                <p className="text-center text-muted-foreground">No completed races yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {raceHistory.races.map((race: any, idx: number) => {
+                    const position = Number(race.position);
+                    const wasWin = position === 1;
+                    const wasPodium = position > 0 && position <= 3;
+                    
+                    return (
+                      <Link 
+                        key={idx} 
+                        to={`/schedule/${race.eventId}`}
+                        className="block hover:bg-card/70 transition-colors rounded-lg"
+                      >
+                        <div className="flex items-center justify-between p-3 bg-card/50 border border-primary/20 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div className="text-xl font-bold w-10 text-center">
+                              {position === 1 && '🥇'}
+                              {position === 2 && '🥈'}
+                              {position === 3 && '🥉'}
+                              {position > 3 && `#${position}`}
+                            </div>
+                            <div>
+                              <p className="font-semibold">{race.raceName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(Number(race.scheduledTime) / 1_000_000).toLocaleDateString()}
+                                {race.finalTime && race.finalTime.length > 0 && race.finalTime[0] !== undefined && ` • ${race.finalTime[0].toFixed(2)}s`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            {race.prizeAmount > 0n && (
+                              <p className="text-sm font-bold text-green-500">
+                                +{formatICP(BigInt(race.prizeAmount))} ICP
+                              </p>
+                            )}
+                            <Badge variant={wasWin ? "default" : wasPodium ? "secondary" : "outline"} className="text-xs">
+                              {race.totalRacers} racers
+                            </Badge>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

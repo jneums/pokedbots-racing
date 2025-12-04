@@ -379,7 +379,9 @@ export const idlFactory = ({ IDL }) => {
           IDL.Opt(
             IDL.Record({
               'tokenIndex' : IDL.Nat,
+              'owner' : IDL.Opt(IDL.Principal),
               'isInitialized' : IDL.Bool,
+              'name' : IDL.Opt(IDL.Text),
               'eloRating' : IDL.Nat,
               'stats' : IDL.Record({
                 'stability' : IDL.Nat,
@@ -398,6 +400,29 @@ export const idlFactory = ({ IDL }) => {
               'raceClass' : RaceClass,
             })
           ),
+        ],
+        ['query'],
+      ),
+    'get_bot_race_history' : IDL.Func(
+        [IDL.Nat, IDL.Nat, IDL.Opt(IDL.Nat)],
+        [
+          IDL.Record({
+            'hasMore' : IDL.Bool,
+            'nextRaceId' : IDL.Opt(IDL.Nat),
+            'races' : IDL.Vec(
+              IDL.Record({
+                'eventId' : IDL.Nat,
+                'raceName' : IDL.Text,
+                'prizeAmount' : IDL.Nat,
+                'scheduledTime' : IDL.Int,
+                'totalRacers' : IDL.Nat,
+                'finalTime' : IDL.Opt(IDL.Float64),
+                'raceId' : IDL.Nat,
+                'position' : IDL.Nat,
+                'eventName' : IDL.Text,
+              })
+            ),
+          }),
         ],
         ['query'],
       ),

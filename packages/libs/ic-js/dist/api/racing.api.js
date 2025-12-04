@@ -66,3 +66,20 @@ export const getBotProfile = async (tokenIndex, identity) => {
     const result = await racingActor.get_bot_profile(BigInt(tokenIndex));
     return result.length > 0 ? (result[0] ?? null) : null;
 };
+/**
+ * Fetches race history for a specific bot with cursor-based pagination.
+ * @param tokenIndex The token index of the bot
+ * @param limit Maximum number of races to return
+ * @param afterRaceId Optional cursor - race ID to start after for pagination
+ * @param identity Optional identity to use for the actor
+ * @returns Race history with pagination info
+ */
+export const getBotRaceHistory = async (tokenIndex, limit = 10, afterRaceId, identity) => {
+    const racingActor = getRacingActor(identity);
+    const result = await racingActor.get_bot_race_history(BigInt(tokenIndex), BigInt(limit), afterRaceId !== undefined ? [BigInt(afterRaceId)] : []);
+    return {
+        races: result.races,
+        hasMore: result.hasMore,
+        nextRaceId: result.nextRaceId.length > 0 ? Number(result.nextRaceId[0]) : null
+    };
+};

@@ -468,6 +468,31 @@ module {
       };
     };
 
+    /// Update race entries (used for removing ineligible entries at race start)
+    public func updateRaceEntries(raceId : Nat, newEntries : [RaceEntry]) : ?Race {
+      switch (getRace(raceId)) {
+        case (?race) {
+          // Recalculate prize pool based on remaining entries
+          var newPrizePool : Nat = 0;
+          for (entry in newEntries.vals()) {
+            newPrizePool += entry.entryFee;
+          };
+
+          let newTax = (newPrizePool * 5) / 100;
+
+          let updatedRace = {
+            race with
+            entries = newEntries;
+            prizePool = newPrizePool;
+            platformTax = newTax;
+          };
+          ignore Map.put(races, nhash, raceId, updatedRace);
+          ?updatedRace;
+        };
+        case (null) { null };
+      };
+    };
+
     /// Set race results
     public func setRaceResults(raceId : Nat, results : [RaceResult]) : ?Race {
       switch (getRace(raceId)) {

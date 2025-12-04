@@ -17,7 +17,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_get_robot_details";
     title = ?"Get Robot Details";
-    description = ?"Get comprehensive details for a specific PokedBot including stats, condition, career, and upgrade status. The bot must be initialized for racing first.";
+    description = ?"Get comprehensive details for a specific PokedBot including stats, condition, career, and upgrade status. The bot must be initialized for racing first. Response includes 'upgrade_costs' field with the parts and ICP cost for the next upgrade of each stat type (speed, power_core, acceleration, stability).";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -165,15 +165,17 @@ module {
       let currentStats = ctx.garageManager.getCurrentStats(racingStats);
       let baseStats = ctx.garageManager.getBaseStats(tokenIndex);
 
-      // Get user inventory
-      let inventory = ctx.garageManager.getUserInventory(user);
-      let inventoryJson = Json.obj([
-        ("speed_chips", Json.int(inventory.speedChips)),
-        ("power_cells", Json.int(inventory.powerCoreFragments)),
-        ("thruster_parts", Json.int(inventory.thrusterKits)),
-        ("gyro_units", Json.int(inventory.gyroModules)),
-        ("universal_parts", Json.int(inventory.universalParts)),
-      ]);
+      // Calculate next upgrade costs for each stat (in parts and ICP)
+      let PART_PRICE_E8S = 1_000_000 : Nat; // 0.01 ICP per part (100 parts = 1 ICP)
+      let speedUpgradeCost = ctx.garageManager.calculateUpgradeCost(racingStats.speedUpgrades);
+      let powerCoreUpgradeCost = ctx.garageManager.calculateUpgradeCost(racingStats.powerCoreUpgrades);
+      let accelerationUpgradeCost = ctx.garageManager.calculateUpgradeCost(racingStats.accelerationUpgrades);
+      let stabilityUpgradeCost = ctx.garageManager.calculateUpgradeCost(racingStats.stabilityUpgrades);
+
+      let speedUpgradeICP = (speedUpgradeCost * PART_PRICE_E8S) / 100_000_000;
+      let powerCoreUpgradeICP = (powerCoreUpgradeCost * PART_PRICE_E8S) / 100_000_000;
+      let accelerationUpgradeICP = (accelerationUpgradeCost * PART_PRICE_E8S) / 100_000_000;
+      let stabilityUpgradeICP = (stabilityUpgradeCost * PART_PRICE_E8S) / 100_000_000;
 
       // Generate image URLs
       let tokenId = ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId);
@@ -184,11 +186,12 @@ module {
       let response = Json.obj([
         ("message", Json.str(factionGreeting)),
         ("token_index", Json.int(tokenIndex)),
+        ("name", switch (racingStats.name) { case (?n) { Json.str(n) }; case (null) { Json.nullable() } }),
         ("race_class", Json.str(raceClass)),
         ("owner", Json.str(Principal.toText(user))),
         ("faction", Json.str(factionText)),
-        ("inventory", inventoryJson),
         ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability)), ("base_speed", Json.int(baseStats.speed)), ("base_power_core", Json.int(baseStats.powerCore)), ("base_acceleration", Json.int(baseStats.acceleration)), ("base_stability", Json.int(baseStats.stability)), ("speed_bonus", Json.int(racingStats.speedBonus)), ("power_core_bonus", Json.int(racingStats.powerCoreBonus)), ("acceleration_bonus", Json.int(racingStats.accelerationBonus)), ("stability_bonus", Json.int(racingStats.stabilityBonus)), ("speed_upgrades", Json.int(racingStats.speedUpgrades)), ("power_core_upgrades", Json.int(racingStats.powerCoreUpgrades)), ("acceleration_upgrades", Json.int(racingStats.accelerationUpgrades)), ("stability_upgrades", Json.int(racingStats.stabilityUpgrades))])),
+        ("upgrade_costs", Json.obj([("speed_parts", Json.int(speedUpgradeCost)), ("speed_icp", Json.int(speedUpgradeICP)), ("power_core_parts", Json.int(powerCoreUpgradeCost)), ("power_core_icp", Json.int(powerCoreUpgradeICP)), ("acceleration_parts", Json.int(accelerationUpgradeCost)), ("acceleration_icp", Json.int(accelerationUpgradeICP)), ("stability_parts", Json.int(stabilityUpgradeCost)), ("stability_icp", Json.int(stabilityUpgradeICP))])),
         ("condition", Json.obj([("battery", Json.int(racingStats.battery)), ("condition", Json.int(racingStats.condition)), ("status", Json.str(status)), ("status_message", Json.str(statusFlavor))])),
         ("career", Json.obj([("races_entered", Json.int(racingStats.racesEntered)), ("wins", Json.int(racingStats.wins)), ("places", Json.int(racingStats.places)), ("shows", Json.int(racingStats.shows)), ("total_scrap_earned", Json.int(racingStats.totalScrapEarned)), ("faction_reputation", Json.int(racingStats.factionReputation)), ("reputation_tier", Json.str(reputationTier))])),
         ("overall_rating", Json.int(overallRating)),

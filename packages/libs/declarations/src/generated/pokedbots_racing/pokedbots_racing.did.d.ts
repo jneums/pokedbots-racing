@@ -189,7 +189,9 @@ export interface McpServer {
     [] | [
       {
         'tokenIndex' : bigint,
+        'owner' : [] | [Principal],
         'isInitialized' : boolean,
+        'name' : [] | [string],
         'eloRating' : bigint,
         'stats' : {
           'stability' : bigint,
@@ -208,6 +210,26 @@ export interface McpServer {
         'raceClass' : RaceClass,
       }
     ]
+  >,
+  'get_bot_race_history' : ActorMethod<
+    [bigint, bigint, [] | [bigint]],
+    {
+      'hasMore' : boolean,
+      'nextRaceId' : [] | [bigint],
+      'races' : Array<
+        {
+          'eventId' : bigint,
+          'raceName' : string,
+          'prizeAmount' : bigint,
+          'scheduledTime' : bigint,
+          'totalRacers' : bigint,
+          'finalTime' : [] | [number],
+          'raceId' : bigint,
+          'position' : bigint,
+          'eventName' : string,
+        }
+      >,
+    }
   >,
   'get_current_periods' : ActorMethod<
     [],

@@ -69,7 +69,19 @@ module {
               // Get racing stats if initialized
               let robotStats = ctx.getStats(Nat32.toNat(tokenIndex));
 
-              msg #= "🏎️ PokedBot #" # Nat32.toText(tokenIndex) # "\n";
+              msg #= "🏎️ PokedBot #" # Nat32.toText(tokenIndex);
+              
+              // Show custom name if set
+              switch (robotStats) {
+                case (?stats) {
+                  switch (stats.name) {
+                    case (?botName) { msg #= " \"" # botName # "\""; };
+                    case (null) {};
+                  };
+                };
+                case (null) {};
+              };
+              msg #= "\n";
 
               // Show stats and rating
               switch (robotStats) {

@@ -183,7 +183,9 @@ module {
           Array.sort<RacingSimulator.Race>(
             filteredRaces,
             func(a, b) {
-              if (a.prizePool > b.prizePool) { #less } else if (a.prizePool < b.prizePool) {
+              let totalA = a.prizePool + a.platformBonus;
+              let totalB = b.prizePool + b.platformBonus;
+              if (totalA > totalB) { #less } else if (totalA < totalB) {
                 #greater;
               } else { #equal };
             },
@@ -320,7 +322,9 @@ module {
         let entryFeeDecimalStr = if (entryFeeDecimal < 10) {
           "0" # Nat.toText(entryFeeDecimal);
         } else { Nat.toText(entryFeeDecimal) };
-        let prizePoolDecimal = (race.prizePool % 100_000_000) / 1_000_000;
+        // Total prize pool includes entry fees, sponsorships, and platform bonus
+        let totalPrizePool = race.prizePool + race.platformBonus;
+        let prizePoolDecimal = (totalPrizePool % 100_000_000) / 1_000_000;
         let prizePoolDecimalStr = if (prizePoolDecimal < 10) {
           "0" # Nat.toText(prizePoolDecimal);
         } else { Nat.toText(prizePoolDecimal) };
