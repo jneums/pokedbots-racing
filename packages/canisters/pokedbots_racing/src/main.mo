@@ -166,6 +166,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   // Stable state for battery recharge tracking
   var stable_last_recharge_time : Int = 0;
 
+  // Stable state for prize payment tracking (prevents duplicate payments)
+  // Key: "raceId:owner:amount" - ensures each prize is only paid once
+  let stable_paid_prizes = Map.new<Text, Int>(); // Maps prize key to timestamp when paid
+
   // Constants
   let TRANSFER_FEE : Nat = 10_000; // 0.0001 ICP
   let PRIZE_DISTRIBUTION_TIMEOUT : Nat = 60_000_000_000; // 60 seconds timeout for prize transfers
@@ -796,13 +800,27 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     switch (prizeInfoOpt) {
       case (?prizeInfo) {
+        // Create unique key for this prize payment
+        let prizeKey = Nat.toText(prizeInfo.raceId) # ":" # Principal.toText(prizeInfo.owner) # ":" # Nat.toText(prizeInfo.amount);
+
+        // Check if this prize was already paid
+        switch (Map.get(stable_paid_prizes, Map.thash, prizeKey)) {
+          case (?paidAt) {
+            Debug.print("DUPLICATE PREVENTED: Prize already paid at " # debug_show (paidAt) # " for key: " # prizeKey);
+            return #awaited(actionId); // Already paid, mark as complete to prevent retries
+          };
+          case (null) {
+            // Not paid yet, proceed with payment
+          };
+        };
+
         Debug.print("Distributing " # debug_show (prizeInfo.amount) # " to " # Principal.toText(prizeInfo.owner) # " for race " # debug_show (prizeInfo.raceId));
 
         let ledgerCanisterId = switch (icpLedgerCanisterId) {
           case (?id) { id };
           case (null) {
             Debug.print("ICP Ledger not configured, skipping prize distribution");
-            return #trappable(actionId); // Skip prize distribution if ledger not configured
+            return #trappable(actionId); // Return actionId, not error - will be cleaned up
           };
         };
         let ledger = actor (Principal.toText(ledgerCanisterId)) : actor {
@@ -822,21 +840,25 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           switch (transferResult) {
             case (#Ok(blockIndex)) {
               Debug.print("Prize sent successfully, block: " # debug_show (blockIndex));
+              // Record that this prize has been paid
+              ignore Map.put(stable_paid_prizes, Map.thash, prizeKey, Time.now());
+              return #awaited(actionId); // Success - action completed
             };
             case (#Err(err)) {
               Debug.print("Prize transfer failed: " # debug_show (err));
+              return #trappable(actionId); // Failed - will be cleaned up
             };
           };
         } catch (e) {
-          Debug.print("Prize transfer caught error");
+          Debug.print("Prize transfer caught error: " # Error.message(e));
+          return #trappable(actionId); // Exception - will be cleaned up
         };
       };
       case (null) {
         Debug.print("Could not decode prize info");
+        return #trappable(actionId); // Invalid data - will be cleaned up
       };
     };
-
-    #trappable(actionId);
   };
 
   // Handle race start - marks race as in progress
@@ -871,7 +893,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                           Int.abs(Time.now() + 1_000_000_000), // 1 second delay
                           {
                             actionType = "prize_distribution";
-                            params = to_candid ((raceId, entry.owner, entry.entryFee));
+                            params = to_candid ({
+                              raceId = raceId;
+                              owner = entry.owner;
+                              amount = entry.entryFee;
+                            });
                           },
                           PRIZE_DISTRIBUTION_TIMEOUT,
                         );
@@ -885,7 +911,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                         Int.abs(Time.now() + 1_000_000_000),
                         {
                           actionType = "prize_distribution";
-                          params = to_candid ((raceId, entry.owner, entry.entryFee));
+                          params = to_candid ({
+                            raceId = raceId;
+                            owner = entry.owner;
+                            amount = entry.entryFee;
+                          });
                         },
                         PRIZE_DISTRIBUTION_TIMEOUT,
                       );
@@ -900,7 +930,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                     Int.abs(Time.now() + 1_000_000_000),
                     {
                       actionType = "prize_distribution";
-                      params = to_candid ((raceId, entry.owner, entry.entryFee));
+                      params = to_candid ({
+                        raceId = raceId;
+                        owner = entry.owner;
+                        amount = entry.entryFee;
+                      });
                     },
                     PRIZE_DISTRIBUTION_TIMEOUT,
                   );
@@ -927,7 +961,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   Int.abs(Time.now() + 1_000_000_000), // 1 second delay
                   {
                     actionType = "prize_distribution";
-                    params = to_candid ((raceId, entry.owner, entry.entryFee));
+                    params = to_candid ({
+                      raceId = raceId;
+                      owner = entry.owner;
+                      amount = entry.entryFee;
+                    });
                   },
                   PRIZE_DISTRIBUTION_TIMEOUT,
                 );
@@ -940,7 +978,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   Int.abs(Time.now() + 1_000_000_000), // 1 second delay
                   {
                     actionType = "prize_distribution";
-                    params = to_candid ((raceId, sponsor.sponsor, sponsor.amount));
+                    params = to_candid ({
+                      raceId = raceId;
+                      owner = sponsor.sponsor;
+                      amount = sponsor.amount;
+                    });
                   },
                   PRIZE_DISTRIBUTION_TIMEOUT,
                 );
