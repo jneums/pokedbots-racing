@@ -67,16 +67,16 @@ import IcpLedger "IcpLedger";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
 
-// // Migration to add name field to PokedBotRacingStats
+// // Migration to add overcharge field to PokedBotRacingStats
 // (
 //   with migration = func(
 //     old_state : {
-//       stable_racing_stats : Map.Map<Nat, { tokenIndex : Nat; ownerPrincipal : Principal; faction : PokedBotsGarage.FactionType; speedBonus : Nat; powerCoreBonus : Nat; accelerationBonus : Nat; stabilityBonus : Nat; speedUpgrades : Nat; powerCoreUpgrades : Nat; accelerationUpgrades : Nat; stabilityUpgrades : Nat; battery : Nat; condition : Nat; experience : Nat; preferredDistance : PokedBotsGarage.Distance; preferredTerrain : PokedBotsGarage.Terrain; racesEntered : Nat; wins : Nat; places : Nat; shows : Nat; totalScrapEarned : Nat; factionReputation : Nat; eloRating : Nat; activatedAt : Int; lastDecayed : Int; lastRecharged : ?Int; lastRepaired : ?Int; lastDiagnostics : ?Int; lastRaced : ?Int; upgradeEndsAt : ?Int; listedForSale : Bool }>;
+//       stable_racing_stats : Map.Map<Nat, { tokenIndex : Nat; ownerPrincipal : Principal; faction : PokedBotsGarage.FactionType; name : ?Text; speedBonus : Nat; powerCoreBonus : Nat; accelerationBonus : Nat; stabilityBonus : Nat; speedUpgrades : Nat; powerCoreUpgrades : Nat; accelerationUpgrades : Nat; stabilityUpgrades : Nat; battery : Nat; condition : Nat; experience : Nat; preferredDistance : PokedBotsGarage.Distance; preferredTerrain : PokedBotsGarage.Terrain; racesEntered : Nat; wins : Nat; places : Nat; shows : Nat; totalScrapEarned : Nat; factionReputation : Nat; eloRating : Nat; activatedAt : Int; lastDecayed : Int; lastRecharged : ?Int; lastRepaired : ?Int; lastDiagnostics : ?Int; lastRaced : ?Int; upgradeEndsAt : ?Int; listedForSale : Bool }>;
 //     }
 //   ) : {
 //     stable_racing_stats : Map.Map<Nat, PokedBotsGarage.PokedBotRacingStats>;
 //   } {
-//     // Add name field (null) to all existing bots
+//     // Add overcharge field (default 0) to all existing bot stats
 //     let new_stats = Map.new<Nat, PokedBotsGarage.PokedBotRacingStats>();
 
 //     for ((tokenIndex, oldStats) in Map.entries(old_state.stable_racing_stats)) {
@@ -84,7 +84,7 @@ import Star "mo:star/star";
 //         tokenIndex = oldStats.tokenIndex;
 //         ownerPrincipal = oldStats.ownerPrincipal;
 //         faction = oldStats.faction;
-//         name = null; // Add name field, initially null
+//         name = oldStats.name;
 //         speedBonus = oldStats.speedBonus;
 //         powerCoreBonus = oldStats.powerCoreBonus;
 //         accelerationBonus = oldStats.accelerationBonus;
@@ -96,6 +96,7 @@ import Star "mo:star/star";
 //         battery = oldStats.battery;
 //         condition = oldStats.condition;
 //         experience = oldStats.experience;
+//         overcharge = 0; // Initialize new field with 0
 //         preferredDistance = oldStats.preferredDistance;
 //         preferredTerrain = oldStats.preferredTerrain;
 //         racesEntered = oldStats.racesEntered;
@@ -697,8 +698,44 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           );
         };
 
-        // Update event with race IDs
-        ignore eventCalendar.addRacesToEvent(event.eventId, createdRaceIds);
+        // Atomically add races to event - only succeeds if event still has no races
+        // This prevents race conditions where multiple timers try to create races for the same event
+        switch (eventCalendar.addRacesToEventIfEmpty(event.eventId, createdRaceIds)) {
+          case (?_updatedEvent) {
+            // Success! We won the race to add races to this event
+            Debug.print("Successfully associated " # Nat.toText(createdRaceIds.size()) # " races with event " # Nat.toText(event.eventId));
+          };
+          case (null) {
+            // Either event disappeared OR another timer already added races
+            // Clean up our duplicate races
+            Debug.print("WARNING: Failed to add races to event " # Nat.toText(event.eventId) # " (another timer beat us or event disappeared). Cleaning up " # Nat.toText(createdRaceIds.size()) # " duplicate races");
+
+            for (raceId in createdRaceIds.vals()) {
+              switch (raceManager.getRace(raceId)) {
+                case (?race) {
+                  ignore raceManager.updateRaceStatus(raceId, #Cancelled);
+
+                  // Cancel the race_start timer
+                  let raceStartTimers = tt().getActionsByFilter(#ByType("race_start"));
+                  for ((timerId, timerAction) in raceStartTimers.vals()) {
+                    let timerRaceIdOpt : ?Nat = from_candid (timerAction.params);
+                    switch (timerRaceIdOpt) {
+                      case (?timerRaceId) {
+                        if (timerRaceId == raceId) {
+                          ignore tt().cancelActionsByIds<system>([timerId.id]);
+                        };
+                      };
+                      case (null) {};
+                    };
+                  };
+
+                  ignore raceManager.deleteRace(raceId);
+                };
+                case (null) {};
+              };
+            };
+          };
+        };
       };
     };
 
@@ -746,8 +783,28 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
       for (i in Iter.range(0, 1 - weeklyLeagues.size())) {
         let nextSunday = RaceCalendar.getNextWeeklyOccurrence(0, 20, 0, scheduleTime);
-        ignore eventCalendar.createWeeklyLeagueEvent(nextSunday, now);
-        Debug.print("Auto-scheduled Weekly League for timestamp: " # debug_show (nextSunday));
+
+        // Check if event already exists at this time (within 30-minute window)
+        let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
+          upcomingEvents,
+          func(e) {
+            switch (e.eventType) {
+              case (#WeeklyLeague) {
+                let timeDiff = Int.abs(e.scheduledTime - nextSunday);
+                timeDiff < (30 * 60 * 1_000_000_000); // Within 30 minutes
+              };
+              case (_) { false };
+            };
+          },
+        );
+
+        if (existingAtTime.size() == 0) {
+          ignore eventCalendar.createWeeklyLeagueEvent(nextSunday, now);
+          Debug.print("Auto-scheduled Weekly League for timestamp: " # debug_show (nextSunday));
+        } else {
+          Debug.print("SKIP: Weekly League already exists at timestamp: " # debug_show (nextSunday));
+        };
+
         scheduleTime := nextSunday + 1_000_000_000; // Move past this event
       };
     };
@@ -779,8 +836,28 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
       for (i in Iter.range(0, 7 - sprintsIn48h.size())) {
         let nextSprint = RaceCalendar.getNextDailySprintTime(scheduleTime);
-        ignore eventCalendar.createDailySprintEvent(nextSprint, now);
-        Debug.print("Auto-scheduled Daily Sprint for timestamp: " # debug_show (nextSprint));
+
+        // Check if event already exists at this time (within 5-minute window)
+        let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
+          upcomingEvents,
+          func(e) {
+            switch (e.eventType) {
+              case (#DailySprint) {
+                let timeDiff = Int.abs(e.scheduledTime - nextSprint);
+                timeDiff < (5 * 60 * 1_000_000_000); // Within 5 minutes
+              };
+              case (_) { false };
+            };
+          },
+        );
+
+        if (existingAtTime.size() == 0) {
+          ignore eventCalendar.createDailySprintEvent(nextSprint, now);
+          Debug.print("Auto-scheduled Daily Sprint for timestamp: " # debug_show (nextSprint));
+        } else {
+          Debug.print("SKIP: Daily Sprint already exists at timestamp: " # debug_show (nextSprint));
+        };
+
         scheduleTime := nextSprint + 1_000_000_000;
       };
     };
@@ -873,90 +950,16 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
         switch (raceManager.getRace(raceId)) {
           case (?race) {
-            // Validate all entries still meet race class requirements
-            var validEntries : [RacingSimulator.RaceEntry] = [];
-            var refundedCount : Nat = 0;
+            // Allow all registered entries to race regardless of ELO changes
+            // Registrations are only a few days out, so letting bots race in their registered class is fine
 
-            for (entry in race.entries.vals()) {
-              // Convert nftId back to tokenIndex to check stats
-              switch (Nat.fromText(entry.nftId)) {
-                case (?tokenIndex) {
-                  switch (garageManager.getStats(tokenIndex)) {
-                    case (?botStats) {
-                      // Check if bot's current ELO still matches race class
-                      if (checkEloEligibility(botStats.eloRating, race.raceClass)) {
-                        // Bot is still eligible, keep the entry
-                        validEntries := Array.append(validEntries, [entry]);
-                      } else {
-                        // Bot no longer eligible (ELO changed), refund entry fee
-                        let refundActionId = tt().setActionASync<system>(
-                          Int.abs(Time.now() + 1_000_000_000), // 1 second delay
-                          {
-                            actionType = "prize_distribution";
-                            params = to_candid ({
-                              raceId = raceId;
-                              owner = entry.owner;
-                              amount = entry.entryFee;
-                            });
-                          },
-                          PRIZE_DISTRIBUTION_TIMEOUT,
-                        );
-                        refundedCount += 1;
-                        Debug.print("Removed ineligible entry (ELO changed): NFT #" # entry.nftId # " - scheduled refund " # debug_show (refundActionId));
-                      };
-                    };
-                    case (null) {
-                      // No stats found, remove entry and refund
-                      let refundActionId = tt().setActionASync<system>(
-                        Int.abs(Time.now() + 1_000_000_000),
-                        {
-                          actionType = "prize_distribution";
-                          params = to_candid ({
-                            raceId = raceId;
-                            owner = entry.owner;
-                            amount = entry.entryFee;
-                          });
-                        },
-                        PRIZE_DISTRIBUTION_TIMEOUT,
-                      );
-                      refundedCount += 1;
-                      Debug.print("Removed entry (no stats): NFT #" # entry.nftId # " - scheduled refund " # debug_show (refundActionId));
-                    };
-                  };
-                };
-                case (null) {
-                  // Invalid nftId format, remove entry and refund
-                  let refundActionId = tt().setActionASync<system>(
-                    Int.abs(Time.now() + 1_000_000_000),
-                    {
-                      actionType = "prize_distribution";
-                      params = to_candid ({
-                        raceId = raceId;
-                        owner = entry.owner;
-                        amount = entry.entryFee;
-                      });
-                    },
-                    PRIZE_DISTRIBUTION_TIMEOUT,
-                  );
-                  refundedCount += 1;
-                  Debug.print("Removed entry (invalid ID): " # entry.nftId # " - scheduled refund " # debug_show (refundActionId));
-                };
-              };
-            };
-
-            // Update race with valid entries only
-            if (refundedCount > 0) {
-              ignore raceManager.updateRaceEntries(raceId, validEntries);
-              Debug.print("Removed " # debug_show (refundedCount) # " ineligible entries, " # debug_show (validEntries.size()) # " valid entries remaining");
-            };
-
-            // Check if race has enough valid entries
-            if (validEntries.size() < race.minEntries) {
-              Debug.print("Race cancelled - not enough valid entries (" # debug_show (validEntries.size()) # " < " # debug_show (race.minEntries) # "), issuing refunds");
+            // Check if race has enough entries
+            if (race.entries.size() < race.minEntries) {
+              Debug.print("Race cancelled - not enough entries (" # debug_show (race.entries.size()) # " < " # debug_show (race.minEntries) # "), issuing refunds");
               ignore raceManager.updateRaceStatus(raceId, #Cancelled);
 
-              // Refund remaining valid entries
-              for (entry in validEntries.vals()) {
+              // Refund all entries
+              for (entry in race.entries.vals()) {
                 let refundActionId = tt().setActionASync<system>(
                   Int.abs(Time.now() + 1_000_000_000), // 1 second delay
                   {
@@ -994,17 +997,18 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
             // Mark as in progress
             ignore raceManager.updateRaceStatus(raceId, #InProgress);
-            Debug.print("Race in progress: " # race.name # " with " # debug_show (validEntries.size()) # " entries");
+            Debug.print("Race in progress: " # race.name # " with " # debug_show (race.entries.size()) # " entries");
 
             // Schedule race finish for after duration
             let finishTime = race.startTime + (race.duration * 1_000_000_000);
-            ignore tt().setActionSync<system>(
+            let finishActionId = tt().setActionSync<system>(
               Int.abs(finishTime),
               {
                 actionType = "race_finish";
                 params = to_candid (raceId);
               },
             );
+            Debug.print("Scheduled race_finish action " # debug_show (finishActionId) # " for race " # debug_show (raceId) # " at " # debug_show (finishTime));
           };
           case (null) {
             Debug.print("Race not found: " # debug_show (raceId));
@@ -1032,6 +1036,15 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
         switch (raceManager.getRace(raceId)) {
           case (?race) {
+            // Guard: Skip if race is already completed to prevent duplicate processing
+            switch (race.status) {
+              case (#Completed) {
+                Debug.print("Race " # debug_show (raceId) # " already completed, skipping duplicate finish");
+                return actionId;
+              };
+              case _ {};
+            };
+
             // Convert race entries to RacingParticipants
             var participants : [RacingSimulator.RacingParticipant] = [];
 
@@ -1387,6 +1400,50 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       ownerResult = ownerResult;
       extCanister = Principal.toText(extCanisterId);
     };
+  };
+
+  /// Find all races that are not associated with any event
+  /// Useful for finding standalone races created outside the event system
+  public query func get_standalone_races() : async [{
+    raceId : Nat;
+    name : Text;
+    raceClass : RacingSimulator.RaceClass;
+    status : RacingSimulator.RaceStatus;
+    startTime : Int;
+    entries : Nat;
+  }] {
+    let allRaces = raceManager.getAllRaces();
+    let allEvents = eventCalendar.getAllEvents();
+
+    // Build a set of all race IDs that belong to events
+    var eventRaceIds : [Nat] = [];
+    for (event in allEvents.vals()) {
+      eventRaceIds := Array.append(eventRaceIds, event.raceIds);
+    };
+
+    // Filter races that are NOT in any event
+    let standaloneRaces = Array.filter<RacingSimulator.Race>(
+      allRaces,
+      func(race) {
+        let isInEvent = Array.find<Nat>(eventRaceIds, func(id) { id == race.raceId });
+        not Option.isSome(isInEvent);
+      },
+    );
+
+    // Map to simplified output
+    Array.map<RacingSimulator.Race, { raceId : Nat; name : Text; raceClass : RacingSimulator.RaceClass; status : RacingSimulator.RaceStatus; startTime : Int; entries : Nat }>(
+      standaloneRaces,
+      func(race) {
+        {
+          raceId = race.raceId;
+          name = race.name;
+          raceClass = race.raceClass;
+          status = race.status;
+          startTime = race.startTime;
+          entries = race.entries.size();
+        };
+      },
+    );
   };
 
   /// Get the canister's balance of a specific ICRC-1 token.
@@ -1964,6 +2021,50 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     eventCalendar.getUpcomingEvents(now, daysAhead);
   };
 
+  // Get upcoming events with race summaries
+  public query func get_upcoming_events_with_races(daysAhead : Nat) : async [{
+    event : RaceCalendar.ScheduledEvent;
+    raceSummary : {
+      totalRaces : Nat;
+      terrains : [RacingSimulator.Terrain];
+      distances : [Nat];
+      totalParticipants : Nat;
+    };
+  }] {
+    let now = Time.now();
+    let events = eventCalendar.getUpcomingEvents(now, daysAhead);
+
+    Array.map<RaceCalendar.ScheduledEvent, { event : RaceCalendar.ScheduledEvent; raceSummary : { totalRaces : Nat; terrains : [RacingSimulator.Terrain]; distances : [Nat]; totalParticipants : Nat } }>(
+      events,
+      func(event) {
+        var terrains : [RacingSimulator.Terrain] = [];
+        var distances : [Nat] = [];
+        var totalParticipants : Nat = 0;
+
+        for (raceId in event.raceIds.vals()) {
+          switch (raceManager.getRace(raceId)) {
+            case (?race) {
+              terrains := Array.append(terrains, [race.terrain]);
+              distances := Array.append(distances, [race.distance]);
+              totalParticipants += race.entries.size();
+            };
+            case (null) {};
+          };
+        };
+
+        {
+          event = event;
+          raceSummary = {
+            totalRaces = event.raceIds.size();
+            terrains = terrains;
+            distances = distances;
+            totalParticipants = totalParticipants;
+          };
+        };
+      },
+    );
+  };
+
   // Get past events (paginated)
   public query func get_past_events(offset : Nat, limit : Nat) : async [RaceCalendar.ScheduledEvent] {
     let now = Time.now();
@@ -1978,6 +2079,83 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   // Get event details by ID
   public query func get_event_details(eventId : Nat) : async ?RaceCalendar.ScheduledEvent {
     eventCalendar.getEvent(eventId);
+  };
+
+  // Get event with aggregated race details
+  public query func get_event_with_races(eventId : Nat) : async ?{
+    event : RaceCalendar.ScheduledEvent;
+    races : [{
+      raceId : Nat;
+      name : Text;
+      distance : Nat;
+      terrain : RacingSimulator.Terrain;
+      raceClass : RacingSimulator.RaceClass;
+      entryFee : Nat;
+      currentEntries : Nat;
+      maxEntries : Nat;
+      participantTokens : [Nat];
+    }];
+  } {
+    switch (eventCalendar.getEvent(eventId)) {
+      case (null) { null };
+      case (?event) {
+        var raceDetails : [{
+          raceId : Nat;
+          name : Text;
+          distance : Nat;
+          terrain : RacingSimulator.Terrain;
+          raceClass : RacingSimulator.RaceClass;
+          entryFee : Nat;
+          currentEntries : Nat;
+          maxEntries : Nat;
+          participantTokens : [Nat];
+        }] = [];
+
+        for (raceId in event.raceIds.vals()) {
+          switch (raceManager.getRace(raceId)) {
+            case (?race) {
+              // Extract token indices from entries
+              let tokens = Array.map<RacingSimulator.RaceEntry, Nat>(
+                race.entries,
+                func(entry) {
+                  // Parse token index from nftId (format: "token_123")
+                  let parts = Text.split(entry.nftId, #char '_');
+                  var tokenIndex : Nat = 0;
+                  for (part in parts) {
+                    switch (Nat.fromText(part)) {
+                      case (?n) { tokenIndex := n };
+                      case (null) {};
+                    };
+                  };
+                  tokenIndex;
+                },
+              );
+
+              raceDetails := Array.append(
+                raceDetails,
+                [{
+                  raceId = race.raceId;
+                  name = race.name;
+                  distance = race.distance;
+                  terrain = race.terrain;
+                  raceClass = race.raceClass;
+                  entryFee = race.entryFee;
+                  currentEntries = race.entries.size();
+                  maxEntries = race.maxEntries;
+                  participantTokens = tokens;
+                }],
+              );
+            };
+            case (null) {};
+          };
+        };
+
+        ?{
+          event = event;
+          races = raceDetails;
+        };
+      };
+    };
   };
 
   // Get race details by race ID
@@ -2144,7 +2322,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   // ===== DEBUG/ADMIN FUNCTIONS =====
 
-  // Manually cancel specific races by ID
+  // Manually cancel specific races by ID (with refunds)
   public shared ({ caller }) func cancel_races_by_ids(raceIds : [Nat]) : async [(Nat, Text)] {
     if (caller != owner) {
       Debug.trap("Only owner can cancel races");
@@ -2157,6 +2335,41 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         case (?race) {
           if (race.status == #Upcoming) {
             ignore raceManager.updateRaceStatus(raceId, #Cancelled);
+
+            // Refund all entries
+            for (entry in race.entries.vals()) {
+              let refundActionId = tt().setActionASync<system>(
+                Int.abs(Time.now() + 1_000_000_000), // 1 second delay
+                {
+                  actionType = "prize_distribution";
+                  params = to_candid ({
+                    raceId = raceId;
+                    owner = entry.owner;
+                    amount = entry.entryFee;
+                  });
+                },
+                PRIZE_DISTRIBUTION_TIMEOUT,
+              );
+              Debug.print("Scheduled refund " # debug_show (refundActionId) # " of " # debug_show (entry.entryFee) # " to " # Principal.toText(entry.owner));
+            };
+
+            // Refund all sponsors
+            for (sponsor in race.sponsors.vals()) {
+              let sponsorRefundActionId = tt().setActionASync<system>(
+                Int.abs(Time.now() + 1_000_000_000), // 1 second delay
+                {
+                  actionType = "prize_distribution";
+                  params = to_candid ({
+                    raceId = raceId;
+                    owner = sponsor.sponsor;
+                    amount = sponsor.amount;
+                  });
+                },
+                PRIZE_DISTRIBUTION_TIMEOUT,
+              );
+              Debug.print("Scheduled sponsor refund " # debug_show (sponsorRefundActionId) # " of " # debug_show (sponsor.amount) # " to " # Principal.toText(sponsor.sponsor));
+            };
+
             cancelledRaces := Array.append(cancelledRaces, [(raceId, race.name)]);
           };
         };
@@ -2189,11 +2402,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   };
 
   // Delete events and their associated races (cleanup duplicates)
-  public shared ({ caller }) func delete_events_and_races(eventIds : [Nat]) : async Text {
-    if (caller != owner) {
-      return "Unauthorized: only owner can delete events";
-    };
-
+  // Internal function to delete events and races
+  private func delete_events_and_races_internal(eventIds : [Nat]) : async Text {
     var deletedEvents : Nat = 0;
     var deletedRaces : Nat = 0;
     var cancelledTimers : Nat = 0;
@@ -2241,6 +2451,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                     };
                   };
                 };
+
+                // Delete the race from storage to prevent orphans
+                ignore raceManager.deleteRace(raceId);
               };
               case (null) {};
             };
@@ -2255,7 +2468,15 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       };
     };
 
-    "Deleted " # Nat.toText(deletedEvents) # " events, cancelled " # Nat.toText(deletedRaces) # " races, and cancelled " # Nat.toText(cancelledTimers) # " timers";
+    "Deleted " # Nat.toText(deletedEvents) # " events, deleted " # Nat.toText(deletedRaces) # " races, and cancelled " # Nat.toText(cancelledTimers) # " timers";
+  };
+
+  // Public wrapper for delete_events_and_races
+  public shared ({ caller }) func delete_events_and_races(eventIds : [Nat]) : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can delete events";
+    };
+    return await delete_events_and_races_internal(eventIds);
   };
 
   // Admin function to manually trigger race start for races with missing timers
@@ -2286,6 +2507,85 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         "Race " # Nat.toText(raceId) # " not found";
       };
     };
+  };
+
+  // Admin function to manually trigger race finish for stuck races
+  public shared ({ caller }) func trigger_race_finish(raceId : Nat) : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can trigger race finish";
+    };
+
+    switch (raceManager.getRace(raceId)) {
+      case (?race) {
+        if (race.status != #InProgress) {
+          return "Race " # Nat.toText(raceId) # " is not in InProgress status (current: " # debug_show (race.status) # ")";
+        };
+
+        // Manually call the race finish handler
+        let actionId : TT.ActionId = { id = 0; time = 0 };
+        let action : TT.Action = {
+          actionType = "race_finish";
+          params = to_candid (raceId);
+          aSync = null;
+          retries = 0;
+        };
+
+        ignore handleRaceFinish<system>(actionId, action);
+        "Triggered race finish for race " # Nat.toText(raceId);
+      };
+      case (null) {
+        "Race " # Nat.toText(raceId) # " not found";
+      };
+    };
+  };
+
+  // Admin function to clear race IDs from events so new races can be created
+  public shared ({ caller }) func clear_event_race_ids() : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can clear event race IDs";
+    };
+
+    let allEvents = eventCalendar.getAllEvents();
+    var clearedCount = 0;
+
+    for (event in allEvents.vals()) {
+      if (event.raceIds.size() > 0) {
+        // Check if any of the race IDs actually exist
+        var hasValidRaces = false;
+        for (raceId in event.raceIds.vals()) {
+          switch (raceManager.getRace(raceId)) {
+            case (?_race) { hasValidRaces := true };
+            case (null) {};
+          };
+        };
+
+        // If none of the race IDs are valid, clear them
+        if (not hasValidRaces) {
+          ignore eventCalendar.clearEventRaces(event.eventId);
+          clearedCount += 1;
+        };
+      };
+    };
+
+    "Cleared race IDs from " # Nat.toText(clearedCount) # " events";
+  };
+
+  // Admin function to manually trigger race creation
+  public shared ({ caller }) func trigger_race_creation() : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can trigger race creation";
+    };
+
+    let actionId : TT.ActionId = { id = 0; time = 0 };
+    let action : TT.Action = {
+      actionType = "race_create";
+      params = to_candid (());
+      aSync = null;
+      retries = 0;
+    };
+
+    ignore handleRaceCreation<system>(actionId, action);
+    "Race creation handler triggered";
   };
 
   // Admin function to find and trigger all stuck races (past start time but still Upcoming)
@@ -2332,6 +2632,340 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
 
     "Triggered " # Nat.toText(triggeredCount) # " stuck races (" # Nat.toText(cancelledCount) # " cancelled due to insufficient entries)";
+  };
+
+  // Delete all events and races created after a specific event ID
+  public shared ({ caller }) func delete_events_after(afterEventId : Nat) : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can delete events";
+    };
+
+    let allEvents = eventCalendar.getAllEvents();
+    var eventIdsToDelete : [Nat] = [];
+
+    // Collect event IDs after the specified ID
+    for (event in allEvents.vals()) {
+      if (event.eventId > afterEventId) {
+        eventIdsToDelete := Array.append(eventIdsToDelete, [event.eventId]);
+      };
+    };
+
+    // Use existing delete function
+    let result = await delete_events_and_races_internal(eventIdsToDelete);
+    return "Deleted " # Nat.toText(eventIdsToDelete.size()) # " events after ID " # Nat.toText(afterEventId) # ": " # result;
+  };
+
+  // Delete all orphaned races and rollback their results
+  public shared ({ caller }) func delete_orphaned_races() : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can delete orphaned races";
+    };
+
+    let allRaces = raceManager.getAllRaces();
+    let allEvents = eventCalendar.getAllEvents();
+
+    // Build a set of all race IDs that belong to events
+    var eventRaceIds : [Nat] = [];
+    for (event in allEvents.vals()) {
+      eventRaceIds := Array.append(eventRaceIds, event.raceIds);
+    };
+
+    // Find and delete orphaned races
+    var deletedCount = 0;
+    var rolledBackCount = 0;
+
+    for (race in allRaces.vals()) {
+      let isInEvent = Array.find<Nat>(eventRaceIds, func(id) { id == race.raceId });
+      if (not Option.isSome(isInEvent)) {
+        // This is an orphaned race
+
+        // If the race was completed, rollback the results
+        if (race.status == #Completed) {
+          switch (race.results) {
+            case (?results) {
+              // Rollback stats for each participant
+              for (result in results.vals()) {
+                switch (Nat.fromText(result.nftId)) {
+                  case (?tokenIndex) {
+                    switch (garageManager.getStats(tokenIndex)) {
+                      case (?stats) {
+                        // Rollback race count
+                        let newRacesEntered = if (stats.racesEntered > 0) {
+                          stats.racesEntered - 1;
+                        } else {
+                          0;
+                        };
+
+                        // Rollback wins/places/shows
+                        var newWins = stats.wins;
+                        var newPlaces = stats.places;
+                        var newShows = stats.shows;
+
+                        if (result.position == 1 and newWins > 0) {
+                          newWins -= 1;
+                        } else if (result.position == 2 and newPlaces > 0) {
+                          newPlaces -= 1;
+                        } else if (result.position == 3 and newShows > 0) {
+                          newShows -= 1;
+                        };
+
+                        // Rollback earnings
+                        let newEarnings = if (stats.totalScrapEarned >= result.prizeAmount) {
+                          stats.totalScrapEarned - result.prizeAmount;
+                        } else {
+                          0;
+                        };
+
+                        // Rollback ELO (reverse the change)
+                        // Since we don't store the old ELO, we'll just reset to starting ELO if they only have 1 race
+                        let newElo = if (newRacesEntered == 0) {
+                          1500; // Reset to starting ELO
+                        } else {
+                          stats.eloRating; // Keep current ELO if they have other races
+                        };
+
+                        // Update the stats
+                        let updatedStats : PokedBotsGarage.PokedBotRacingStats = {
+                          stats with
+                          racesEntered = newRacesEntered;
+                          wins = newWins;
+                          places = newPlaces;
+                          shows = newShows;
+                          totalScrapEarned = newEarnings;
+                          eloRating = newElo;
+                        };
+
+                        ignore Map.put(stable_racing_stats, Map.nhash, tokenIndex, updatedStats);
+                        rolledBackCount += 1;
+                      };
+                      case null {};
+                    };
+                  };
+                  case null {};
+                };
+              };
+            };
+            case null {};
+          };
+        };
+
+        // Delete the race
+        if (raceManager.deleteRace(race.raceId)) {
+          deletedCount += 1;
+        };
+      };
+    };
+
+    "Deleted " # Nat.toText(deletedCount) # " orphaned races and rolled back stats for " # Nat.toText(rolledBackCount) # " participants";
+  };
+
+  // Recalculate bot stats from actual race results (fixes stats after orphan cleanup)
+  public shared ({ caller }) func recalculate_bot_stats() : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can recalculate stats";
+    };
+
+    let allRaces = raceManager.getAllRaces();
+    let allEvents = eventCalendar.getAllEvents();
+    let now = Time.now();
+
+    // Build a set of valid race IDs (races that belong to events)
+    var validRaceIds : [Nat] = [];
+    for (event in allEvents.vals()) {
+      validRaceIds := Array.append(validRaceIds, event.raceIds);
+    };
+
+    // Clear all leaderboards
+    leaderboardManager.clearAllLeaderboards();
+
+    // Track stats per bot
+    var botStats = Map.new<Nat, { racesEntered : Nat; wins : Nat; places : Nat; shows : Nat; totalEarnings : Nat }>();
+
+    // Go through all completed valid races
+    for (race in allRaces.vals()) {
+      // Only count races that belong to events
+      let isValid = Array.find<Nat>(validRaceIds, func(id) { id == race.raceId });
+      if (Option.isSome(isValid) and race.status == #Completed) {
+        switch (race.results) {
+          case (?results) {
+            for (result in results.vals()) {
+              switch (Nat.fromText(result.nftId)) {
+                case (?tokenIndex) {
+                  // Get or create stats for this bot
+                  let currentStats = switch (Map.get(botStats, Map.nhash, tokenIndex)) {
+                    case (?stats) { stats };
+                    case null {
+                      {
+                        racesEntered = 0;
+                        wins = 0;
+                        places = 0;
+                        shows = 0;
+                        totalEarnings = 0;
+                      };
+                    };
+                  };
+
+                  // Update stats
+                  let newStats = {
+                    racesEntered = currentStats.racesEntered + 1;
+                    wins = if (result.position == 1) { currentStats.wins + 1 } else {
+                      currentStats.wins;
+                    };
+                    places = if (result.position == 2) {
+                      currentStats.places + 1;
+                    } else { currentStats.places };
+                    shows = if (result.position == 3) { currentStats.shows + 1 } else {
+                      currentStats.shows;
+                    };
+                    totalEarnings = currentStats.totalEarnings + result.prizeAmount;
+                  };
+
+                  ignore Map.put(botStats, Map.nhash, tokenIndex, newStats);
+                };
+                case null {};
+              };
+            };
+          };
+          case null {};
+        };
+      };
+    };
+
+    // Update bot stats in stable storage and rebuild leaderboards
+    var updatedCount = 0;
+
+    // If there are no races, zero out all bot stats
+    if (Map.size(botStats) == 0) {
+      for ((tokenIndex, currentBotStats) in Map.entries(stable_racing_stats)) {
+        let updatedBotStats : PokedBotsGarage.PokedBotRacingStats = {
+          currentBotStats with
+          racesEntered = 0;
+          wins = 0;
+          places = 0;
+          shows = 0;
+          totalScrapEarned = 0;
+        };
+        ignore Map.put(stable_racing_stats, Map.nhash, tokenIndex, updatedBotStats);
+        updatedCount += 1;
+      };
+    } else {
+      // Update bots that have race data
+      for ((tokenIndex, calculatedStats) in Map.entries(botStats)) {
+        switch (garageManager.getStats(tokenIndex)) {
+          case (?currentBotStats) {
+            let updatedBotStats : PokedBotsGarage.PokedBotRacingStats = {
+              currentBotStats with
+              racesEntered = calculatedStats.racesEntered;
+              wins = calculatedStats.wins;
+              places = calculatedStats.places;
+              shows = calculatedStats.shows;
+              totalScrapEarned = calculatedStats.totalEarnings;
+              // Keep existing ELO and other fields
+            };
+
+            ignore Map.put(stable_racing_stats, Map.nhash, tokenIndex, updatedBotStats);
+            updatedCount += 1;
+          };
+          case null {};
+        };
+      };
+    };
+
+    // Rebuild leaderboards from valid races only
+    leaderboardManager.updateCurrentPeriods(now);
+    var leaderboardUpdates = 0;
+
+    for (race in allRaces.vals()) {
+      let isValid = Array.find<Nat>(validRaceIds, func(id) { id == race.raceId });
+      if (Option.isSome(isValid) and race.status == #Completed) {
+        switch (race.results) {
+          case (?results) {
+            for (i in Iter.range(0, results.size() - 1)) {
+              let result = results[i];
+              switch (Nat.fromText(result.nftId)) {
+                case (?tokenIndex) {
+                  switch (garageManager.getStats(tokenIndex)) {
+                    case (?botStats) {
+                      let position = i + 1;
+
+                      leaderboardManager.recordRaceResult(
+                        tokenIndex,
+                        result.owner,
+                        position,
+                        results.size(),
+                        result.prizeAmount,
+                        1.0, // pointsMultiplier
+                        botStats.faction,
+                        race.raceClass,
+                        race.startTime,
+                      );
+                      leaderboardUpdates += 1;
+                    };
+                    case null {};
+                  };
+                };
+                case null {};
+              };
+            };
+          };
+          case null {};
+        };
+      };
+    };
+
+    "Recalculated stats for " # Nat.toText(updatedCount) # " bots and updated leaderboards with " # Nat.toText(leaderboardUpdates) # " entries from " # Nat.toText(validRaceIds.size()) # " valid races";
+  };
+
+  // Reset all bot ELOs to 1500
+  public shared ({ caller }) func reset_all_elos() : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can reset ELOs";
+    };
+
+    var resetCount = 0;
+    for ((tokenIndex, stats) in Map.entries(stable_racing_stats)) {
+      let updatedStats : PokedBotsGarage.PokedBotRacingStats = {
+        stats with
+        eloRating = 1500;
+      };
+      ignore Map.put(stable_racing_stats, Map.nhash, tokenIndex, updatedStats);
+      resetCount += 1;
+    };
+
+    "Reset ELO to 1500 for " # Nat.toText(resetCount) # " bots";
+  };
+
+  // Reattach orphaned races to an event
+  public shared ({ caller }) func reattach_races_to_event(eventId : Nat, raceIds : [Nat]) : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can reattach races";
+    };
+
+    switch (eventCalendar.addRacesToEvent(eventId, raceIds)) {
+      case (?updatedEvent) {
+        "Successfully added " # Nat.toText(raceIds.size()) # " races to event #" # Nat.toText(eventId) # ". Event now has " # Nat.toText(updatedEvent.raceIds.size()) # " total races.";
+      };
+      case (null) {
+        "Event #" # Nat.toText(eventId) # " not found";
+      };
+    };
+  };
+
+  // Manually trigger the event creation handler
+  public shared ({ caller }) func trigger_event_creation() : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can trigger event creation";
+    };
+
+    let now = Time.now();
+
+    // Call the event scheduling function
+    ensureCalendarScheduled<system>(now);
+
+    // Get upcoming events to show what was created
+    let upcomingEvents = eventCalendar.getUpcomingEvents(now, 14);
+
+    "Event creation triggered. Total upcoming events: " # Nat.toText(upcomingEvents.size());
   };
 
   // Debug function to create a test race starting soon
@@ -2457,6 +3091,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   };
   system func postupgrade() {
     HttpAssets.postupgrade(http_assets);
+
+    // Note: Overcharge migration completed - all bots now have overcharge field
+    // No longer need to reset overcharge on every upgrade
 
     // Update leaderboard periods based on current time
     let now = Time.now();

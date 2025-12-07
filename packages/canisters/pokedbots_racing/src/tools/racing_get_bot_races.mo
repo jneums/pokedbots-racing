@@ -161,7 +161,8 @@ module {
             };
 
             // Build race JSON based on status
-            let prizePoolDecimal = (race.prizePool % 100_000_000) / 1_000_000;
+            let totalPrizePool = race.prizePool + race.platformBonus;
+            let prizePoolDecimal = (totalPrizePool % 100_000_000) / 1_000_000;
             let prizePoolDecimalStr = if (prizePoolDecimal < 10) {
               "0" # Nat.toText(prizePoolDecimal);
             } else { Nat.toText(prizePoolDecimal) };
@@ -173,7 +174,7 @@ module {
               ("class", Json.str(classText)),
               ("terrain", Json.str(terrainText)),
               ("distance_km", Json.int(race.distance)),
-              ("prize_pool_icp", Json.str(Text.concat(Nat.toText(race.prizePool / 100_000_000), "." # prizePoolDecimalStr))),
+              ("prize_pool_icp", Json.str(Text.concat(Nat.toText(totalPrizePool / 100_000_000), "." # prizePoolDecimalStr))),
               ("entries", Json.int(race.entries.size())),
               ("max_entries", Json.int(race.maxEntries)),
             ];

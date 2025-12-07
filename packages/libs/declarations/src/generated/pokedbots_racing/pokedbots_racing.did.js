@@ -78,6 +78,11 @@ export const idlFactory = ({ IDL }) => {
     'Industrial' : IDL.Null,
     'Master' : IDL.Null,
   });
+  const Terrain = IDL.Variant({
+    'MetalRoads' : IDL.Null,
+    'WastelandSand' : IDL.Null,
+    'ScrapHeaps' : IDL.Null,
+  });
   const ReconstitutionTrace = IDL.Record({
     'errors' : IDL.Vec(IDL.Text),
     'actionsRestored' : IDL.Nat,
@@ -124,11 +129,6 @@ export const idlFactory = ({ IDL }) => {
     'InProgress' : IDL.Null,
     'Completed' : IDL.Null,
     'Upcoming' : IDL.Null,
-  });
-  const Terrain = IDL.Variant({
-    'MetalRoads' : IDL.Null,
-    'WastelandSand' : IDL.Null,
-    'ScrapHeaps' : IDL.Null,
   });
   const RaceResult = IDL.Record({
     'owner' : IDL.Principal,
@@ -284,6 +284,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Text))],
         [],
       ),
+    'clear_event_race_ids' : IDL.Func([], [IDL.Text], []),
     'clear_reconstitution_traces' : IDL.Func([], [], []),
     'create_my_api_key' : IDL.Func(
         [IDL.Text, IDL.Vec(IDL.Text)],
@@ -340,7 +341,9 @@ export const idlFactory = ({ IDL }) => {
       ),
     'debug_seed_leaderboard' : IDL.Func([IDL.Nat], [IDL.Text], []),
     'decode_token_identifier' : IDL.Func([IDL.Text], [IDL.Nat], ['query']),
+    'delete_events_after' : IDL.Func([IDL.Nat], [IDL.Text], []),
     'delete_events_and_races' : IDL.Func([IDL.Vec(IDL.Nat)], [IDL.Text], []),
+    'delete_orphaned_races' : IDL.Func([], [IDL.Text], []),
     'emergency_clear_all_timers' : IDL.Func([], [IDL.Nat], []),
     'encode_token_identifier' : IDL.Func([IDL.Nat32], [IDL.Text], ['query']),
     'force_finish_race' : IDL.Func([IDL.Nat], [IDL.Text], []),
@@ -436,6 +439,30 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(ScheduledEvent)],
         ['query'],
       ),
+    'get_event_with_races' : IDL.Func(
+        [IDL.Nat],
+        [
+          IDL.Opt(
+            IDL.Record({
+              'event' : ScheduledEvent,
+              'races' : IDL.Vec(
+                IDL.Record({
+                  'terrain' : Terrain,
+                  'name' : IDL.Text,
+                  'distance' : IDL.Nat,
+                  'participantTokens' : IDL.Vec(IDL.Nat),
+                  'currentEntries' : IDL.Nat,
+                  'raceId' : IDL.Nat,
+                  'entryFee' : IDL.Nat,
+                  'maxEntries' : IDL.Nat,
+                  'raceClass' : RaceClass,
+                })
+              ),
+            })
+          ),
+        ],
+        ['query'],
+      ),
     'get_ext_canister' : IDL.Func([], [IDL.Principal], ['query']),
     'get_garage_account_id' : IDL.Func([IDL.Principal], [IDL.Text], ['query']),
     'get_icp_ledger' : IDL.Func([], [IDL.Opt(IDL.Principal)], ['query']),
@@ -498,6 +525,22 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(ReconstitutionTrace)],
         ['query'],
       ),
+    'get_standalone_races' : IDL.Func(
+        [],
+        [
+          IDL.Vec(
+            IDL.Record({
+              'startTime' : IDL.Int,
+              'status' : RaceStatus,
+              'name' : IDL.Text,
+              'entries' : IDL.Nat,
+              'raceId' : IDL.Nat,
+              'raceClass' : RaceClass,
+            })
+          ),
+        ],
+        ['query'],
+      ),
     'get_timer_diagnostics' : IDL.Func([], [TimerDiagnostics], ['query']),
     'get_total_nft_count' : IDL.Func([], [IDL.Nat], ['query']),
     'get_trait_schema' : IDL.Func([], [TraitSchema], ['query']),
@@ -505,6 +548,23 @@ export const idlFactory = ({ IDL }) => {
     'get_upcoming_events' : IDL.Func(
         [IDL.Nat],
         [IDL.Vec(ScheduledEvent)],
+        ['query'],
+      ),
+    'get_upcoming_events_with_races' : IDL.Func(
+        [IDL.Nat],
+        [
+          IDL.Vec(
+            IDL.Record({
+              'event' : ScheduledEvent,
+              'raceSummary' : IDL.Record({
+                'distances' : IDL.Vec(IDL.Nat),
+                'totalParticipants' : IDL.Nat,
+                'terrains' : IDL.Vec(Terrain),
+                'totalRaces' : IDL.Nat,
+              }),
+            })
+          ),
+        ],
         ['query'],
       ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
@@ -518,6 +578,13 @@ export const idlFactory = ({ IDL }) => {
     'initialize_race_timer' : IDL.Func([], [IDL.Text], []),
     'list_my_api_keys' : IDL.Func([], [IDL.Vec(ApiKeyMetadata)], ['query']),
     'process_overdue_timers' : IDL.Func([], [IDL.Text], []),
+    'reattach_races_to_event' : IDL.Func(
+        [IDL.Nat, IDL.Vec(IDL.Nat)],
+        [IDL.Text],
+        [],
+      ),
+    'recalculate_bot_stats' : IDL.Func([], [IDL.Text], []),
+    'reset_all_elos' : IDL.Func([], [IDL.Text], []),
     'reset_bot_stats' : IDL.Func([IDL.Nat], [Result_1], []),
     'revoke_my_api_key' : IDL.Func([IDL.Text], [], []),
     'set_ext_canister' : IDL.Func([IDL.Principal], [Result_1], []),
@@ -533,6 +600,8 @@ export const idlFactory = ({ IDL }) => {
         [HttpRequestResult],
         ['query'],
       ),
+    'trigger_event_creation' : IDL.Func([], [IDL.Text], []),
+    'trigger_race_creation' : IDL.Func([], [IDL.Text], []),
     'trigger_race_start' : IDL.Func([IDL.Nat], [IDL.Text], []),
     'trigger_stuck_races' : IDL.Func([], [IDL.Text], []),
     'upload_base_stats_batch' : IDL.Func(

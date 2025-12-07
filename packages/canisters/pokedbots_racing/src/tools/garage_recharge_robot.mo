@@ -3,6 +3,7 @@ import Principal "mo:base/Principal";
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
 import Int "mo:base/Int";
+import Float "mo:base/Float";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
 import Error "mo:base/Error";
@@ -24,7 +25,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_recharge_robot";
     title = ?"Recharge Robot Battery";
-    description = ?"Recharge a robot's battery. Costs 0.1 ICP + 0.0001 ICP transfer fee. Restores 50 Battery. Does NOT restore condition (use garage_repair_robot for that). Cooldown: 6 hours. Requires ICRC-2 approval.";
+    description = ?"Recharge robot battery. Costs 0.1 ICP + 0.0001 fee. Restores 75 battery. Does NOT restore condition (use garage_repair_robot). 6hr cooldown. Requires ICRC-2 approval.\n\n**OVERCHARGE MECHANIC:**\n• Base overcharge: (100 - battery) × 0.75, max 75%\n• Efficiency affected by CONDITION + RNG: 0.5 + (condition/200) + random(-0.2, +0.2)\n  - 100% condition: 80-120% efficiency (reliable)\n  - 50% condition: 55-95% efficiency (risky)\n  - 0% condition: 30-70% efficiency (wildcard)\n• Examples at 100% condition:\n  - 10% battery → 54-81% overcharge (avg 67.5%)\n  - 50% battery → 30-45% overcharge (avg 37.5%)\n• Overcharge consumed in next race for one-time stat boost:\n  - Speed: +0.3% per 1% overcharge (max +22.5% at 75%)\n  - Acceleration: +0.3% per 1% overcharge (max +22.5% at 75%)\n  - Stability: -0.2% per 1% overcharge (max -15% at 75%)\n  - Power Core: -0.2% per 1% overcharge (max -15% at 75%)\n• Strategic: Low battery + high condition = reliable big boost. Low condition = gambling!";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -138,16 +139,56 @@ module {
             return ToolContext.makeError(errorMsg, cb);
           };
           case (#Ok(blockIndex)) {
-            // Payment successful, update battery only
-            let batteryRestored = Nat.min(50, 100 - racingStats.battery);
+            // Payment successful, calculate battery and overcharge
+            let totalRecharge = 75;
+            let currentBattery = racingStats.battery;
+            let currentCondition = racingStats.condition;
+            let maxBattery = 100;
+
+            // Battery increases by 75 (capped at 100)
+            let newBattery = Nat.min(maxBattery, currentBattery + totalRecharge);
+
+            // Overcharge based on how LOW battery was before recharge
+            // Lower battery = bigger overcharge potential (risk/reward mechanic)
+            // Base formula: (100 - currentBattery) * 0.75, max 75%
+            let batteryDeficit = 100 - currentBattery;
+            let baseOvercharge = Float.fromInt(batteryDeficit) * 0.75;
+
+            // Condition affects efficiency with randomness
+            // efficiency = 0.5 + (condition / 200) + random(-0.2, +0.2)
+            // At 100% condition: 0.5 + 0.5 + random = 0.8-1.2 (avg 1.0)
+            // At 50% condition: 0.5 + 0.25 + random = 0.55-0.95 (avg 0.75)
+            // At 0% condition: 0.5 + 0 + random = 0.3-0.7 (avg 0.5)
+            let conditionBonus = Float.fromInt(currentCondition) / 200.0;
+
+            // Generate pseudo-random variance based on timestamp and token index
+            let seed = Int.abs(now) + tokenIndex;
+            let randomHash = seed % 1000; // 0-999
+            let randomVariance = (Float.fromInt(randomHash) / 1000.0) * 0.4 - 0.2; // -0.2 to +0.2
+
+            let efficiency = 0.5 + conditionBonus + randomVariance;
+            let finalOvercharge = baseOvercharge * efficiency;
+            let newOvercharge = Nat.min(75, Int.abs(Float.toInt(finalOvercharge)));
+
+            let batteryRestored = newBattery - currentBattery;
+            let overchargeAdded = newOvercharge - racingStats.overcharge;
 
             let updatedStats = {
               racingStats with
-              battery = Nat.min(100, racingStats.battery + 50);
+              battery = newBattery;
+              overcharge = newOvercharge;
               lastRecharged = ?now;
             };
 
             ctx.garageManager.updateStats(tokenIndex, updatedStats);
+
+            let overchargeMsg = if (overchargeAdded > 0) {
+              let speedBoost = Int.abs(Float.toInt(Float.fromInt(overchargeAdded) * 0.3));
+              let stabilityPenalty = Int.abs(Float.toInt(Float.fromInt(overchargeAdded) * 0.2));
+              " ⚡ OVERCHARGE: +" # Nat.toText(overchargeAdded) # "% (+" # Nat.toText(speedBoost) # "% Speed/Accel, -" # Nat.toText(stabilityPenalty) # "% Stability/PowerCore for next race)";
+            } else {
+              "";
+            };
 
             let response = Json.obj([
               ("token_index", Json.int(tokenIndex)),
@@ -155,9 +196,11 @@ module {
               ("payment", Json.obj([("amount", Json.str("0.1 ICP")), ("fee", Json.str("0.0001 ICP")), ("total", Json.str("0.1001 ICP")), ("block_index", Json.int(blockIndex))])),
               ("battery_restored", Json.int(batteryRestored)),
               ("new_battery", Json.int(updatedStats.battery)),
+              ("overcharge_added", Json.int(overchargeAdded)),
+              ("new_overcharge", Json.int(updatedStats.overcharge)),
               ("cost_icp", Json.str("0.1")),
               ("next_available_hours", Json.int(6)),
-              ("message", Json.str("⚡ Power cells recharged. Battery at " # Nat.toText(updatedStats.battery) # "%")),
+              ("message", Json.str("⚡ Power cells recharged. Battery at " # Nat.toText(updatedStats.battery) # "%" # overchargeMsg)),
             ]);
 
             ToolContext.makeSuccess(response, cb);

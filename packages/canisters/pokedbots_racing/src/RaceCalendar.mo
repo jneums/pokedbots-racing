@@ -162,31 +162,8 @@ module {
       metadata : EventMetadata,
       now : Int,
     ) : ScheduledEvent {
-      // Check for duplicate event at this time (within 5 minute tolerance)
-      let FIVE_MINUTES_NS : Int = 5 * 60 * 1_000_000_000;
-      let allEvents = getAllEvents();
-
-      for (existingEvent in allEvents.vals()) {
-        // Check if there's already an event of this type at approximately this time
-        let timeDiff = Int.abs(existingEvent.scheduledTime - scheduledTime);
-        if (timeDiff < FIVE_MINUTES_NS) {
-          // Check if it's the same event type
-          let sameType = switch (eventType, existingEvent.eventType) {
-            case (#WeeklyLeague, #WeeklyLeague) { true };
-            case (#DailySprint, #DailySprint) { true };
-            case (#MonthlyCup, #MonthlyCup) { true };
-            case (#SpecialEvent(a), #SpecialEvent(b)) { a == b };
-            case _ { false };
-          };
-
-          if (sameType) {
-            // Return the existing event instead of creating a duplicate
-            return existingEvent;
-          };
-        };
-      };
-
-      // No duplicate found, create new event
+      // Always create a new event - duplicate detection was causing race orphaning issues
+      // when existing events were reused after being rescheduled
       let eventId = nextEventId;
       nextEventId += 1;
 
@@ -351,6 +328,43 @@ module {
           let updated = {
             event with
             raceIds = Array.append(event.raceIds, raceIds);
+          };
+          ignore Map.put(events, nhash, eventId, updated);
+          ?updated;
+        };
+        case (null) { null };
+      };
+    };
+
+    // Atomic: Add races to event ONLY if it has no races yet
+    // Returns: Some(updatedEvent) if races were added, None if event already has races or doesn't exist
+    public func addRacesToEventIfEmpty(eventId : Nat, raceIds : [Nat]) : ?ScheduledEvent {
+      switch (getEvent(eventId)) {
+        case (?event) {
+          if (event.raceIds.size() > 0) {
+            // Event already has races, abort
+            null;
+          } else {
+            // Event has no races, safe to add
+            let updated = {
+              event with
+              raceIds = raceIds; // Use direct assignment since we know it's empty
+            };
+            ignore Map.put(events, nhash, eventId, updated);
+            ?updated;
+          };
+        };
+        case (null) { null };
+      };
+    };
+
+    // Clear race IDs from an event
+    public func clearEventRaces(eventId : Nat) : ?ScheduledEvent {
+      switch (getEvent(eventId)) {
+        case (?event) {
+          let updated = {
+            event with
+            raceIds = [];
           };
           ignore Map.put(events, nhash, eventId, updated);
           ?updated;

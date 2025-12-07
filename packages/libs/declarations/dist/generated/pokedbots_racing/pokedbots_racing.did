@@ -191,6 +191,7 @@ type McpServer =
                                                      nat;
                                                      text;
                                                    });
+   clear_event_race_ids: () -> (text);
    clear_reconstitution_traces: () -> ();
    /// * Creates a new API key. This API key is linked to the caller's principal.
    ///    * @param name A human-readable name for the key.
@@ -240,7 +241,9 @@ type McpServer =
    debug_seed_leaderboard: (count: nat) -> (text);
    /// Decode EXT token identifier to get token index (public query)
    decode_token_identifier: (tokenIdentifier: text) -> (nat) query;
+   delete_events_after: (afterEventId: nat) -> (text);
    delete_events_and_races: (eventIds: vec nat) -> (text);
+   delete_orphaned_races: () -> (text);
    emergency_clear_all_timers: () -> (nat);
    /// Encode token index to EXT token identifier (public query)
    encode_token_identifier: (tokenIndex: nat32) -> (text) query;
@@ -314,6 +317,24 @@ type McpServer =
                                  seasonId: nat;
                                }) query;
    get_event_details: (eventId: nat) -> (opt ScheduledEvent) query;
+   get_event_with_races: (eventId: nat) ->
+    (opt
+      record {
+        event: ScheduledEvent;
+        races:
+         vec
+          record {
+            currentEntries: nat;
+            distance: nat;
+            entryFee: nat;
+            maxEntries: nat;
+            name: text;
+            participantTokens: vec nat;
+            raceClass: RaceClass;
+            raceId: nat;
+            terrain: Terrain;
+          };
+      }) query;
    /// Get the currently configured EXT NFT canister ID.
    get_ext_canister: () -> (principal) query;
    /// Get the garage account ID for a given user principal
@@ -357,6 +378,18 @@ type McpServer =
    get_past_events: (offset: nat, limit: nat) -> (vec ScheduledEvent) query;
    get_race_by_id: (raceId: nat) -> (opt Race) query;
    get_reconstitution_traces: () -> (vec ReconstitutionTrace) query;
+   /// Find all races that are not associated with any event
+   /// Useful for finding standalone races created outside the event system
+   get_standalone_races: () ->
+    (vec
+      record {
+        entries: nat;
+        name: text;
+        raceClass: RaceClass;
+        raceId: nat;
+        startTime: int;
+        status: RaceStatus;
+      }) query;
    get_timer_diagnostics: () -> (TimerDiagnostics) query;
    /// Get total count of NFTs with metadata stored
    get_total_nft_count: () -> (nat) query;
@@ -365,6 +398,18 @@ type McpServer =
    /// Get the canister's balance of a specific ICRC-1 token.
    get_treasury_balance: (ledger_id: principal) -> (nat);
    get_upcoming_events: (daysAhead: nat) -> (vec ScheduledEvent) query;
+   get_upcoming_events_with_races: (daysAhead: nat) ->
+    (vec
+      record {
+        event: ScheduledEvent;
+        raceSummary:
+         record {
+           distances: vec nat;
+           terrains: vec Terrain;
+           totalParticipants: nat;
+           totalRaces: nat;
+         };
+      }) query;
    /// Handle incoming HTTP requests.
    http_request: (req: HttpRequest) -> (HttpResponse) query;
    /// Handle streaming callbacks for large HTTP responses.
@@ -378,6 +423,9 @@ type McpServer =
    ///    * @returns A list of API key metadata (but not the raw keys).
    list_my_api_keys: () -> (vec ApiKeyMetadata) query;
    process_overdue_timers: () -> (text);
+   reattach_races_to_event: (eventId: nat, raceIds: vec nat) -> (text);
+   recalculate_bot_stats: () -> (text);
+   reset_all_elos: () -> (text);
    /// Reset a bot's racing stats (owner only) - allows re-initialization with correct faction
    /// This is useful after faction system changes or data migrations
    reset_bot_stats: (tokenIndex: nat) -> (Result_1);
@@ -396,6 +444,8 @@ type McpServer =
        context: blob;
        response: HttpRequestResult;
      }) -> (HttpRequestResult) query;
+   trigger_event_creation: () -> (text);
+   trigger_race_creation: () -> (text);
    trigger_race_start: (raceId: nat) -> (text);
    trigger_stuck_races: () -> (text);
    /// Upload a batch of pre-computed base stats

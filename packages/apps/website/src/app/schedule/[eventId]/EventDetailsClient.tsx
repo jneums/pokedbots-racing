@@ -190,7 +190,8 @@ function RaceCard({ raceId }: { raceId: bigint }) {
                 const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(result.nftId));
                 const imageUrl = generateExtThumbnailLink(tokenId);
                 const winnerTime = race.results?.[0]?.[0]?.finalTime;
-                const timeGap = idx > 0 && winnerTime ? (result.finalTime - winnerTime).toFixed(2) : null;
+                const isDNF = result.finalTime > 100000; // DNF threshold
+                const timeGap = idx > 0 && winnerTime && !isDNF ? (result.finalTime - winnerTime).toFixed(2) : null;
                 
                 return (
                   <Link key={idx} to={`/bot/${result.nftId}`} className="block hover:bg-card/70 transition-colors rounded-lg">
@@ -210,10 +211,14 @@ function RaceCard({ raceId }: { raceId: bigint }) {
                         <p className="font-semibold"><BotName tokenIndex={Number(result.nftId)} /></p>
                         <p className="text-sm text-muted-foreground">
                           {result.finalTime !== undefined ? (
-                            <>
-                              {result.finalTime.toFixed(2)}s
-                              {timeGap && <span className="text-xs ml-1">(+{timeGap}s)</span>}
-                            </>
+                            isDNF ? (
+                              <span className="text-red-500 font-bold">DNF</span>
+                            ) : (
+                              <>
+                                {result.finalTime.toFixed(2)}s
+                                {timeGap && <span className="text-xs ml-1">(+{timeGap}s)</span>}
+                              </>
+                            )
                           ) : (
                             `Position ${idx + 1}`
                           )}

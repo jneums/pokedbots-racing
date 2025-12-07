@@ -46,6 +46,41 @@ export declare const getRaceById: (raceId: number, identity?: Identity) => Promi
  */
 export declare const getBotProfile: (tokenIndex: number, identity?: Identity) => Promise<any>;
 /**
+ * Fetches upcoming scheduled race events with race summaries.
+ * @param daysAhead Number of days ahead to look for events
+ * @param identity Optional identity to use for the actor
+ * @returns An array of events with race summaries
+ */
+export declare const getUpcomingEventsWithRaces: (daysAhead?: number, identity?: Identity) => Promise<Array<{
+    event: ScheduledEvent;
+    raceSummary: {
+        totalRaces: bigint;
+        terrains: Array<PokedBotsRacing.Terrain>;
+        distances: Array<bigint>;
+        totalParticipants: bigint;
+    };
+}>>;
+/**
+ * Fetches details for a specific event with full race details.
+ * @param eventId The ID of the event to fetch
+ * @param identity Optional identity to use for the actor
+ * @returns The event with race details if found, null otherwise
+ */
+export declare const getEventWithRaces: (eventId: number, identity?: Identity) => Promise<{
+    event: ScheduledEvent;
+    races: Array<{
+        raceId: bigint;
+        name: string;
+        distance: bigint;
+        terrain: PokedBotsRacing.Terrain;
+        raceClass: PokedBotsRacing.RaceClass;
+        entryFee: bigint;
+        currentEntries: bigint;
+        maxEntries: bigint;
+        participantTokens: Array<bigint>;
+    }>;
+} | null>;
+/**
  * Fetches race history for a specific bot with cursor-based pagination.
  * @param tokenIndex The token index of the bot
  * @param limit Maximum number of races to return

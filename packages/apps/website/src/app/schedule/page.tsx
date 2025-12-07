@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useGetUpcomingEvents, useGetPastEvents, type ScheduledEvent } from "@/hooks/useRacing";
+import { useGetUpcomingEventsWithRaces, useGetPastEvents, type ScheduledEvent } from "@/hooks/useRacing";
 
 function formatICP(amount: bigint): string {
   const icp = Number(amount) / 100_000_000;
@@ -107,7 +107,16 @@ function getDivisionName(division: any): string {
   return 'Unknown';
 }
 
-function EventCard({ event, isPastEvent = false }: { event: ScheduledEvent; isPastEvent?: boolean }) {
+function EventCard({ event, raceSummary, isPastEvent = false }: { 
+  event: ScheduledEvent; 
+  raceSummary?: {
+    totalRaces: bigint;
+    terrains: Array<any>;
+    distances: Array<bigint>;
+    totalParticipants: bigint;
+  };
+  isPastEvent?: boolean;
+}) {
   const totalPrizePool = Number(event.metadata.prizePoolBonus) + 
                          (Number(event.metadata.entryFee) * Number(event.raceIds.length));
 
@@ -117,6 +126,24 @@ function EventCard({ event, isPastEvent = false }: { event: ScheduledEvent; isPa
   
   const isUpcoming = 'Announced' in event.status;
 
+  // Get terrain icons
+  const getTerrainIcon = (terrain: any): string => {
+    if ('ScrapHeaps' in terrain) return '🔩';
+    if ('WastelandSand' in terrain) return '🏜️';
+    if ('MetalRoads' in terrain) return '🛣️';
+    return '🏁';
+  };
+
+  const uniqueTerrains = raceSummary ? Array.from(new Set(raceSummary.terrains.map(t => {
+    if ('ScrapHeaps' in t) return 'ScrapHeaps';
+    if ('WastelandSand' in t) return 'WastelandSand';
+    if ('MetalRoads' in t) return 'MetalRoads';
+    return 'Unknown';
+  }))) : [];
+
+  const distanceRange = raceSummary && raceSummary.distances.length > 0 ? 
+    `${Math.min(...raceSummary.distances.map(Number))}${Math.max(...raceSummary.distances.map(Number)) !== Math.min(...raceSummary.distances.map(Number)) ? `-${Math.max(...raceSummary.distances.map(Number))}` : ''}km` : null;
+
   return (
     <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur">
       <CardHeader>
@@ -124,27 +151,62 @@ function EventCard({ event, isPastEvent = false }: { event: ScheduledEvent; isPa
           <div className="space-y-2 flex-1">
             <div className="flex items-center gap-3">
               <span className="text-3xl">{getEventTypeIcon(event.eventType)}</span>
-              <div>
-                <CardTitle className="text-2xl">{event.metadata.name}</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {getEventTypeName(event.eventType)}
-                </p>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <CardTitle className="text-2xl">{event.metadata.name}</CardTitle>
+                  <Badge variant="outline" className="bg-primary/20 text-primary font-mono text-sm">
+                    {formatDate(event.scheduledTime)}
+                  </Badge>
+                  {getStatusBadge(event.status, event.registrationCloses, isPastEvent)}
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1 flex-wrap">
+                  <span>{getEventTypeName(event.eventType)}</span>
+                  <span>•</span>
+                  <span>{event.raceIds.length} race{event.raceIds.length !== 1 ? 's' : ''}</span>
+                  {distanceRange && (
+                    <>
+                      <span>•</span>
+                      <span className="font-mono">{distanceRange}</span>
+                    </>
+                  )}
+                  {uniqueTerrains.length > 0 && (
+                    <>
+                      <span>•</span>
+                      <span className="flex gap-1">
+                        {uniqueTerrains.map((t, idx) => (
+                          <span key={idx} title={t}>
+                            {getTerrainIcon({ [t]: null })}
+                          </span>
+                        ))}
+                      </span>
+                    </>
+                  )}
+                  {raceSummary && Number(raceSummary.totalParticipants) > 0 && (
+                    <>
+                      <span>•</span>
+                      <span>👥 {Number(raceSummary.totalParticipants)}</span>
+                    </>
+                  )}
+                </div>
               </div>
-              {getStatusBadge(event.status, event.registrationCloses, isPastEvent)}
             </div>
             <CardDescription className="text-base">
               {event.metadata.description}
             </CardDescription>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span>🕒 {formatDate(event.scheduledTime)}</span>
+            <div className="flex items-center gap-4 text-sm">
               {isRegistrationOpen && !isPastEvent && (
                 <span className="text-green-500 font-semibold">
-                  Closes {formatRelativeTime(event.registrationCloses)}
+                  ⏰ Closes {formatRelativeTime(event.registrationCloses)}
                 </span>
               )}
               {isPastEvent && (
                 <span className="text-muted-foreground">
-                  Completed
+                  ✓ Completed
+                </span>
+              )}
+              {isUpcoming && !isPastEvent && (
+                <span className="text-blue-500 font-semibold">
+                  Opens {formatRelativeTime(event.registrationOpens)}
                 </span>
               )}
             </div>
@@ -213,7 +275,7 @@ function EventCard({ event, isPastEvent = false }: { event: ScheduledEvent; isPa
 }
 
 export default function SchedulePage() {
-  const { data: upcomingEvents, isLoading: upcomingLoading } = useGetUpcomingEvents(14); // Next 2 weeks
+  const { data: upcomingEventsData, isLoading: upcomingLoading } = useGetUpcomingEventsWithRaces(14); // Next 2 weeks
   
   const [pastPage, setPastPage] = useState(0);
   const [activeTab, setActiveTab] = useState('upcoming');
@@ -259,15 +321,19 @@ export default function SchedulePage() {
                 <div className="text-center py-12">
                   <p className="text-muted-foreground">Loading events...</p>
                 </div>
-              ) : !upcomingEvents || upcomingEvents.length === 0 ? (
+              ) : !upcomingEventsData || upcomingEventsData.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-lg text-muted-foreground">No upcoming events scheduled.</p>
                   <p className="text-sm text-muted-foreground mt-2">Check back later for new races!</p>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {upcomingEvents.map((event) => (
-                    <EventCard key={event.eventId.toString()} event={event} />
+                  {upcomingEventsData.map((item) => (
+                    <EventCard 
+                      key={item.event.eventId.toString()} 
+                      event={item.event} 
+                      raceSummary={item.raceSummary}
+                    />
                   ))}
                 </div>
               )}

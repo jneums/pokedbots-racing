@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   getUpcomingEvents,
+  getUpcomingEventsWithRaces,
   getAllScheduledEvents,
   getPastEvents,
   getEventDetails,
+  getEventWithRaces,
   getRaceById,
   getBotProfile,
   getBotRaceHistory,
@@ -21,6 +23,19 @@ export const useGetUpcomingEvents = (daysAhead?: number) => {
     queryKey: ['upcomingEvents', daysAhead],
     queryFn: async () => {
       return getUpcomingEvents(daysAhead);
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+};
+
+/**
+ * React Query hook to fetch upcoming race events with race summaries.
+ */
+export const useGetUpcomingEventsWithRaces = (daysAhead?: number) => {
+  return useQuery({
+    queryKey: ['upcomingEventsWithRaces', daysAhead],
+    queryFn: async () => {
+      return getUpcomingEventsWithRaces(daysAhead);
     },
     refetchInterval: 30000, // Refetch every 30 seconds
   });
@@ -63,6 +78,23 @@ export const useGetEventDetails = (eventId: number | null) => {
         return null;
       }
       return getEventDetails(eventId);
+    },
+    enabled: eventId !== null,
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+};
+
+/**
+ * React Query hook to fetch details for a specific event with full race details.
+ */
+export const useGetEventWithRaces = (eventId: number | null) => {
+  return useQuery({
+    queryKey: ['eventWithRaces', eventId],
+    queryFn: () => {
+      if (eventId === null) {
+        return null;
+      }
+      return getEventWithRaces(eventId);
     },
     enabled: eventId !== null,
     refetchInterval: 30000, // Refetch every 30 seconds

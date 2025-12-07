@@ -23,7 +23,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_enter_race";
     title = ?"Enter Race";
-    description = ?"Enter your PokedBot in a wasteland race. Pays entry fee via ICRC-2. Bot must meet race class requirements based on ELO rating. Bots can race while upgrading.";
+    description = ?"Enter your PokedBot in a wasteland race. Pays entry fee via ICRC-2. Bot must meet race class requirements based on ELO rating. Bots can race while upgrading.\n\n**RACE COSTS (Applied after completion):**\n• Battery Drain: Base 10-20 (distance) × terrain (1.0-1.2×) × Power Core efficiency × condition penalty\n• Condition Wear: Base 3-7 (distance) × position (0.8-1.4×, winners wear less) × terrain (1.0-1.5×)\n\n**WARNING:** Low battery/condition severely reduces stats and can cause DNF (no prize). Check bot condition before entering.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

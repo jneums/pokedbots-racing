@@ -102,10 +102,10 @@ module {
               };
 
               let classText = switch (race.raceClass) {
-                case (#Scavenger) { "Scavenger (0-2 wins)" };
-                case (#Raider) { "Raider (3-5 wins)" };
-                case (#Elite) { "Elite (6-9 wins)" };
-                case (#SilentKlan) { "Silent Klan Invitational (10+ wins)" };
+                case (#Scavenger) { "Scavenger (<1400 ELO)" };
+                case (#Raider) { "Raider (1400-1599 ELO)" };
+                case (#Elite) { "Elite (1600-1799 ELO)" };
+                case (#SilentKlan) { "Silent Klan Invitational (1800+ ELO)" };
               };
 
               let terrainText = switch (race.terrain) {
@@ -125,7 +125,7 @@ module {
               let entryFeeDecimalStr = if (entryFeeDecimal < 10) {
                 "0" # Nat.toText(entryFeeDecimal);
               } else { Nat.toText(entryFeeDecimal) };
-              
+
               // Total prize pool includes entry fees, sponsorships, and platform bonus
               let totalPrizePool = race.prizePool + race.platformBonus;
               let prizePoolDecimal = (totalPrizePool % 100_000_000) / 1_000_000;

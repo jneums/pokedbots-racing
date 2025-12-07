@@ -99,6 +99,57 @@ export const getBotProfile = async (
 };
 
 /**
+ * Fetches upcoming scheduled race events with race summaries.
+ * @param daysAhead Number of days ahead to look for events
+ * @param identity Optional identity to use for the actor
+ * @returns An array of events with race summaries
+ */
+export const getUpcomingEventsWithRaces = async (
+  daysAhead: number = 7,
+  identity?: Identity
+): Promise<Array<{
+  event: ScheduledEvent;
+  raceSummary: {
+    totalRaces: bigint;
+    terrains: Array<PokedBotsRacing.Terrain>;
+    distances: Array<bigint>;
+    totalParticipants: bigint;
+  };
+}>> => {
+  const racingActor = getRacingActor(identity);
+  const result = await racingActor.get_upcoming_events_with_races(BigInt(daysAhead));
+  return result;
+};
+
+/**
+ * Fetches details for a specific event with full race details.
+ * @param eventId The ID of the event to fetch
+ * @param identity Optional identity to use for the actor
+ * @returns The event with race details if found, null otherwise
+ */
+export const getEventWithRaces = async (
+  eventId: number,
+  identity?: Identity
+): Promise<{
+  event: ScheduledEvent;
+  races: Array<{
+    raceId: bigint;
+    name: string;
+    distance: bigint;
+    terrain: PokedBotsRacing.Terrain;
+    raceClass: PokedBotsRacing.RaceClass;
+    entryFee: bigint;
+    currentEntries: bigint;
+    maxEntries: bigint;
+    participantTokens: Array<bigint>;
+  }>;
+} | null> => {
+  const racingActor = getRacingActor(identity);
+  const result = await racingActor.get_event_with_races(BigInt(eventId));
+  return result.length > 0 ? (result[0] ?? null) : null;
+};
+
+/**
  * Fetches race history for a specific bot with cursor-based pagination.
  * @param tokenIndex The token index of the bot
  * @param limit Maximum number of races to return

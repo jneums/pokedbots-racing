@@ -19,22 +19,22 @@ module {
   public func getMonthIdFromTime(timestamp : Int) : Nat {
     let NANOS_PER_SECOND : Int = 1_000_000_000;
     let SECONDS_PER_DAY : Int = 86400;
-    
+
     let seconds = timestamp / NANOS_PER_SECOND;
     let days = seconds / SECONDS_PER_DAY;
-    
+
     // January 1, 1970 was a Thursday
     // Calculate approximate year and month
     let yearsSince1970 = Int.abs(days / 365);
     let year = 1970 + yearsSince1970;
-    
+
     // Calculate day of year (approximate)
     let dayOfYear = Int.abs(days % 365);
-    
+
     // Approximate month (30.44 days per month average)
     let month = Int.abs((dayOfYear * 12) / 365) + 1;
     let monthClamped = if (month > 12) { 12 } else { month };
-    
+
     (year * 100) + monthClamped; // YYYYMM format
   };
 
@@ -44,12 +44,12 @@ module {
     let monthId = getMonthIdFromTime(timestamp);
     let month = monthId % 100;
     let year = monthId / 100;
-    
+
     let seasonInYear = if (month <= 3) { 1 } // Winter
-                       else if (month <= 6) { 2 } // Spring
-                       else if (month <= 9) { 3 } // Summer
-                       else { 4 }; // Fall
-    
+    else if (month <= 6) { 2 } // Spring
+    else if (month <= 9) { 3 } // Summer
+    else { 4 }; // Fall
+
     // Season ID format: YYYYS (e.g., 20251 = 2025 Winter, 20254 = 2025 Fall)
     (year * 10) + seasonInYear;
   };
@@ -495,6 +495,31 @@ module {
       currentSeasonId := newSeasonId;
       let newBoard = Map.new<Nat, LeaderboardEntry>();
       ignore Map.put(seasonBoards, nhash, newSeasonId, newBoard);
+    };
+
+    // Clear all leaderboards (used when recalculating from scratch)
+    public func clearAllLeaderboards() {
+      // Clear all monthly boards
+      for ((monthId, _board) in Map.entries(monthlyBoards)) {
+        ignore Map.remove(monthlyBoards, nhash, monthId);
+      };
+
+      // Clear all season boards
+      for ((seasonId, _board) in Map.entries(seasonBoards)) {
+        ignore Map.remove(seasonBoards, nhash, seasonId);
+      };
+
+      // Clear all-time board
+      for ((tokenIndex, _entry) in Map.entries(allTimeBoard)) {
+        ignore Map.remove(allTimeBoard, nhash, tokenIndex);
+      };
+
+      // Clear all faction boards
+      for ((factionKey, board) in Map.entries(factionBoards)) {
+        for ((tokenIndex, _entry) in Map.entries(board)) {
+          ignore Map.remove(board, nhash, tokenIndex);
+        };
+      };
     };
   };
 };

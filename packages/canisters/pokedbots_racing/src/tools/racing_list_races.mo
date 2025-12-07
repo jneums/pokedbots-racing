@@ -57,8 +57,8 @@ module {
       // Get all upcoming races (bot eligibility filtering happens below)
       var allRaces = ctx.raceManager.getUpcomingRaces();
 
-      // If token_index provided, verify bot exists and store stats for eligibility check
-      let botStats : ?PokedBotsGarage.PokedBotRacingStats = switch (tokenIndexOpt) {
+      // If token_index provided, verify bot exists (ownership check only, no filtering needed)
+      let _botStats : ?PokedBotsGarage.PokedBotRacingStats = switch (tokenIndexOpt) {
         case (?tokenIndex) {
           switch (ctx.garageManager.getStats(tokenIndex)) {
             case (?stats) {
@@ -276,11 +276,11 @@ module {
         };
 
         let classText = switch (race.raceClass) {
-          case (#Scavenger) { "Scavenger (0-2 wins)" };
-          case (#Raider) { "Raider (3-5 wins)" };
-          case (#Elite) { "Elite (6-9 wins)" };
+          case (#Scavenger) { "Scavenger (<1400 ELO)" };
+          case (#Raider) { "Raider (1400-1599 ELO)" };
+          case (#Elite) { "Elite (1600-1799 ELO)" };
           case (#SilentKlan) {
-            "Silent Klan Invitational (10+ wins, GodClass/Master only)";
+            "Silent Klan Invitational (1800+ ELO)";
           };
         };
 
@@ -341,7 +341,9 @@ module {
           ("duration_seconds", Json.int(race.duration)),
           ("terrain", Json.str(terrainText)),
           ("entry_fee_icp", Json.str(Text.concat(Nat.toText(race.entryFee / 100_000_000), "." # entryFeeDecimalStr))),
-          ("prize_pool_icp", Json.str(Text.concat(Nat.toText(race.prizePool / 100_000_000), "." # prizePoolDecimalStr))),
+          ("prize_pool_icp", Json.str(Text.concat(Nat.toText(totalPrizePool / 100_000_000), "." # prizePoolDecimalStr))),
+          ("entry_fees_icp", Json.str(Text.concat(Nat.toText(race.prizePool / 100_000_000), "." # Nat.toText((race.prizePool % 100_000_000) / 1_000_000)))),
+          ("platform_bonus_icp", Json.str(Text.concat(Nat.toText(race.platformBonus / 100_000_000), "." # Nat.toText((race.platformBonus % 100_000_000) / 1_000_000)))),
           ("sponsored_icp", Json.str(Text.concat(Nat.toText(totalSponsored / 100_000_000), "." # sponsoredDecimalStr))),
           ("sponsors", Json.arr(sponsorsArray)),
           ("entries", Json.int(race.entries.size())),

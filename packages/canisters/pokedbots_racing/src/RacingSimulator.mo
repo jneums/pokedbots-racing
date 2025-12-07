@@ -233,14 +233,25 @@ module {
       let raceTimeSeed = Int.abs(race.startTime / 1_000_000_000); // Convert to seconds
       let combinedSeed = race.raceId + raceTimeSeed;
 
-      // Calculate times
+      // Calculate times - DNF (Did Not Finish) if stats too low from battery/condition
       var racerTimes : [(RacingParticipant, Float)] = [];
+      var dnfParticipants : [RacingParticipant] = [];
 
       for (i in Iter.range(0, participants.size() - 1)) {
         let participant = participants[i];
-        let seed = combinedSeed * 1000 + i;
-        let time = calculateRaceTime(race, participant, seed);
-        racerTimes := Array.append(racerTimes, [(participant, time)]);
+
+        // Check if bot has critical stats failure (below 10 in any stat = DNF)
+        // This happens when battery is 0% or condition is 0%
+        if (
+          participant.stats.speed < 10 or participant.stats.acceleration < 10 or
+          participant.stats.powerCore < 10 or participant.stats.stability < 10
+        ) {
+          dnfParticipants := Array.append(dnfParticipants, [participant]);
+        } else {
+          let seed = combinedSeed * 1000 + i;
+          let time = calculateRaceTime(race, participant, seed);
+          racerTimes := Array.append(racerTimes, [(participant, time)]);
+        };
       };
 
       // Sort by time
@@ -254,6 +265,7 @@ module {
       let netPrizePool = Nat.sub(totalPool, race.platformTax);
       var results : [RaceResult] = [];
 
+      // Add finishers with prizes
       for (i in Iter.range(0, sorted.size() - 1)) {
         let (participant, time) = sorted[i];
         let position = i + 1;
@@ -279,6 +291,19 @@ module {
         };
 
         results := Array.append(results, [result]);
+      };
+
+      // Add DNF (Did Not Finish) participants at the end
+      // They get no prize and a special DNF marker time (999999.0)
+      for (participant in dnfParticipants.vals()) {
+        let dnfResult : RaceResult = {
+          nftId = participant.nftId;
+          owner = participant.owner;
+          position = results.size() + 1; // Last place + 1, 2, 3...
+          finalTime = 999999.0; // DNF marker
+          prizeAmount = 0;
+        };
+        results := Array.append(results, [dnfResult]);
       };
 
       ?results;
@@ -465,6 +490,14 @@ module {
           ?updatedRace;
         };
         case (null) { null };
+      };
+    };
+
+    /// Delete a race from storage (for cleanup of orphaned races)
+    public func deleteRace(raceId : Nat) : Bool {
+      switch (Map.remove(races, nhash, raceId)) {
+        case (?_race) { true };
+        case (null) { false };
       };
     };
 

@@ -74,6 +74,7 @@ module {
     battery : Nat;
     condition : Nat;
     experience : Nat;
+    overcharge : Nat; // Overcharge (0-75%), earned by recharging at low battery, consumed in next race for stat boost
 
     // Preferences
     preferredDistance : Distance;
@@ -239,11 +240,24 @@ module {
             case (?botStats) {
               let current = getCurrentStats(botStats);
               let boosted = applyTerrainBonus(current, botStats.faction, terrain, botStats.condition);
+
+              // Apply preferred terrain bonus (+5% if racing on preferred terrain)
+              let finalStats = if (botStats.preferredTerrain == terrain) {
+                {
+                  speed = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.speed) * 1.05)));
+                  powerCore = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.powerCore) * 1.05)));
+                  acceleration = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.acceleration) * 1.05)));
+                  stability = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.stability) * 1.05)));
+                };
+              } else {
+                boosted;
+              };
+
               ?{
-                speed = boosted.speed;
-                powerCore = boosted.powerCore;
-                acceleration = boosted.acceleration;
-                stability = boosted.stability;
+                speed = finalStats.speed;
+                powerCore = finalStats.powerCore;
+                acceleration = finalStats.acceleration;
+                stability = finalStats.stability;
               };
             };
             case (null) { null };
@@ -344,12 +358,17 @@ module {
 
     /// Apply race costs (battery drain and condition wear)
     /// Costs scale with distance, terrain difficulty, and finishing position
+    /// Battery drain is inversely proportional to power core level (higher power core = more efficient = less drain)
     public func applyRaceCosts(nftId : Text, distance : Nat, terrain : RacingSimulator.Terrain, position : Nat) {
       let tokenIndex = Nat.fromText(nftId);
       switch (tokenIndex) {
         case (?idx) {
           switch (Map.get(stats, nhash, idx)) {
             case (?botStats) {
+              // Get current power core stat (base + bonuses)
+              let currentStats = getCurrentStats(botStats);
+              let powerCore = currentStats.powerCore;
+
               // Battery drain scales with distance
               // Base: 10 for short (5km), 15 for medium (15km), 20 for long (25km+)
               let baseBatteryDrain = if (distance < 10) { 10 } else if (distance < 20) {
@@ -363,7 +382,26 @@ module {
                 case (#MetalRoads) { 1.0 }; // Smooth roads = normal
               };
 
-              let totalBatteryDrain = Float.toInt(Float.fromInt(baseBatteryDrain) * terrainBatteryMod);
+              // Power Core efficiency: Higher power core reduces battery drain (logarithmic curve)
+              // Uses log curve so benefits diminish at higher levels
+              // At powerCore 1 (min): ~100% drain (1.0x multiplier)
+              // At powerCore 20 (avg beginner): ~70% drain (0.70x multiplier)
+              // At powerCore 40 (solid): ~52% drain (0.52x multiplier)
+              // At powerCore 80 (god mode): ~35% drain (0.35x multiplier)
+              // At powerCore 100 (max): ~30% drain (0.30x multiplier) - 3.3x more races per battery
+              // Formula: multiplier = 1.0 - (0.70 * log(powerCore) / log(100))
+              let normalizedPowerCore = Float.max(1.0, Float.fromInt(powerCore));
+              let logEffect = Float.min(0.70, 0.70 * (Float.log(normalizedPowerCore) / Float.log(100.0)));
+              let efficiencyMultiplier = 1.0 - logEffect;
+
+              // Condition penalty: Poor condition reduces power core efficiency
+              // At 100 condition: no penalty (1.0x)
+              // At 50 condition: +25% drain (1.25x)
+              // At 0 condition: +50% drain (1.5x)
+              // Formula: penalty = 1.0 + ((100 - condition) / 200)
+              let conditionPenalty = 1.0 + (Float.fromInt(100 - botStats.condition) / 200.0);
+
+              let totalBatteryDrain = Float.toInt(Float.fromInt(baseBatteryDrain) * terrainBatteryMod * efficiencyMultiplier * conditionPenalty);
               let finalBatteryDrain = Nat.min(botStats.battery, Int.abs(totalBatteryDrain));
 
               // Condition wear scales with distance and finishing position
@@ -387,10 +425,12 @@ module {
               let totalConditionWear = Float.toInt(Float.fromInt(baseConditionWear) * positionMod * terrainConditionMod);
               let finalConditionWear = Nat.min(botStats.condition, Int.abs(totalConditionWear));
 
+              // CONSUME ALL OVERCHARGE after race
               let updatedStats = {
                 botStats with
                 battery = Nat.sub(botStats.battery, finalBatteryDrain);
                 condition = Nat.sub(botStats.condition, finalConditionWear);
+                overcharge = 0; // Overcharge consumed after race
               };
               updateStats(idx, updatedStats);
             };
@@ -458,6 +498,7 @@ module {
         battery = 100;
         condition = 100;
         experience = 0;
+        overcharge = 0;
         preferredDistance = derivePreferredDistance(baseStats.powerCore, baseStats.speed);
         preferredTerrain = switch (metadata) {
           case (?traits) { derivePreferredTerrain(traits) };
@@ -578,37 +619,67 @@ module {
       let base = getBaseStats(botStats.tokenIndex);
 
       // Apply battery penalty to speed and acceleration (energy-dependent stats)
-      // 100% battery = no penalty, 50% battery = -15% stats, 0% battery = -30% stats
+      // Battery penalties - softer at high levels, harsh when critical
+      // 80-100% battery = no penalty (1.0x)
+      // 50% battery = -15% stats (0.85x) - still competitive
+      // 25% battery = -40% stats (0.60x) - noticeably slow
+      // 10% battery = -70% stats (0.30x) - desperate
+      // 0% battery = -90% stats (0.10x) - "resurrection sickness"
       let batteryPenalty = if (botStats.battery >= 80) {
         1.0;
       } else if (botStats.battery >= 50) {
-        // Linear scale from 1.0 to 0.85 between 80-50 battery
-        1.0 - ((80.0 - Float.fromInt(botStats.battery)) / 30.0) * 0.15;
+        // Linear scale from 0.85 to 1.0 between 50-80 battery (light penalty)
+        0.85 + ((Float.fromInt(botStats.battery) - 50.0) / 30.0) * 0.15;
+      } else if (botStats.battery >= 25) {
+        // Linear scale from 0.60 to 0.85 between 25-50 battery (moderate penalty)
+        0.60 + ((Float.fromInt(botStats.battery) - 25.0) / 25.0) * 0.25;
+      } else if (botStats.battery >= 10) {
+        // Linear scale from 0.30 to 0.60 between 10-25 battery (heavy penalty)
+        0.30 + ((Float.fromInt(botStats.battery) - 10.0) / 15.0) * 0.30;
       } else {
-        // Linear scale from 0.85 to 0.70 between 50-0 battery
-        0.85 - (Float.fromInt(50 - botStats.battery) / 50.0) * 0.15;
+        // Critical: 0-10% battery = 0.10 to 0.30 multiplier (resurrection sickness)
+        0.10 + (Float.fromInt(botStats.battery) / 10.0) * 0.20;
       };
 
       // Apply condition penalty to powerCore and stability (mechanical wear stats)
-      // 100% condition = no penalty, 70% condition = -10% stats, 25% condition = -30% stats
+      // HARSH PENALTIES - Damaged bots perform poorly!
+      // 100% condition = no penalty (1.0x)
+      // 70% condition = -20% stats (0.80x)
+      // 50% condition = -40% stats (0.60x)
+      // 25% condition = -70% stats (0.30x)
+      // 0% condition = -90% stats (0.10x) - critical damage
       let conditionPenalty = if (botStats.condition >= 90) {
         1.0;
       } else if (botStats.condition >= 70) {
-        // Linear scale from 1.0 to 0.90 between 90-70 condition
-        1.0 - ((90.0 - Float.fromInt(botStats.condition)) / 20.0) * 0.10;
+        // Linear scale from 0.80 to 1.0 between 70-90 condition
+        0.80 + ((Float.fromInt(botStats.condition) - 70.0) / 20.0) * 0.20;
+      } else if (botStats.condition >= 50) {
+        // Linear scale from 0.60 to 0.80 between 50-70 condition
+        0.60 + ((Float.fromInt(botStats.condition) - 50.0) / 20.0) * 0.20;
       } else if (botStats.condition >= 25) {
-        // Linear scale from 0.90 to 0.70 between 70-25 condition
-        0.90 - ((70.0 - Float.fromInt(botStats.condition)) / 45.0) * 0.20;
+        // Linear scale from 0.30 to 0.60 between 25-50 condition
+        0.30 + ((Float.fromInt(botStats.condition) - 25.0) / 25.0) * 0.30;
       } else {
-        // Critical condition: 25% or below = 30% penalty
-        0.70;
+        // Critical: 0-25% condition = 0.10 to 0.30 multiplier (falling apart)
+        0.10 + (Float.fromInt(botStats.condition) / 25.0) * 0.20;
       };
 
+      // OVERCHARGE BONUSES (consumed in next race)
+      // Speed: +0.3% per 1% overcharge (max +22.5% at 75% overcharge)
+      // Acceleration: +0.3% per 1% overcharge (max +22.5% at 75% overcharge)
+      // Stability: -0.2% per 1% overcharge (max -15% at 75% overcharge)
+      // PowerCore: -0.2% per 1% overcharge (max -15% at 75% overcharge)
+      let overchargeBonus = Float.fromInt(botStats.overcharge) / 100.0; // 0.0 to 0.75
+      let speedOvercharge = 1.0 + (overchargeBonus * 0.3); // 1.0 to 1.225
+      let accelOvercharge = 1.0 + (overchargeBonus * 0.3); // 1.0 to 1.225
+      let stabilityOvercharge = 1.0 - (overchargeBonus * 0.2); // 1.0 to 0.85
+      let powerCoreOvercharge = 1.0 - (overchargeBonus * 0.2); // 1.0 to 0.85
+
       // Apply penalties to appropriate stats
-      let speedWithPenalty = Float.toInt(Float.fromInt(base.speed + botStats.speedBonus) * batteryPenalty);
-      let accelerationWithPenalty = Float.toInt(Float.fromInt(base.acceleration + botStats.accelerationBonus) * batteryPenalty);
-      let powerCoreWithPenalty = Float.toInt(Float.fromInt(base.powerCore + botStats.powerCoreBonus) * conditionPenalty);
-      let stabilityWithPenalty = Float.toInt(Float.fromInt(base.stability + botStats.stabilityBonus) * conditionPenalty);
+      let speedWithPenalty = Float.toInt(Float.fromInt(base.speed + botStats.speedBonus) * batteryPenalty * speedOvercharge);
+      let accelerationWithPenalty = Float.toInt(Float.fromInt(base.acceleration + botStats.accelerationBonus) * batteryPenalty * accelOvercharge);
+      let powerCoreWithPenalty = Float.toInt(Float.fromInt(base.powerCore + botStats.powerCoreBonus) * conditionPenalty * powerCoreOvercharge);
+      let stabilityWithPenalty = Float.toInt(Float.fromInt(base.stability + botStats.stabilityBonus) * conditionPenalty * stabilityOvercharge);
 
       {
         speed = Nat.min(100, Int.abs(speedWithPenalty));

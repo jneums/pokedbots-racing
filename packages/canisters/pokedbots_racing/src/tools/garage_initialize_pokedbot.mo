@@ -16,7 +16,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_initialize_pokedbot";
     title = ?"Register PokedBot Racing License";
-    description = ?"Register your PokedBot for a wasteland racing license (free, one-time). This official registration reveals your bot's faction and racing stats based on its NFT traits. Required before entering any races. Only works with PokedBots you own.";
+    description = ?"Register your PokedBot for a wasteland racing license (free, one-time). Reveals faction and racing stats based on NFT traits. Required before entering races.\n\n**FACTION BONUSES:**\nUltra-Rare: UltimateMaster (+15% all), Wild (+20% Accel/-10% Stab), Golden (+15% all if condition≥90%), Ultimate (+12% Speed/Accel)\nSuper-Rare: Blackhole (+12% on MetalRoads), Dead (+10% PowerCore/+8% Stab), Master (+12% Speed/+8% PowerCore)\nRare: Bee (+10% Accel), Food (+8% condition recovery), Box (+10% on ScrapHeaps), Murder (+8% Speed/Accel)\nCommon: Game (+8% on WastelandSand), Animal (+6% balanced), Industrial (+5% PowerCore/Stab)";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -79,7 +79,7 @@ module {
           };
           // If owned by someone else, verify new ownership and update owner
           // (This handles the transfer case - preserve all stats except owner)
-          
+
           // Verify ownership via EXT canister
           let garageSubaccount = ExtIntegration.deriveGarageSubaccount(user);
           let garageAccountId = ExtIntegration.principalToAccountIdentifier(ctx.canisterPrincipal, ?garageSubaccount);
@@ -103,7 +103,7 @@ module {
 
           // Update owner (transfer case) - preserve all other stats
           let _ = ctx.garageManager.updateBotOwner(tokenIndex, user);
-          
+
           return ToolContext.makeTextSuccess("🔄 **OWNERSHIP UPDATED**\n\nPokedBot #" # Nat.toText(tokenIndex) # " has been registered to your account. All racing stats and upgrades have been preserved.", cb);
         };
         case (null) {
@@ -216,6 +216,52 @@ module {
       // Get current stats (base + bonuses)
       let currentStats = ctx.garageManager.getCurrentStats(racingStats);
 
+      // Get faction mechanics explanation
+      let factionMechanics = switch (racingStats.faction) {
+        case (#UltimateMaster) {
+          "MECHANICS: +15% all stats, 2x upgrade bonus chance, -40% decay. Supreme performance.";
+        };
+        case (#Wild) {
+          "MECHANICS: +20% Acceleration, -10% Stability, +30% decay. High-risk chaos engine.";
+        };
+        case (#Golden) {
+          "MECHANICS: +15% all stats when condition ≥90%. Requires pristine maintenance.";
+        };
+        case (#Ultimate) {
+          "MECHANICS: +12% Speed, +12% Acceleration. Peak performance baseline.";
+        };
+        case (#Blackhole) {
+          "MECHANICS: +12% on MetalRoads terrain. 'Void Energy' = superior highway efficiency. Power Core reduces battery drain.";
+        };
+        case (#Dead) {
+          "MECHANICS: +10% Power Core, +8% Stability. Necro-resilience improves energy efficiency.";
+        };
+        case (#Master) {
+          "MECHANICS: +12% Speed, +8% Power Core. Precision engineering from Europa Base 7.";
+        };
+        case (#Bee) {
+          "MECHANICS: +10% Acceleration. Hive-mind swarm optimization.";
+        };
+        case (#Food) {
+          "MECHANICS: +8% Condition recovery. Energy-efficient sustenance systems.";
+        };
+        case (#Box) {
+          "MECHANICS: +10% on ScrapHeaps terrain. Recycled parts excel in rough conditions.";
+        };
+        case (#Murder) {
+          "MECHANICS: +8% Speed, +8% Acceleration. Combat-grade aggression core.";
+        };
+        case (#Game) {
+          "MECHANICS: +8% on WastelandSand terrain. Entertainment tech optimized for sand.";
+        };
+        case (#Animal) {
+          "MECHANICS: +6% balanced stats. Organic-synthetic hybrid stability.";
+        };
+        case (#Industrial) {
+          "MECHANICS: +5% Power Core, +5% Stability. Reliable workhorse design.";
+        };
+      };
+
       // Build JSON response
       let response = Json.obj([
         ("token_index", Json.int(tokenIndex)),
@@ -227,6 +273,8 @@ module {
         ("status", Json.str("Racing license registered! Ready for wasteland competition.")),
         ("license_status", Json.str("REGISTERED")),
         ("faction_message", Json.str(factionMessage)),
+        ("faction_mechanics", Json.str(factionMechanics)),
+        ("energy_note", Json.str("POWER CORE STAT = ENERGY EFFICIENCY: Higher Power Core reduces battery drain during races. At PC=100: only 30% normal battery consumption (3.3x more races per charge).")),
       ]);
 
       ToolContext.makeSuccess(response, cb);

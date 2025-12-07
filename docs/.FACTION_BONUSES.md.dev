@@ -1,0 +1,266 @@
+# Faction Bonuses - Complete Reference
+
+## Overview
+All 14 PokedBots factions have unique characteristics based on their rarity tier and Type trait from the NFT collection. Factions are automatically derived from trait combinations during stat generation and determine upgrade efficiency, decay rates, and potential future bonuses.
+
+**Current Implementation Status:**
+- ✅ **Faction assignment**: Based on Type trait from NFT metadata
+- ✅ **Upgrade bonus mechanics**: Catch-up system - rarer factions have LOWER bonus chance (common/rare get better odds)
+- ✅ **Decay rates**: Rarity-based faster recharge (ultra-rare recharge faster)
+- ✅ **Racing terrain bonuses**: Blackhole (+12% MetalRoads), Box (+10% ScrapHeaps), Game (+8% WastelandSand), Golden (+15% at 90%+ condition)
+- ✅ **Preferred terrain bonus**: +5% all stats when racing on bot's preferred terrain
+- 🔜 **Scavenging bonuses**: Designed but not yet implemented (see below for planned mechanics)
+
+---
+
+## Faction Rarity Tiers & Upgrade Catch-Up Mechanics
+
+### **Ultra-Rare** (4 factions)
+- Population: UltimateMaster (1), Wild (5), Golden (27), Ultimate (45) = 78 total
+- Shared benefits:
+  - **10% upgrade bonus chance** (2x stat gain when it procs)
+  - **Faster battery recharge** (+25% to +40% recharge rate)
+  - **Prestige status** in leaderboards
+- **Design Philosophy**: Already strong base stats, lower upgrade bonus to balance
+w
+### **Super-Rare** (3 factions)
+- Population: Blackhole (244), Dead (382), Master (640) = 1,266 total
+- Shared benefits:
+  - **20% upgrade bonus chance** (2x stat gain when it procs)
+  - **+15% battery recharge rate**
+- **Design Philosophy**: Good base stats, moderate catch-up help
+
+### **Rare** (4 factions) - BEST CATCH-UP
+- Population: Bee (717), Food (778), Box (798), Murder (999) = 3,292 total
+- Shared benefits:
+  - **35% upgrade bonus chance** (2x stat gain when it procs) ⭐ HIGHEST ODDS
+  - **+5% battery recharge rate**
+- **Design Philosophy**: Average base stats, strong catch-up mechanic for competitiveness
+
+### **Common** (3 factions)
+- Population: Game (1,654), Animal (1,701), Industrial (2,009) = 5,364 total
+- Shared benefits:
+  - **25% upgrade bonus chance** (2x stat gain when it procs)
+  - **Standard battery recharge rate**
+- **Design Philosophy**: Most common, decent catch-up odds to stay competitive
+
+### **Special Case: Wild Faction**
+- **High variance upgrades**: Instead of 2x bonus, gains -2 to +2 random variance on each upgrade
+- **Slower recharge**: 0.7x battery recharge rate (30% slower)
+- **Philosophy**: Unpredictable and wild - high risk, high variance gameplay
+
+---
+
+## Complete Faction Breakdown
+
+**Note:** Racing bonuses marked with ✅ are currently implemented. Scavenging bonuses marked with 🔜 are designed but awaiting implementation.
+
+### 🌌 **ULTRA-RARE FACTIONS**
+
+#### **Blackhole** (244 bots)
+*"Void energy courses through them. Reality bends in their wake."*
+
+**Racing Bonuses:**
+- ✅ **Void Highway:** +12% all stats on MetalRoads terrain (currently implemented)
+- ✅ **Preferred Terrain Bonus:** Additional +5% if MetalRoads is derived as preferred terrain from background
+- ✅ **Super-rare upgrades:** 20% chance for 2x stat gains on upgrades (catch-up mechanic)
+- ✅ **Faster recharge:** +15% battery recharge rate
+- 🔜 **Dark Energy:** Battery represented as "Void Energy" (cosmetic, future flavor text)
+
+**Scavenging Bonuses (Planned):**
+- 🔜 **Void Walker:** -40% condition damage in Void Pits zone
+- 🔜 **Reality Distortion:** +50% parts in Void Pits (massive multiplier for hardest zone)
+
+**Recharge Rate:** +15% (super-rare tier)
+
+**Flavor:** "The void provides. The void consumes. Balance."
+
+---
+
+#### **Box** (798 bots - RARE tier, not ultra-rare)
+*"Contained chaos. What's inside is anyone's guess."*
+
+**Racing Bonuses:**
+- ✅ **Crate Crasher:** +10% all stats on ScrapHeaps terrain (currently implemented)
+- ✅ **Preferred Terrain Bonus:** Additional +5% if ScrapHeaps is preferred terrain
+- ✅ **Rare upgrades:** 35% chance for 2x stat gains (BEST catch-up mechanic!)
+- ✅ **Slight recharge boost:** +5% battery recharge rate
+
+**Scavenging Bonuses (Planned):**
+- 🔜 **Scrap Hoarder:** +15% parts in Scrap Heaps specifically
+- 🔜 **Box of Surprises:** Parts yield has wider variance (0.6x to 1.6x vs normal 0.8x to 1.2x)
+- 🔜 **Jackpot Finder:** 5% chance to triple parts found (lucky box!)
+
+**Recharge Rate:** +5% (rare tier)
+
+**Flavor:** "Every race is a surprise. Every scavenge is a gamble. Every box is a mystery."
+
+---
+
+#### **Game** (1,654 bots - COMMON tier)
+*"Playful chaos. Rules are suggestions."*
+
+**Racing Bonuses:**
+- ✅ **Game Mechanics:** +8% all stats on WastelandSand terrain (currently implemented)
+- ✅ **Preferred Terrain Bonus:** Additional +5% if WastelandSand is preferred terrain
+- ✅ **Common upgrades:** 25% chance for 2x stat gains on upgrades
+- ✅ **Standard recharge:** Normal battery recharge rate
+
+**Scavenging Bonuses (Planned):**
+- 🔜 **Playful Scavenger:** +8% parts in Abandoned Settlements
+- 🔜 **Mini-Game Bonuses:** Short missions (6h) have +15% parts yield
+- 🔜 **Achievement Hunter:** Every 5 scavenging missions completed awards +10 extra parts
+
+**Recharge Rate:** Standard (common tier)
+
+**Flavor:** "Life is a game. Play to win. Play to have fun."
+
+---
+
+#### **Golden** (27 bots - ULTRA-RARE tier)
+*"Pristine perfection wrapped in gold. Maintenance is everything."*
+
+**Racing Bonuses:**
+- ✅ **Golden Standard:** +15% all stats when condition ≥90% (currently implemented)
+- ✅ **Preferred Terrain Bonus:** Additional +5% if racing on preferred terrain
+- ✅ **Ultra-rare upgrades:** 10% chance for 2x stat gains (already strong, lower catch-up)
+- ✅ **Premium recharge:** +30% battery recharge rate
+
+**Scavenging Bonuses (Planned):**
+- 🔜 **Too Pristine:** CANNOT scavenge in Scrap Heaps or Dead Machine Fields (too dirty)
+- 🔜 **Royal Expedition:** +30% parts in Abandoned Settlements only (clean zones)
+- 🔜 **Golden Haul:** Parts found have 15% chance to award double (quality over quantity)
+
+**Recharge Rate:** +30% (ultra-rare tier)
+
+**Flavor:** "Why scavenge when you can simply be magnificent?"
+
+---
+
+### ⚫ **REMAINING FACTIONS** (Current Implementation)
+
+**All other factions currently have:**
+- ✅ Rarity-based decay rates (ultra-rare: -25% to -40%, super-rare: -15%, rare: -5%, common: standard)
+- ✅ Rarity-based upgrade mechanics
+- ✅ +5% preferred terrain bonus (all bots, based on background trait → terrain derivation)
+- 🔜 Scavenging bonuses designed but not yet implemented
+
+#### **UltimateMaster** (1 bot - ULTRA-RARE)
+- Current: 10% upgrade bonus, +40% recharge rate
+- Planned: +20% parts all zones, -30% battery drain, zone master access
+
+#### **Wild** (5 bots - ULTRA-RARE)  
+- Current: High variance upgrades (-2 to +2), 30% SLOWER recharge (wild and unpredictable!)
+- Planned: +25% parts WastelandSand zones, -40% condition loss, double world buff potency with RNG
+
+#### **Ultimate** (45 bots - ULTRA-RARE)
+- Current: 10% upgrade bonus, +25% recharge rate
+- Planned: Mission durations -15%, +15% parts all zones, speed buff focus
+
+#### **Dead** (382 bots - SUPER-RARE)
+- Current: 20% upgrade bonus, +15% recharge rate
+- Planned: +10% parts all zones, +40% parts Dead Machine Fields, half condition damage
+
+#### **Master** (640 bots - SUPER-RARE)
+- Current: 20% upgrade bonus, +15% recharge rate  
+- Planned: -25% battery drain, +12% parts all zones, every 10th mission double parts
+
+#### **Bee** (717 bots - RARE)
+- Current: 35% upgrade bonus (best catch-up!), +5% recharge rate
+- Planned: +8% parts Abandoned Settlements, +10% on 24h expeditions, collective world buff
+
+#### **Food** (778 bots - RARE)
+- Current: 35% upgrade bonus (best catch-up!), +5% recharge rate
+- Planned: +12% parts Scrap Heaps/Settlements, -20% battery drain, 30% stronger world buffs
+
+#### **Murder** (999 bots - RARE)
+- Current: 35% upgrade bonus (best catch-up!), +5% recharge rate
+- Planned: +15% parts Dead Machine Fields, faster parts but +20% condition damage
+
+#### **Animal** (1,701 bots - COMMON)
+- Current: 25% upgrade bonus, standard recharge
+- Planned: +8% parts WastelandSand, -15% condition loss on 12h/24h, world buffs last 2 races
+
+#### **Industrial** (2,009 bots - COMMON)
+- Current: 25% upgrade bonus, standard recharge
+- Planned: +5% parts all zones, -10% battery drain, reduced variance (0.9x-1.1x)
+
+---
+
+## Faction Rarity Distribution (Actual)
+
+```
+Ultra-Rare (78 bots, 0.78%):
+├─ UltimateMaster: 1 bot (0.01%)
+├─ Wild: 5 bots (0.05%)
+├─ Golden: 27 bots (0.27%)
+└─ Ultimate: 45 bots (0.45%)
+
+Super-Rare (1,266 bots, 12.66%):
+├─ Blackhole: 244 bots (2.44%)
+├─ Dead: 382 bots (3.82%)
+└─ Master: 640 bots (6.40%)
+
+Rare (3,292 bots, 32.92%):
+├─ Bee: 717 bots (7.17%)
+├─ Food: 778 bots (7.78%)
+├─ Box: 798 bots (7.98%)
+└─ Murder: 999 bots (9.99%)
+
+Common (5,364 bots, 53.64%):
+├─ Game: 1,654 bots (16.54%)
+├─ Animal: 1,701 bots (17.01%)
+└─ Industrial: 2,009 bots (20.09%)
+
+Total: 10,000 PokedBots
+```
+
+---
+
+## Design Philosophy
+
+1. **Rarity ≠ Power:** Common bots can compete with proper upgrades - rarity affects efficiency, not ceiling
+2. **Terrain Specialization:** Factions excel in specific environments (Blackhole on MetalRoads, Box on ScrapHeaps, etc.)
+3. **Maintenance Matters:** Golden's condition requirement creates interesting trade-offs
+4. **Future-Proof:** Scavenging bonuses designed to expand faction identity without breaking racing balance
+5. **Flavor First:** Mechanics match thematic identity (Blackhole = void energy, Golden = pristine, Dead = undying)
+
+---
+
+## Future Expansions (Planned)
+
+**When Scavenging Launches:**
+- Implement all planned scavenging bonuses
+- Add faction-specific zones or events
+- Create faction reputation/loyalty tracking
+- Faction-exclusive scavenging tools or upgrades
+
+**Potential Future Features:**
+- Faction tournaments (Bee vs Animal, etc.)
+- Cross-faction alliances/rivalries for team races
+- Faction cosmetic variants (e.g., "Void-touched" Blackhole variants)
+- Faction-specific achievement systems
+- Dynamic faction balance patches based on usage data
+
+---
+
+## Lore Notes
+
+**Faction Origins (Wasteland Canon):**
+- **UltimateMaster:** Pre-war AI experiments that achieved sentience and transcendence
+- **Blackhole:** Survivors of the Void Incident, infused with reality-bending dark energy  
+- **Golden:** Corporate elite bots, now status symbols and pristine collectors' items
+- **Ultimate:** One step below perfection - optimized for peak performance
+- **Wild:** Escaped zoo automatons that adapted to wasteland freedom
+- **Dead:** Necro-bots that refuse to stay offline, thriving in decay
+- **Master:** Disciplined training automatons, now wasteland wanderers
+- **Blackhole:** Void-touched machines with highway mastery
+- **Box:** Mystery containers - unpredictable and gambling-prone
+- **Bee:** Hive-mind agricultural drones gone rogue, working collectively
+- **Food:** Nourishment-powered bots that consume to fuel themselves
+- **Murder:** Built for destruction, optimized for aggressive racing
+- **Game:** Playful automatons that treat survival as entertainment
+- **Animal:** Primal instinct meets mechanical precision
+- **Industrial:** Mass-produced workhorses - reliable, common, essential
+
+*"Choose your faction. Choose your path. The wasteland rewards specialization."*

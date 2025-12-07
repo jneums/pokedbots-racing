@@ -10,9 +10,9 @@ module {
   /// K-factor determines how much ratings change per race
   /// Higher K for newer bots (more volatile), lower for veterans (more stable)
   public func getKFactor(racesEntered : Nat) : Float {
-    if (racesEntered < 20) { 40.0 } // New bots: high volatility
-    else if (racesEntered < 50) { 32.0 } // Mid-level: moderate changes
-    else { 24.0 }; // Veterans: stable ratings
+    if (racesEntered < 20) { 10.0 } // New bots: high volatility
+    else if (racesEntered < 50) { 8.0 } // Mid-level: moderate changes
+    else { 6.0 }; // Veterans: stable ratings
   };
 
   /// Calculate expected score for bot A vs bot B

@@ -25,7 +25,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_upgrade_robot";
     title = ?"Upgrade Robot";
-    description = ?"Start an upgrade session. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability). Pay with parts (earned from racing) or ICP (progressive cost). Takes 12 hours. Use garage_get_robot_details to see the exact parts and ICP cost for each upgrade type in the 'upgrade_costs' field.";
+    description = ?"Start a 12-hour upgrade session. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability). Pay with parts (earned from racing) or ICP. Use garage_get_robot_details to see exact costs. UPGRADE MECHANICS: Base gain = 1-3 points (1st upgrade: 1-3, 2nd-3rd: 1-2, 4th+: 1). Difficulty scaling: stats <60 get full bonus, 60-70 (×0.8), 70-80 (×0.6), 80-90 (×0.4), 90+ (×0.2). Faction bonus chances: Ultra-rare (10% double), Super-rare like Blackhole/Dead/Master (20% double), Rare like Bee/Food/Box/Murder (35% double), Common (25% double). Wild faction: ±2 variance instead. First 3 upgrades guaranteed ≥1 point, later upgrades can give 0. Example: Bot at 65 Speed, 2nd Velocity upgrade: rolls 1-2 × 0.8 difficulty = 0.8-1.6 → rounds to 1-2 points before faction roll.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -189,7 +189,9 @@ module {
 
       let updatedStats = {
         racingStats with
-        battery = Nat.sub(racingStats.battery, 15);
+        battery = if (racingStats.battery >= 15) {
+          racingStats.battery - 15;
+        } else { 0 };
         upgradeEndsAt = ?endsAt;
       };
 

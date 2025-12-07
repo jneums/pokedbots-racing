@@ -116,6 +116,7 @@ export interface McpServer {
   'cancel_actions_by_filter' : ActorMethod<[ActionFilter], CancellationResult>,
   'cancel_actions_by_ids' : ActorMethod<[Array<bigint>], CancellationResult>,
   'cancel_races_by_ids' : ActorMethod<[Array<bigint>], Array<[bigint, string]>>,
+  'clear_event_race_ids' : ActorMethod<[], string>,
   'clear_reconstitution_traces' : ActorMethod<[], undefined>,
   'create_my_api_key' : ActorMethod<[string, Array<string>], string>,
   'debug_check_bot_owner' : ActorMethod<
@@ -162,7 +163,9 @@ export interface McpServer {
   >,
   'debug_seed_leaderboard' : ActorMethod<[bigint], string>,
   'decode_token_identifier' : ActorMethod<[string], bigint>,
+  'delete_events_after' : ActorMethod<[bigint], string>,
   'delete_events_and_races' : ActorMethod<[Array<bigint>], string>,
+  'delete_orphaned_races' : ActorMethod<[], string>,
   'emergency_clear_all_timers' : ActorMethod<[], bigint>,
   'encode_token_identifier' : ActorMethod<[number], string>,
   'force_finish_race' : ActorMethod<[bigint], string>,
@@ -236,6 +239,27 @@ export interface McpServer {
     { 'seasonId' : bigint, 'monthId' : bigint }
   >,
   'get_event_details' : ActorMethod<[bigint], [] | [ScheduledEvent]>,
+  'get_event_with_races' : ActorMethod<
+    [bigint],
+    [] | [
+      {
+        'event' : ScheduledEvent,
+        'races' : Array<
+          {
+            'terrain' : Terrain,
+            'name' : string,
+            'distance' : bigint,
+            'participantTokens' : Array<bigint>,
+            'currentEntries' : bigint,
+            'raceId' : bigint,
+            'entryFee' : bigint,
+            'maxEntries' : bigint,
+            'raceClass' : RaceClass,
+          }
+        >,
+      }
+    ]
+  >,
   'get_ext_canister' : ActorMethod<[], Principal>,
   'get_garage_account_id' : ActorMethod<[Principal], string>,
   'get_icp_ledger' : ActorMethod<[], [] | [Principal]>,
@@ -269,11 +293,38 @@ export interface McpServer {
   'get_past_events' : ActorMethod<[bigint, bigint], Array<ScheduledEvent>>,
   'get_race_by_id' : ActorMethod<[bigint], [] | [Race]>,
   'get_reconstitution_traces' : ActorMethod<[], Array<ReconstitutionTrace>>,
+  'get_standalone_races' : ActorMethod<
+    [],
+    Array<
+      {
+        'startTime' : bigint,
+        'status' : RaceStatus,
+        'name' : string,
+        'entries' : bigint,
+        'raceId' : bigint,
+        'raceClass' : RaceClass,
+      }
+    >
+  >,
   'get_timer_diagnostics' : ActorMethod<[], TimerDiagnostics>,
   'get_total_nft_count' : ActorMethod<[], bigint>,
   'get_trait_schema' : ActorMethod<[], TraitSchema>,
   'get_treasury_balance' : ActorMethod<[Principal], bigint>,
   'get_upcoming_events' : ActorMethod<[bigint], Array<ScheduledEvent>>,
+  'get_upcoming_events_with_races' : ActorMethod<
+    [bigint],
+    Array<
+      {
+        'event' : ScheduledEvent,
+        'raceSummary' : {
+          'distances' : Array<bigint>,
+          'totalParticipants' : bigint,
+          'terrains' : Array<Terrain>,
+          'totalRaces' : bigint,
+        },
+      }
+    >
+  >,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
   'http_request_streaming_callback' : ActorMethod<
     [StreamingToken],
@@ -284,6 +335,9 @@ export interface McpServer {
   'initialize_race_timer' : ActorMethod<[], string>,
   'list_my_api_keys' : ActorMethod<[], Array<ApiKeyMetadata>>,
   'process_overdue_timers' : ActorMethod<[], string>,
+  'reattach_races_to_event' : ActorMethod<[bigint, Array<bigint>], string>,
+  'recalculate_bot_stats' : ActorMethod<[], string>,
+  'reset_all_elos' : ActorMethod<[], string>,
   'reset_bot_stats' : ActorMethod<[bigint], Result_1>,
   'revoke_my_api_key' : ActorMethod<[string], undefined>,
   'set_ext_canister' : ActorMethod<[Principal], Result_1>,
@@ -293,6 +347,8 @@ export interface McpServer {
     [{ 'context' : Uint8Array | number[], 'response' : HttpRequestResult }],
     HttpRequestResult
   >,
+  'trigger_event_creation' : ActorMethod<[], string>,
+  'trigger_race_creation' : ActorMethod<[], string>,
   'trigger_race_start' : ActorMethod<[bigint], string>,
   'trigger_stuck_races' : ActorMethod<[], string>,
   'upload_base_stats_batch' : ActorMethod<

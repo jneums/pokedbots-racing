@@ -67,7 +67,9 @@ module {
         case (#Wild) {
           "⚙️ **SCRAP PARTS FAILING** - Salvaged components breaking down";
         };
-        case (#Golden) { "✨ **MINOR IMPERFECTIONS** - Beneath our standards" };
+        case (#Golden) {
+          "✨ **MINOR IMPERFECTIONS** - Beneath our standards. Golden bots need 90%+ condition for +15% stat bonus!";
+        };
         case (#Ultimate) {
           "⚡ **WEAR DETECTED** - Ultimate systems need tuning";
         };
@@ -81,10 +83,12 @@ module {
         case (#Bee) { "🐝 **HIVE DAMAGE** - Swarm components need repair" };
         case (#Food) { "🍔 **NUTRITION LOW** - Energy systems degrading" };
         case (#Box) {
-          "📦 **STRUCTURAL WEAR** - Containment integrity compromised";
+          "📦 **STRUCTURAL WEAR** - Containment integrity compromised. Box bots get +10% on ScrapHeaps!";
         };
         case (#Murder) { "🔪 **EDGE DULLED** - Weapon systems need sharpening" };
-        case (#Game) { "🎮 **LAG DETECTED** - Game logic needs optimization" };
+        case (#Game) {
+          "🎮 **LAG DETECTED** - Game logic needs optimization. Game bots excel on WastelandSand (+8%)!";
+        };
         case (#Animal) {
           "🦎 **WEAR AND TEAR** - Natural degradation occurring";
         };
@@ -107,9 +111,11 @@ module {
           "⚡ **ULTIMATE CHARGE LOW** - Power cells depleting";
         };
         case (#Blackhole) {
-          "🌌 **VOID ENERGY LOW** - Dimensional power fading";
+          "🌌 **VOID ENERGY LOW** - Dimensional power reserves depleting. Higher Power Core stat = better void energy efficiency on MetalRoads!";
         };
-        case (#Dead) { "💀 **LIFE FORCE LOW** - Necro-energy depleted" };
+        case (#Dead) {
+          "💀 **LIFE FORCE LOW** - Necro-energy depleted. Strong Power Core extends necro-system runtime!";
+        };
         case (#Master) {
           "📊 **POWER OPTIMIZATION NEEDED** - Efficiency dropping";
         };
@@ -131,8 +137,12 @@ module {
         };
         case (#Golden) { "✨ **PRISTINE PERFECTION** - Golden systems optimal" };
         case (#Ultimate) { "⚡ **ULTIMATE READY** - All systems at maximum" };
-        case (#Blackhole) { "🌌 **VOID READY** - Dimensional engines primed" };
-        case (#Dead) { "💀 **UNDEAD READY** - Necro-systems fully charged" };
+        case (#Blackhole) {
+          "🌌 **VOID READY** - Dimensional engines primed. +12% performance on MetalRoads terrain!";
+        };
+        case (#Dead) {
+          "💀 **UNDEAD READY** - Necro-systems fully charged. Enhanced Power Core resilience!";
+        };
         case (#Master) {
           "🎯 **OPTIMAL STATUS** - All systems green, ready for deployment";
         };

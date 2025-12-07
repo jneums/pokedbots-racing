@@ -241,7 +241,11 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
                               <p className="font-semibold">{race.raceName}</p>
                               <p className="text-xs text-muted-foreground">
                                 {new Date(Number(race.scheduledTime) / 1_000_000).toLocaleDateString()}
-                                {race.finalTime && race.finalTime.length > 0 && race.finalTime[0] !== undefined && ` • ${race.finalTime[0].toFixed(2)}s`}
+                                {race.finalTime && race.finalTime.length > 0 && race.finalTime[0] !== undefined && (
+                                  race.finalTime[0] > 100000 
+                                    ? <span className="text-red-500 font-bold ml-1">• DNF</span>
+                                    : ` • ${race.finalTime[0].toFixed(2)}s`
+                                )}
                               </p>
                             </div>
                           </div>
