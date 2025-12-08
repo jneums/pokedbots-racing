@@ -18,7 +18,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_get_bot_races";
     title = ?"Get Bot's Race Entries";
-    description = ?"Show races that a specific bot is entered in. Returns 5 races per page. Filter by status category and use cursor-based pagination.";
+    description = ?"Show races that a specific bot is entered in. Returns 5 races per page. Filter by status category and use cursor-based pagination.\n\n**TIMESTAMP FORMAT:** All timestamps (start_time, entry_deadline, created_at) are in nanoseconds since Unix epoch (UTC). Convert to readable dates: divide by 1_000_000 for milliseconds, then convert to user's timezone.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -141,7 +141,7 @@ module {
           var racesArray : [Json.Json] = [];
           for (race in races.vals()) {
             let classText = switch (race.raceClass) {
-              case (#Scavenger) { "Scavenger" };
+              case (#Junker) { "Junker" };
               case (#Raider) { "Raider" };
               case (#Elite) { "Elite" };
               case (#SilentKlan) { "Silent Klan" };

@@ -263,7 +263,7 @@ module {
       "🌍 \"The old world died. We race through its bones.\" - Wasteland Saying",
       "🔧 \"A well-maintained bot is a dangerous bot.\" - Garage Master Wisdom",
       "🏁 \"The Silent Klan sees all. They control the races.\" - Delta City Rumor",
-      "⚙️ \"Scrap today, champion tomorrow.\" - Scavenger's Hope",
+      "⚙️ \"Scrap today, champion tomorrow.\" - Junker's Hope",
       "🎯 \"Precision beats chaos. Usually.\" - Master Protocol #47",
     ];
 

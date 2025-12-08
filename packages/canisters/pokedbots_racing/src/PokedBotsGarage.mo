@@ -10,6 +10,7 @@ import Iter "mo:base/Iter";
 import Principal "mo:base/Principal";
 import Option "mo:base/Option";
 import Debug "mo:base/Debug";
+import Result "mo:base/Result";
 import Map "mo:map/Map";
 import { nhash; phash } "mo:map/Map";
 import RacingSimulator "./RacingSimulator";
@@ -98,6 +99,14 @@ module {
     lastRaced : ?Int;
     upgradeEndsAt : ?Int;
     listedForSale : Bool;
+
+    // Scavenging stats
+    scavengingMissions : Nat; // Total missions completed
+    totalPartsScavenged : Nat; // Lifetime parts found
+    scavengingReputation : Nat; // Separate progression from racing
+    bestHaul : Nat; // Biggest single mission haul
+    activeMission : ?ScavengingMission; // Current mission if any
+    worldBuff : ?WorldBuff; // Active world buff if any
   };
 
   public type UpgradeType = {
@@ -112,6 +121,34 @@ module {
     upgradeType : UpgradeType;
     startedAt : Int;
     endsAt : Int;
+  };
+
+  // Scavenging System Types
+  public type ScavengingMissionType = {
+    #ShortExpedition; // 6 hours
+    #DeepSalvage; // 12 hours
+    #WastelandExpedition; // 24 hours
+  };
+
+  public type ScavengingZone = {
+    #ScrapHeaps; // 1.0x multipliers (safe)
+    #AbandonedSettlements; // 1.2x battery, 1.3x condition, 1.4x parts
+    #DeadMachineFields; // 1.5x battery, 1.8x condition, 2.0x parts
+  };
+
+  public type ScavengingMission = {
+    missionId : Nat;
+    tokenIndex : Nat;
+    missionType : ScavengingMissionType;
+    zone : ScavengingZone;
+    startTime : Int;
+    endTime : Int;
+  };
+
+  public type WorldBuff = {
+    stats : [(Text, Nat)]; // e.g., [("speed", 3), ("acceleration", 2)]
+    appliedAt : Int; // When buff was earned
+    expiresAt : Int; // 48 hours from appliedAt
   };
 
   public type PartType = {
@@ -171,6 +208,15 @@ module {
     private let stats = initStats;
     private let activeUpgrades = initActiveUpgrades;
     private let userInventories = initUserInventories;
+
+    // Mission ID counter for scavenging
+    private var nextMissionId : Nat = 0;
+
+    public func getNextMissionId() : Nat {
+      let id = nextMissionId;
+      nextMissionId += 1;
+      id;
+    };
 
     // ===== RACING STATS PROVIDER IMPLEMENTATION =====
 
@@ -238,6 +284,23 @@ module {
         case (?idx) {
           switch (Map.get(stats, nhash, idx)) {
             case (?botStats) {
+              // Check if bot is on a scavenging mission
+              switch (botStats.activeMission) {
+                case (?mission) {
+                  // Bot is scavenging - return critically low stats to trigger DNF
+                  Debug.print("Bot #" # nftId # " is scavenging, will DNF in race");
+                  return ?{
+                    speed = 5;
+                    powerCore = 5;
+                    acceleration = 5;
+                    stability = 5;
+                  };
+                };
+                case (null) {
+                  // Not scavenging, proceed normally
+                };
+              };
+
               let current = getCurrentStats(botStats);
               let boosted = applyTerrainBonus(current, botStats.faction, terrain, botStats.condition);
 
@@ -425,12 +488,13 @@ module {
               let totalConditionWear = Float.toInt(Float.fromInt(baseConditionWear) * positionMod * terrainConditionMod);
               let finalConditionWear = Nat.min(botStats.condition, Int.abs(totalConditionWear));
 
-              // CONSUME ALL OVERCHARGE after race
+              // CONSUME overcharge and world buff after race
               let updatedStats = {
                 botStats with
                 battery = Nat.sub(botStats.battery, finalBatteryDrain);
                 condition = Nat.sub(botStats.condition, finalConditionWear);
                 overcharge = 0; // Overcharge consumed after race
+                worldBuff = null; // World buff consumed after race
               };
               updateStats(idx, updatedStats);
             };
@@ -525,15 +589,44 @@ module {
         lastRaced = null;
         upgradeEndsAt = null;
         listedForSale = false;
+
+        // Scavenging stats (initialized to defaults)
+        scavengingMissions = 0;
+        totalPartsScavenged = 0;
+        scavengingReputation = 0;
+        bestHaul = 0;
+        activeMission = null;
+        worldBuff = null;
       };
 
       ignore Map.put(stats, nhash, tokenIndex, racingStats);
       racingStats;
     };
 
-    /// Get stats for a bot
+    /// Get stats for a bot (checks and expires world buffs automatically)
     public func getStats(tokenIndex : Nat) : ?PokedBotRacingStats {
-      Map.get(stats, nhash, tokenIndex);
+      switch (Map.get(stats, nhash, tokenIndex)) {
+        case (null) { null };
+        case (?botStats) {
+          // Check if world buff has expired
+          switch (botStats.worldBuff) {
+            case (?buff) {
+              let now = Time.now();
+              if (now >= buff.expiresAt) {
+                // Buff has expired, remove it
+                let updatedStats = {
+                  botStats with
+                  worldBuff = null;
+                };
+                updateStats(tokenIndex, updatedStats);
+                return ?updatedStats;
+              };
+            };
+            case (null) {};
+          };
+          ?botStats;
+        };
+      };
     };
 
     /// Update stats
@@ -675,11 +768,34 @@ module {
       let stabilityOvercharge = 1.0 - (overchargeBonus * 0.2); // 1.0 to 0.85
       let powerCoreOvercharge = 1.0 - (overchargeBonus * 0.2); // 1.0 to 0.85
 
-      // Apply penalties to appropriate stats
-      let speedWithPenalty = Float.toInt(Float.fromInt(base.speed + botStats.speedBonus) * batteryPenalty * speedOvercharge);
-      let accelerationWithPenalty = Float.toInt(Float.fromInt(base.acceleration + botStats.accelerationBonus) * batteryPenalty * accelOvercharge);
-      let powerCoreWithPenalty = Float.toInt(Float.fromInt(base.powerCore + botStats.powerCoreBonus) * conditionPenalty * powerCoreOvercharge);
-      let stabilityWithPenalty = Float.toInt(Float.fromInt(base.stability + botStats.stabilityBonus) * conditionPenalty * stabilityOvercharge);
+      // WORLD BUFF BONUSES (from scavenging missions, expires in 48h)
+      // Apply flat stat bonuses from world buffs
+      var speedBuff : Nat = 0;
+      var powerCoreBuff : Nat = 0;
+      var accelerationBuff : Nat = 0;
+      var stabilityBuff : Nat = 0;
+
+      switch (botStats.worldBuff) {
+        case (?buff) {
+          // Apply each stat buff
+          for ((stat, value) in buff.stats.vals()) {
+            switch (stat) {
+              case ("speed") { speedBuff := value };
+              case ("powerCore") { powerCoreBuff := value };
+              case ("acceleration") { accelerationBuff := value };
+              case ("stability") { stabilityBuff := value };
+              case (_) {}; // Ignore unknown stats
+            };
+          };
+        };
+        case (null) {}; // No buff active
+      };
+
+      // Apply penalties to appropriate stats, then add world buffs
+      let speedWithPenalty = Float.toInt(Float.fromInt(base.speed + botStats.speedBonus) * batteryPenalty * speedOvercharge) + speedBuff;
+      let accelerationWithPenalty = Float.toInt(Float.fromInt(base.acceleration + botStats.accelerationBonus) * batteryPenalty * accelOvercharge) + accelerationBuff;
+      let powerCoreWithPenalty = Float.toInt(Float.fromInt(base.powerCore + botStats.powerCoreBonus) * conditionPenalty * powerCoreOvercharge) + powerCoreBuff;
+      let stabilityWithPenalty = Float.toInt(Float.fromInt(base.stability + botStats.stabilityBonus) * conditionPenalty * stabilityOvercharge) + stabilityBuff;
 
       {
         speed = Nat.min(100, Int.abs(speedWithPenalty));
@@ -908,6 +1024,7 @@ module {
     };
 
     /// Remove parts from user inventory (returns false if insufficient)
+    /// Universal Parts can substitute for any specific part type
     public func removeParts(user : Principal, partType : PartType, amount : Nat) : Bool {
       let inv = getUserInventory(user);
       let currentAmount = switch (partType) {
@@ -918,6 +1035,7 @@ module {
         case (#UniversalPart) { inv.universalParts };
       };
 
+      // Try to use specific part type first
       if (currentAmount >= amount) {
         let updatedInv = switch (partType) {
           case (#SpeedChip) {
@@ -937,10 +1055,54 @@ module {
           };
         };
         ignore Map.put(userInventories, phash, user, updatedInv);
-        true;
-      } else {
-        false;
+        return true;
       };
+
+      // If specific part is insufficient, try combining with Universal Parts
+      if (partType != #UniversalPart) {
+        let deficit = amount - currentAmount; // How many we're short
+
+        if (inv.universalParts >= deficit) {
+          // Use all specific parts + universal parts to make up the difference
+          let updatedInv = switch (partType) {
+            case (#SpeedChip) {
+              {
+                inv with
+                speedChips = 0; // Use all specific parts
+                universalParts = inv.universalParts - deficit; // Fill gap with universal
+              };
+            };
+            case (#PowerCoreFragment) {
+              {
+                inv with
+                powerCoreFragments = 0;
+                universalParts = inv.universalParts - deficit;
+              };
+            };
+            case (#ThrusterKit) {
+              {
+                inv with
+                thrusterKits = 0;
+                universalParts = inv.universalParts - deficit;
+              };
+            };
+            case (#GyroModule) {
+              {
+                inv with
+                gyroModules = 0;
+                universalParts = inv.universalParts - deficit;
+              };
+            };
+            case (#UniversalPart) {
+              inv; // Should never reach here
+            };
+          };
+          ignore Map.put(userInventories, phash, user, updatedInv);
+          return true;
+        };
+      };
+
+      false; // Insufficient parts even with universal substitution
     };
 
     /// Calculate upgrade cost based on current upgrade count
@@ -980,6 +1142,537 @@ module {
           };
         };
         case (null) { 0 };
+      };
+    };
+
+    // ===== SCAVENGING SYSTEM =====
+
+    /// Get mission duration in nanoseconds
+    private func getMissionDuration(missionType : ScavengingMissionType) : Int {
+      switch (missionType) {
+        case (#ShortExpedition) { 6 * 3600 * 1_000_000_000 }; // 6 hours
+        case (#DeepSalvage) { 12 * 3600 * 1_000_000_000 }; // 12 hours
+        case (#WastelandExpedition) { 24 * 3600 * 1_000_000_000 }; // 24 hours
+      };
+    };
+
+    /// Get base parts yield for mission type
+    private func getBaseParts(missionType : ScavengingMissionType) : {
+      min : Nat;
+      max : Nat;
+    } {
+      switch (missionType) {
+        case (#ShortExpedition) { { min = 15; max = 35 } };
+        case (#DeepSalvage) { { min = 40; max = 80 } };
+        case (#WastelandExpedition) { { min = 100; max = 200 } };
+      };
+    };
+
+    /// Get base battery cost for mission type
+    private func getBaseBatteryCost(missionType : ScavengingMissionType) : Nat {
+      switch (missionType) {
+        case (#ShortExpedition) { 20 };
+        case (#DeepSalvage) { 40 };
+        case (#WastelandExpedition) { 80 };
+      };
+    };
+
+    /// Get zone multipliers
+    private func getZoneMultipliers(zone : ScavengingZone) : {
+      battery : Float;
+      condition : Float;
+      parts : Float;
+    } {
+      switch (zone) {
+        case (#ScrapHeaps) { { battery = 1.0; condition = 1.0; parts = 1.0 } };
+        case (#AbandonedSettlements) {
+          { battery = 1.2; condition = 1.3; parts = 1.4 };
+        };
+        case (#DeadMachineFields) {
+          { battery = 1.5; condition = 1.8; parts = 2.0 };
+        };
+      };
+    };
+
+    /// Get faction bonuses for scavenging (from SCAVENGING_FACTION_BONUSES.md)
+    private func getFactionScavengingBonus(faction : FactionType, zone : ScavengingZone) : {
+      partsMultiplier : Float;
+      batteryMultiplier : Float;
+      conditionMultiplier : Float;
+    } {
+      switch (faction) {
+        // Ultra-rare factions
+        case (#UltimateMaster) {
+          {
+            partsMultiplier = 1.20;
+            batteryMultiplier = 0.70;
+            conditionMultiplier = 1.0;
+          };
+        };
+        case (#Golden) {
+          {
+            partsMultiplier = 1.0;
+            batteryMultiplier = 1.0;
+            conditionMultiplier = 1.0;
+          };
+        }; // Has RNG double instead
+        case (#Ultimate) {
+          {
+            partsMultiplier = 1.15;
+            batteryMultiplier = 1.0;
+            conditionMultiplier = 1.0;
+          };
+        }; // Has time reduction special
+        case (#Wild) {
+          // 1.25x in WastelandSand, but no WastelandSand scavenging zones yet, so 1.0x everywhere
+          {
+            partsMultiplier = 1.0;
+            batteryMultiplier = 1.0;
+            conditionMultiplier = 0.60;
+          };
+        };
+
+        // Super-rare factions
+        case (#Blackhole) {
+          {
+            partsMultiplier = 1.10;
+            batteryMultiplier = 1.0;
+            conditionMultiplier = 1.5;
+          };
+        }; // Penalty: +50% condition damage
+        case (#Dead) {
+          let partsMult = if (zone == #DeadMachineFields) { 1.40 } else { 1.10 };
+          {
+            partsMultiplier = partsMult;
+            batteryMultiplier = 1.0;
+            conditionMultiplier = 0.50;
+          }; // -50% condition damage
+        };
+        case (#Master) {
+          {
+            partsMultiplier = 1.12;
+            batteryMultiplier = 0.75;
+            conditionMultiplier = 1.0;
+          };
+        };
+
+        // Rare factions
+        case (#Bee) {
+          let partsMult = if (zone == #AbandonedSettlements) { 1.08 } else {
+            1.0;
+          };
+          {
+            partsMultiplier = partsMult;
+            batteryMultiplier = 1.0;
+            conditionMultiplier = 1.0;
+          };
+        };
+        case (#Food) {
+          let partsMult = if (zone == #ScrapHeaps or zone == #AbandonedSettlements) {
+            1.12;
+          } else { 1.0 };
+          {
+            partsMultiplier = partsMult;
+            batteryMultiplier = 0.80;
+            conditionMultiplier = 1.0;
+          };
+        };
+        case (#Box) {
+          {
+            partsMultiplier = 1.05;
+            batteryMultiplier = 1.0;
+            conditionMultiplier = 1.0;
+          };
+        }; // Has RNG triple
+        case (#Murder) {
+          let partsMult = if (zone == #DeadMachineFields) { 1.15 } else { 1.0 };
+          {
+            partsMultiplier = partsMult;
+            batteryMultiplier = 1.0;
+            conditionMultiplier = 1.2;
+          }; // +20% condition damage
+        };
+
+        // Common factions
+        case (#Game) {
+          {
+            partsMultiplier = 1.0;
+            batteryMultiplier = 1.0;
+            conditionMultiplier = 1.0;
+          };
+        }; // Has milestone bonus
+        case (#Animal) {
+          // WastelandSand bonus not applicable yet, will add when zones expand
+          {
+            partsMultiplier = 1.0;
+            batteryMultiplier = 1.0;
+            conditionMultiplier = 1.0;
+          };
+        };
+        case (#Industrial) {
+          {
+            partsMultiplier = 1.05;
+            batteryMultiplier = 0.90;
+            conditionMultiplier = 1.0;
+          };
+        };
+      };
+    };
+
+    /// Start a scavenging mission
+    public func startScavengingMission(
+      tokenIndex : Nat,
+      missionType : ScavengingMissionType,
+      zone : ScavengingZone,
+      now : Int,
+    ) : Result.Result<ScavengingMission, Text> {
+      switch (getStats(tokenIndex)) {
+        case (null) { #err("Bot not initialized for racing") };
+        case (?botStats) {
+          // Check if bot is already on a mission
+          switch (botStats.activeMission) {
+            case (?_) { return #err("Bot is already on a scavenging mission") };
+            case (null) {};
+          };
+
+          // Check battery requirement
+          let baseBattery = getBaseBatteryCost(missionType);
+          if (botStats.battery < baseBattery) {
+            return #err("Insufficient battery. Need " # Nat.toText(baseBattery) # ", have " # Nat.toText(botStats.battery));
+          };
+
+          // Create mission
+          let missionId = getNextMissionId();
+          let duration = getMissionDuration(missionType);
+          let endTime = now + duration;
+
+          let mission : ScavengingMission = {
+            missionId = missionId;
+            tokenIndex = tokenIndex;
+            missionType = missionType;
+            zone = zone;
+            startTime = now;
+            endTime = endTime;
+          };
+
+          // Update bot stats with active mission
+          let updatedStats = {
+            botStats with
+            activeMission = ?mission;
+          };
+          updateStats(tokenIndex, updatedStats);
+
+          #ok(mission);
+        };
+      };
+    };
+
+    /// Complete a scavenging mission and award parts
+    public func completeScavengingMission(
+      tokenIndex : Nat,
+      now : Int,
+      rng : Nat, // For randomness
+    ) : Result.Result<{ partsFound : Nat; speedChips : Nat; powerCoreFragments : Nat; thrusterKits : Nat; gyroModules : Nat; universalParts : Nat; batteryConsumed : Nat; conditionLost : Nat; worldBuffApplied : Bool; worldBuff : ?WorldBuff; events : [Text] }, Text> {
+      switch (getStats(tokenIndex)) {
+        case (null) { #err("Bot not found") };
+        case (?botStats) {
+          // Check if bot has an active mission
+          switch (botStats.activeMission) {
+            case (null) { return #err("Bot is not on a scavenging mission") };
+            case (?mission) {
+              // Check if mission is complete
+              if (now < mission.endTime) {
+                let remainingNanos = mission.endTime - now;
+                let remainingMinutes = remainingNanos / (60 * 1_000_000_000);
+                return #err("Mission not complete yet. " # Nat.toText(Int.abs(remainingMinutes)) # " minutes remaining");
+              };
+
+              // Calculate rewards and costs
+              let baseParts = getBaseParts(mission.missionType);
+              let baseBattery = getBaseBatteryCost(mission.missionType);
+              let zoneMultipliers = getZoneMultipliers(mission.zone);
+              let factionBonus = getFactionScavengingBonus(botStats.faction, mission.zone);
+
+              // Get current stats for scavenging bonuses
+              let currentStats = getCurrentStats(botStats);
+
+              // STAT BONUSES FOR SCAVENGING:
+              // 1. Power Core reduces battery cost (energy efficiency)
+              let powerCoreBonus = if (currentStats.powerCore >= 80) {
+                0.80; // -20% battery cost
+              } else if (currentStats.powerCore >= 50) {
+                0.90; // -10% battery cost
+              } else {
+                1.0; // Normal cost
+              };
+
+              // 2. Condition affects variance (better maintained = more consistent)
+              let conditionVariance = if (botStats.condition >= 80) {
+                (90, 110); // Tight variance: 90-110% (±10%)
+              } else if (botStats.condition >= 50) {
+                (80, 120); // Normal variance: 80-120% (±20%)
+              } else {
+                (70, 130); // Wide variance: 70-130% (±30%, risky)
+              };
+
+              // 3. Stability reduces condition loss in dangerous zones
+              let stabilityBonus = if (mission.zone == #DeadMachineFields and currentStats.stability >= 70) {
+                0.75; // -25% condition loss in dangerous zones
+              } else {
+                1.0; // Normal condition loss
+              };
+
+              // RNG for parts yield (adjusted variance based on condition)
+              let rngSeed = rng + tokenIndex + Int.abs(now);
+              let varianceRange = conditionVariance.1 - conditionVariance.0;
+              let rngVariance = Float.fromInt((rngSeed % varianceRange) + conditionVariance.0) / 100.0;
+
+              // Calculate parts found
+              let basePartsAvg = (baseParts.min + baseParts.max) / 2;
+              let partsBeforeRNG = Float.fromInt(basePartsAvg) * zoneMultipliers.parts * factionBonus.partsMultiplier;
+              var partsFound = Int.abs(Float.toInt(partsBeforeRNG * rngVariance));
+
+              // Check for faction-specific RNG bonuses
+              var events : [Text] = [];
+              var worldBuffApplied = false;
+              var worldBuff : ?WorldBuff = null;
+
+              // Golden faction: 15% chance to double parts
+              if (botStats.faction == #Golden) {
+                let doubleProc = (rngSeed % 100) < 15;
+                if (doubleProc) {
+                  partsFound := partsFound * 2;
+                  events := Array.append(events, ["Lucky streak! Parts yield doubled (Golden faction)"]);
+                };
+              };
+
+              // Box faction: 5% chance to triple parts
+              if (botStats.faction == #Box) {
+                let tripleProc = (rngSeed % 100) < 5;
+                if (tripleProc) {
+                  partsFound := partsFound * 3;
+                  events := Array.append(events, ["Jackpot! Found a treasure cache (Box faction)"]);
+                };
+              };
+
+              // World buff chance (15%)
+              let buffProc = ((rngSeed * 7) % 100) < 15;
+              if (buffProc) {
+                let buffStats = switch (mission.missionType) {
+                  case (#ShortExpedition) { [("speed", 2 : Nat)] }; // +2 speed
+                  case (#DeepSalvage) {
+                    [("speed", 3 : Nat), ("acceleration", 2 : Nat)];
+                  }; // +3 speed, +2 accel
+                  case (#WastelandExpedition) {
+                    [("speed", 4 : Nat), ("acceleration", 3 : Nat), ("powerCore", 2 : Nat)];
+                  }; // +4/+3/+2
+                };
+
+                let buff : WorldBuff = {
+                  stats = buffStats;
+                  appliedAt = now;
+                  expiresAt = now + (48 * 3600); // 48 hours
+                };
+
+                // Blackhole converts world buff to racing stats instead
+                if (botStats.faction == #Blackhole) {
+                  let blackholeBuff : WorldBuff = {
+                    stats = [("speed", 3 : Nat), ("acceleration", 3 : Nat)];
+                    appliedAt = now;
+                    expiresAt = now + (48 * 3600);
+                  };
+                  worldBuff := ?blackholeBuff;
+                  events := Array.append(events, ["Void resonance detected! Racing stats boosted (+3 Speed, +3 Accel for next race)"]);
+                } else {
+                  worldBuff := ?buff;
+                  events := Array.append(events, ["Wasteland resonance discovered! Stat buffs applied for next race"]);
+                };
+                worldBuffApplied := true;
+              };
+
+              // Master faction: Every 10th mission doubles parts
+              if (botStats.faction == #Master) {
+                let nextMissionCount = botStats.scavengingMissions + 1;
+                if (nextMissionCount % 10 == 0) {
+                  partsFound := partsFound * 2;
+                  events := Array.append(events, ["Mastery bonus! Parts doubled (10th mission)"]);
+                };
+              };
+
+              // Game faction: Every 5th mission +10 parts
+              if (botStats.faction == #Game) {
+                let nextMissionCount = botStats.scavengingMissions + 1;
+                if (nextMissionCount % 5 == 0) {
+                  partsFound += 10;
+                  events := Array.append(events, ["Achievement unlocked! +10 bonus parts (5th mission)"]);
+                };
+              };
+
+              // Calculate battery consumed (with Power Core efficiency bonus)
+              let batteryFloat = Float.fromInt(baseBattery) * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus;
+              let batteryConsumed = Int.abs(Float.toInt(batteryFloat));
+
+              // Calculate condition lost (with Stability bonus in dangerous zones)
+              let baseConditionLoss = switch (mission.missionType) {
+                case (#ShortExpedition) { 15 };
+                case (#DeepSalvage) { 25 };
+                case (#WastelandExpedition) { 40 };
+              };
+              let conditionFloat = Float.fromInt(baseConditionLoss) * zoneMultipliers.condition * factionBonus.conditionMultiplier * stabilityBonus;
+              let conditionLost = Int.abs(Float.toInt(conditionFloat));
+
+              // Update bot stats (use saturating subtraction)
+              let newBattery : Nat = if (botStats.battery > batteryConsumed) {
+                botStats.battery - batteryConsumed;
+              } else { 0 };
+
+              let newCondition : Nat = if (botStats.condition > conditionLost) {
+                botStats.condition - conditionLost;
+              } else { 0 };
+
+              let newBestHaul = if (partsFound > botStats.bestHaul) {
+                partsFound;
+              } else { botStats.bestHaul };
+
+              let updatedStats = {
+                botStats with
+                battery = newBattery;
+                condition = newCondition;
+                scavengingMissions = botStats.scavengingMissions + 1;
+                totalPartsScavenged = botStats.totalPartsScavenged + partsFound;
+                scavengingReputation = botStats.scavengingReputation + 1; // +1 per mission
+                bestHaul = newBestHaul;
+                activeMission = null; // Clear mission
+                worldBuff = worldBuff; // Apply new buff if earned
+              };
+              updateStats(tokenIndex, updatedStats);
+
+              // Award parts to player's inventory
+              let owner = botStats.ownerPrincipal;
+
+              // Distribute parts dynamically based on mission type and zone
+              // Calculate distribution percentages
+              let partDistribution : [(PartType, Float)] = switch (mission.zone) {
+                case (#ScrapHeaps) {
+                  // Balanced parts, good for universal
+                  [(#UniversalPart, 0.4), (#SpeedChip, 0.15), (#PowerCoreFragment, 0.15), (#ThrusterKit, 0.15), (#GyroModule, 0.15)];
+                };
+                case (#AbandonedSettlements) {
+                  // More specialized parts, less universal
+                  [(#UniversalPart, 0.25), (#SpeedChip, 0.20), (#PowerCoreFragment, 0.20), (#ThrusterKit, 0.20), (#GyroModule, 0.15)];
+                };
+                case (#DeadMachineFields) {
+                  // Mostly specialized parts, rare universal
+                  [(#UniversalPart, 0.10), (#SpeedChip, 0.25), (#PowerCoreFragment, 0.25), (#ThrusterKit, 0.20), (#GyroModule, 0.20)];
+                };
+              };
+
+              // Calculate parts per type
+              var speedChipsFound = 0;
+              var powerCoreFragmentsFound = 0;
+              var thrusterKitsFound = 0;
+              var gyroModulesFound = 0;
+              var universalPartsFound = 0;
+
+              for ((partType, percentage) in partDistribution.vals()) {
+                let amount = Int.abs(Float.toInt(Float.fromInt(partsFound) * percentage));
+                switch (partType) {
+                  case (#SpeedChip) { speedChipsFound := amount };
+                  case (#PowerCoreFragment) {
+                    powerCoreFragmentsFound := amount;
+                  };
+                  case (#ThrusterKit) { thrusterKitsFound := amount };
+                  case (#GyroModule) { gyroModulesFound := amount };
+                  case (#UniversalPart) { universalPartsFound := amount };
+                };
+              };
+
+              // Ensure at least 1 of something if total > 0
+              if (partsFound > 0 and speedChipsFound + powerCoreFragmentsFound + thrusterKitsFound + gyroModulesFound + universalPartsFound == 0) {
+                universalPartsFound := partsFound; // Fallback to all universal
+              };
+
+              switch (Map.get(userInventories, phash, owner)) {
+                case (null) {
+                  // Create new inventory
+                  let newInventory : UserInventory = {
+                    owner = owner;
+                    speedChips = speedChipsFound;
+                    powerCoreFragments = powerCoreFragmentsFound;
+                    thrusterKits = thrusterKitsFound;
+                    gyroModules = gyroModulesFound;
+                    universalParts = universalPartsFound;
+                  };
+                  ignore Map.put(userInventories, phash, owner, newInventory);
+                };
+                case (?inv) {
+                  let updatedInv = {
+                    owner = inv.owner;
+                    speedChips = inv.speedChips + speedChipsFound;
+                    powerCoreFragments = inv.powerCoreFragments + powerCoreFragmentsFound;
+                    thrusterKits = inv.thrusterKits + thrusterKitsFound;
+                    gyroModules = inv.gyroModules + gyroModulesFound;
+                    universalParts = inv.universalParts + universalPartsFound;
+                  };
+                  ignore Map.put(userInventories, phash, owner, updatedInv);
+                };
+              };
+
+              #ok({
+                partsFound = partsFound;
+                speedChips = speedChipsFound;
+                powerCoreFragments = powerCoreFragmentsFound;
+                thrusterKits = thrusterKitsFound;
+                gyroModules = gyroModulesFound;
+                universalParts = universalPartsFound;
+                batteryConsumed = batteryConsumed;
+                conditionLost = conditionLost;
+                worldBuffApplied = worldBuffApplied;
+                worldBuff = worldBuff;
+                events = events;
+              });
+            };
+          };
+        };
+      };
+    };
+
+    /// Check and expire world buffs that are older than 48 hours
+    public func checkAndExpireWorldBuff(tokenIndex : Nat, now : Int) : Bool {
+      switch (getStats(tokenIndex)) {
+        case (null) { false };
+        case (?botStats) {
+          switch (botStats.worldBuff) {
+            case (null) { false };
+            case (?buff) {
+              if (now >= buff.expiresAt) {
+                // Buff has expired, remove it
+                let updatedStats = {
+                  botStats with
+                  worldBuff = null;
+                };
+                updateStats(tokenIndex, updatedStats);
+                true; // Buff was expired
+              } else {
+                false; // Buff still valid
+              };
+            };
+          };
+        };
+      };
+    };
+
+    /// Consume world buff after a race
+    public func consumeWorldBuff(tokenIndex : Nat) {
+      switch (getStats(tokenIndex)) {
+        case (null) {};
+        case (?botStats) {
+          let updatedStats = {
+            botStats with
+            worldBuff = null;
+          };
+          updateStats(tokenIndex, updatedStats);
+        };
       };
     };
   };

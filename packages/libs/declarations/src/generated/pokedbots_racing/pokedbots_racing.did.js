@@ -31,8 +31,8 @@ export const idlFactory = ({ IDL }) => {
   });
   const RaceClass = IDL.Variant({
     'Elite' : IDL.Null,
+    'Junker' : IDL.Null,
     'SilentKlan' : IDL.Null,
-    'Scavenger' : IDL.Null,
     'Raider' : IDL.Null,
   });
   const EventMetadata = IDL.Record({
@@ -602,6 +602,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'trigger_event_creation' : IDL.Func([], [IDL.Text], []),
     'trigger_race_creation' : IDL.Func([], [IDL.Text], []),
+    'trigger_race_finish' : IDL.Func([IDL.Nat], [IDL.Text], []),
     'trigger_race_start' : IDL.Func([IDL.Nat], [IDL.Text], []),
     'trigger_stuck_races' : IDL.Func([], [IDL.Text], []),
     'upload_base_stats_batch' : IDL.Func(

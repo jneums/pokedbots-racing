@@ -66,7 +66,7 @@ function RaceCard({ raceId }: { raceId: bigint }) {
   
   // Get class name from race name
   const getClassName = (name: string): string => {
-    if (name.includes('Scavenger')) return 'Scavenger';
+    if (name.includes('Junker')) return 'Junker';
     if (name.includes('Raider')) return 'Raider';
     if (name.includes('Elite')) return 'Elite';
     if (name.includes('SilentKlan') || name.includes('Silent Klan')) return 'SilentKlan';
@@ -157,6 +157,16 @@ function RaceCard({ raceId }: { raceId: bigint }) {
                   return `${principal.slice(0, 6)}...${principal.slice(-4)}`;
                 };
                 
+                // Calculate sponsor tier based on amount (in e8s)
+                const getSponsorTier = (amount: bigint): string => {
+                  if (amount >= 500_000_000n) return "🏆 PLATINUM";
+                  if (amount >= 200_000_000n) return "🥇 GOLD";
+                  if (amount >= 50_000_000n) return "🥈 SILVER";
+                  return "🥉 BRONZE";
+                };
+                
+                const tier = getSponsorTier(sponsor.amount);
+                
                 return (
                   <div key={idx} className="flex items-center gap-3 p-3 bg-card/50 border border-primary/20 rounded-lg">
                     <img
@@ -172,7 +182,7 @@ function RaceCard({ raceId }: { raceId: bigint }) {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold text-green-500">+{formatICP(sponsor.amount)}</p>
-                      <p className="text-xs text-muted-foreground">Sponsored</p>
+                      <p className="text-xs text-muted-foreground">{tier}</p>
                     </div>
                   </div>
                 );

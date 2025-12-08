@@ -18,7 +18,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_get_race_details";
     title = ?"Get Race Details";
-    description = ?"Get detailed information about a specific race including all entries, participants, current status, and results (if completed).";
+    description = ?"Get detailed information about a specific race including all entries, participants, current status, and results (if completed).\n\n**TIMESTAMP FORMAT:** All timestamps (start_time, entry_deadline, created_at, entered_at, timestamp) are in nanoseconds since Unix epoch (UTC). Convert to readable dates: divide by 1_000_000 for milliseconds, then convert to user's timezone. Current date: December 7, 2025.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -102,7 +102,7 @@ module {
               };
 
               let classText = switch (race.raceClass) {
-                case (#Scavenger) { "Scavenger (<1400 ELO)" };
+                case (#Junker) { "Junker (<1400 ELO)" };
                 case (#Raider) { "Raider (1400-1599 ELO)" };
                 case (#Elite) { "Elite (1600-1799 ELO)" };
                 case (#SilentKlan) { "Silent Klan Invitational (1800+ ELO)" };

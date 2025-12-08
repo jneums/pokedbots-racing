@@ -151,8 +151,8 @@ type RaceEntry =
 type RaceClass = 
  variant {
    Elite;
+   Junker;
    Raider;
-   Scavenger;
    SilentKlan;
  };
 type Race = 
@@ -446,6 +446,7 @@ type McpServer =
      }) -> (HttpRequestResult) query;
    trigger_event_creation: () -> (text);
    trigger_race_creation: () -> (text);
+   trigger_race_finish: (raceId: nat) -> (text);
    trigger_race_start: (raceId: nat) -> (text);
    trigger_stuck_races: () -> (text);
    /// Upload a batch of pre-computed base stats

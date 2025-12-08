@@ -47,11 +47,14 @@ import GarageGetRobotDetails "tools/garage_get_robot_details";
 import GarageRechargeRobot "tools/garage_recharge_robot";
 import GarageRepairRobot "tools/garage_repair_robot";
 import GarageUpgradeRobot "tools/garage_upgrade_robot";
+import GarageStartScavenging "tools/garage_start_scavenging";
+import GarageCompleteScavenging "tools/garage_complete_scavenging";
 import RacingListRaces "tools/racing_list_races";
 import RacingEnterRace "tools/racing_enter_race";
 import RacingSponsorRace "tools/racing_sponsor_race";
 import RacingGetRaceDetails "tools/racing_get_race_details";
 import RacingGetBotRaces "tools/racing_get_bot_races";
+import HelpGetCompendium "tools/help_get_compendium";
 
 // Import Stats module for NFT metadata
 import Stats "Stats";
@@ -67,60 +70,87 @@ import IcpLedger "IcpLedger";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
 
-// // Migration to add overcharge field to PokedBotRacingStats
+// // Migration to rename #Scavenger -> #Junker in RaceClass variants
 // (
 //   with migration = func(
 //     old_state : {
-//       stable_racing_stats : Map.Map<Nat, { tokenIndex : Nat; ownerPrincipal : Principal; faction : PokedBotsGarage.FactionType; name : ?Text; speedBonus : Nat; powerCoreBonus : Nat; accelerationBonus : Nat; stabilityBonus : Nat; speedUpgrades : Nat; powerCoreUpgrades : Nat; accelerationUpgrades : Nat; stabilityUpgrades : Nat; battery : Nat; condition : Nat; experience : Nat; preferredDistance : PokedBotsGarage.Distance; preferredTerrain : PokedBotsGarage.Terrain; racesEntered : Nat; wins : Nat; places : Nat; shows : Nat; totalScrapEarned : Nat; factionReputation : Nat; eloRating : Nat; activatedAt : Int; lastDecayed : Int; lastRecharged : ?Int; lastRepaired : ?Int; lastDiagnostics : ?Int; lastRaced : ?Int; upgradeEndsAt : ?Int; listedForSale : Bool }>;
+//       stable_races : Map.Map<Nat, { raceId : Nat; name : Text; distance : Nat; terrain : RacingSimulator.Terrain; raceClass : { #Scavenger; #Raider; #Elite; #SilentKlan }; entryFee : Nat; maxEntries : Nat; minEntries : Nat; startTime : Int; duration : Nat; entryDeadline : Int; createdAt : Int; entries : [RacingSimulator.RaceEntry]; status : RacingSimulator.RaceStatus; results : ?[RacingSimulator.RaceResult]; prizePool : Nat; platformTax : Nat; platformBonus : Nat; sponsors : [RacingSimulator.Sponsor] }>;
+//       stable_events : Map.Map<Nat, { eventId : Nat; eventType : RaceCalendar.EventType; scheduledTime : Int; registrationOpens : Int; registrationCloses : Int; status : RaceCalendar.EventStatus; metadata : { name : Text; description : Text; divisions : [{ #Scavenger; #Raider; #Elite; #SilentKlan }]; entryFee : Nat; prizePoolBonus : Nat; pointsMultiplier : Float; maxEntries : Nat; minEntries : Nat }; raceIds : [Nat]; createdAt : Int }>;
 //     }
 //   ) : {
-//     stable_racing_stats : Map.Map<Nat, PokedBotsGarage.PokedBotRacingStats>;
+//     stable_races : Map.Map<Nat, RacingSimulator.Race>;
+//     stable_events : Map.Map<Nat, RaceCalendar.ScheduledEvent>;
 //   } {
-//     // Add overcharge field (default 0) to all existing bot stats
-//     let new_stats = Map.new<Nat, PokedBotsGarage.PokedBotRacingStats>();
-
-//     for ((tokenIndex, oldStats) in Map.entries(old_state.stable_racing_stats)) {
-//       let newStats : PokedBotsGarage.PokedBotRacingStats = {
-//         tokenIndex = oldStats.tokenIndex;
-//         ownerPrincipal = oldStats.ownerPrincipal;
-//         faction = oldStats.faction;
-//         name = oldStats.name;
-//         speedBonus = oldStats.speedBonus;
-//         powerCoreBonus = oldStats.powerCoreBonus;
-//         accelerationBonus = oldStats.accelerationBonus;
-//         stabilityBonus = oldStats.stabilityBonus;
-//         speedUpgrades = oldStats.speedUpgrades;
-//         powerCoreUpgrades = oldStats.powerCoreUpgrades;
-//         accelerationUpgrades = oldStats.accelerationUpgrades;
-//         stabilityUpgrades = oldStats.stabilityUpgrades;
-//         battery = oldStats.battery;
-//         condition = oldStats.condition;
-//         experience = oldStats.experience;
-//         overcharge = 0; // Initialize new field with 0
-//         preferredDistance = oldStats.preferredDistance;
-//         preferredTerrain = oldStats.preferredTerrain;
-//         racesEntered = oldStats.racesEntered;
-//         wins = oldStats.wins;
-//         places = oldStats.places;
-//         shows = oldStats.shows;
-//         totalScrapEarned = oldStats.totalScrapEarned;
-//         factionReputation = oldStats.factionReputation;
-//         eloRating = oldStats.eloRating;
-//         activatedAt = oldStats.activatedAt;
-//         lastDecayed = oldStats.lastDecayed;
-//         lastRecharged = oldStats.lastRecharged;
-//         lastRepaired = oldStats.lastRepaired;
-//         lastDiagnostics = oldStats.lastDiagnostics;
-//         lastRaced = oldStats.lastRaced;
-//         upgradeEndsAt = oldStats.upgradeEndsAt;
-//         listedForSale = oldStats.listedForSale;
+//     // Helper to convert old RaceClass to new RaceClass
+//     func migrateRaceClass(old : { #Scavenger; #Raider; #Elite; #SilentKlan }) : RacingSimulator.RaceClass {
+//       switch (old) {
+//         case (#Scavenger) { #Junker };
+//         case (#Raider) { #Raider };
+//         case (#Elite) { #Elite };
+//         case (#SilentKlan) { #SilentKlan };
 //       };
+//     };
 
-//       Map.set(new_stats, Map.nhash, tokenIndex, newStats);
+//     // Migrate races
+//     let new_races = Map.new<Nat, RacingSimulator.Race>();
+//     for ((raceId, oldRace) in Map.entries(old_state.stable_races)) {
+//       let newRace : RacingSimulator.Race = {
+//         raceId = oldRace.raceId;
+//         name = oldRace.name;
+//         distance = oldRace.distance;
+//         terrain = oldRace.terrain;
+//         raceClass = migrateRaceClass(oldRace.raceClass);
+//         entryFee = oldRace.entryFee;
+//         maxEntries = oldRace.maxEntries;
+//         minEntries = oldRace.minEntries;
+//         startTime = oldRace.startTime;
+//         duration = oldRace.duration;
+//         entryDeadline = oldRace.entryDeadline;
+//         createdAt = oldRace.createdAt;
+//         entries = oldRace.entries;
+//         status = oldRace.status;
+//         results = oldRace.results;
+//         prizePool = oldRace.prizePool;
+//         platformTax = oldRace.platformTax;
+//         platformBonus = oldRace.platformBonus;
+//         sponsors = oldRace.sponsors;
+//       };
+//       Map.set(new_races, Map.nhash, raceId, newRace);
+//     };
+
+//     // Migrate events
+//     let new_events = Map.new<Nat, RaceCalendar.ScheduledEvent>();
+//     for ((eventId, oldEvent) in Map.entries(old_state.stable_events)) {
+//       let newDivisions = Array.map<{ #Scavenger; #Raider; #Elite; #SilentKlan }, RacingSimulator.RaceClass>(
+//         oldEvent.metadata.divisions,
+//         migrateRaceClass
+//       );
+//       let newEvent : RaceCalendar.ScheduledEvent = {
+//         eventId = oldEvent.eventId;
+//         eventType = oldEvent.eventType;
+//         scheduledTime = oldEvent.scheduledTime;
+//         registrationOpens = oldEvent.registrationOpens;
+//         registrationCloses = oldEvent.registrationCloses;
+//         status = oldEvent.status;
+//         metadata = {
+//           name = oldEvent.metadata.name;
+//           description = oldEvent.metadata.description;
+//           divisions = newDivisions;
+//           entryFee = oldEvent.metadata.entryFee;
+//           prizePoolBonus = oldEvent.metadata.prizePoolBonus;
+//           pointsMultiplier = oldEvent.metadata.pointsMultiplier;
+//           maxEntries = oldEvent.metadata.maxEntries;
+//           minEntries = oldEvent.metadata.minEntries;
+//         };
+//         raceIds = oldEvent.raceIds;
+//         createdAt = oldEvent.createdAt;
+//       };
+//       Map.set(new_events, Map.nhash, eventId, newEvent);
 //     };
 
 //     {
-//       stable_racing_stats = new_stats;
+//       stable_races = new_races;
+//       stable_events = new_events;
 //     };
 //   }
 // )
@@ -399,14 +429,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     } else if (eloRating >= 1400) {
       #Raider; // Mid tier: 1400-1599
     } else {
-      #Scavenger; // Entry tier: <1400
+      #Junker; // Entry tier: <1400
     };
   };
 
   /// Check if bot's current ELO matches race class requirements
   func checkEloEligibility(eloRating : Nat, raceClass : RacingSimulator.RaceClass) : Bool {
     switch (raceClass) {
-      case (#Scavenger) { eloRating < 1400 };
+      case (#Junker) { eloRating < 1400 };
       case (#Raider) { eloRating >= 1400 and eloRating < 1600 };
       case (#Elite) { eloRating >= 1600 and eloRating < 1800 };
       case (#SilentKlan) { eloRating >= 1800 };
@@ -656,7 +686,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
           // Apply class-based entry fee multiplier
           let classFeeMultiplier : Float = switch (division) {
-            case (#Scavenger) { 1.0 }; // Base fee
+            case (#Junker) { 1.0 }; // Base fee
             case (#Raider) { 2.0 }; // 2x
             case (#Elite) { 5.0 }; // 5x
             case (#SilentKlan) { 10.0 }; // 10x
@@ -664,9 +694,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
           let adjustedEntryFee = Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
 
-          // Apply platform bonus only to Scavenger/Raider (Elite/SilentKlan are self-sustaining)
+          // Apply platform bonus only to Junker/Raider (Elite/SilentKlan are self-sustaining)
           let platformBonus : Nat = switch (division) {
-            case (#Scavenger) { event.metadata.prizePoolBonus };
+            case (#Junker) { event.metadata.prizePoolBonus };
             case (#Raider) { event.metadata.prizePoolBonus };
             case (#Elite) { 0 };
             case (#SilentKlan) { 0 };
@@ -1108,9 +1138,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   };
 
                   // Base parts awarded by race class (matches original scrap system: 1 scrap = 1 part)
-                  // First upgrade costs 100 parts, achievable in ~7-15 Scavenger races
+                  // First upgrade costs 100 parts, achievable in ~7-15 Junker races
                   let baseParts : Nat = switch (race.raceClass) {
-                    case (#Scavenger) { 5 }; // Entry: 2.5-15 parts per race (winner: 15, participation: 2.5)
+                    case (#Junker) { 5 }; // Entry: 2.5-15 parts per race (winner: 15, participation: 2.5)
                     case (#Raider) { 12 }; // Mid: 6-36 parts per race (winner: 36)
                     case (#Elite) { 25 }; // High: 12.5-75 parts per race (winner: 75)
                     case (#SilentKlan) { 50 }; // Top: 25-150 parts per race (winner: 150)
@@ -1265,6 +1295,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   // Import tool configurations from separate modules
   transient let tools : [McpTypes.Tool] = [
+    HelpGetCompendium.config(),
     GarageListMyPokedBots.config(),
     MarketplaceBrowsePokedBots.config(),
     MarketplacePurchasePokedBot.config(),
@@ -1276,6 +1307,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     GarageRechargeRobot.config(),
     GarageRepairRobot.config(),
     GarageUpgradeRobot.config(),
+    GarageStartScavenging.config(),
+    GarageCompleteScavenging.config(),
     RacingListRaces.config(),
     RacingEnterRace.config(),
     RacingSponsorRace.config(),
@@ -1298,6 +1331,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
     tools = tools;
     toolImplementations = [
+      ("help_get_compendium", HelpGetCompendium.handle(toolContext)),
       ("garage_list_my_pokedbots", GarageListMyPokedBots.handler(toolContext)),
       ("browse_pokedbots", MarketplaceBrowsePokedBots.handle(toolContext)),
       ("purchase_pokedbot", MarketplacePurchasePokedBot.handle(toolContext)),
@@ -1309,6 +1343,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       ("garage_recharge_robot", GarageRechargeRobot.handle(toolContext)),
       ("garage_repair_robot", GarageRepairRobot.handle(toolContext)),
       ("garage_upgrade_robot", GarageUpgradeRobot.handle(toolContext)),
+      ("garage_start_scavenging", GarageStartScavenging.handle(toolContext)),
+      ("garage_complete_scavenging", GarageCompleteScavenging.handle(toolContext)),
       ("racing_list_races", RacingListRaces.handle(toolContext)),
       ("racing_enter_race", RacingEnterRace.handle(toolContext)),
       ("racing_sponsor_race", RacingSponsorRace.handle(toolContext)),
@@ -1771,8 +1807,17 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   } {
     switch (garageManager.getStats(tokenIndex)) {
       case (?botStats) {
-        let current = garageManager.getCurrentStats(botStats);
-        let rating = garageManager.calculateOverallRating(botStats);
+        // Show stats at 100% (no battery/condition penalties visible to others)
+        let baseStats = garageManager.getBaseStats(tokenIndex);
+        let statsAt100 = {
+          speed = baseStats.speed + botStats.speedBonus;
+          powerCore = baseStats.powerCore + botStats.powerCoreBonus;
+          acceleration = baseStats.acceleration + botStats.accelerationBonus;
+          stability = baseStats.stability + botStats.stabilityBonus;
+        };
+        // Calculate rating based on stats at 100%
+        let totalStats = statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability;
+        let rating = totalStats / 4;
         let raceClass = getRaceClassFromElo(botStats.eloRating);
 
         ?{
@@ -1782,10 +1827,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           faction = botStats.faction;
           raceClass = raceClass;
           stats = {
-            speed = current.speed;
-            powerCore = current.powerCore;
-            acceleration = current.acceleration;
-            stability = current.stability;
+            speed = statsAt100.speed;
+            powerCore = statsAt100.powerCore;
+            acceleration = statsAt100.acceleration;
+            stability = statsAt100.stability;
             overallRating = rating;
           };
           career = {
@@ -2981,7 +3026,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     let race = raceManager.createRace(
       5, // distance
       #ScrapHeaps, // terrain
-      #Scavenger, // raceClass
+      #Junker, // raceClass
       5_000_000, // entryFee
       12, // maxEntries
       2, // minEntries
@@ -3030,7 +3075,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     ];
 
     let divisions : [RacingSimulator.RaceClass] = [
-      #Scavenger,
+      #Junker,
       #Raider,
       #Elite,
       #SilentKlan,
@@ -3058,7 +3103,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
         // Division-based multiplier
         let multiplier = switch (division) {
-          case (#Scavenger) { 1.0 };
+          case (#Junker) { 1.0 };
           case (#Raider) { 1.5 };
           case (#Elite) { 2.0 };
           case (#SilentKlan) { 3.0 };

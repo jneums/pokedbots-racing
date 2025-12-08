@@ -16,7 +16,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_initialize_pokedbot";
     title = ?"Register PokedBot Racing License";
-    description = ?"Register your PokedBot for a wasteland racing license (free, one-time). Reveals faction and racing stats based on NFT traits. Required before entering races.\n\n**FACTION BONUSES:**\nUltra-Rare: UltimateMaster (+15% all), Wild (+20% Accel/-10% Stab), Golden (+15% all if condition≥90%), Ultimate (+12% Speed/Accel)\nSuper-Rare: Blackhole (+12% on MetalRoads), Dead (+10% PowerCore/+8% Stab), Master (+12% Speed/+8% PowerCore)\nRare: Bee (+10% Accel), Food (+8% condition recovery), Box (+10% on ScrapHeaps), Murder (+8% Speed/Accel)\nCommon: Game (+8% on WastelandSand), Animal (+6% balanced), Industrial (+5% PowerCore/Stab)";
+    description = ?"Register your PokedBot for a wasteland racing license (free, one-time). Reveals faction and racing stats based on NFT traits. Required before entering races.\n\nUse help_get_compendium tool to see all faction bonuses and mechanics.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

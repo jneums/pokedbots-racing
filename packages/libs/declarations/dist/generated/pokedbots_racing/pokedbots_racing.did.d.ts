@@ -349,6 +349,7 @@ export interface McpServer {
   >,
   'trigger_event_creation' : ActorMethod<[], string>,
   'trigger_race_creation' : ActorMethod<[], string>,
+  'trigger_race_finish' : ActorMethod<[bigint], string>,
   'trigger_race_start' : ActorMethod<[bigint], string>,
   'trigger_stuck_races' : ActorMethod<[], string>,
   'upload_base_stats_batch' : ActorMethod<
@@ -397,8 +398,8 @@ export interface Race {
   'prizePool' : bigint,
 }
 export type RaceClass = { 'Elite' : null } |
+  { 'Junker' : null } |
   { 'SilentKlan' : null } |
-  { 'Scavenger' : null } |
   { 'Raider' : null };
 export interface RaceEntry {
   'owner' : Principal,

@@ -9,8 +9,8 @@ This document defines the faction-specific bonuses for the scavenging system, re
 
 ### UltimateMaster (1 bot)
 **Parts Multiplier:** 1.20x all zones  
-**Battery Drain:** -30% (0.70x consumption)  
-**Special:** Completes missions 25% faster (4.5h/9h/18h) AND returns with full battery restored  
+**Battery Drain:** -30% (0.70x consumption), 15% chance to yield double parts  
+**Special:** Completes missions 15% faster (5.1h/10.2h/20.4h effective)
 **Philosophy:** Perfect efficiency - faster completion with zero downtime
 
 **Simulation Values:**
@@ -71,14 +71,15 @@ This document defines the faction-specific bonuses for the scavenging system, re
 ### Blackhole (244 bots)
 **Parts Multiplier:** 1.10x all zones  
 **Battery Drain:** Standard  
-**Special:** Parts found have "void quality" - worth 1.5x when used for upgrades (but normal value if sold)  
-**Philosophy:** The void enhances what it touches - better upgrade materials
+**Special:** +50% condition damage on scavenging missions, BUT world buffs grant +1-3 Speed AND +1-3 Accel for next race (instead of parts)  
+**Philosophy:** Poor scavengers, elite racers - trade durability for performance
 
 **Simulation Values:**
 - 6h mission: 16.5-38.5 parts (base 15-35 × 1.1)
 - 12h mission: 44-88 parts (base 40-80 × 1.1)
 - 24h mission: 110-220 parts (base 100-200 × 1.1)
-- **Void Enhancement: When spending parts on upgrades, Blackhole parts count as 1.5x (24.75-57.75 / 66-132 / 165-330 effective upgrade value)**
+- Condition damage: 1.5x (higher repair costs)
+- World buff bonus: When world buff procs (15% chance), grants +1-3 Speed AND +1-3 Acceleration for next race (instead of bonus parts)
 
 ---
 

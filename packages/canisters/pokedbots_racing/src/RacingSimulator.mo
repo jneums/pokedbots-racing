@@ -47,7 +47,7 @@ module {
   // ===== RACE TYPES =====
 
   public type RaceClass = {
-    #Scavenger; // 0-2 wins
+    #Junker; // 0-2 wins
     #Raider; // 3-5 wins
     #Elite; // 6-9 wins
     #SilentKlan; // 10+ wins
@@ -100,7 +100,7 @@ module {
     results : ?[RaceResult];
     prizePool : Nat;
     platformTax : Nat; // 5% taken
-    platformBonus : Nat; // Platform bonus for Scavenger/Raider classes
+    platformBonus : Nat; // Platform bonus for Junker/Raider classes
     sponsors : [Sponsor];
   };
 
@@ -331,7 +331,7 @@ module {
       };
 
       let classPrefix = switch (raceClass) {
-        case (#Scavenger) { "Scavenger" };
+        case (#Junker) { "Junker" };
         case (#Raider) { "Raider" };
         case (#Elite) { "Elite" };
         case (#SilentKlan) { "Silent Klan Invitational" };

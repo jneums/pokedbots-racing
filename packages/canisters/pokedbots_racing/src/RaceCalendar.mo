@@ -377,13 +377,13 @@ module {
     public func createWeeklyLeagueEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Weekly League Championship";
-        description = "Major competitive event - Entry scales by class (Scavenger 0.2, Raider 0.4, Elite 1.0, SilentKlan 2.0 ICP). Scavenger/Raider classes receive platform bonus.";
-        entryFee = 20_000_000; // 0.2 ICP base (Scavenger)
+        description = "Major competitive event - Entry scales by class (Junker 0.2, Raider 0.4, Elite 1.0, SilentKlan 2.0 ICP). Junker/Raider classes receive platform bonus.";
+        entryFee = 20_000_000; // 0.2 ICP base (Junker)
         maxEntries = 50; // Multiple heats if needed
         minEntries = 6;
         prizePoolBonus = 200_000_000; // Platform adds 2 ICP (Phase 1 bonus)
         pointsMultiplier = 2.0; // Double points
-        divisions = [#Scavenger, #Raider, #Elite, #SilentKlan]; // All divisions
+        divisions = [#Junker, #Raider, #Elite, #SilentKlan]; // All divisions
       };
 
       scheduleEvent(
@@ -400,13 +400,13 @@ module {
     public func createDailySprintEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Daily Sprint Challenge";
-        description = "Quick race for XP and rewards - Entry scales by class (Scavenger 0.05, Raider 0.1, Elite 0.25 ICP). Scavenger/Raider receive platform bonus.";
-        entryFee = 5_000_000; // 0.05 ICP base (Scavenger)
+        description = "Quick race for XP and rewards - Entry scales by class (Junker 0.05, Raider 0.1, Elite 0.25 ICP). Junker/Raider receive platform bonus.";
+        entryFee = 5_000_000; // 0.05 ICP base (Junker)
         maxEntries = 12;
         minEntries = 3;
         prizePoolBonus = 50_000_000; // Platform adds 0.5 ICP (Phase 1 bonus)
         pointsMultiplier = 1.0; // Standard points
-        divisions = [#Scavenger, #Raider, #Elite]; // Exclude SilentKlan
+        divisions = [#Junker, #Raider, #Elite]; // Exclude SilentKlan
       };
 
       scheduleEvent(

@@ -18,7 +18,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_get_robot_details";
     title = ?"Get Robot Details";
-    description = ?"Get comprehensive details for a specific PokedBot including stats, condition, career, and upgrade status. The bot must be initialized for racing first.\n\n**OWNERSHIP:**\n• If you own the bot: Full details including condition, battery, upgrade costs, active upgrades, scrap earned, and ability to race.\n• If you don't own the bot: Public racing profile with current stats, career record (wins/places/shows/races/ELO/reputation), faction, preferences, and overall rating.\n\nResponse includes 'upgrade_costs' field with the parts and ICP cost for the next upgrade of each stat type (speed, power_core, acceleration, stability) - only for owned bots.\n\n**BATTERY MECHANICS (aka 'Energy' in flavor text):**\n• Battery is consumed during races (10-20 base drain × terrain × efficiency × condition penalty).\n• **Power Core stat = Energy Efficiency**: Higher Power Core reduces battery drain logarithmically. At powerCore=20: 70% drain. At powerCore=40: 52% drain. At powerCore=100: 30% drain (3.3x more races per battery).\n• **BATTERY PENALTIES (Linear sliding scale, affects Speed/Acceleration):**\n  - 80-100% battery: No penalty (1.0x multiplier)\n  - 50-80% battery: Linear from -0% to -25% (0.75x-1.0x)\n  - 25-50% battery: Linear from -25% to -50% (0.50x-0.75x) ← 29% battery = ~46% reduction!\n  - 10-25% battery: Linear from -50% to -75% (0.25x-0.50x)\n  - 0-10% battery: Linear from -75% to -90% (0.10x-0.25x) - resurrection sickness\n• Recharge costs 0.1 ICP and restores 75 battery (6hr cooldown).\n\n**OVERCHARGE MECHANIC:**\n• Base: (100 - battery) × 0.75 × [0.5 + condition/200 + random(-0.2, +0.2)]\n• High condition = reliable overcharge. Low condition = RNG wildcard!\n• Consumed in next race for one-time boost: +0.3% Speed/Accel per 1%, -0.2% Stability/PowerCore per 1%\n• Max boost at 75% overcharge: +22.5% Speed/Accel, -15% Stability/PowerCore\n• Strategic: Low battery + high condition = consistent big boost. Low condition = gambling!\n\n**TERRAIN BONUSES:**\n• **Preferred Terrain Bonus**: +5% all stats when racing on the bot's preferred terrain (derived from background color).\n• **Faction Terrain Bonuses** (stack with preferred terrain):\n  - Blackhole: +12% on MetalRoads. 'Void Energy' = battery with superior highway efficiency.\n  - Golden: +15% all stats when condition ≥90% (pristine maintenance required).\n  - Box: +10% on ScrapHeaps. Game: +8% on WastelandSand.\n• Ultra-rare factions (UltimateMaster/Wild/Golden/Ultimate): 2x upgrade bonus chance, -25% to -40% decay rates.\n• Super-rare factions (Blackhole/Dead/Master): 20% upgrade bonus chance, -15% decay.";
+    description = ?"Get comprehensive details for a specific PokedBot including stats, condition, career, and upgrade status. The bot must be initialized for racing first.\n\n**TIMESTAMPS:** All timestamps (ends_at, last_recharged, last_repaired) are in nanoseconds since Unix epoch (UTC). Divide by 1_000_000 for milliseconds. Cooldowns: recharge 6hr, repair 12hr.\n\n**OWNERSHIP:** If you own the bot, shows full details (condition, battery, upgrade costs). If not, shows public profile only (stats, career, ELO).\n\nFor detailed mechanics (battery penalties, overcharge, terrain bonuses), use help_get_compendium tool.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -93,7 +93,7 @@ module {
       } else if (racingStats.eloRating >= 1400) {
         "Raider (1400-1599 ELO)";
       } else {
-        "Scavenger (<1400 ELO)";
+        "Junker (<1400 ELO)";
       };
 
       // Get wasteland flavor text
@@ -189,6 +189,14 @@ module {
       let currentStats = ctx.garageManager.getCurrentStats(racingStats);
       let baseStats = ctx.garageManager.getBaseStats(tokenIndex);
 
+      // Calculate stats at 100% condition/battery (no penalties)
+      let statsAt100 = {
+        speed = baseStats.speed + racingStats.speedBonus;
+        powerCore = baseStats.powerCore + racingStats.powerCoreBonus;
+        acceleration = baseStats.acceleration + racingStats.accelerationBonus;
+        stability = baseStats.stability + racingStats.stabilityBonus;
+      };
+
       // Calculate next upgrade costs for each stat (in parts and ICP)
       let PART_PRICE_E8S = 1_000_000 : Nat; // 0.01 ICP per part (100 parts = 1 ICP)
       let speedUpgradeCost = ctx.garageManager.calculateUpgradeCost(racingStats.speedUpgrades);
@@ -217,10 +225,43 @@ module {
           ("owner", Json.str(Principal.toText(user))),
           ("is_owner", Json.bool(true)),
           ("faction", Json.str(factionText)),
-          ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability)), ("base_speed", Json.int(baseStats.speed)), ("base_power_core", Json.int(baseStats.powerCore)), ("base_acceleration", Json.int(baseStats.acceleration)), ("base_stability", Json.int(baseStats.stability)), ("speed_bonus", Json.int(racingStats.speedBonus)), ("power_core_bonus", Json.int(racingStats.powerCoreBonus)), ("acceleration_bonus", Json.int(racingStats.accelerationBonus)), ("stability_bonus", Json.int(racingStats.stabilityBonus)), ("speed_upgrades", Json.int(racingStats.speedUpgrades)), ("power_core_upgrades", Json.int(racingStats.powerCoreUpgrades)), ("acceleration_upgrades", Json.int(racingStats.accelerationUpgrades)), ("stability_upgrades", Json.int(racingStats.stabilityUpgrades))])),
+          ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability)), ("stats_at_100_percent", Json.obj([("speed", Json.int(statsAt100.speed)), ("power_core", Json.int(statsAt100.powerCore)), ("acceleration", Json.int(statsAt100.acceleration)), ("stability", Json.int(statsAt100.stability))])), ("base_speed", Json.int(baseStats.speed)), ("base_power_core", Json.int(baseStats.powerCore)), ("base_acceleration", Json.int(baseStats.acceleration)), ("base_stability", Json.int(baseStats.stability)), ("speed_bonus", Json.int(racingStats.speedBonus)), ("power_core_bonus", Json.int(racingStats.powerCoreBonus)), ("acceleration_bonus", Json.int(racingStats.accelerationBonus)), ("stability_bonus", Json.int(racingStats.stabilityBonus)), ("speed_upgrades", Json.int(racingStats.speedUpgrades)), ("power_core_upgrades", Json.int(racingStats.powerCoreUpgrades)), ("acceleration_upgrades", Json.int(racingStats.accelerationUpgrades)), ("stability_upgrades", Json.int(racingStats.stabilityUpgrades))])),
           ("upgrade_costs", Json.obj([("speed_parts", Json.int(speedUpgradeCost)), ("speed_icp", Json.int(speedUpgradeICP)), ("power_core_parts", Json.int(powerCoreUpgradeCost)), ("power_core_icp", Json.int(powerCoreUpgradeICP)), ("acceleration_parts", Json.int(accelerationUpgradeCost)), ("acceleration_icp", Json.int(accelerationUpgradeICP)), ("stability_parts", Json.int(stabilityUpgradeCost)), ("stability_icp", Json.int(stabilityUpgradeICP))])),
           ("upgrade_mechanics", Json.str(upgradeMechanicsNote)),
-          ("condition", Json.obj([("battery", Json.int(racingStats.battery)), ("overcharge", Json.int(racingStats.overcharge)), ("condition", Json.int(racingStats.condition)), ("status", Json.str(status)), ("status_message", Json.str(statusFlavor))])),
+          (
+            "condition",
+            Json.obj([
+              ("battery", Json.int(racingStats.battery)),
+              ("overcharge", Json.int(racingStats.overcharge)),
+              ("condition", Json.int(racingStats.condition)),
+              ("status", Json.str(status)),
+              ("status_message", Json.str(statusFlavor)),
+              ("last_recharged", switch (racingStats.lastRecharged) { case (?t) { Json.int(t) }; case (null) { Json.nullable() } }),
+              ("last_repaired", switch (racingStats.lastRepaired) { case (?t) { Json.int(t) }; case (null) { Json.nullable() } }),
+              (
+                "world_buff",
+                switch (racingStats.worldBuff) {
+                  case (?buff) {
+                    let now = Time.now();
+                    let hoursRemaining = (buff.expiresAt - now) / (60 * 60 * 1_000_000_000);
+                    var statsText = "";
+                    for ((stat, value) in buff.stats.vals()) {
+                      statsText := statsText # " +" # Nat.toText(value) # " " # stat;
+                    };
+                    Json.obj([
+                      ("active", Json.bool(true)),
+                      ("stats", Json.str(statsText)),
+                      ("expires_in_hours", Json.int(Int.abs(hoursRemaining))),
+                      ("message", Json.str("World buff active:" # statsText # " (expires in " # Nat.toText(Int.abs(hoursRemaining)) # "h)")),
+                    ]);
+                  };
+                  case (null) {
+                    Json.obj([("active", Json.bool(false))]);
+                  };
+                },
+              ),
+            ]),
+          ),
           ("career", Json.obj([("races_entered", Json.int(racingStats.racesEntered)), ("wins", Json.int(racingStats.wins)), ("places", Json.int(racingStats.places)), ("shows", Json.int(racingStats.shows)), ("total_scrap_earned", Json.int(racingStats.totalScrapEarned)), ("faction_reputation", Json.int(racingStats.factionReputation)), ("reputation_tier", Json.str(reputationTier))])),
           ("overall_rating", Json.int(overallRating)),
           ("can_race", Json.bool(canRace)),
@@ -231,6 +272,41 @@ module {
           ("thumbnail", Json.str(thumbnailUrl)),
           ("image", Json.str(fullImageUrl)),
           (
+            "active_scavenging",
+            switch (racingStats.activeMission) {
+              case null { Json.obj([("status", Json.str("None"))]) };
+              case (?mission) {
+                let timeRemaining = mission.endTime - now;
+                let hoursRemaining = timeRemaining / (60 * 60 * 1_000_000_000);
+                let minutesRemaining = (timeRemaining % (60 * 60 * 1_000_000_000)) / (60 * 1_000_000_000);
+
+                let missionTypeText = switch (mission.missionType) {
+                  case (#ShortExpedition) { "ShortExpedition (6h)" };
+                  case (#DeepSalvage) { "DeepSalvage (12h)" };
+                  case (#WastelandExpedition) { "WastelandExpedition (24h)" };
+                };
+
+                let zoneText = switch (mission.zone) {
+                  case (#ScrapHeaps) { "ScrapHeaps" };
+                  case (#AbandonedSettlements) { "AbandonedSettlements" };
+                  case (#DeadMachineFields) { "DeadMachineFields" };
+                };
+
+                let isComplete = now >= mission.endTime;
+
+                Json.obj([
+                  ("status", Json.str(if isComplete { "Ready to collect" } else { "In progress" })),
+                  ("mission_type", Json.str(missionTypeText)),
+                  ("zone", Json.str(zoneText)),
+                  ("time_remaining_hours", Json.int(Int.abs(hoursRemaining))),
+                  ("time_remaining_minutes", Json.int(Int.abs(minutesRemaining))),
+                  ("end_time", Json.int(mission.endTime)),
+                  ("is_complete", Json.bool(isComplete)),
+                ]);
+              };
+            },
+          ),
+          (
             "active_upgrade",
             switch (upgradeInfo) {
               case null { Json.obj([("status", Json.str("None"))]) };
@@ -239,7 +315,11 @@ module {
           ),
         ]);
       } else {
-        // Public details only for bots not owned by caller
+        // Public details only for bots not owned by caller - show only statsAt100 (no battery/condition penalties)
+        // Calculate rating based on stats at 100%
+        let totalStatsAt100 = statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability;
+        let ratingAt100 = totalStatsAt100 / 4;
+
         Json.obj([
           ("message", Json.str("Public racing profile for PokedBot #" # Nat.toText(tokenIndex))),
           ("token_index", Json.int(tokenIndex)),
@@ -247,9 +327,9 @@ module {
           ("race_class", Json.str(raceClass)),
           ("is_owner", Json.bool(false)),
           ("faction", Json.str(factionText)),
-          ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability))])),
+          ("stats", Json.obj([("speed", Json.int(statsAt100.speed)), ("power_core", Json.int(statsAt100.powerCore)), ("acceleration", Json.int(statsAt100.acceleration)), ("stability", Json.int(statsAt100.stability))])),
           ("career", Json.obj([("races_entered", Json.int(racingStats.racesEntered)), ("wins", Json.int(racingStats.wins)), ("places", Json.int(racingStats.places)), ("shows", Json.int(racingStats.shows)), ("faction_reputation", Json.int(racingStats.factionReputation)), ("reputation_tier", Json.str(reputationTier)), ("elo_rating", Json.int(racingStats.eloRating))])),
-          ("overall_rating", Json.int(overallRating)),
+          ("overall_rating", Json.int(ratingAt100)),
           ("preferred_distance", Json.str(distanceText)),
           ("preferred_terrain", Json.str(terrainText)),
           ("thumbnail", Json.str(thumbnailUrl)),

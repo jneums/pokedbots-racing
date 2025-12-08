@@ -25,7 +25,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_upgrade_robot";
     title = ?"Upgrade Robot";
-    description = ?"Start a 12-hour upgrade session. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability). Pay with parts (earned from racing) or ICP. Use garage_get_robot_details to see exact costs. UPGRADE MECHANICS: Base gain = 1-3 points (1st upgrade: 1-3, 2nd-3rd: 1-2, 4th+: 1). Difficulty scaling: stats <60 get full bonus, 60-70 (×0.8), 70-80 (×0.6), 80-90 (×0.4), 90+ (×0.2). Faction bonus chances: Ultra-rare (10% double), Super-rare like Blackhole/Dead/Master (20% double), Rare like Bee/Food/Box/Murder (35% double), Common (25% double). Wild faction: ±2 variance instead. First 3 upgrades guaranteed ≥1 point, later upgrades can give 0. Example: Bot at 65 Speed, 2nd Velocity upgrade: rolls 1-2 × 0.8 difficulty = 0.8-1.6 → rounds to 1-2 points before faction roll.";
+    description = ?"Start a 12-hour upgrade session. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability). Pay with specific parts, Universal Parts (can substitute), or ICP. Use garage_get_robot_details to see exact costs.\n\nFor detailed upgrade mechanics (difficulty scaling, faction bonuses), use help_get_compendium tool.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -130,7 +130,7 @@ module {
       // Handle payment
       if (paymentMethod == "parts") {
         if (not ctx.garageManager.removeParts(user, partType, partsNeeded)) {
-          return ToolContext.makeError("Insufficient parts. Needed: " # Nat.toText(partsNeeded) # " " # debug_show (partType) # ". Race on appropriate terrain to earn them!", cb);
+          return ToolContext.makeError("Insufficient parts. Needed: " # Nat.toText(partsNeeded) # " " # debug_show (partType) # " (Universal Parts can substitute). Race on appropriate terrain or go scavenging to earn them!", cb);
         };
       } else {
         // ICP payment
