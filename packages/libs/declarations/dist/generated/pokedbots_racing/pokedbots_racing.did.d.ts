@@ -129,6 +129,20 @@ export interface McpServer {
     }
   >,
   'debug_create_test_race' : ActorMethod<[bigint], string>,
+  'debug_get_all_tracks' : ActorMethod<
+    [],
+    Array<
+      {
+        'segmentCount' : bigint,
+        'laps' : bigint,
+        'name' : string,
+        'description' : string,
+        'trackId' : bigint,
+        'totalDistance' : bigint,
+        'primaryTerrain' : Terrain,
+      }
+    >
+  >,
   'debug_preview_stats' : ActorMethod<
     [bigint],
     {
@@ -162,6 +176,53 @@ export interface McpServer {
     }
   >,
   'debug_seed_leaderboard' : ActorMethod<[bigint], string>,
+  'debug_simulate_race' : ActorMethod<
+    [bigint, Array<bigint>, bigint],
+    [] | [
+      {
+        'participants' : Array<
+          {
+            'tokenIndex' : bigint,
+            'stats' : {
+              'stability' : bigint,
+              'speed' : bigint,
+              'acceleration' : bigint,
+              'powerCore' : bigint,
+            },
+          }
+        >,
+        'track' : {
+          'segmentCount' : bigint,
+          'laps' : bigint,
+          'name' : string,
+          'description' : string,
+          'trackId' : bigint,
+          'totalDistance' : bigint,
+        },
+        'results' : Array<
+          {
+            'tokenIndex' : bigint,
+            'finalTime' : number,
+            'avgSegmentTime' : number,
+            'position' : bigint,
+          }
+        >,
+        'analysis' : {
+          'lastPlaceTime' : number,
+          'winner' : bigint,
+          'timeSpread' : number,
+          'avgTime' : number,
+          'winnerTime' : number,
+        },
+      }
+    ]
+  >,
+  'debug_test_simulation' : ActorMethod<
+    [Array<bigint>, bigint, bigint],
+    [] | [
+      { 'results' : Array<{ 'tokenIndex' : bigint, 'finalTime' : number }> }
+    ]
+  >,
   'decode_token_identifier' : ActorMethod<[string], bigint>,
   'delete_events_after' : ActorMethod<[bigint], string>,
   'delete_events_and_races' : ActorMethod<[Array<bigint>], string>,
@@ -203,6 +264,7 @@ export interface McpServer {
           'acceleration' : bigint,
           'powerCore' : bigint,
         },
+        'preferredTerrain' : Terrain,
         'faction' : FactionType,
         'career' : {
           'wins' : bigint,
@@ -233,6 +295,24 @@ export interface McpServer {
         }
       >,
     }
+  >,
+  'get_completed_races' : ActorMethod<
+    [bigint],
+    Array<
+      {
+        'terrain' : Terrain,
+        'entryCount' : bigint,
+        'trackSeed' : bigint,
+        'name' : string,
+        'results' : [] | [
+          Array<{ 'finalTime' : number, 'nftId' : string, 'position' : bigint }>
+        ],
+        'distance' : bigint,
+        'trackId' : bigint,
+        'raceId' : bigint,
+        'raceClass' : RaceClass,
+      }
+    >
   >,
   'get_current_periods' : ActorMethod<
     [],
@@ -289,11 +369,7 @@ export interface McpServer {
   'get_nft_stats_by_identifier' : ActorMethod<[string], [] | [NFTStats]>,
   'get_nft_trait' : ActorMethod<[bigint, string], [] | [string]>,
   'get_nft_trait_value' : ActorMethod<[bigint, bigint], [] | [bigint]>,
-  'get_owner' : ActorMethod<[], Principal>,
-  'get_past_events' : ActorMethod<[bigint, bigint], Array<ScheduledEvent>>,
-  'get_race_by_id' : ActorMethod<[bigint], [] | [Race]>,
-  'get_reconstitution_traces' : ActorMethod<[], Array<ReconstitutionTrace>>,
-  'get_standalone_races' : ActorMethod<
+  'get_orphaned_races' : ActorMethod<
     [],
     Array<
       {
@@ -306,6 +382,59 @@ export interface McpServer {
       }
     >
   >,
+  'get_owner' : ActorMethod<[], Principal>,
+  'get_past_events' : ActorMethod<[bigint, bigint], Array<ScheduledEvent>>,
+  'get_race_by_id' : ActorMethod<[bigint], [] | [Race]>,
+  'get_race_replay_data' : ActorMethod<
+    [bigint],
+    [] | [
+      {
+        'participants' : Array<
+          {
+            'owner' : Principal,
+            'stats' : {
+              'stability' : bigint,
+              'speed' : bigint,
+              'acceleration' : bigint,
+              'powerCore' : bigint,
+            },
+            'nftId' : string,
+          }
+        >,
+        'track' : {
+          'laps' : bigint,
+          'name' : string,
+          'segments' : Array<
+            {
+              'angle' : bigint,
+              'terrain' : Terrain,
+              'difficulty' : number,
+              'length' : bigint,
+            }
+          >,
+          'description' : string,
+          'trackId' : bigint,
+          'totalDistance' : bigint,
+          'primaryTerrain' : Terrain,
+        },
+        'trackSeed' : bigint,
+        'results' : [] | [
+          Array<
+            {
+              'owner' : Principal,
+              'prizeAmount' : bigint,
+              'finalTime' : number,
+              'nftId' : string,
+              'position' : bigint,
+            }
+          >
+        ],
+        'trackId' : bigint,
+        'raceId' : bigint,
+      }
+    ]
+  >,
+  'get_reconstitution_traces' : ActorMethod<[], Array<ReconstitutionTrace>>,
   'get_timer_diagnostics' : ActorMethod<[], TimerDiagnostics>,
   'get_total_nft_count' : ActorMethod<[], bigint>,
   'get_trait_schema' : ActorMethod<[], TraitSchema>,
@@ -381,6 +510,7 @@ export interface Race {
   'status' : RaceStatus,
   'duration' : bigint,
   'terrain' : Terrain,
+  'trackSeed' : bigint,
   'platformTax' : bigint,
   'minEntries' : bigint,
   'name' : string,
@@ -389,6 +519,7 @@ export interface Race {
   'distance' : bigint,
   'platformBonus' : bigint,
   'entries' : Array<RaceEntry>,
+  'trackId' : bigint,
   'raceId' : bigint,
   'entryDeadline' : bigint,
   'entryFee' : bigint,
@@ -403,6 +534,7 @@ export type RaceClass = { 'Elite' : null } |
   { 'Raider' : null };
 export interface RaceEntry {
   'owner' : Principal,
+  'stats' : [] | [RacingStats],
   'nftId' : string,
   'entryFee' : bigint,
   'enteredAt' : bigint,
@@ -410,6 +542,7 @@ export interface RaceEntry {
 export interface RaceResult {
   'owner' : Principal,
   'prizeAmount' : bigint,
+  'stats' : [] | [RacingStats],
   'finalTime' : number,
   'nftId' : string,
   'position' : bigint,
@@ -418,6 +551,12 @@ export type RaceStatus = { 'Cancelled' : null } |
   { 'InProgress' : null } |
   { 'Completed' : null } |
   { 'Upcoming' : null };
+export interface RacingStats {
+  'stability' : bigint,
+  'speed' : bigint,
+  'acceleration' : bigint,
+  'powerCore' : bigint,
+}
 export interface ReconstitutionTrace {
   'errors' : Array<string>,
   'actionsRestored' : bigint,

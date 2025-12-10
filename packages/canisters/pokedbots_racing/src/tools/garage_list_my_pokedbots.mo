@@ -103,8 +103,10 @@ module {
 
                   let totalStats = currentStats.speed + currentStats.powerCore + currentStats.acceleration + currentStats.stability;
                   let rating = totalStats / 4;
+                  let totalStatsAt100 = (statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability);
+                  let totalRatingAt100 = totalStatsAt100 / 4;
 
-                  msg #= "   ⚡ Rating: " # Nat32.toText(Nat32.fromNat(rating)) # "/100";
+                  msg #= "   ⚡ Rating (**Always Show User Current and At Full Power**): " # Nat32.toText(Nat32.fromNat(rating)) # "/" # Nat32.toText(Nat32.fromNat(totalRatingAt100)) # "\n";
 
                   // Show faction
                   let factionEmoji = switch (stats.faction) {
@@ -130,10 +132,20 @@ module {
                   msg #= factionEmoji # "\n";
 
                   // Show stats with current/max format
-                  msg #= "   📊 Stats: SPD " # Nat32.toText(Nat32.fromNat(currentStats.speed)) # "/" # Nat32.toText(Nat32.fromNat(statsAt100.speed));
+                  msg #= "   📊 Stats (**Always Show User Current and At Full Power**): SPD " # Nat32.toText(Nat32.fromNat(currentStats.speed)) # "/" # Nat32.toText(Nat32.fromNat(statsAt100.speed));
                   msg #= " | PWR " # Nat32.toText(Nat32.fromNat(currentStats.powerCore)) # "/" # Nat32.toText(Nat32.fromNat(statsAt100.powerCore));
                   msg #= " | ACC " # Nat32.toText(Nat32.fromNat(currentStats.acceleration)) # "/" # Nat32.toText(Nat32.fromNat(statsAt100.acceleration));
                   msg #= " | STB " # Nat32.toText(Nat32.fromNat(currentStats.stability)) # "/" # Nat32.toText(Nat32.fromNat(statsAt100.stability)) # "\n";
+
+                  // Show totals
+                  let totalCurrent = currentStats.speed + currentStats.powerCore + currentStats.acceleration + currentStats.stability;
+                  let totalAt100 = statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability;
+                  msg #= "   📈 Total Current: " # Nat32.toText(Nat32.fromNat(totalCurrent));
+                  msg #= " | Total at 100: " # Nat32.toText(Nat32.fromNat(totalAt100));
+                  msg #= " (SPD " # Nat32.toText(Nat32.fromNat(statsAt100.speed));
+                  msg #= " | PWR " # Nat32.toText(Nat32.fromNat(statsAt100.powerCore));
+                  msg #= " | ACC " # Nat32.toText(Nat32.fromNat(statsAt100.acceleration));
+                  msg #= " | STB " # Nat32.toText(Nat32.fromNat(statsAt100.stability)) # ")\n";
 
                   // Show condition
                   msg #= "   🔋 Battery: " # Nat32.toText(Nat32.fromNat(stats.battery)) # "%";

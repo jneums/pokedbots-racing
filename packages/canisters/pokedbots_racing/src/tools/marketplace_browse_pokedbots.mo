@@ -1,4 +1,3 @@
-import Principal "mo:base/Principal";
 import Result "mo:base/Result";
 import Text "mo:base/Text";
 import Nat32 "mo:base/Nat32";
@@ -7,7 +6,6 @@ import Array "mo:base/Array";
 import Float "mo:base/Float";
 import Nat "mo:base/Nat";
 import Int "mo:base/Int";
-import Order "mo:base/Order";
 
 import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
@@ -24,7 +22,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("after", Json.obj([("type", Json.str("number")), ("description", Json.str("Show listings after this token index (pagination)"))])), ("faction", Json.obj([("type", Json.str("string")), ("description", Json.str("Filter by faction: UltimateMaster, Wild, Golden, Ultimate, Blackhole, Dead, Master, Bee, Food, Box, Murder, Game, Animal, or Industrial")), ("enum", Json.arr([Json.str("UltimateMaster"), Json.str("Wild"), Json.str("Golden"), Json.str("Ultimate"), Json.str("Blackhole"), Json.str("Dead"), Json.str("Master"), Json.str("Bee"), Json.str("Food"), Json.str("Box"), Json.str("Murder"), Json.str("Game"), Json.str("Animal"), Json.str("Industrial")]))])), ("minRating", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum overall rating (30-100)"))])), ("maxPrice", Json.obj([("type", Json.str("number")), ("description", Json.str("Maximum price in ICP"))])), ("minWins", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum number of race wins"))])), ("minWinRate", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum win rate percentage (0-100)"))])), ("sortBy", Json.obj([("type", Json.str("string")), ("description", Json.str("Sort results by: price, rating, winRate, or wins (default: price)")), ("enum", Json.arr([Json.str("price"), Json.str("rating"), Json.str("winRate"), Json.str("wins")]))])), ("sortDesc", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Sort descending (highest first). Default varies by sortBy."))]))])),
+      ("properties", Json.obj([("tokenIndex", Json.obj([("type", Json.str("number")), ("description", Json.str("Get details for a specific token index"))])), ("after", Json.obj([("type", Json.str("number")), ("description", Json.str("Show listings after this token index (pagination)"))])), ("faction", Json.obj([("type", Json.str("string")), ("description", Json.str("Filter by faction: UltimateMaster, Wild, Golden, Ultimate, Blackhole, Dead, Master, Bee, Food, Box, Murder, Game, Animal, or Industrial")), ("enum", Json.arr([Json.str("UltimateMaster"), Json.str("Wild"), Json.str("Golden"), Json.str("Ultimate"), Json.str("Blackhole"), Json.str("Dead"), Json.str("Master"), Json.str("Bee"), Json.str("Food"), Json.str("Box"), Json.str("Murder"), Json.str("Game"), Json.str("Animal"), Json.str("Industrial")]))])), ("minRating", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum overall rating (30-100)"))])), ("maxPrice", Json.obj([("type", Json.str("number")), ("description", Json.str("Maximum price in ICP"))])), ("minWins", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum number of race wins"))])), ("minWinRate", Json.obj([("type", Json.str("number")), ("description", Json.str("Minimum win rate percentage (0-100)"))])), ("sortBy", Json.obj([("type", Json.str("string")), ("description", Json.str("Sort results by: price, rating, winRate, or wins (default: price)")), ("enum", Json.arr([Json.str("price"), Json.str("rating"), Json.str("winRate"), Json.str("wins")]))])), ("sortDesc", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Sort descending (highest first). Default varies by sortBy."))]))])),
     ]);
     outputSchema = null;
   };
@@ -35,6 +33,12 @@ module {
     cb : (Result.Result<McpTypes.CallToolResult, McpTypes.HandlerError>) -> (),
   ) -> async () {
     func(_args : McpTypes.JsonValue, _auth : ?AuthTypes.AuthInfo, cb : (Result.Result<McpTypes.CallToolResult, McpTypes.HandlerError>) -> ()) : async () {
+      // Check if requesting specific token
+      let specificTokenIndex = switch (Result.toOption(Json.getAsNat(_args, "tokenIndex"))) {
+        case (?idx) { ?Nat32.fromNat(idx) };
+        case (null) { null };
+      };
+
       // Parse filter parameters
       let afterTokenIndex = switch (Result.toOption(Json.getAsNat(_args, "after"))) {
         case (?idx) { ?Nat32.fromNat(idx) };
@@ -71,6 +75,94 @@ module {
 
       if (listingsResult.size() == 0) {
         return ToolContext.makeTextSuccess("No PokedBots are currently listed for sale on the marketplace.", cb);
+      };
+
+      // If specific token requested, find and return just that one
+      switch (specificTokenIndex) {
+        case (?tokenIdx) {
+          // Find the specific listing
+          let found = Array.find<(Nat32, ExtIntegration.Listing, ExtIntegration.Metadata)>(
+            listingsResult,
+            func((idx, _, _)) : Bool { idx == tokenIdx },
+          );
+
+          switch (found) {
+            case (null) {
+              return ToolContext.makeError("Token #" # Nat32.toText(tokenIdx) # " is not currently listed for sale.", cb);
+            };
+            case (?(tokenIndex, listing, _metadata)) {
+              // Get stats for this token
+              let baseStats = context.garageManager.getBaseStats(Nat32.toNat(tokenIndex));
+              let racingStats = context.garageManager.getStats(Nat32.toNat(tokenIndex));
+              let priceICP = Float.fromInt(Nat64.toNat(listing.price)) / 100000000.0;
+
+              // Build response with stats
+              let response : McpTypes.JsonValue = switch (racingStats) {
+                case (?stats) {
+                  // Bot has racing history
+                  let rating = context.garageManager.calculateOverallRating(stats);
+                  let winRate = if (stats.racesEntered > 0) {
+                    Float.fromInt(stats.wins) / Float.fromInt(stats.racesEntered) * 100.0;
+                  } else { 0.0 };
+
+                  let factionText = switch (stats.faction) {
+                    case (#UltimateMaster) { "UltimateMaster" };
+                    case (#Wild) { "Wild" };
+                    case (#Golden) { "Golden" };
+                    case (#Ultimate) { "Ultimate" };
+                    case (#Blackhole) { "Blackhole" };
+                    case (#Dead) { "Dead" };
+                    case (#Master) { "Master" };
+                    case (#Bee) { "Bee" };
+                    case (#Food) { "Food" };
+                    case (#Box) { "Box" };
+                    case (#Murder) { "Murder" };
+                    case (#Game) { "Game" };
+                    case (#Animal) { "Animal" };
+                    case (#Industrial) { "Industrial" };
+                  };
+
+                  let terrainText = switch (stats.preferredTerrain) {
+                    case (#ScrapHeaps) { "ScrapHeaps" };
+                    case (#WastelandSand) { "WastelandSand" };
+                    case (#MetalRoads) { "MetalRoads" };
+                  };
+
+                  let distanceText = switch (stats.preferredDistance) {
+                    case (#ShortSprint) { "ShortSprint" };
+                    case (#MediumHaul) { "MediumHaul" };
+                    case (#LongTrek) { "LongTrek" };
+                  };
+
+                  let podiums = stats.wins + stats.places + stats.shows;
+
+                  Json.obj([
+                    ("token_index", Json.int(Nat32.toNat(tokenIndex))),
+                    ("price_icp", Json.str(Float.format(#fix 4, priceICP))),
+                    ("stats", Json.obj([("faction", Json.str(factionText)), ("base_speed", Json.int(baseStats.speed)), ("base_power_core", Json.int(baseStats.powerCore)), ("base_acceleration", Json.int(baseStats.acceleration)), ("base_stability", Json.int(baseStats.stability)), ("overall_rating", Json.int(rating)), ("races_entered", Json.int(stats.racesEntered)), ("wins", Json.int(stats.wins)), ("podiums", Json.int(podiums)), ("win_rate", Json.str(Float.format(#fix 1, winRate))), ("preferred_terrain", Json.str(terrainText)), ("preferred_distance", Json.str(distanceText))])),
+                    ("message", Json.str("Found token #" # Nat32.toText(tokenIdx) # " listed for " # Float.format(#fix 2, priceICP) # " ICP")),
+                  ]);
+                };
+                case (null) {
+                  // Uninitialized bot - show base stats only
+                  let avgStat = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
+
+                  Json.obj([
+                    ("token_index", Json.int(Nat32.toNat(tokenIndex))),
+                    ("price_icp", Json.str(Float.format(#fix 4, priceICP))),
+                    ("stats", Json.obj([("base_speed", Json.int(baseStats.speed)), ("base_power_core", Json.int(baseStats.powerCore)), ("base_acceleration", Json.int(baseStats.acceleration)), ("base_stability", Json.int(baseStats.stability)), ("overall_rating", Json.int(avgStat)), ("races_entered", Json.int(0)), ("wins", Json.int(0)), ("podiums", Json.int(0)), ("win_rate", Json.str("0.0"))])),
+                    ("message", Json.str("Found token #" # Nat32.toText(tokenIdx) # " listed for " # Float.format(#fix 2, priceICP) # " ICP (not yet initialized for racing)")),
+                  ]);
+                };
+              };
+
+              return ToolContext.makeSuccess(response, cb);
+            };
+          };
+        };
+        case (null) {
+          // Continue with normal browse logic
+        };
       };
 
       // Enrich listings with racing stats
@@ -520,9 +612,11 @@ module {
               details #= " | ACC " # Nat.toText(stats.baseAcceleration);
               details #= " | STB " # Nat.toText(stats.baseStability) # "\n";
               if (stats.racesEntered > 0) {
-                let losses = if (stats.racesEntered >= stats.wins) {
-                  stats.racesEntered - stats.wins;
-                } else { 0 };
+                // Calculate losses (racesEntered should always be >= wins, but use saturating subtraction to be safe)
+                let racesInt = Int.abs(stats.racesEntered);
+                let winsInt = Int.abs(stats.wins);
+                let lossesInt = racesInt - winsInt;
+                let losses = Int.abs(lossesInt);
                 details #= "   🏁 Record: " # Nat.toText(stats.wins) # "W-" # Nat.toText(losses) # "L";
                 details #= " (" # Float.format(#fix 1, stats.winRate) # "% win rate)\n";
               } else {

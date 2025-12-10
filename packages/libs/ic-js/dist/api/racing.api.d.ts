@@ -93,3 +93,15 @@ export declare const getBotRaceHistory: (tokenIndex: number, limit?: number, aft
     hasMore: boolean;
     nextRaceId: number | null;
 }>;
+/**
+ * Debug function to test race simulation on the backend for validation.
+ * @param tokenIndexes Array of bot token indexes to simulate
+ * @param trackId The track ID to use
+ * @param trackSeed The seed for randomness
+ * @param identity Optional identity to use for the actor
+ * @returns Simulation results with final times
+ */
+export declare const debugTestSimulation: (tokenIndexes: number[], trackId: number, trackSeed: number, identity?: Identity) => Promise<{
+    tokenIndex: number;
+    finalTime: number;
+}[] | null>;

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   getUpcomingEvents,
   getUpcomingEventsWithRaces,
@@ -9,6 +9,7 @@ import {
   getRaceById,
   getBotProfile,
   getBotRaceHistory,
+  debugTestSimulation,
   type ScheduledEvent,
   type Race,
 } from '@pokedbots-racing/ic-js';
@@ -147,5 +148,24 @@ export const useGetBotRaceHistory = (tokenIndex: number | null, limit: number = 
       return getBotRaceHistory(tokenIndex, limit, afterRaceId);
     },
     enabled: tokenIndex !== null,
+  });
+};
+
+/**
+ * Query hook to test simulation on the backend for validation.
+ */
+export const useDebugTestSimulation = (
+  tokenIndexes: number[],
+  trackId: number,
+  trackSeed: number,
+  enabled: boolean = true
+) => {
+  return useQuery({
+    queryKey: ['debugTestSimulation', tokenIndexes, trackId, trackSeed],
+    queryFn: async () => {
+      if (tokenIndexes.length === 0) return null;
+      return debugTestSimulation(tokenIndexes, trackId, trackSeed);
+    },
+    enabled: enabled && tokenIndexes.length > 0,
   });
 };

@@ -11,12 +11,17 @@ import Json "mo:json";
 import ToolContext "ToolContext";
 import PokedBotsGarage "../PokedBotsGarage";
 import ExtIntegration "../ExtIntegration";
+import IcpLedger "../IcpLedger";
 
 module {
+  // Registration cost: 0.1 ICP + 0.0001 ICP fee
+  let REGISTRATION_COST = 10000000 : Nat; // 0.1 ICP in e8s
+  let TRANSFER_FEE = 10000 : Nat; // 0.0001 ICP in e8s
+
   public func config() : McpTypes.Tool = {
     name = "garage_initialize_pokedbot";
     title = ?"Register PokedBot Racing License";
-    description = ?"Register your PokedBot for a wasteland racing license (free, one-time). Reveals faction and racing stats based on NFT traits. Required before entering races.\n\nUse help_get_compendium tool to see all faction bonuses and mechanics.";
+    description = ?"Register your PokedBot for a wasteland racing license (0.1 ICP registration fee, one-time). Reveals faction and racing stats based on NFT traits. Starting ELO is based on bot quality: 60+ rating = SilentKlan tier (1800 ELO), 40-60 = Elite (1600), 20-40 = Raider (1400), <20 = Junker (1200). Required before entering races. Requires ICRC-2 approval.\n\nUse help_get_compendium tool to see all faction bonuses and mechanics.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -130,6 +135,53 @@ module {
             return ToolContext.makeError("You do not own this PokedBot. It must be in your garage to initialize.", cb);
           };
         };
+      };
+
+      // Get ICP Ledger canister ID from context
+      let ledgerId = switch (ctx.icpLedgerCanisterId()) {
+        case (?id) { id };
+        case (null) {
+          return ToolContext.makeError("ICP Ledger not configured", cb);
+        };
+      };
+
+      // Pull payment via ICRC-2 (0.1 ICP registration fee)
+      let icpLedger = actor (Principal.toText(ledgerId)) : actor {
+        icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
+      };
+      let totalCost = REGISTRATION_COST + TRANSFER_FEE;
+
+      let blockIndex = try {
+        let transferResult = await icpLedger.icrc2_transfer_from({
+          from = { owner = user; subaccount = null };
+          to = { owner = ctx.canisterPrincipal; subaccount = null };
+          amount = totalCost;
+          fee = ?TRANSFER_FEE;
+          memo = null;
+          created_at_time = null;
+          spender_subaccount = null;
+        });
+
+        switch (transferResult) {
+          case (#Err(error)) {
+            let errorMsg = switch (error) {
+              case (#InsufficientFunds { balance }) {
+                "Insufficient funds. Balance: " # Nat.toText(balance) # " e8s, Required: " # Nat.toText(totalCost) # " e8s";
+              };
+              case (#InsufficientAllowance { allowance }) {
+                "Insufficient ICRC-2 allowance. Current: " # Nat.toText(allowance) # " e8s, Required: " # Nat.toText(totalCost) # " e8s. Please approve the canister first.";
+              };
+              case (#BadFee { expected_fee }) {
+                "Bad fee. Expected: " # Nat.toText(expected_fee) # " e8s";
+              };
+              case _ { "Transfer failed" };
+            };
+            return ToolContext.makeError(errorMsg, cb);
+          };
+          case (#Ok(blockIdx)) { blockIdx };
+        };
+      } catch (e) {
+        return ToolContext.makeError("Payment failed: " # Error.message(e), cb);
       };
 
       // Initialize racing stats (faction will be derived from metadata automatically)
@@ -267,7 +319,9 @@ module {
         ("token_index", Json.int(tokenIndex)),
         ("name", switch (customName) { case (?n) { Json.str(n) }; case (null) { Json.nullable() } }),
         ("faction", Json.str(factionText)),
+        ("payment", Json.obj([("amount", Json.str("0.1 ICP")), ("fee", Json.str("0.0001 ICP")), ("total", Json.str("0.1001 ICP")), ("block_index", Json.int(blockIndex))])),
         ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability))])),
+        ("starting_elo", Json.int(racingStats.eloRating)),
         ("battery", Json.int(racingStats.battery)),
         ("condition", Json.int(racingStats.condition)),
         ("status", Json.str("Racing license registered! Ready for wasteland competition.")),

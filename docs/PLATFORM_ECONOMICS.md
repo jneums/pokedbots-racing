@@ -43,7 +43,7 @@ Players pay ICP for bot upgrades when not using scrap parts.
 
 ### 3. Maintenance Services
 - **Recharge:** 0.1 ICP (restores +20 condition, +10 battery, 6hr cooldown)
-- **Repair:** 0.05 ICP (restores +10 condition only, 12hr cooldown)
+- **Repair:** 0.05 ICP (restores +10 condition only, 3hr cooldown)
 
 **Usage patterns:**
 - Casual racer: 4 recharges/month = **0.4 ICP/month**

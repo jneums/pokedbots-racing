@@ -306,7 +306,7 @@ Robots require regular maintenance to maintain optimal performance.
 #### 2. Basic Repair 🔧
 - **Cost:** 0.05 ICP + 0.0001 ICP fee
 - **Effect:** Restores +10 Condition
-- **Cooldown:** 12 hours
+- **Cooldown:** 3 hours
 - **Use:** Maintain race readiness between events
 
 ### Decay Mechanics

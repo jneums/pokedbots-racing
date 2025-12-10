@@ -71,14 +71,14 @@ This document defines the faction-specific bonuses for the scavenging system, re
 ### Blackhole (244 bots)
 **Parts Multiplier:** 1.10x all zones  
 **Battery Drain:** Standard  
-**Special:** +50% condition damage on scavenging missions, BUT world buffs grant +1-3 Speed AND +1-3 Accel for next race (instead of parts)  
+**Special:** +10% condition damage on scavenging missions, BUT world buffs grant +1-3 Speed AND +1-3 Accel for next race (instead of parts)
 **Philosophy:** Poor scavengers, elite racers - trade durability for performance
 
 **Simulation Values:**
 - 6h mission: 16.5-38.5 parts (base 15-35 × 1.1)
 - 12h mission: 44-88 parts (base 40-80 × 1.1)
 - 24h mission: 110-220 parts (base 100-200 × 1.1)
-- Condition damage: 1.5x (higher repair costs)
+- Condition damage: 1.1x (slightly higher repair costs)
 - World buff bonus: When world buff procs (15% chance), grants +1-3 Speed AND +1-3 Acceleration for next race (instead of bonus parts)
 
 ---

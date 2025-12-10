@@ -227,31 +227,101 @@ module {
       acceleration : Nat;
       stability : Nat;
     } {
-      let bonus : Float = switch (faction, terrain) {
-        // Blackhole: +12% on MetalRoads
-        case (#Blackhole, #MetalRoads) { 1.12 };
-        // Box: +10% on ScrapHeaps
-        case (#Box, #ScrapHeaps) { 1.10 };
-        // Game: +8% on WastelandSand
-        case (#Game, #WastelandSand) { 1.08 };
-        // Golden: +15% when condition >= 90
-        case (#Golden, _) {
-          if (condition >= 90) { 1.15 } else { 1.0 };
+      var speed = stats.speed;
+      var powerCore = stats.powerCore;
+      var acceleration = stats.acceleration;
+      var stability = stats.stability;
+
+      // Apply faction bonuses
+      switch (faction) {
+        // Ultra-Rare Factions
+        case (#UltimateMaster) {
+          speed := Int.abs(Float.toInt(Float.fromInt(speed) * 1.15));
+          powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.15));
+          acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.15));
+          stability := Int.abs(Float.toInt(Float.fromInt(stability) * 1.15));
         };
-        // All others: no terrain bonus
-        case (_) { 1.0 };
+        case (#Wild) {
+          acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.20));
+          stability := Int.abs(Float.toInt(Float.fromInt(stability) * 0.90));
+        };
+        case (#Golden) {
+          if (condition >= 90) {
+            speed := Int.abs(Float.toInt(Float.fromInt(speed) * 1.15));
+            powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.15));
+            acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.15));
+            stability := Int.abs(Float.toInt(Float.fromInt(stability) * 1.15));
+          };
+        };
+        case (#Ultimate) {
+          speed := Int.abs(Float.toInt(Float.fromInt(speed) * 1.12));
+          acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.12));
+        };
+
+        // Super-Rare Factions
+        case (#Blackhole) {
+          if (terrain == #MetalRoads) {
+            speed := Int.abs(Float.toInt(Float.fromInt(speed) * 1.12));
+            powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.12));
+            acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.12));
+            stability := Int.abs(Float.toInt(Float.fromInt(stability) * 1.12));
+          };
+        };
+        case (#Dead) {
+          powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.10));
+          stability := Int.abs(Float.toInt(Float.fromInt(stability) * 1.08));
+        };
+        case (#Master) {
+          speed := Int.abs(Float.toInt(Float.fromInt(speed) * 1.12));
+          powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.08));
+        };
+
+        // Rare Factions
+        case (#Bee) {
+          acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.10));
+        };
+        case (#Box) {
+          if (terrain == #ScrapHeaps) {
+            speed := Int.abs(Float.toInt(Float.fromInt(speed) * 1.10));
+            powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.10));
+            acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.10));
+            stability := Int.abs(Float.toInt(Float.fromInt(stability) * 1.10));
+          };
+        };
+        case (#Murder) {
+          speed := Int.abs(Float.toInt(Float.fromInt(speed) * 1.08));
+          acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.08));
+        };
+
+        // Common Factions
+        case (#Game) {
+          if (terrain == #WastelandSand) {
+            speed := Int.abs(Float.toInt(Float.fromInt(speed) * 1.08));
+            powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.08));
+            acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.08));
+            stability := Int.abs(Float.toInt(Float.fromInt(stability) * 1.08));
+          };
+        };
+        case (#Animal) {
+          speed := Int.abs(Float.toInt(Float.fromInt(speed) * 1.06));
+          powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.06));
+          acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.06));
+          stability := Int.abs(Float.toInt(Float.fromInt(stability) * 1.06));
+        };
+        case (#Industrial) {
+          powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.05));
+          stability := Int.abs(Float.toInt(Float.fromInt(stability) * 1.05));
+        };
+
+        // Food faction has no racing bonuses (condition recovery only)
+        case (#Food) {};
       };
 
-      if (bonus == 1.0) {
-        return stats;
-      };
-
-      // Apply bonus to all stats
       {
-        speed = Nat.min(100, Int.abs(Float.toInt(Float.fromInt(stats.speed) * bonus)));
-        powerCore = Nat.min(100, Int.abs(Float.toInt(Float.fromInt(stats.powerCore) * bonus)));
-        acceleration = Nat.min(100, Int.abs(Float.toInt(Float.fromInt(stats.acceleration) * bonus)));
-        stability = Nat.min(100, Int.abs(Float.toInt(Float.fromInt(stats.stability) * bonus)));
+        speed = Nat.min(100, speed);
+        powerCore = Nat.min(100, powerCore);
+        acceleration = Nat.min(100, acceleration);
+        stability = Nat.min(100, stability);
       };
     };
 
@@ -284,33 +354,65 @@ module {
         case (?idx) {
           switch (Map.get(stats, nhash, idx)) {
             case (?botStats) {
-              // Check if bot is on a scavenging mission
-              switch (botStats.activeMission) {
-                case (?mission) {
-                  // Bot is scavenging - return critically low stats to trigger DNF
-                  Debug.print("Bot #" # nftId # " is scavenging, will DNF in race");
-                  return ?{
-                    speed = 5;
-                    powerCore = 5;
-                    acceleration = 5;
-                    stability = 5;
-                  };
-                };
-                case (null) {
-                  // Not scavenging, proceed normally
-                };
-              };
+              // Note: Bot might have been pulled from scavenging when entering race
+              // No special handling needed here - proceed with normal stat calculation
 
               let current = getCurrentStats(botStats);
               let boosted = applyTerrainBonus(current, botStats.faction, terrain, botStats.condition);
 
-              // Apply preferred terrain bonus (+5% if racing on preferred terrain)
+              // Apply preferred terrain bonus (+10% if racing on preferred terrain)
               let finalStats = if (botStats.preferredTerrain == terrain) {
                 {
-                  speed = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.speed) * 1.05)));
-                  powerCore = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.powerCore) * 1.05)));
-                  acceleration = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.acceleration) * 1.05)));
-                  stability = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.stability) * 1.05)));
+                  speed = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.speed) * 1.10)));
+                  powerCore = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.powerCore) * 1.10)));
+                  acceleration = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.acceleration) * 1.10)));
+                  stability = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.stability) * 1.10)));
+                };
+              } else {
+                boosted;
+              };
+
+              ?{
+                speed = finalStats.speed;
+                powerCore = finalStats.powerCore;
+                acceleration = finalStats.acceleration;
+                stability = finalStats.stability;
+              };
+            };
+            case (null) { null };
+          };
+        };
+        case (null) { null };
+      };
+    };
+
+    /// Get racing stats at 100% battery/condition with terrain bonuses (for simulator)
+    /// This matches what the frontend sees via get_bot_profile
+    public func getStatsAt100WithTerrain(nftId : Text, terrain : Terrain) : ?RacingSimulator.RacingStats {
+      let tokenIndex = Nat.fromText(nftId);
+      switch (tokenIndex) {
+        case (?idx) {
+          switch (Map.get(stats, nhash, idx)) {
+            case (?botStats) {
+              // Get base stats + bonuses (no battery/condition penalties)
+              let baseStats = getBaseStats(idx);
+              let statsAt100 = {
+                speed = baseStats.speed + botStats.speedBonus;
+                powerCore = baseStats.powerCore + botStats.powerCoreBonus;
+                acceleration = baseStats.acceleration + botStats.accelerationBonus;
+                stability = baseStats.stability + botStats.stabilityBonus;
+              };
+
+              // Apply faction terrain bonuses (condition=100 for Golden faction bonus)
+              let boosted = applyTerrainBonus(statsAt100, botStats.faction, terrain, 100);
+
+              // Apply preferred terrain bonus (+10% if racing on preferred terrain)
+              let finalStats = if (botStats.preferredTerrain == terrain) {
+                {
+                  speed = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.speed) * 1.10)));
+                  powerCore = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.powerCore) * 1.10)));
+                  acceleration = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.acceleration) * 1.10)));
+                  stability = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.stability) * 1.10)));
                 };
               } else {
                 boosted;
@@ -544,6 +646,25 @@ module {
       // Get base stats
       let baseStats = getBaseStats(tokenIndex);
 
+      // Calculate overall rating from base stats: (speed + powerCore + acceleration + stability) / 4
+      let totalStats = baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability;
+      let averageRating = totalStats / 4;
+
+      // Map rating to starting ELO:
+      // 60+ rating = SilentKlan tier (1800 ELO)
+      // 40-59 rating = Elite tier (1600 ELO)
+      // 20-39 rating = Raider tier (1400 ELO)
+      // <20 rating = Junker tier (1200 ELO)
+      let startingElo = if (averageRating >= 60) {
+        1800; // SilentKlan tier
+      } else if (averageRating >= 40) {
+        1600; // Elite tier
+      } else if (averageRating >= 20) {
+        1400; // Raider tier
+      } else {
+        1200; // Junker tier
+      };
+
       let now = Time.now();
 
       let racingStats : PokedBotRacingStats = {
@@ -580,7 +701,7 @@ module {
         shows = 0;
         totalScrapEarned = 0;
         factionReputation = 0;
-        eloRating = 1500; // Start all bots at 1500 ELO
+        eloRating = startingElo; // Start based on bot quality (1200-1800)
         activatedAt = now;
         lastDecayed = now; // Initialize decay tracking
         lastRecharged = null;
@@ -1237,9 +1358,9 @@ module {
           {
             partsMultiplier = 1.10;
             batteryMultiplier = 1.0;
-            conditionMultiplier = 1.5;
+            conditionMultiplier = 1.1;
           };
-        }; // Penalty: +50% condition damage
+        }; // Penalty: +10% condition damage
         case (#Dead) {
           let partsMult = if (zone == #DeadMachineFields) { 1.40 } else { 1.10 };
           {
@@ -1363,6 +1484,86 @@ module {
           updateStats(tokenIndex, updatedStats);
 
           #ok(mission);
+        };
+      };
+    };
+
+    /// Pull bot from active scavenging mission (used when entering races)
+    /// Returns penalties applied: reduced parts yield and condition damage
+    public func pullFromScavenging(
+      tokenIndex : Nat,
+      now : Int,
+      rng : Nat,
+    ) : Result.Result<{ penalties : Text }, Text> {
+      switch (getStats(tokenIndex)) {
+        case (null) { #err("Bot not found") };
+        case (?botStats) {
+          switch (botStats.activeMission) {
+            case (null) { #err("Bot is not on a scavenging mission") };
+            case (?mission) {
+              // Calculate progress percentage (0-100)
+              let totalDuration = mission.endTime - mission.startTime;
+              let elapsed = now - mission.startTime;
+              let progress = if (totalDuration > 0) {
+                Int.abs(Float.toInt((Float.fromInt(elapsed) / Float.fromInt(totalDuration)) * 100.0));
+              } else { 0 };
+
+              // Calculate partial rewards based on progress
+              let basePartsData = getBaseParts(mission.missionType);
+              let avgBaseParts = (basePartsData.min + basePartsData.max) / 2;
+              let zoneMultipliers = getZoneMultipliers(mission.zone);
+              let factionBonus = getFactionScavengingBonus(botStats.faction, mission.zone);
+
+              // Parts scaled by progress (50% progress = 50% parts)
+              let progressMultiplier = Float.fromInt(progress) / 100.0;
+              let partsFloat = Float.fromInt(avgBaseParts) * zoneMultipliers.parts * factionBonus.partsMultiplier * progressMultiplier;
+              let partsFound = Int.abs(Float.toInt(partsFloat));
+
+              // Early withdrawal penalty: lose 50% of potential parts (harsh penalty to prevent exploitation)
+              let earlyWithdrawalPenalty = 0.50;
+              let finalParts = Int.abs(Float.toInt(Float.fromInt(partsFound) * earlyWithdrawalPenalty));
+
+              // Condition damage from rushed withdrawal
+              // Base damage scales with mission type, then reduced by progress
+              // This prevents exploiting long missions for short durations
+              let fullMissionConditionLoss = switch (mission.missionType) {
+                case (#ShortExpedition) { 20 }; // +5 penalty vs 15 normal completion
+                case (#DeepSalvage) { 35 }; // +10 penalty vs 25 normal completion
+                case (#WastelandExpedition) { 55 }; // +15 penalty vs 40 normal completion
+              };
+              // Minimum 50% of full penalty even at 0% progress (prevents gaming system)
+              let progressConditionMultiplier = 0.5 + (progressMultiplier * 0.5); // 50-100% of full penalty
+              let conditionFloat = Float.fromInt(fullMissionConditionLoss) * progressConditionMultiplier * zoneMultipliers.condition * factionBonus.conditionMultiplier;
+              let conditionLost = Int.abs(Float.toInt(conditionFloat));
+
+              // Apply condition damage
+              let newCondition : Nat = if (botStats.condition > conditionLost) {
+                botStats.condition - conditionLost;
+              } else {
+                0;
+              };
+
+              // Update bot stats: clear mission, reduce condition, award partial parts
+              let updatedStats = {
+                botStats with
+                activeMission = null;
+                condition = newCondition;
+                totalPartsScavenged = botStats.totalPartsScavenged + finalParts;
+              };
+              updateStats(tokenIndex, updatedStats);
+
+              // Award partial parts to owner's inventory
+              let owner = botStats.ownerPrincipal;
+              // For early withdrawal, give all parts as UniversalParts for simplicity
+              if (finalParts > 0) {
+                addParts(owner, #UniversalPart, finalParts);
+              };
+
+              let penaltyText = "⚠️ Pulled from mission early! Progress: " # Nat.toText(progress) # "%. Partial parts awarded: " # Nat.toText(finalParts) # " (50% penalty). Condition damage: -" # Nat.toText(conditionLost) # "%.";
+
+              #ok({ penalties = penaltyText });
+            };
+          };
         };
       };
     };
@@ -1510,7 +1711,7 @@ module {
 
               // Calculate battery consumed (with Power Core efficiency bonus)
               let batteryFloat = Float.fromInt(baseBattery) * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus;
-              let batteryConsumed = Int.abs(Float.toInt(batteryFloat));
+              let batteryRequested = Int.abs(Float.toInt(batteryFloat));
 
               // Calculate condition lost (with Stability bonus in dangerous zones)
               let baseConditionLoss = switch (mission.missionType) {
@@ -1519,16 +1720,35 @@ module {
                 case (#WastelandExpedition) { 40 };
               };
               let conditionFloat = Float.fromInt(baseConditionLoss) * zoneMultipliers.condition * factionBonus.conditionMultiplier * stabilityBonus;
-              let conditionLost = Int.abs(Float.toInt(conditionFloat));
+              let conditionRequested = Int.abs(Float.toInt(conditionFloat));
 
-              // Update bot stats (use saturating subtraction)
-              let newBattery : Nat = if (botStats.battery > batteryConsumed) {
-                botStats.battery - batteryConsumed;
-              } else { 0 };
+              // Update bot stats (use saturating subtraction and track actual consumed)
+              var actualBatteryConsumed = batteryRequested;
+              let newBattery : Nat = if (botStats.battery > batteryRequested) {
+                botStats.battery - batteryRequested;
+              } else {
+                actualBatteryConsumed := botStats.battery; // Only consumed what was available
+                0;
+              };
 
-              let newCondition : Nat = if (botStats.condition > conditionLost) {
-                botStats.condition - conditionLost;
-              } else { 0 };
+              var actualConditionLost = conditionRequested;
+              let newCondition : Nat = if (botStats.condition > conditionRequested) {
+                botStats.condition - conditionRequested;
+              } else {
+                actualConditionLost := botStats.condition; // Only lost what was available
+                0;
+              };
+
+              // Scale rewards if battery/condition ran out (failure penalty)
+              var partsScaling = 1.0;
+              if (actualBatteryConsumed < batteryRequested) {
+                // Ran out of battery - scale parts based on how much battery was available
+                partsScaling := Float.fromInt(actualBatteryConsumed) / Float.fromInt(batteryRequested);
+                events := Array.append(events, ["⚠️ Battery depleted mid-mission! Parts yield reduced to " # Nat.toText(Int.abs(Float.toInt(partsScaling * 100.0))) # "%"]);
+              };
+
+              // Apply scaling to parts
+              partsFound := Int.abs(Float.toInt(Float.fromInt(partsFound) * partsScaling));
 
               let newBestHaul = if (partsFound > botStats.bestHaul) {
                 partsFound;
@@ -1625,8 +1845,8 @@ module {
                 thrusterKits = thrusterKitsFound;
                 gyroModules = gyroModulesFound;
                 universalParts = universalPartsFound;
-                batteryConsumed = batteryConsumed;
-                conditionLost = conditionLost;
+                batteryConsumed = actualBatteryConsumed;
+                conditionLost = actualConditionLost;
                 worldBuffApplied = worldBuffApplied;
                 worldBuff = worldBuff;
                 events = events;

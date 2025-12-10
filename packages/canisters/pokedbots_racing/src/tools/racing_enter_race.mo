@@ -23,7 +23,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_enter_race";
     title = ?"Enter Race";
-    description = ?"Enter your PokedBot in a wasteland race. Pays entry fee via ICRC-2. Bot must meet race class requirements based on ELO rating. Bots can race while upgrading.\n\n**WARNING:** Low battery/condition severely reduces stats and can cause DNF (no prize). Check bot condition before entering.\n\nFor race cost details (battery drain, condition wear formulas), use help_get_compendium tool.";
+    description = ?"Enter your PokedBot in a wasteland race. Pays entry fee via ICRC-2. Bot must meet race class requirements based on ELO rating. Bots can race while upgrading or scavenging.\n\n**SCAVENGING BOTS:** You can register for races while your bot is on a scavenging mission. When the race starts, your bot will be pulled from the mission with penalties:\n• Partial parts awarded based on progress (with 50% early withdrawal penalty)\n• Condition damage scales with mission type and progress (minimum 50% of full penalty)\n• Penalties applied at race start time, not at registration\n• WARNING: Starting long missions just to pull out early is NOT profitable due to harsh penalties\n\n**RACE COSTS (Applied after completion):**\n• Battery Drain: Base 10-20 (distance) × terrain (1.0-1.2×) × Power Core efficiency × condition penalty\n• Condition Wear: Base 3-7 (distance) × position (0.8-1.4×, winners wear less) × terrain (1.0-1.5×)\n\n**WARNING:** Low battery/condition severely reduces stats and can cause DNF (no prize). Check bot condition before entering.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -89,7 +89,7 @@ module {
       };
 
       // Get bot stats and verify registered owner
-      let botStats = switch (ctx.garageManager.getStats(tokenIndex)) {
+      var botStats = switch (ctx.garageManager.getStats(tokenIndex)) {
         case (null) {
           return ToolContext.makeError("This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first to register it.", cb);
         };
@@ -103,6 +103,9 @@ module {
       };
 
       let now = Time.now();
+
+      // Allow race entry even if bot is scavenging - they'll be pulled when race starts
+      // No need to check or pull from scavenging here
 
       // Check if race is accepting entries
       switch (race.status) {
@@ -213,6 +216,16 @@ module {
                 let hoursUntilStart = timeUntilStart / 3_600_000_000_000;
                 let minutesUntilStart = (timeUntilStart % 3_600_000_000_000) / 60_000_000_000;
 
+                // Build wasteland message - check if bot is on a scavenging mission
+                let wastelandMsg = switch (botStats.activeMission) {
+                  case (?mission) {
+                    "⚡ Race entry confirmed! Your bot will be pulled from their scavenging mission when the race starts (with penalties based on progress).";
+                  };
+                  case (null) {
+                    "⚡ Your bot heads to the starting line. The wasteland awaits...";
+                  };
+                };
+
                 let response = Json.obj([
                   ("message", Json.str("🏁 **RACE ENTRY CONFIRMED**")),
                   ("race_id", Json.int(raceId)),
@@ -226,7 +239,7 @@ module {
                   ("starts_in_hours", Json.int(hoursUntilStart)),
                   ("starts_in_minutes", Json.int(minutesUntilStart)),
                   ("battery_remaining", Json.int(botStats.battery)),
-                  ("wasteland_message", Json.str("⚡ Your bot heads to the starting line. The wasteland awaits...")),
+                  ("wasteland_message", Json.str(wastelandMsg)),
                 ]);
 
                 ToolContext.makeSuccess(response, cb);

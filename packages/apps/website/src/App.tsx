@@ -5,6 +5,7 @@ import HomePage from './app/page';
 import SchedulePage from './app/schedule/page';
 import EventDetailsPage from './app/schedule/[eventId]/page';
 import LeaderboardPage from './app/leaderboard/page';
+import SimulatorPage from './app/simulator/page';
 import DocsListPage from './app/docs/page';
 import DocPage from './app/docs/[slug]/page';
 import GuidesListPage from './app/guides/page';
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="/schedule" element={<SchedulePage />} />
           <Route path="/schedule/:eventId" element={<EventDetailsPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/simulator" element={<SimulatorPage />} />
           <Route path="/bot/:tokenIndex" element={<BotDetailsPage />} />
           <Route path="/docs" element={<DocsListPage />} />
           <Route path="/docs/:slug" element={<DocPage />} />

@@ -377,11 +377,11 @@ module {
     public func createWeeklyLeagueEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Weekly League Championship";
-        description = "Major competitive event - Entry scales by class (Junker 0.2, Raider 0.4, Elite 1.0, SilentKlan 2.0 ICP). Junker/Raider classes receive platform bonus.";
+        description = "Major competitive event - Entry scales by class (Junker 0.2, Raider 0.4, Elite 1.0, SilentKlan 2.0 ICP). All classes receive platform bonus to guarantee top 3 profitability.";
         entryFee = 20_000_000; // 0.2 ICP base (Junker)
         maxEntries = 50; // Multiple heats if needed
         minEntries = 6;
-        prizePoolBonus = 200_000_000; // Platform adds 2 ICP (Phase 1 bonus)
+        prizePoolBonus = 200_000_000; // Platform adds 2 ICP
         pointsMultiplier = 2.0; // Double points
         divisions = [#Junker, #Raider, #Elite, #SilentKlan]; // All divisions
       };
@@ -400,11 +400,11 @@ module {
     public func createDailySprintEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Daily Sprint Challenge";
-        description = "Quick race for XP and rewards - Entry scales by class (Junker 0.05, Raider 0.1, Elite 0.25 ICP). Junker/Raider receive platform bonus.";
+        description = "Quick race for XP and rewards - Entry scales by class (Junker 0.05, Raider 0.1, Elite 0.25 ICP). All classes receive platform bonus.";
         entryFee = 5_000_000; // 0.05 ICP base (Junker)
         maxEntries = 12;
-        minEntries = 3;
-        prizePoolBonus = 50_000_000; // Platform adds 0.5 ICP (Phase 1 bonus)
+        minEntries = 2;
+        prizePoolBonus = 50_000_000; // Platform adds 0.5 ICP (Junker base)
         pointsMultiplier = 1.0; // Standard points
         divisions = [#Junker, #Raider, #Elite]; // Exclude SilentKlan
       };

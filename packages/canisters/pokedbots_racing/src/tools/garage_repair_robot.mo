@@ -17,12 +17,12 @@ import ExtIntegration "../ExtIntegration";
 module {
   let REPAIR_COST = 5000000 : Nat; // 0.05 ICP
   let TRANSFER_FEE = 10000 : Nat;
-  let REPAIR_COOLDOWN : Int = 43200000000000; // 12 hours in nanoseconds
+  let REPAIR_COOLDOWN : Int = 10800000000000; // 3 hours in nanoseconds
 
   public func config() : McpTypes.Tool = {
     name = "garage_repair_robot";
     title = ?"Repair Robot Condition";
-    description = ?"Repair a robot to restore condition. Costs 0.05 ICP + 0.0001 ICP transfer fee. Restores 30 Condition. Cooldown: 12 hours.";
+    description = ?"Repair a robot to restore condition. Costs 0.05 ICP + 0.0001 ICP transfer fee. Restores 25 Condition. Cooldown: 3 hours.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -118,11 +118,11 @@ module {
             return ToolContext.makeError("Payment failed", cb);
           };
           case (#Ok(blockIndex)) {
-            let conditionRestored = Nat.min(30, 100 - racingStats.condition);
+            let conditionRestored = Nat.min(25, 100 - racingStats.condition);
 
             let updatedStats = {
               racingStats with
-              condition = Nat.min(100, racingStats.condition + 30);
+              condition = Nat.min(100, racingStats.condition + 25);
               lastRepaired = ?now;
             };
 

@@ -43,6 +43,9 @@ export default function Navigation() {
             <Link to="/schedule" className={linkClass('/schedule')}>
               Schedule
             </Link>
+            <Link to="/simulator" className={linkClass('/simulator')}>
+              Simulator
+            </Link>
             <Link to="/guides" className={linkClass('/guides')}>
               Guides
             </Link>
@@ -102,6 +105,13 @@ export default function Navigation() {
                     onClick={() => setIsOpen(false)}
                   >
                     Schedule
+                  </Link>
+                  <Link 
+                    to="/simulator" 
+                    className={mobileLinkClass('/simulator')}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Simulator
                   </Link>
                   <Link 
                     to="/guides" 

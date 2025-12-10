@@ -126,6 +126,13 @@ type ReconstitutionTrace =
    timestamp: Time__1;
    validationPassed: bool;
  };
+type RacingStats = 
+ record {
+   acceleration: nat;
+   powerCore: nat;
+   speed: nat;
+   stability: nat;
+ };
 type RaceStatus = 
  variant {
    Cancelled;
@@ -140,6 +147,7 @@ type RaceResult =
    owner: principal;
    position: nat;
    prizeAmount: nat;
+   stats: opt RacingStats;
  };
 type RaceEntry = 
  record {
@@ -147,6 +155,7 @@ type RaceEntry =
    entryFee: nat;
    nftId: text;
    owner: principal;
+   stats: opt RacingStats;
  };
 type RaceClass = 
  variant {
@@ -176,6 +185,8 @@ type Race =
    startTime: int;
    status: RaceStatus;
    terrain: Terrain;
+   trackId: nat;
+   trackSeed: nat;
  };
 type NFTStats = vec nat;
 type NFTMetadata = 
@@ -206,6 +217,18 @@ type McpServer =
        tokenIdentifier: text;
      });
    debug_create_test_race: (startInMinutes: nat) -> (text);
+   /// Test/debug: Get all available tracks
+   debug_get_all_tracks: () ->
+    (vec
+      record {
+        description: text;
+        laps: nat;
+        name: text;
+        primaryTerrain: Terrain;
+        segmentCount: nat;
+        totalDistance: nat;
+        trackId: nat;
+      }) query;
    /// Debug: Preview what stats would be derived for a token index
    /// Shows both metadata-based and fallback stats for comparison
    debug_preview_stats: (tokenIndex: nat) ->
@@ -239,6 +262,57 @@ type McpServer =
          };
      }) query;
    debug_seed_leaderboard: (count: nat) -> (text);
+   /// Test/debug: Simulate a race with specific bots on a specific track
+   /// Returns detailed results for balance testing
+   debug_simulate_race: (trackId: nat, tokenIndices: vec nat, seed: nat) ->
+    (opt
+      record {
+        analysis:
+         record {
+           avgTime: float64;
+           lastPlaceTime: float64;
+           timeSpread: float64;
+           winner: nat;
+           winnerTime: float64;
+         };
+        participants:
+         vec
+          record {
+            stats:
+             record {
+               acceleration: nat;
+               powerCore: nat;
+               speed: nat;
+               stability: nat;
+             };
+            tokenIndex: nat;
+          };
+        results:
+         vec
+          record {
+            avgSegmentTime: float64;
+            finalTime: float64;
+            position: nat;
+            tokenIndex: nat;
+          };
+        track:
+         record {
+           description: text;
+           laps: nat;
+           name: text;
+           segmentCount: nat;
+           totalDistance: nat;
+           trackId: nat;
+         };
+      });
+   /// Debug: Test simulate a race with specific bots and track
+   /// Returns backend-calculated times for validation
+   debug_test_simulation: (tokenIndexes: vec nat, trackId: nat, trackSeed:
+    nat) ->
+    (opt record {results: vec record {
+                                finalTime: float64;
+                                tokenIndex: nat;
+                              };});
    /// Decode EXT token identifier to get token index (public query)
    decode_token_identifier: (tokenIdentifier: text) -> (nat) query;
    delete_events_after: (afterEventId: nat) -> (text);
@@ -282,6 +356,7 @@ type McpServer =
         isInitialized: bool;
         name: opt text;
         owner: opt principal;
+        preferredTerrain: Terrain;
         raceClass: RaceClass;
         stats:
          record {
@@ -312,6 +387,25 @@ type McpServer =
            totalRacers: nat;
          };
      }) query;
+   /// Get all completed races with their results for analysis
+   get_completed_races: (limit: nat) ->
+    (vec
+      record {
+        distance: nat;
+        entryCount: nat;
+        name: text;
+        raceClass: RaceClass;
+        raceId: nat;
+        results:
+         opt vec record {
+                   finalTime: float64;
+                   nftId: text;
+                   position: nat;
+                 };
+        terrain: Terrain;
+        trackId: nat;
+        trackSeed: nat;
+      }) query;
    get_current_periods: () -> (record {
                                  monthId: nat;
                                  seasonId: nat;
@@ -373,14 +467,9 @@ type McpServer =
    get_nft_trait: (tokenId: nat, traitName: text) -> (opt text) query;
    /// Get a specific trait value ID by trait index (for calculations)
    get_nft_trait_value: (tokenId: nat, traitIndex: nat) -> (opt nat) query;
-   /// Get the current owner of the canister.
-   get_owner: () -> (principal) query;
-   get_past_events: (offset: nat, limit: nat) -> (vec ScheduledEvent) query;
-   get_race_by_id: (raceId: nat) -> (opt Race) query;
-   get_reconstitution_traces: () -> (vec ReconstitutionTrace) query;
    /// Find all races that are not associated with any event
-   /// Useful for finding standalone races created outside the event system
-   get_standalone_races: () ->
+   /// Useful for finding orphaned races created outside the event system
+   get_orphaned_races: () ->
     (vec
       record {
         entries: nat;
@@ -390,6 +479,60 @@ type McpServer =
         startTime: int;
         status: RaceStatus;
       }) query;
+   /// Get the current owner of the canister.
+   get_owner: () -> (principal) query;
+   get_past_events: (offset: nat, limit: nat) -> (vec ScheduledEvent) query;
+   get_race_by_id: (raceId: nat) -> (opt Race) query;
+   /// Get race replay data for deterministic frontend replay
+   /// Returns track info, race seed, and participants for frontend simulation
+   get_race_replay_data: (raceId: nat) ->
+    (opt
+      record {
+        participants:
+         vec
+          record {
+            nftId: text;
+            owner: principal;
+            stats:
+             record {
+               acceleration: nat;
+               powerCore: nat;
+               speed: nat;
+               stability: nat;
+             };
+          };
+        raceId: nat;
+        results:
+         opt
+          vec
+           record {
+             finalTime: float64;
+             nftId: text;
+             owner: principal;
+             position: nat;
+             prizeAmount: nat;
+           };
+        track:
+         record {
+           description: text;
+           laps: nat;
+           name: text;
+           primaryTerrain: Terrain;
+           segments:
+            vec
+             record {
+               angle: int;
+               difficulty: float64;
+               length: nat;
+               terrain: Terrain;
+             };
+           totalDistance: nat;
+           trackId: nat;
+         };
+        trackId: nat;
+        trackSeed: nat;
+      }) query;
+   get_reconstitution_traces: () -> (vec ReconstitutionTrace) query;
    get_timer_diagnostics: () -> (TimerDiagnostics) query;
    /// Get total count of NFTs with metadata stored
    get_total_nft_count: () -> (nat) query;

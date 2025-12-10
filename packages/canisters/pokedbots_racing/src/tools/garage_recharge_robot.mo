@@ -84,6 +84,14 @@ module {
         case (?stats) { stats };
       };
 
+      // Check if bot is currently scavenging
+      switch (racingStats.activeMission) {
+        case (?mission) {
+          return ToolContext.makeError("Cannot recharge while bot is on a scavenging mission. Complete the mission first.", cb);
+        };
+        case (null) {};
+      };
+
       // Check cooldown
       let now = Time.now();
       switch (racingStats.lastRecharged) {
@@ -151,7 +159,9 @@ module {
             // Overcharge based on how LOW battery was before recharge
             // Lower battery = bigger overcharge potential (risk/reward mechanic)
             // Base formula: (100 - currentBattery) * 0.75, max 75%
-            let batteryDeficit = 100 - currentBattery;
+            let batteryDeficit = if (currentBattery >= 100) { 0 } else {
+              100 - currentBattery;
+            };
             let baseOvercharge = Float.fromInt(batteryDeficit) * 0.75;
 
             // Condition affects efficiency with randomness
@@ -170,8 +180,12 @@ module {
             let finalOvercharge = baseOvercharge * efficiency;
             let newOvercharge = Nat.min(75, Int.abs(Float.toInt(finalOvercharge)));
 
-            let batteryRestored = newBattery - currentBattery;
-            let overchargeAdded = newOvercharge - racingStats.overcharge;
+            let batteryRestored = if (newBattery >= currentBattery) {
+              newBattery - currentBattery;
+            } else { 0 };
+            let overchargeAdded = if (newOvercharge >= racingStats.overcharge) {
+              newOvercharge - racingStats.overcharge;
+            } else { 0 };
 
             let updatedStats = {
               racingStats with

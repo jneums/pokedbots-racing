@@ -300,7 +300,7 @@ Restore token 4247
 **Restores:**
 - +10 Condition (only)
 
-**Cooldown:** 12 hours
+**Cooldown:** 3 hours
 
 **How to Use:**
 ```
@@ -316,7 +316,7 @@ Fix token 4247
 **Repair vs Recharge:**
 | Action | Cost | Condition | Battery | Cooldown |
 |--------|------|-----------|---------|----------|
-| Repair | 5 ICP | +10 | 0 | 12 hours |
+| Repair | 5 ICP | +10 | 0 | 3 hours |
 | Recharge | 10 ICP | +20 | +10 | 6 hours |
 
 ---

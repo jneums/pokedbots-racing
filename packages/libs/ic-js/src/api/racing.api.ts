@@ -176,3 +176,35 @@ export const getBotRaceHistory = async (
     nextRaceId: result.nextRaceId.length > 0 ? Number(result.nextRaceId[0]) : null
   };
 };
+
+/**
+ * Debug function to test race simulation on the backend for validation.
+ * @param tokenIndexes Array of bot token indexes to simulate
+ * @param trackId The track ID to use
+ * @param trackSeed The seed for randomness
+ * @param identity Optional identity to use for the actor
+ * @returns Simulation results with final times
+ */
+export const debugTestSimulation = async (
+  tokenIndexes: number[],
+  trackId: number,
+  trackSeed: number,
+  identity?: Identity
+): Promise<{ tokenIndex: number; finalTime: number }[] | null> => {
+  const racingActor = getRacingActor(identity);
+  const result = await racingActor.debug_test_simulation(
+    tokenIndexes.map(BigInt),
+    BigInt(trackId),
+    BigInt(trackSeed)
+  );
+  
+  if (result.length === 0 || !result[0]) {
+    return null;
+  }
+  
+  const data = result[0];
+  return data.results.map((r: any) => ({
+    tokenIndex: Number(r.tokenIndex),
+    finalTime: Number(r.finalTime),
+  }));
+};

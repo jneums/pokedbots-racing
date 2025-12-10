@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useGetEventDetails, useGetRaceById, useGetBotProfile } from "@/hooks/useRacing";
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { RaceVisualizer } from '@/components/RaceVisualizer';
 
 function formatICP(amount: bigint): string {
   const icp = Number(amount) / 100_000_000;
@@ -38,6 +39,18 @@ function getTerrainIcon(terrain: any): string {
   return '🏁';
 }
 
+function getTrackName(trackId: number): string {
+  const trackNames = [
+    "Default Track",
+    "Scrap Mountain Circuit",
+    "Highway of the Dead",
+    "Wasteland Gauntlet",
+    "Junkyard Sprint",
+    "Metal Mesa Run"
+  ];
+  return trackNames[trackId] || trackNames[0];
+}
+
 function BotName({ tokenIndex }: { tokenIndex: number }) {
   const { data: botProfile } = useGetBotProfile(tokenIndex);
   
@@ -47,6 +60,72 @@ function BotName({ tokenIndex }: { tokenIndex: number }) {
   
   return <>PokedBot #{tokenIndex}</>;
 }
+
+function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrain, botOrder, raceStartTime, raceStatus }: {
+  results: any[];
+  trackSeed: bigint;
+  trackId: number;
+  distance: number;
+  terrain: any;
+  botOrder?: string[];
+  raceStartTime?: bigint;
+  raceStatus?: any;
+}) {
+  // Fetch bot profiles for faction and preferredTerrain (not in stats snapshot)
+  const botProfiles = results.map(r => {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const { data } = useGetBotProfile(Number(r.nftId));
+    return data;
+  });
+
+  const allLoaded = botProfiles.every(p => p !== undefined);
+
+  if (!allLoaded) {
+    return (
+      <div className="w-full h-48 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading race visualization...</p>
+      </div>
+    );
+  }
+
+  // Map results with stats from entries and faction/terrain from profiles
+  const resultsWithStats = results.map((r: any, idx: number) => {
+    // Backend might return stats as optional array [stats] or direct object
+    const statsData = r.stats && r.stats.length > 0 && r.stats[0] ? r.stats[0] : r.stats;
+    
+    const finalStats = statsData ? {
+      speed: Number(statsData.speed),
+      stability: Number(statsData.stability),
+      powerCore: Number(statsData.powerCore),
+      acceleration: Number(statsData.acceleration),
+    } : undefined;
+    
+    return {
+      nftId: r.nftId,
+      finalTime: r.finalTime,
+      position: r.position || 0,
+      // Don't pass faction/preferredTerrain since bonuses are already applied in stats
+      faction: 'Unknown', // Dummy value, won't be used
+      preferredTerrain: 'ScrapHeaps', // Dummy value, won't be used
+      stats: finalStats,
+    };
+  });
+
+  return (
+    <RaceVisualizer
+      results={resultsWithStats}
+      trackSeed={trackSeed}
+      trackId={trackId}
+      distance={distance}
+      terrain={terrain}
+      botOrder={botOrder}
+      raceStartTime={raceStartTime}
+      raceStatus={raceStatus}
+      bonusesAlreadyApplied={true}
+    />
+  );
+}
+
 
 function RaceCard({ raceId }: { raceId: bigint }) {
   const { data: race } = useGetRaceById(Number(raceId));
@@ -82,6 +161,11 @@ function RaceCard({ raceId }: { raceId: bigint }) {
               {getTerrainIcon(race.terrain)} {race.name}
             </CardTitle>
             <CardDescription className="mt-2">
+              {(race as any).trackId !== undefined && (
+                <>
+                  🏁 {getTrackName(Number((race as any).trackId))} • {' '}
+                </>
+              )}
               {getTerrainName(race.terrain)} • {race.distance.toString()}km • ~{race.duration.toString()}s
             </CardDescription>
           </div>
@@ -191,12 +275,37 @@ function RaceCard({ raceId }: { raceId: bigint }) {
           </div>
         )}
 
+        {/* Race Visualizer - show only when race has entries with stats */}
+        {('InProgress' in race.status || 'Completed' in race.status) && 
+         (race as any).trackSeed && (race as any).trackSeed !== 0 && !Array.isArray((race as any).trackSeed) && 
+         race.entries.length > 1 && 
+         race.entries[0]?.stats && (
+          <div className="mb-4">
+            <RaceVisualizerWithStats
+              results={race.results && race.results.length > 0 && race.results[0] ? race.results[0] : race.entries.map((entry: any, idx: number) => ({
+                nftId: entry.nftId,
+                finalTime: null, // Use null instead of 0 to indicate "no result yet"
+                position: idx + 1,
+                stats: entry.stats, // Use stats snapshot from entry (set at race start)
+              }))}
+              trackSeed={BigInt((race as any).trackSeed)}
+              trackId={Number((race as any).trackId) || 1}
+              distance={Number(race.distance)}
+              terrain={race.terrain}
+              botOrder={race.entries.map((entry: any) => entry.nftId)}
+              raceStartTime={race.startTime}
+              raceStatus={race.status}
+            />
+          </div>
+        )}
+
         {/* Results if completed */}
         {race.results && race.results.length > 0 && race.results[0] && (
-          <div className="space-y-2">
-            <p className="text-sm font-semibold">Results:</p>
+          <>            
             <div className="space-y-2">
-              {race.results[0].map((result: any, idx: number) => {
+              <p className="text-sm font-semibold">Results:</p>
+              <div className="space-y-2">
+                {race.results[0].map((result: any, idx: number) => {
                 const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(result.nftId));
                 const imageUrl = generateExtThumbnailLink(tokenId);
                 const winnerTime = race.results?.[0]?.[0]?.finalTime;
@@ -247,6 +356,7 @@ function RaceCard({ raceId }: { raceId: bigint }) {
               })}
             </div>
           </div>
+          </>
         )}
       </CardContent>
     </Card>

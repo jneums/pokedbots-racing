@@ -126,7 +126,7 @@ Restore condition and battery.
 Repair damage to improve condition.
 
 **Cost:** 0.05 ICP + 0.0001 ICP fee (total: 0.0501 ICP)
-**Cooldown:** 12 hours  
+**Cooldown:** 3 hours  
 **Effect:** +10 Condition
 
 **Input:**
@@ -173,12 +173,13 @@ Start a 12-hour upgrade session.
 
 ### `marketplace_browse_pokedbots`
 
-Browse listings with powerful filtering and sorting.
+Browse listings with powerful filtering and sorting, or lookup a specific token.
 
 **Input:**
 ```json
 {
-  "after": 42,              // Optional: pagination cursor
+  "tokenIndex": 4079,       // Optional: Get details for specific token (no pagination)
+  "after": 42,              // Optional: pagination cursor (browse mode)
   "faction": "GodClass",    // Optional: filter by faction
   "minRating": 70,          // Optional: min rating (30-100)
   "maxPrice": 0.5,          // Optional: max price in ICP
@@ -189,14 +190,26 @@ Browse listings with powerful filtering and sorting.
 }
 ```
 
-**Output:** Formatted text showing 5 listings with:
+**Two Modes:**
+
+1. **Specific Token Lookup** (when `tokenIndex` provided):
+   - Returns single listing with full stats
+   - Error if token not listed
+   - No pagination
+
+2. **Browse Mode** (when `tokenIndex` omitted):
+   - Returns 5 listings per page
+   - Apply filters and sorting
+   - Use `after` for pagination
+
+**Output:** Formatted text showing listings with:
 - Token index, price in ICP
 - Faction, overall rating (or base if never raced)
 - Base stats (SPD/PWR/ACC/STB)
 - Win/loss record and win rate (if raced)
 - Terrain and distance preferences
 - Thumbnail image URL
-- Pagination cursor for next page
+- Pagination cursor for next page (browse mode)
 - Filter/sort info in header
 
 ### `marketplace_purchase_pokedbot`

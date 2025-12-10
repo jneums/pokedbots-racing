@@ -70,90 +70,81 @@ import IcpLedger "IcpLedger";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
 
-// // Migration to rename #Scavenger -> #Junker in RaceClass variants
-// (
-//   with migration = func(
-//     old_state : {
-//       stable_races : Map.Map<Nat, { raceId : Nat; name : Text; distance : Nat; terrain : RacingSimulator.Terrain; raceClass : { #Scavenger; #Raider; #Elite; #SilentKlan }; entryFee : Nat; maxEntries : Nat; minEntries : Nat; startTime : Int; duration : Nat; entryDeadline : Int; createdAt : Int; entries : [RacingSimulator.RaceEntry]; status : RacingSimulator.RaceStatus; results : ?[RacingSimulator.RaceResult]; prizePool : Nat; platformTax : Nat; platformBonus : Nat; sponsors : [RacingSimulator.Sponsor] }>;
-//       stable_events : Map.Map<Nat, { eventId : Nat; eventType : RaceCalendar.EventType; scheduledTime : Int; registrationOpens : Int; registrationCloses : Int; status : RaceCalendar.EventStatus; metadata : { name : Text; description : Text; divisions : [{ #Scavenger; #Raider; #Elite; #SilentKlan }]; entryFee : Nat; prizePoolBonus : Nat; pointsMultiplier : Float; maxEntries : Nat; minEntries : Nat }; raceIds : [Nat]; createdAt : Int }>;
-//     }
-//   ) : {
-//     stable_races : Map.Map<Nat, RacingSimulator.Race>;
-//     stable_events : Map.Map<Nat, RaceCalendar.ScheduledEvent>;
-//   } {
-//     // Helper to convert old RaceClass to new RaceClass
-//     func migrateRaceClass(old : { #Scavenger; #Raider; #Elite; #SilentKlan }) : RacingSimulator.RaceClass {
-//       switch (old) {
-//         case (#Scavenger) { #Junker };
-//         case (#Raider) { #Raider };
-//         case (#Elite) { #Elite };
-//         case (#SilentKlan) { #SilentKlan };
-//       };
-//     };
+// Migration to add stats field to RaceEntry type - COMMENTED OUT AFTER MIGRATION COMPLETE
+/*
+(
+  with migration = func(
+    old_state : {
+      stable_races : Map.Map<Nat, { raceId : Nat; name : Text; distance : Nat; terrain : RacingSimulator.Terrain; trackId : Nat; trackSeed : Nat; raceClass : RacingSimulator.RaceClass; entryFee : Nat; maxEntries : Nat; minEntries : Nat; startTime : Int; duration : Nat; entryDeadline : Int; createdAt : Int; entries : [{ nftId : Text; owner : Principal; entryFee : Nat; enteredAt : Int }]; status : RacingSimulator.RaceStatus; results : ?[RacingSimulator.RaceResult]; prizePool : Nat; platformTax : Nat; platformBonus : Nat; sponsors : [RacingSimulator.Sponsor] }>;
+    };
+  ) : {
+    stable_races : Map.Map<Nat, RacingSimulator.Race>;
+  } {
+    // Copy stats from results to entries for live simulation
+    let new_races = Map.new<Nat, RacingSimulator.Race>();
+    for ((raceId, oldRace) in Map.entries(old_state.stable_races)) {
+      // Migrate entries - add stats field, copying from results if available
+      let migratedEntries = Array.map<{ nftId : Text; owner : Principal; entryFee : Nat; enteredAt : Int }, RacingSimulator.RaceEntry>(
+        oldRace.entries,
+        func(oldEntry) : RacingSimulator.RaceEntry {
+          // Try to find stats from race results
+          let statsFromResults : ?RacingSimulator.RacingStats = switch (oldRace.results) {
+            case (?results) {
+              // Find matching result by nftId
+              let matchingResult = Array.find<RacingSimulator.RaceResult>(
+                results,
+                func(r) { r.nftId == oldEntry.nftId }
+              );
+              switch (matchingResult) {
+                case (?result) { result.stats };
+                case (null) { null };
+              };
+            };
+            case (null) { null };
+          };
 
-//     // Migrate races
-//     let new_races = Map.new<Nat, RacingSimulator.Race>();
-//     for ((raceId, oldRace) in Map.entries(old_state.stable_races)) {
-//       let newRace : RacingSimulator.Race = {
-//         raceId = oldRace.raceId;
-//         name = oldRace.name;
-//         distance = oldRace.distance;
-//         terrain = oldRace.terrain;
-//         raceClass = migrateRaceClass(oldRace.raceClass);
-//         entryFee = oldRace.entryFee;
-//         maxEntries = oldRace.maxEntries;
-//         minEntries = oldRace.minEntries;
-//         startTime = oldRace.startTime;
-//         duration = oldRace.duration;
-//         entryDeadline = oldRace.entryDeadline;
-//         createdAt = oldRace.createdAt;
-//         entries = oldRace.entries;
-//         status = oldRace.status;
-//         results = oldRace.results;
-//         prizePool = oldRace.prizePool;
-//         platformTax = oldRace.platformTax;
-//         platformBonus = oldRace.platformBonus;
-//         sponsors = oldRace.sponsors;
-//       };
-//       Map.set(new_races, Map.nhash, raceId, newRace);
-//     };
+          {
+            nftId = oldEntry.nftId;
+            owner = oldEntry.owner;
+            entryFee = oldEntry.entryFee;
+            enteredAt = oldEntry.enteredAt;
+            stats = statsFromResults; // Copy stats from results or null
+          };
+        },
+      );
 
-//     // Migrate events
-//     let new_events = Map.new<Nat, RaceCalendar.ScheduledEvent>();
-//     for ((eventId, oldEvent) in Map.entries(old_state.stable_events)) {
-//       let newDivisions = Array.map<{ #Scavenger; #Raider; #Elite; #SilentKlan }, RacingSimulator.RaceClass>(
-//         oldEvent.metadata.divisions,
-//         migrateRaceClass
-//       );
-//       let newEvent : RaceCalendar.ScheduledEvent = {
-//         eventId = oldEvent.eventId;
-//         eventType = oldEvent.eventType;
-//         scheduledTime = oldEvent.scheduledTime;
-//         registrationOpens = oldEvent.registrationOpens;
-//         registrationCloses = oldEvent.registrationCloses;
-//         status = oldEvent.status;
-//         metadata = {
-//           name = oldEvent.metadata.name;
-//           description = oldEvent.metadata.description;
-//           divisions = newDivisions;
-//           entryFee = oldEvent.metadata.entryFee;
-//           prizePoolBonus = oldEvent.metadata.prizePoolBonus;
-//           pointsMultiplier = oldEvent.metadata.pointsMultiplier;
-//           maxEntries = oldEvent.metadata.maxEntries;
-//           minEntries = oldEvent.metadata.minEntries;
-//         };
-//         raceIds = oldEvent.raceIds;
-//         createdAt = oldEvent.createdAt;
-//       };
-//       Map.set(new_events, Map.nhash, eventId, newEvent);
-//     };
+      let newRace : RacingSimulator.Race = {
+        raceId = oldRace.raceId;
+        name = oldRace.name;
+        distance = oldRace.distance;
+        terrain = oldRace.terrain;
+        raceClass = oldRace.raceClass;
+        entryFee = oldRace.entryFee;
+        maxEntries = oldRace.maxEntries;
+        minEntries = oldRace.minEntries;
+        startTime = oldRace.startTime;
+        duration = oldRace.duration;
+        entryDeadline = oldRace.entryDeadline;
+        createdAt = oldRace.createdAt;
+        entries = migratedEntries;
+        status = oldRace.status;
+        results = oldRace.results;
+        prizePool = oldRace.prizePool;
+        platformTax = oldRace.platformTax;
+        platformBonus = oldRace.platformBonus;
+        sponsors = oldRace.sponsors;
+        trackId = oldRace.trackId;
+        trackSeed = oldRace.trackSeed;
+      };
+      Map.set(new_races, Map.nhash, raceId, newRace);
+    };
 
-//     {
-//       stable_races = new_races;
-//       stable_events = new_events;
-//     };
-//   }
-// )
+    {
+      stable_races = new_races;
+    };
+  };
+)
+*/
 shared ({ caller = deployer }) persistent actor class McpServer(
   args : ?{
     owner : ?Principal;
@@ -694,12 +685,22 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
           let adjustedEntryFee = Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
 
-          // Apply platform bonus only to Junker/Raider (Elite/SilentKlan are self-sustaining)
-          let platformBonus : Nat = switch (division) {
-            case (#Junker) { event.metadata.prizePoolBonus };
-            case (#Raider) { event.metadata.prizePoolBonus };
-            case (#Elite) { 0 };
-            case (#SilentKlan) { 0 };
+          // Apply scaled platform bonus to all classes to guarantee top 3 profitability
+          let platformBonus : Nat = switch (event.eventType, division) {
+            // Daily Sprint bonuses
+            case (#DailySprint, #Junker) { 50_000_000 }; // 0.5 ICP
+            case (#DailySprint, #Raider) { 60_000_000 }; // 0.6 ICP
+            case (#DailySprint, #Elite) { 140_000_000 }; // 1.4 ICP
+            // Weekly League bonuses
+            case (#WeeklyLeague, #Junker) { 200_000_000 }; // 2.0 ICP
+            case (#WeeklyLeague, #Raider) { 200_000_000 }; // 2.0 ICP
+            case (#WeeklyLeague, #Elite) { 140_000_000 }; // 1.4 ICP
+            case (#WeeklyLeague, #SilentKlan) { 280_000_000 }; // 2.8 ICP
+            // Monthly Cup bonuses
+            case (#MonthlyCup, #Elite) { 500_000_000 }; // 5.0 ICP
+            case (#MonthlyCup, #SilentKlan) { 500_000_000 }; // 5.0 ICP
+            // Fallback
+            case _ { event.metadata.prizePoolBonus };
           };
 
           let race = raceManager.createRace(
@@ -1025,20 +1026,157 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               return actionId;
             };
 
+            // Generate unpredictable trackSeed using race start execution time
+            // This prevents pre-simulation while allowing frontend to simulate in real-time
+            // Use full timestamp for maximum entropy and uniqueness
+            let executionTime = Time.now();
+            let trackSeed = Int.abs(raceId * 7919 + executionTime);
+
+            Debug.print("Generated trackSeed at race start: " # debug_show (trackSeed) # " (executionTime: " # debug_show (executionTime) # ")");
+
+            // Update race with trackSeed so frontend can fetch it for real-time simulation
+            switch (raceManager.setTrackSeed(raceId, trackSeed)) {
+              case (?_updated) {
+                Debug.print("Updated race " # debug_show (raceId) # " with trackSeed " # debug_show (trackSeed));
+              };
+              case (null) {
+                Debug.print("Failed to update race with trackSeed");
+              };
+            };
+
             // Mark as in progress
             ignore raceManager.updateRaceStatus(raceId, #InProgress);
             Debug.print("Race in progress: " # race.name # " with " # debug_show (race.entries.size()) # " entries");
 
-            // Schedule race finish for after duration
-            let finishTime = race.startTime + (race.duration * 1_000_000_000);
-            let finishActionId = tt().setActionSync<system>(
-              Int.abs(finishTime),
-              {
-                actionType = "race_finish";
-                params = to_candid (raceId);
-              },
-            );
-            Debug.print("Scheduled race_finish action " # debug_show (finishActionId) # " for race " # debug_show (raceId) # " at " # debug_show (finishTime));
+            // Snapshot stats for all entries at race start (includes buffs/penalties)
+            var entriesWithStats : [RacingSimulator.RaceEntry] = [];
+            for (entry in race.entries.vals()) {
+              // Parse token index
+              let tokenIndexOpt = Nat.fromText(entry.nftId);
+
+              switch (tokenIndexOpt) {
+                case (?tokenIndex) {
+                  // First, check if bot is on a scavenging mission and pull them out
+                  switch (garageManager.getStats(tokenIndex)) {
+                    case (?botStats) {
+                      switch (botStats.activeMission) {
+                        case (?mission) {
+                          // Pull bot from scavenging mission with penalties
+                          let rng = Int.abs(executionTime % 1000000);
+                          switch (garageManager.pullFromScavenging(tokenIndex, executionTime, rng)) {
+                            case (#ok(result)) {
+                              Debug.print("Pulled bot " # entry.nftId # " from scavenging at race start: " # result.penalties);
+                            };
+                            case (#err(errMsg)) {
+                              Debug.print("Error pulling bot " # entry.nftId # " from scavenging: " # errMsg);
+                            };
+                          };
+                        };
+                        case (null) {
+                          // Not on mission, proceed normally
+                        };
+                      };
+                    };
+                    case (null) {};
+                  };
+
+                  // Get bot stats WITH terrain bonuses for this race
+                  switch (garageManager.getRacingStatsWithTerrain(entry.nftId, race.terrain)) {
+                    case (?stats) {
+                      let entryWithStats : RacingSimulator.RaceEntry = {
+                        nftId = entry.nftId;
+                        owner = entry.owner;
+                        entryFee = entry.entryFee;
+                        enteredAt = entry.enteredAt;
+                        stats = ?stats;
+                      };
+                      entriesWithStats := Array.append(entriesWithStats, [entryWithStats]);
+                    };
+                    case (null) {
+                      Debug.print("Warning: No stats found for NFT " # entry.nftId # ", keeping entry without stats");
+                      entriesWithStats := Array.append(entriesWithStats, [entry]);
+                    };
+                  };
+                };
+                case (null) {
+                  Debug.print("Warning: Invalid nftId format: " # entry.nftId);
+                  entriesWithStats := Array.append(entriesWithStats, [entry]);
+                };
+              };
+            };
+
+            // Update race entries with stats snapshot
+            ignore raceManager.updateRaceEntries(raceId, entriesWithStats);
+            Debug.print("Snapshotted stats for " # debug_show (entriesWithStats.size()) # " entries at race start");
+
+            // Simulate the race immediately to get actual finish time
+            var participants : [RacingSimulator.RacingParticipant] = [];
+            for (entry in entriesWithStats.vals()) {
+              switch (entry.stats) {
+                case (?stats) {
+                  let participant : RacingSimulator.RacingParticipant = {
+                    nftId = entry.nftId;
+                    owner = entry.owner;
+                    stats = stats;
+                  };
+                  participants := Array.append(participants, [participant]);
+                };
+                case (null) {};
+              };
+            };
+
+            // Get updated race with trackSeed
+            let updatedRace = switch (raceManager.getRace(raceId)) {
+              case (?r) { r };
+              case (null) {
+                Debug.print("Error: Race not found after trackSeed update");
+                return actionId;
+              };
+            };
+
+            // Simulate race and store results
+            switch (raceSimulator.simulateRaceSegmented(updatedRace, participants)) {
+              case (?results) {
+                Debug.print("Race simulated at start, " # debug_show (results.size()) # " racers");
+
+                // Store results immediately
+                ignore raceManager.setRaceResults(raceId, results);
+
+                // Find slowest finisher to determine actual race duration
+                var slowestTime : Float = 0.0;
+                for (result in results.vals()) {
+                  if (result.finalTime > slowestTime) {
+                    slowestTime := result.finalTime;
+                  };
+                };
+
+                // Convert slowest time to nanoseconds and schedule finish
+                let raceDurationNanos = Int.abs(Float.toInt(slowestTime * 1_000_000_000.0));
+                let finishTime = race.startTime + raceDurationNanos;
+
+                let finishActionId = tt().setActionSync<system>(
+                  Int.abs(finishTime),
+                  {
+                    actionType = "race_finish";
+                    params = to_candid (raceId);
+                  },
+                );
+                Debug.print("Scheduled race_finish action " # debug_show (finishActionId) # " for race " # debug_show (raceId) # " at " # debug_show (finishTime) # " (slowest time: " # Float.toText(slowestTime) # "s)");
+              };
+              case (null) {
+                Debug.print("Error: Failed to simulate race at start");
+                // Fallback to estimated duration
+                let finishTime = race.startTime + (race.duration * 1_000_000_000);
+                let finishActionId = tt().setActionSync<system>(
+                  Int.abs(finishTime),
+                  {
+                    actionType = "race_finish";
+                    params = to_candid (raceId);
+                  },
+                );
+                Debug.print("Scheduled race_finish action (fallback) " # debug_show (finishActionId) # " for race " # debug_show (raceId) # " at " # debug_show (finishTime));
+              };
+            };
           };
           case (null) {
             Debug.print("Race not found: " # debug_show (raceId));
@@ -1053,7 +1191,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     actionId;
   };
 
-  // Handle race finish - simulate and distribute prizes
+  // Handle race finish - apply results and distribute prizes
   func handleRaceFinish<system>(actionId : TT.ActionId, action : TT.Action) : TT.ActionId {
     Debug.print("Race finish handler triggered");
 
@@ -1075,33 +1213,22 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               case _ {};
             };
 
-            // Convert race entries to RacingParticipants
-            var participants : [RacingSimulator.RacingParticipant] = [];
+            // Results were already simulated and stored at race start
+            // Just retrieve them and apply consequences (ELO, stats, prizes)
+            Debug.print("Applying race results simulated at race start");
 
-            for (entry in race.entries.vals()) {
-              // Get bot stats from garage manager WITH terrain bonuses
-              switch (garageManager.getRacingStatsWithTerrain(entry.nftId, race.terrain)) {
-                case (?stats) {
-                  let participant : RacingSimulator.RacingParticipant = {
-                    nftId = entry.nftId;
-                    owner = entry.owner;
-                    stats = stats;
-                  };
-                  participants := Array.append(participants, [participant]);
-                };
-                case (null) {
-                  Debug.print("Warning: No stats found for NFT " # entry.nftId);
-                };
+            switch (race.results) {
+              case (null) {
+                Debug.print("Error: No results found for race " # debug_show (raceId) # " - race may not have been properly started");
+                return actionId;
               };
-            };
-
-            // Simulate the race using generic simulator
-            switch (raceSimulator.simulateRace(race, participants)) {
               case (?results) {
-                Debug.print("Race simulated, " # debug_show (results.size()) # " racers");
+                if (results.size() == 0) {
+                  Debug.print("Error: Empty results array for race " # debug_show (raceId));
+                  return actionId;
+                };
 
-                // Update race with results
-                ignore raceManager.setRaceResults(raceId, results);
+                Debug.print("Applying race results, " # debug_show (results.size()) # " racers");
 
                 // Apply ELO rating changes for all race participants
                 let eloResults = Array.map<RacingSimulator.RaceResult, (Text, Nat)>(
@@ -1226,10 +1353,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
                 ignore raceManager.updateRaceStatus(raceId, #Completed);
                 Debug.print("Race completed successfully - " # debug_show (results.size()) # " participants updated");
-              };
-              case (null) {
-                Debug.print("Race simulation failed");
-                ignore raceManager.updateRaceStatus(raceId, #Cancelled);
               };
             };
           };
@@ -1439,8 +1562,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   };
 
   /// Find all races that are not associated with any event
-  /// Useful for finding standalone races created outside the event system
-  public query func get_standalone_races() : async [{
+  /// Useful for finding orphaned races created outside the event system
+  public query func get_orphaned_races() : async [{
     raceId : Nat;
     name : Text;
     raceClass : RacingSimulator.RaceClass;
@@ -1652,6 +1775,141 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     statsManager.getSchema();
   };
 
+  // --- RACE REPLAY DATA ---
+
+  /// Get race replay data for deterministic frontend replay
+  /// Returns track info, race seed, and participants for frontend simulation
+  public query func get_race_replay_data(raceId : Nat) : async ?{
+    raceId : Nat;
+    trackId : Nat;
+    trackSeed : Nat;
+    track : {
+      trackId : Nat;
+      name : Text;
+      description : Text;
+      totalDistance : Nat;
+      primaryTerrain : RacingSimulator.Terrain;
+      laps : Nat;
+      segments : [{
+        length : Nat;
+        angle : Int;
+        terrain : RacingSimulator.Terrain;
+        difficulty : Float;
+      }];
+    };
+    participants : [{
+      nftId : Text;
+      owner : Principal;
+      stats : {
+        speed : Nat;
+        powerCore : Nat;
+        acceleration : Nat;
+        stability : Nat;
+      };
+    }];
+    results : ?[{
+      nftId : Text;
+      owner : Principal;
+      position : Nat;
+      finalTime : Float;
+      prizeAmount : Nat;
+    }];
+  } {
+    switch (raceManager.getRace(raceId)) {
+      case (?race) {
+        // Get track template
+        let trackOpt = RacingSimulator.getTrack(race.trackId);
+        switch (trackOpt) {
+          case (?trackTemplate) {
+            // Convert participants
+            var participantData : [{
+              nftId : Text;
+              owner : Principal;
+              stats : {
+                speed : Nat;
+                powerCore : Nat;
+                acceleration : Nat;
+                stability : Nat;
+              };
+            }] = [];
+
+            for (entry in race.entries.vals()) {
+              switch (garageManager.getRacingStatsWithTerrain(entry.nftId, race.terrain)) {
+                case (?stats) {
+                  participantData := Array.append(
+                    participantData,
+                    [{
+                      nftId = entry.nftId;
+                      owner = entry.owner;
+                      stats = {
+                        speed = stats.speed;
+                        powerCore = stats.powerCore;
+                        acceleration = stats.acceleration;
+                        stability = stats.stability;
+                      };
+                    }],
+                  );
+                };
+                case (null) {};
+              };
+            };
+
+            // Convert results if they exist
+            let resultsData = switch (race.results) {
+              case (?results) {
+                ?Array.map<RacingSimulator.RaceResult, { nftId : Text; owner : Principal; position : Nat; finalTime : Float; prizeAmount : Nat }>(
+                  results,
+                  func(r) {
+                    {
+                      nftId = r.nftId;
+                      owner = r.owner;
+                      position = r.position;
+                      finalTime = r.finalTime;
+                      prizeAmount = r.prizeAmount;
+                    };
+                  },
+                );
+              };
+              case (null) { null };
+            };
+
+            // Convert track segments
+            let segmentData = Array.map<RacingSimulator.TrackSegment, { length : Nat; angle : Int; terrain : RacingSimulator.Terrain; difficulty : Float }>(
+              trackTemplate.segments,
+              func(seg) {
+                {
+                  length = seg.length;
+                  angle = seg.angle;
+                  terrain = seg.terrain;
+                  difficulty = seg.difficulty;
+                };
+              },
+            );
+
+            ?{
+              raceId = race.raceId;
+              trackId = race.trackId;
+              trackSeed = race.trackSeed;
+              track = {
+                trackId = trackTemplate.trackId;
+                name = trackTemplate.name;
+                description = trackTemplate.description;
+                totalDistance = trackTemplate.totalDistance;
+                primaryTerrain = trackTemplate.primaryTerrain;
+                laps = trackTemplate.laps;
+                segments = segmentData;
+              };
+              participants = participantData;
+              results = resultsData;
+            };
+          };
+          case (null) { null };
+        };
+      };
+      case (null) { null };
+    };
+  };
+
   // --- DEBUG METHODS ---
 
   /// Debug: Preview what stats would be derived for a token index
@@ -1772,6 +2030,415 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     statsManager.getAllTokenIds();
   };
 
+  /// Debug: Test simulate a race with specific bots and track
+  /// Returns backend-calculated times for validation
+  public shared func debug_test_simulation(
+    tokenIndexes : [Nat],
+    trackId : Nat,
+    trackSeed : Nat,
+  ) : async ?{
+    results : [{
+      tokenIndex : Nat;
+      finalTime : Float;
+    }];
+  } {
+    // Get track to determine terrain
+    let trackOpt = RacingSimulator.getTrack(trackId);
+    let terrain = switch (trackOpt) {
+      case (?track) { track.primaryTerrain };
+      case (null) { #ScrapHeaps }; // Fallback
+    };
+
+    // Get stats for all bots at 100% battery/condition with terrain bonuses applied
+    // This matches what the frontend simulator uses (stats from get_bot_profile + bonuses)
+    let participants = Array.mapFilter<Nat, RacingSimulator.RacingParticipant>(
+      tokenIndexes,
+      func(tokenIndex : Nat) : ?RacingSimulator.RacingParticipant {
+        let nftId = Nat.toText(tokenIndex);
+        switch (garageManager.getStatsAt100WithTerrain(nftId, terrain)) {
+          case (?stats) {
+            ?{
+              nftId = nftId;
+              owner = Principal.fromText("aaaaa-aa"); // Dummy owner for test
+              stats = stats;
+            };
+          };
+          case null { null };
+        };
+      },
+    );
+
+    if (participants.size() == 0) {
+      return null;
+    };
+
+    // Create a test race
+    let distance = 15000; // 15km in meters
+    let duration = raceSimulator.calculateRaceDuration(distance, terrain);
+
+    let testRace : RacingSimulator.Race = {
+      raceId = 0;
+      name = "Test Simulation";
+      trackId = trackId;
+      trackSeed = trackSeed;
+      distance = distance;
+      duration = duration;
+      terrain = terrain;
+      entryFee = 0;
+      prizePool = 0;
+      platformBonus = 0;
+      platformTax = 0;
+      maxEntries = 20;
+      minEntries = 2;
+      startTime = 0;
+      entryDeadline = 0;
+      status = #InProgress;
+      entries = [];
+      results = null;
+      createdAt = 0;
+      raceClass = #Junker;
+      sponsors = [];
+    };
+
+    // Simulate the race
+    switch (raceSimulator.simulateRaceSegmented(testRace, participants)) {
+      case (?results) {
+        let formattedResults = Array.map<RacingSimulator.RaceResult, { tokenIndex : Nat; finalTime : Float }>(
+          results,
+          func(result : RacingSimulator.RaceResult) : {
+            tokenIndex : Nat;
+            finalTime : Float;
+          } {
+            let tokenIndex = switch (Nat.fromText(result.nftId)) {
+              case (?idx) { idx };
+              case null { 0 };
+            };
+            {
+              tokenIndex = tokenIndex;
+              finalTime = result.finalTime;
+            };
+          },
+        );
+        ?{ results = formattedResults };
+      };
+      case null { null };
+    };
+  };
+
+  // --- RACE HISTORY ---
+
+  /// Get all completed races with their results for analysis
+  public query func get_completed_races(limit : Nat) : async [{
+    raceId : Nat;
+    name : Text;
+    terrain : RacingSimulator.Terrain;
+    distance : Nat;
+    raceClass : RacingSimulator.RaceClass;
+    trackId : Nat;
+    trackSeed : Nat;
+    entryCount : Nat;
+    results : ?[{
+      position : Nat;
+      nftId : Text;
+      finalTime : Float;
+    }];
+  }] {
+    let allRaces = raceManager.getAllRaces();
+
+    // Filter only completed races with results
+    let completedRaces = Array.filter<RacingSimulator.Race>(
+      allRaces,
+      func(race) {
+        switch (race.status) {
+          case (#Completed) { Option.isSome(race.results) };
+          case (_) { false };
+        };
+      },
+    );
+
+    // Take only the requested number
+    let limited = if (completedRaces.size() > limit) {
+      Array.tabulate<RacingSimulator.Race>(limit, func(i) { completedRaces[i] });
+    } else {
+      completedRaces;
+    };
+
+    // Map to output format
+    Array.map<RacingSimulator.Race, { raceId : Nat; name : Text; terrain : RacingSimulator.Terrain; distance : Nat; raceClass : RacingSimulator.RaceClass; trackId : Nat; trackSeed : Nat; entryCount : Nat; results : ?[{ position : Nat; nftId : Text; finalTime : Float }] }>(
+      limited,
+      func(race) {
+        let mappedResults = switch (race.results) {
+          case (?results) {
+            ?Array.map<RacingSimulator.RaceResult, { position : Nat; nftId : Text; finalTime : Float }>(
+              results,
+              func(r) {
+                {
+                  position = r.position;
+                  nftId = r.nftId;
+                  finalTime = r.finalTime;
+                };
+              },
+            );
+          };
+          case (null) { null };
+        };
+
+        {
+          raceId = race.raceId;
+          name = race.name;
+          terrain = race.terrain;
+          distance = race.distance;
+          raceClass = race.raceClass;
+          trackId = race.trackId;
+          trackSeed = race.trackSeed;
+          entryCount = race.entries.size();
+          results = mappedResults;
+        };
+      },
+    );
+  };
+
+  // --- SIMULATION TESTING ---
+
+  /// Test/debug: Simulate a race with specific bots on a specific track
+  /// Returns detailed results for balance testing
+  public shared ({ caller }) func debug_simulate_race(
+    trackId : Nat,
+    tokenIndices : [Nat],
+    seed : Nat,
+  ) : async ?{
+    track : {
+      trackId : Nat;
+      name : Text;
+      description : Text;
+      totalDistance : Nat;
+      laps : Nat;
+      segmentCount : Nat;
+    };
+    participants : [{
+      tokenIndex : Nat;
+      stats : {
+        speed : Nat;
+        powerCore : Nat;
+        acceleration : Nat;
+        stability : Nat;
+      };
+    }];
+    results : [{
+      tokenIndex : Nat;
+      position : Nat;
+      finalTime : Float;
+      avgSegmentTime : Float;
+    }];
+    analysis : {
+      winner : Nat;
+      winnerTime : Float;
+      lastPlaceTime : Float;
+      timeSpread : Float;
+      avgTime : Float;
+    };
+  } {
+    // Only owner can run simulations
+    if (caller != owner) {
+      return null;
+    };
+
+    // Get track
+    let trackOpt = RacingSimulator.getTrack(trackId);
+    let track = switch (trackOpt) {
+      case (?t) { t };
+      case (null) { return null };
+    };
+
+    // Build participants from token indices
+    var participants : [RacingSimulator.RacingParticipant] = [];
+    var participantData : [{
+      tokenIndex : Nat;
+      stats : {
+        speed : Nat;
+        powerCore : Nat;
+        acceleration : Nat;
+        stability : Nat;
+      };
+    }] = [];
+
+    for (tokenIndex in tokenIndices.vals()) {
+      let nftId = Nat.toText(tokenIndex);
+      // Get stats at 100% with terrain bonuses (matches actual race simulation)
+      switch (garageManager.getStatsAt100WithTerrain(nftId, track.primaryTerrain)) {
+        case (?statsAt100) {
+          let participant : RacingSimulator.RacingParticipant = {
+            nftId = nftId;
+            owner = caller;
+            stats = statsAt100;
+          };
+
+          participants := Array.append(participants, [participant]);
+          participantData := Array.append(
+            participantData,
+            [{
+              tokenIndex = tokenIndex;
+              stats = statsAt100;
+            }],
+          );
+        };
+        case (null) {
+          // Skip uninitialized bots
+        };
+      };
+    };
+
+    if (participants.size() < 2) {
+      return null;
+    };
+
+    // Create mock race
+    let mockRace : RacingSimulator.Race = {
+      raceId = 999999;
+      name = "Debug Test Race";
+      distance = track.totalDistance / 1000; // Convert meters to km
+      terrain = track.primaryTerrain;
+      trackId = trackId;
+      trackSeed = seed; // Use provided seed for reproducibility testing
+      raceClass = #Elite;
+      entryFee = 0;
+      maxEntries = 20;
+      minEntries = 2;
+      startTime = Time.now();
+      duration = 300;
+      entryDeadline = Time.now();
+      createdAt = Time.now();
+      entries = [];
+      status = #InProgress;
+      results = null;
+      prizePool = 0;
+      platformTax = 0;
+      platformBonus = 0;
+      sponsors = [];
+    };
+
+    // Simulate the race
+    let simulator = RacingSimulator.RaceSimulator();
+    switch (simulator.simulateRaceSegmented(mockRace, participants)) {
+      case (?results) {
+        // Calculate analysis
+        var totalTime : Float = 0.0;
+        var fastestTime : Float = 999999.0;
+        var slowestTime : Float = 0.0;
+        var winnerIndex : Nat = 0;
+
+        var resultData : [{
+          tokenIndex : Nat;
+          position : Nat;
+          finalTime : Float;
+          avgSegmentTime : Float;
+        }] = [];
+
+        let totalSegments = track.segments.size() * track.laps;
+
+        for (result in results.vals()) {
+          let tokenIndex = switch (Nat.fromText(result.nftId)) {
+            case (?idx) { idx };
+            case (null) { 0 };
+          };
+
+          if (result.finalTime < 999999.0) {
+            // Not DNF
+            totalTime += result.finalTime;
+            if (result.finalTime < fastestTime) {
+              fastestTime := result.finalTime;
+              winnerIndex := tokenIndex;
+            };
+            if (result.finalTime > slowestTime) {
+              slowestTime := result.finalTime;
+            };
+          };
+
+          resultData := Array.append(
+            resultData,
+            [{
+              tokenIndex = tokenIndex;
+              position = result.position;
+              finalTime = result.finalTime;
+              avgSegmentTime = if (totalSegments > 0) {
+                result.finalTime / Float.fromInt(totalSegments);
+              } else { 0.0 };
+            }],
+          );
+        };
+
+        let avgTime = if (results.size() > 0) {
+          totalTime / Float.fromInt(results.size());
+        } else { 0.0 };
+
+        ?{
+          track = {
+            trackId = track.trackId;
+            name = track.name;
+            description = track.description;
+            totalDistance = track.totalDistance;
+            laps = track.laps;
+            segmentCount = track.segments.size();
+          };
+          participants = participantData;
+          results = resultData;
+          analysis = {
+            winner = winnerIndex;
+            winnerTime = fastestTime;
+            lastPlaceTime = slowestTime;
+            timeSpread = slowestTime - fastestTime;
+            avgTime = avgTime;
+          };
+        };
+      };
+      case (null) { null };
+    };
+  };
+
+  /// Test/debug: Get all available tracks
+  public query func debug_get_all_tracks() : async [{
+    trackId : Nat;
+    name : Text;
+    description : Text;
+    totalDistance : Nat;
+    primaryTerrain : RacingSimulator.Terrain;
+    laps : Nat;
+    segmentCount : Nat;
+  }] {
+    let trackIds = [1, 2, 3, 4, 5];
+    var tracks : [{
+      trackId : Nat;
+      name : Text;
+      description : Text;
+      totalDistance : Nat;
+      primaryTerrain : RacingSimulator.Terrain;
+      laps : Nat;
+      segmentCount : Nat;
+    }] = [];
+
+    for (id in trackIds.vals()) {
+      switch (RacingSimulator.getTrack(id)) {
+        case (?track) {
+          tracks := Array.append(
+            tracks,
+            [{
+              trackId = track.trackId;
+              name = track.name;
+              description = track.description;
+              totalDistance = track.totalDistance;
+              primaryTerrain = track.primaryTerrain;
+              laps = track.laps;
+              segmentCount = track.segments.size();
+            }],
+          );
+        };
+        case (null) {};
+      };
+    };
+
+    tracks;
+  };
+
   /// Get a specific trait value ID by trait index (for calculations)
   public query func get_nft_trait_value(tokenId : Nat, traitIndex : Nat) : async ?Nat {
     statsManager.getTraitValue(tokenId, traitIndex);
@@ -1789,6 +2456,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     owner : ?Principal;
     faction : PokedBotsGarage.FactionType;
     raceClass : RacingSimulator.RaceClass;
+    preferredTerrain : RacingSimulator.Terrain;
     stats : {
       speed : Nat;
       powerCore : Nat;
@@ -1826,6 +2494,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           owner = ?botStats.ownerPrincipal;
           faction = botStats.faction;
           raceClass = raceClass;
+          preferredTerrain = botStats.preferredTerrain;
           stats = {
             speed = statsAt100.speed;
             powerCore = statsAt100.powerCore;
