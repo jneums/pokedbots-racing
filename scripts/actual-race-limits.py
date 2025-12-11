@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+"""
+Quick analysis: Maximum races per bot given actual race schedule.
+"""
+
+print("=" * 80)
+print("ACTUAL RACE AVAILABILITY ANALYSIS")
+print("=" * 80)
+
+print("\n📅 DAILY RACE SCHEDULE:")
+print("\n4 Daily Sprint Events (every 6 hours):")
+print("  • 00:00 UTC - Scavenger, Raider, Elite races")
+print("  • 06:00 UTC - Scavenger, Raider, Elite races")
+print("  • 12:00 UTC - Scavenger, Raider, Elite races")
+print("  • 18:00 UTC - Scavenger, Raider, Elite races")
+print("\nTotal: 12 race opportunities per day (4 events × 3 classes)")
+
+print("\n🤖 MAXIMUM RACES PER BOT:")
+print("  • Each bot can only enter 1 race per class")
+print("  • Maximum: 4 races/day/bot (one per event)")
+print("  • Realistic with maintenance: 2-3 races/day")
+
+print("\n📊 REVISED PLAYER SCENARIO:")
+print("\nIf player has 5-6 bots racing 2-3 times per day:")
+print("  • 5 bots × 3 races/day = 15 races/day")
+print("  • 15 races/day × 7 days = 105 races/week")
+print("  • At 0.15 ICP avg entry = 15.75 ICP/week entry fees")
+print("\nMaintenance per bot per day:")
+print("  • 3 races ≈ 45 battery drain")
+print("  • 3 races ≈ 15 condition wear")
+print("  • Needs: ~1 recharge every 2 days, 1 repair every 2-3 days")
+print("  • Cost: ~0.35 ICP/week/bot")
+print("  • 5 bots: 1.75 ICP/week total maintenance")
+
+print("\n💰 REVISED ECONOMICS:")
+print("  Revenue (Prizes):        6.00 ICP")
+print("  Entry Fees:            -15.75 ICP")
+print("  Maintenance:            -1.75 ICP")
+print("  ─────────────────────────────────")
+print("  NET RESULT:            -11.50 ICP/week ⚠️")
+
+print("\n🔍 ANALYSIS:")
+print("  • Still losing money, but less severe than estimated")
+print("  • 6 ICP in prizes from 105 races = 0.057 ICP/race avg")
+print("  • Suggests very low win rate or racing in Scavenger class")
+print("  • Break-even needs: 18 ICP in prizes (3x current)")
+
+print("\n💡 PATH TO PROFITABILITY:")
+print("\n  OPTION A: Improve Win Rate")
+print("    • Need ~30% top-3 finish rate")
+print("    • Upgrade bot stats (Speed, Acceleration)")
+print("    • Strategic race selection")
+print("\n  OPTION B: Reduce Volume")
+print("    • 2 races/day instead of 3 per bot")
+print("    • Saves: 5.25 ICP entry + 0.6 ICP maintenance = 5.85 ICP/week")
+print("    • New net: -5.65 ICP/week (still negative, but better)")
+print("\n  OPTION C: Focus Best Bots")
+print("    • Race only top 2-3 bots")
+print("    • 3 bots × 3 races = 9.45 ICP entry/week")
+print("    • Maintenance: 1.05 ICP/week")
+print("    • Need only 10.5 ICP in prizes to break even (vs 17.5)")
+print("\n  OPTION D: Target Elite Races")
+print("    • Higher entry (0.25 ICP) but much better prizes")
+print("    • Top 3 in Elite race ≈ 0.8-2.0 ICP vs 0.15 ICP in Scavenger")
+print("    • Break-even at 35% top-3 rate vs 53% in Scavenger")
+
+print("\n" + "=" * 80)

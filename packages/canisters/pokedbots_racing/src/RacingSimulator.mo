@@ -455,7 +455,8 @@ module {
       let effectiveSpeed = baseSpeed / (terrainMod * angleMod * difficultyMod * momentumMod);
       let segmentTime = (segmentLength / effectiveSpeed) * randomMod;
 
-      Float.max(0.1, segmentTime);
+      // 10x speed multiplier to reduce race times for better UX
+      Float.max(0.1, segmentTime / 10.0);
     };
 
     /// Simulate race segment-by-segment and return only final times

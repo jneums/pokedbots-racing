@@ -409,7 +409,7 @@ export const idlFactory = ({ IDL }) => {
             })
           ),
         ],
-        [],
+        ['query'],
       ),
     'debug_test_simulation' : IDL.Func(
         [IDL.Vec(IDL.Nat), IDL.Nat, IDL.Nat],
@@ -425,7 +425,7 @@ export const idlFactory = ({ IDL }) => {
             })
           ),
         ],
-        [],
+        ['query'],
       ),
     'decode_token_identifier' : IDL.Func([IDL.Text], [IDL.Nat], ['query']),
     'delete_events_after' : IDL.Func([IDL.Nat], [IDL.Text], []),

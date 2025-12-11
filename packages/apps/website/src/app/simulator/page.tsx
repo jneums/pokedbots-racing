@@ -103,6 +103,7 @@ const RaceVisualizerWithBackend = ({ raceData }: { raceData: any }) => {
       terrain={raceData.terrain}
       botOrder={raceData.botOrder}
       isValidating={isLoading}
+      startAtEnd={true}
     />
   );
 };

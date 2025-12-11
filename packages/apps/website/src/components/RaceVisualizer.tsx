@@ -31,6 +31,7 @@ interface RaceVisualizerProps {
   raceStartTime?: bigint; // Race start time in nanoseconds (for live mode)
   raceStatus?: any; // Race status (InProgress, Completed, etc.)
   bonusesAlreadyApplied?: boolean; // If true, stats already include terrain/faction bonuses (from backend snapshot)
+  startAtEnd?: boolean; // Start visualization at the end (for simulator mode)
 }
 
 // Helper to extract terrain from variant object or string
@@ -588,9 +589,21 @@ function simulateRaceProgression(
   return positions;
 }
 
-export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain, botOrder, isValidating = false, raceStartTime, raceStatus, bonusesAlreadyApplied = false }: RaceVisualizerProps) {
+export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain, botOrder, isValidating = false, raceStartTime, raceStatus, bonusesAlreadyApplied = false, startAtEnd = false }: RaceVisualizerProps) {
   // Determine if race is currently in progress (live mode)
-  const isLive = raceStatus && 'InProgress' in raceStatus;
+  // Check both status and timing - race is live if status is InProgress OR if it has started but not completed
+  const isLive = useMemo(() => {
+    if (raceStatus && 'InProgress' in raceStatus) return true;
+    
+    // Also check timing: if race has started but not completed, treat as live
+    if (raceStartTime && (!raceStatus || !('Completed' in raceStatus))) {
+      const now = Date.now() * 1_000_000; // Current time in nanoseconds
+      const hasStarted = Number(raceStartTime) <= now;
+      return hasStarted;
+    }
+    
+    return false;
+  }, [raceStatus, raceStartTime]);
   
   // Calculate initial time for live mode
   const getInitialTime = () => {
@@ -601,12 +614,21 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     return Math.max(0, elapsedSeconds);
   };
   
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(getInitialTime());
+  // Calculate initial time based on mode: live races start at current time, completed races start at end
+  const getInitialDisplayTime = () => {
+    if (isLive) {
+      return getInitialTime(); // Live races show current elapsed time
+    }
+    return 0; // Completed races will be set to maxTime after it's calculated
+  };
+  
+  const [isPlaying, setIsPlaying] = useState(isLive); // Auto-play only for live races
+  const [currentTime, setCurrentTime] = useState(getInitialDisplayTime());
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [liveMode, setLiveMode] = useState(isLive);
   const animationRef = useRef<number | undefined>(undefined);
   const lastFrameTimeRef = useRef<number>(0);
+  const hasSetFinalPosition = useRef<boolean>(false);
   
   // Pre-calculate segment times for all bots (memoized)
   const segmentTimesMap = useMemo(() => {
@@ -676,21 +698,39 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
   // Use positions directly - they're already in registration order from sortedResults
   const stablePositions = positions;
   
+  // Set completed races to final position on mount, or if startAtEnd is requested
+  useEffect(() => {
+    if ((!isLive || startAtEnd) && maxTime > 0 && !hasSetFinalPosition.current) {
+      setCurrentTime(maxTime);
+      hasSetFinalPosition.current = true;
+    }
+  }, [isLive, maxTime, startAtEnd]);
+  
+  // Reset to end when trackSeed changes in simulator mode
+  useEffect(() => {
+    if (startAtEnd && maxTime > 0) {
+      setCurrentTime(maxTime);
+      setIsPlaying(false);
+    }
+  }, [trackSeed, startAtEnd, maxTime]);
+  
   // Update live mode when race status changes
   useEffect(() => {
+    const wasLive = liveMode;
     setLiveMode(isLive);
-  }, [isLive]);
-  
-  // Auto-play when trackSeed exists and is not 0
-  useEffect(() => {
-    if (trackSeed && trackSeed !== 0n && !isPlaying) {
-      // For live mode, start from current elapsed time
-      if (liveMode && raceStartTime) {
-        setCurrentTime(getInitialTime());
-      }
+    
+    // If transitioning from live to completed, jump to final position
+    if (wasLive && !isLive && maxTime > 0) {
+      setCurrentTime(maxTime);
+      setIsPlaying(false);
+    }
+    
+    // If it's a new live race, auto-play and set current time
+    if (isLive && raceStartTime) {
+      setCurrentTime(getInitialTime());
       setIsPlaying(true);
     }
-  }, [trackSeed, liveMode]);
+  }, [isLive, maxTime, raceStartTime]);
   
   useEffect(() => {
     if (!isPlaying) {

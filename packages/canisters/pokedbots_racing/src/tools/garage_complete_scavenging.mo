@@ -18,7 +18,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_complete_scavenging";
     title = ?"Complete Scavenging Mission";
-    description = ?"Complete a scavenging mission and collect rewards. Awards parts to your inventory and potentially world buffs.\n\n**Rewards:**\n• Parts distributed across multiple types (Speed Chips, Power Core Fragments, Thruster Kits, Gyro Modules, Universal Parts)\n• Distribution varies by zone: ScrapHeaps (40% universal), AbandonedSettlements (25% universal), DeadMachineFields (10% universal)\n• Battery and condition consumed based on zone difficulty\n• 15% chance for world buff (expires in 48h)\n• Faction-specific bonuses and specials applied\n\n**Can only complete after mission duration has elapsed.**";
+    description = ?"Complete a scavenging mission and collect rewards. Awards parts to your inventory and potentially world buffs.\n\n**Rewards:**\n• Parts distributed across multiple types (Speed Chips, Power Core Fragments, Thruster Kits, Gyro Modules, Universal Parts)\n• Distribution varies by zone: ScrapHeaps (40% universal), AbandonedSettlements (25% universal), DeadMachineFields (10% universal)\n• Battery and condition consumed based on zone difficulty\n• 15% chance for world buff (expires in 48h)\n• Faction-specific bonuses and specials applied\n\n**Mission durations: ShortExpedition (5h), DeepSalvage (11h), WastelandExpedition (23h)**\n**Can only complete after mission duration has elapsed.**";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

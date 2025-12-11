@@ -304,7 +304,7 @@ type McpServer =
            totalDistance: nat;
            trackId: nat;
          };
-      });
+      }) query;
    /// Debug: Test simulate a race with specific bots and track
    /// Returns backend-calculated times for validation
    debug_test_simulation: (tokenIndexes: vec nat, trackId: nat, trackSeed:
@@ -312,7 +312,7 @@ type McpServer =
     (opt record {results: vec record {
                                 finalTime: float64;
                                 tokenIndex: nat;
-                              };});
+                              };}) query;
    /// Decode EXT token identifier to get token index (public query)
    decode_token_identifier: (tokenIdentifier: text) -> (nat) query;
    delete_events_after: (afterEventId: nat) -> (text);

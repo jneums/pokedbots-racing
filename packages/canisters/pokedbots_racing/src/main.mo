@@ -2032,7 +2032,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   /// Debug: Test simulate a race with specific bots and track
   /// Returns backend-calculated times for validation
-  public shared func debug_test_simulation(
+  public query func debug_test_simulation(
     tokenIndexes : [Nat],
     trackId : Nat,
     trackSeed : Nat,
@@ -2202,7 +2202,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   /// Test/debug: Simulate a race with specific bots on a specific track
   /// Returns detailed results for balance testing
-  public shared ({ caller }) func debug_simulate_race(
+  public query func debug_simulate_race(
     trackId : Nat,
     tokenIndices : [Nat],
     seed : Nat,
@@ -2238,11 +2238,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       avgTime : Float;
     };
   } {
-    // Only owner can run simulations
-    if (caller != owner) {
-      return null;
-    };
-
     // Get track
     let trackOpt = RacingSimulator.getTrack(trackId);
     let track = switch (trackOpt) {
@@ -2269,7 +2264,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         case (?statsAt100) {
           let participant : RacingSimulator.RacingParticipant = {
             nftId = nftId;
-            owner = caller;
+            owner = Principal.fromText("aaaaa-aa"); // Dummy principal for simulation
             stats = statsAt100;
           };
 
@@ -3559,7 +3554,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           shows = 0;
           totalScrapEarned = 0;
         };
-        ignore Map.put(stable_racing_stats, Map.nhash, tokenIndex, updatedBotStats);
+        garageManager.updateStats(tokenIndex, updatedBotStats);
         updatedCount += 1;
       };
     } else {
@@ -3577,7 +3572,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               // Keep existing ELO and other fields
             };
 
-            ignore Map.put(stable_racing_stats, Map.nhash, tokenIndex, updatedBotStats);
+            garageManager.updateStats(tokenIndex, updatedBotStats);
             updatedCount += 1;
           };
           case null {};

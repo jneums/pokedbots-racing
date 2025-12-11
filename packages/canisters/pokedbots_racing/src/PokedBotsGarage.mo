@@ -1292,9 +1292,9 @@ module {
     /// Get base battery cost for mission type
     private func getBaseBatteryCost(missionType : ScavengingMissionType) : Nat {
       switch (missionType) {
-        case (#ShortExpedition) { 20 };
-        case (#DeepSalvage) { 40 };
-        case (#WastelandExpedition) { 80 };
+        case (#ShortExpedition) { 10 };
+        case (#DeepSalvage) { 20 };
+        case (#WastelandExpedition) { 40 };
       };
     };
 
@@ -1307,10 +1307,10 @@ module {
       switch (zone) {
         case (#ScrapHeaps) { { battery = 1.0; condition = 1.0; parts = 1.0 } };
         case (#AbandonedSettlements) {
-          { battery = 1.2; condition = 1.3; parts = 1.4 };
+          { battery = 1.1; condition = 1.15; parts = 1.4 };
         };
         case (#DeadMachineFields) {
-          { battery = 1.5; condition = 1.8; parts = 2.0 };
+          { battery = 1.2; condition = 1.3; parts = 2.0 };
         };
       };
     };
@@ -1527,9 +1527,9 @@ module {
               // Base damage scales with mission type, then reduced by progress
               // This prevents exploiting long missions for short durations
               let fullMissionConditionLoss = switch (mission.missionType) {
-                case (#ShortExpedition) { 20 }; // +5 penalty vs 15 normal completion
-                case (#DeepSalvage) { 35 }; // +10 penalty vs 25 normal completion
-                case (#WastelandExpedition) { 55 }; // +15 penalty vs 40 normal completion
+                case (#ShortExpedition) { 10 }; // Reduced penalty for abandoning mission
+                case (#DeepSalvage) { 18 }; // Reduced penalty for abandoning mission
+                case (#WastelandExpedition) { 28 }; // Reduced penalty for abandoning mission
               };
               // Minimum 50% of full penalty even at 0% progress (prevents gaming system)
               let progressConditionMultiplier = 0.5 + (progressMultiplier * 0.5); // 50-100% of full penalty
