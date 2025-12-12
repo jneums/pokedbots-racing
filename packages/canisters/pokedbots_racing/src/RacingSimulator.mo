@@ -959,7 +959,7 @@ module {
           let updatedRace = {
             race with
             results = ?results;
-            status = #Completed;
+            // Don't change status here - race is still InProgress until handleRaceFinish
           };
           ignore Map.put(races, nhash, raceId, updatedRace);
           ?updatedRace;

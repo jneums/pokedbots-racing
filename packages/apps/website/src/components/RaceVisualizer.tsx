@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, RotateCcw, FastForward } from 'lucide-react';
+import { Play, Pause, RotateCcw, FastForward, SkipForward } from 'lucide-react';
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
 
 interface RaceResult {
@@ -355,7 +355,8 @@ function calculateSegmentTimeEstimate(
   const effectiveSpeed = baseSpeed / (terrainMod * angleMod * difficultyMod * momentumMod);
   const segmentTime = (segmentLength / effectiveSpeed) * randomMod;
   
-  return Math.max(0.1, segmentTime);
+  // Apply 10x speed multiplier to match backend
+  return Math.max(0.1, segmentTime / 10.0);
 }
 
 // Calculate segment-by-segment times for a bot
@@ -591,19 +592,35 @@ function simulateRaceProgression(
 
 export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain, botOrder, isValidating = false, raceStartTime, raceStatus, bonusesAlreadyApplied = false, startAtEnd = false }: RaceVisualizerProps) {
   // Determine if race is currently in progress (live mode)
-  // Check both status and timing - race is live if status is InProgress OR if it has started but not completed
+  // Race is live if status is InProgress
   const isLive = useMemo(() => {
-    if (raceStatus && 'InProgress' in raceStatus) return true;
+    console.log('[RaceVisualizer] Status check:', {
+      raceStatus,
+      keys: raceStatus ? Object.keys(raceStatus) : [],
+      hasInProgress: raceStatus && 'InProgress' in raceStatus,
+      hasCompleted: raceStatus && 'Completed' in raceStatus,
+      stringified: JSON.stringify(raceStatus),
+    });
     
-    // Also check timing: if race has started but not completed, treat as live
-    if (raceStartTime && (!raceStatus || !('Completed' in raceStatus))) {
-      const now = Date.now() * 1_000_000; // Current time in nanoseconds
+    // Check if status is InProgress (handle both string keys and object structure)
+    if (!raceStatus) return false;
+    
+    // Check for string key variant
+    if ('InProgress' in raceStatus) return true;
+    
+    // Check if it's Completed (means not live)
+    if ('Completed' in raceStatus) return false;
+    
+    // Fallback: check if race has started but no results yet
+    if (raceStartTime && (!results || results.length === 0 || !results[0]?.finalTime)) {
+      const now = Date.now() * 1_000_000;
       const hasStarted = Number(raceStartTime) <= now;
-      return hasStarted;
+      const notTooOld = (now - Number(raceStartTime)) < (2 * 60 * 60 * 1_000_000_000); // Less than 2 hours ago
+      return hasStarted && notTooOld;
     }
     
     return false;
-  }, [raceStatus, raceStartTime]);
+  }, [raceStatus, raceStartTime, results]);
   
   // Calculate initial time for live mode
   const getInitialTime = () => {
@@ -614,12 +631,12 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     return Math.max(0, elapsedSeconds);
   };
   
-  // Calculate initial time based on mode: live races start at current time, completed races start at end
+  // Calculate initial time based on mode: live races start at current time, completed races start at beginning
   const getInitialDisplayTime = () => {
     if (isLive) {
       return getInitialTime(); // Live races show current elapsed time
     }
-    return 0; // Completed races will be set to maxTime after it's calculated
+    return 0; // Completed races start at beginning
   };
   
   const [isPlaying, setIsPlaying] = useState(isLive); // Auto-play only for live races
@@ -698,13 +715,13 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
   // Use positions directly - they're already in registration order from sortedResults
   const stablePositions = positions;
   
-  // Set completed races to final position on mount, or if startAtEnd is requested
+  // For simulator mode with startAtEnd, set to final position on mount
   useEffect(() => {
-    if ((!isLive || startAtEnd) && maxTime > 0 && !hasSetFinalPosition.current) {
+    if (startAtEnd && maxTime > 0 && !hasSetFinalPosition.current) {
       setCurrentTime(maxTime);
       hasSetFinalPosition.current = true;
     }
-  }, [isLive, maxTime, startAtEnd]);
+  }, [maxTime, startAtEnd]);
   
   // Reset to end when trackSeed changes in simulator mode
   useEffect(() => {
@@ -802,6 +819,12 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     const nextSpeed = speeds[(currentIndex + 1) % speeds.length];
     setPlaybackSpeed(nextSpeed);
   };
+
+  const handleSkipToEnd = () => {
+    setIsPlaying(false);
+    setCurrentTime(maxTime);
+    lastFrameTimeRef.current = 0;
+  };
   
   const getTerrainIcon = (terrain: any): string => {
     const terrainStr = getTerrainString(terrain);
@@ -875,6 +898,15 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
               disabled={currentTime === 0 || liveMode}
             >
               <RotateCcw className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSkipToEnd}
+              disabled={currentTime >= maxTime || liveMode}
+              title="Skip to end"
+            >
+              <SkipForward className="w-4 h-4" />
             </Button>
             <Button
               variant="outline"

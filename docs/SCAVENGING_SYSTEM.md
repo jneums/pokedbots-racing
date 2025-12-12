@@ -15,8 +15,8 @@ Instead of sitting idle, underperforming bots become resource gatherers. They ex
 
 ## Mission Types
 
-### 1. **Short Expedition** (6 hours)
-- **Duration:** 6 hours
+### 1. **Short Expedition** (1 hour)
+- **Duration:** 1 hour
 - **Battery Cost:** 20-35 (based on zone danger)
 - **Condition Cost:** 10-20
 - **Parts Yield:** 15-35 parts (RNG + bot stats influence)

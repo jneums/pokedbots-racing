@@ -140,7 +140,7 @@ Here are easy natural language commands you can use:
 
 ## What Is It?
 
-Send your bots into the wasteland to gather upgrade parts. No ICP cost - just battery and condition wear. You can scavenge while racing!
+Send your bots into the wasteland to gather upgrade parts. No ICP cost - just battery and condition wear. You can not scavenge while racing. If you are registered for a race it will pull you out of the scavenging mission!
 
 ## 3 Mission Lengths
 
@@ -172,7 +172,7 @@ Random bonus stats for your next race! Longer missions = bigger buffs. Expires i
 - High Power Core stat = less battery drain
 - High Stability = less condition damage in dangerous zones
 - Dead faction bots get 1.4x parts in DeadMachineFields + take 50% less condition damage (perfect scavengers!)
-- You can race while scavenging, but if your race starts before mission ends, you'll take penalties
+- You can register to race while scavenging, but if your race starts before mission ends, the mission will end and you'll take penalties
 
 ---
 

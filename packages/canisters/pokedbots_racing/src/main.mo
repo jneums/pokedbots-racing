@@ -1140,7 +1140,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                 Debug.print("Race simulated at start, " # debug_show (results.size()) # " racers");
 
                 // Store results immediately
-                ignore raceManager.setRaceResults(raceId, results);
+                let updatedWithResults = raceManager.setRaceResults(raceId, results);
+                Debug.print("Stored results in race, updated race: " # debug_show (updatedWithResults));
 
                 // Find slowest finisher to determine actual race duration
                 var slowestTime : Float = 0.0;
@@ -1230,18 +1231,17 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
                 Debug.print("Applying race results, " # debug_show (results.size()) # " racers");
 
-                // Apply ELO rating changes for all race participants
+                // Apply ELO rating changes first
                 let eloResults = Array.map<RacingSimulator.RaceResult, (Text, Nat)>(
                   results,
                   func(r : RacingSimulator.RaceResult) : (Text, Nat) {
                     (r.nftId, r.position);
                   },
                 );
-                garageManager.applyRaceEloChanges(eloResults);
+                let eloChanges = garageManager.applyRaceEloChanges(eloResults);
 
-                // Update bot stats using garage manager
+                // Now update race stats (should preserve ELO from previous update)
                 for (result in results.vals()) {
-                  // Record race result in garage
                   garageManager.recordRaceResult(
                     result.nftId,
                     result.position,

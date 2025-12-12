@@ -125,7 +125,7 @@ module {
 
   // Scavenging System Types
   public type ScavengingMissionType = {
-    #ShortExpedition; // 6 hours
+    #ShortExpedition; // 1 hour
     #DeepSalvage; // 12 hours
     #WastelandExpedition; // 24 hours
   };
@@ -481,7 +481,9 @@ module {
 
     /// Calculate and apply ELO changes for all race participants
     /// Should be called once with all race results before individual recordRaceResult calls
-    public func applyRaceEloChanges(results : [(Text, Nat)]) {
+    // Combined function to update both ELO and race stats in a single operation
+    // This prevents the race condition where sequential updates overwrite each other
+    public func applyRaceEloChanges(results : [(Text, Nat)]) : [(Nat, Int)] {
       // results: [(nftId, position)]
 
       // Convert to format needed for ELO calculation: (tokenIndex, currentElo, racesEntered, position)
@@ -518,6 +520,48 @@ module {
           };
           case (null) {};
         };
+      };
+
+      // Return the ELO changes for logging/debugging
+      eloChanges;
+    };
+
+    // Update race stats (wins/places/shows/earnings) while preserving ELO
+    // This version reads CURRENT stats (including ELO update) and only modifies race stats
+    public func recordRaceResultWithElo(
+      nftId : Text,
+      position : Nat,
+      fieldSize : Nat,
+      earnings : Nat,
+    ) {
+      switch (Nat.fromText(nftId)) {
+        case (?tokenIndex) {
+          // Get CURRENT stats (which includes ELO update from applyRaceEloChanges)
+          switch (Map.get(stats, nhash, tokenIndex)) {
+            case (?botStats) {
+              let updatedStats = {
+                botStats with
+                racesEntered = botStats.racesEntered + 1;
+                wins = if (position == 1) { botStats.wins + 1 } else {
+                  botStats.wins;
+                };
+                places = if (position == 2) { botStats.places + 1 } else {
+                  botStats.places;
+                };
+                shows = if (position == 3) { botStats.shows + 1 } else {
+                  botStats.shows;
+                };
+                totalScrapEarned = botStats.totalScrapEarned + earnings;
+                experience = botStats.experience + (if (position <= 3) { 10 } else { 5 });
+                factionReputation = botStats.factionReputation + (if (position == 1) { 5 } else if (position <= 3) { 2 } else { 1 });
+                lastRaced = ?Time.now();
+              };
+              updateStats(tokenIndex, updatedStats);
+            };
+            case (null) {};
+          };
+        };
+        case (null) {};
       };
     };
 
@@ -1271,7 +1315,7 @@ module {
     /// Get mission duration in nanoseconds
     private func getMissionDuration(missionType : ScavengingMissionType) : Int {
       switch (missionType) {
-        case (#ShortExpedition) { 6 * 3600 * 1_000_000_000 }; // 6 hours
+        case (#ShortExpedition) { 1 * 3600 * 1_000_000_000 }; // 1 hour
         case (#DeepSalvage) { 12 * 3600 * 1_000_000_000 }; // 12 hours
         case (#WastelandExpedition) { 24 * 3600 * 1_000_000_000 }; // 24 hours
       };
