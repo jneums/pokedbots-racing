@@ -21,7 +21,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("The token index of the PokedBot to send scavenging"))])), ("mission_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("ShortExpedition"), Json.str("DeepSalvage"), Json.str("WastelandExpedition")])), ("description", Json.str("Mission duration: ShortExpedition (5h), DeepSalvage (11h), WastelandExpedition (23h)"))])), ("zone", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("ScrapHeaps"), Json.str("AbandonedSettlements"), Json.str("DeadMachineFields")])), ("description", Json.str("Zone difficulty and rewards"))]))])),
+      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("The token index of the PokedBot to send scavenging"))])), ("mission_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("ShortExpedition"), Json.str("DeepSalvage"), Json.str("WastelandExpedition")])), ("description", Json.str("Mission duration: ShortExpedition (1h), DeepSalvage (12h), WastelandExpedition (24h)"))])), ("zone", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("ScrapHeaps"), Json.str("AbandonedSettlements"), Json.str("DeadMachineFields")])), ("description", Json.str("Zone difficulty and rewards"))]))])),
       ("required", Json.arr([Json.str("token_index"), Json.str("mission_type"), Json.str("zone")])),
     ]);
     outputSchema = null;
