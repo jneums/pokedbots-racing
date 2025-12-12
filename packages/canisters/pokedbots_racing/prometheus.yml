@@ -56,5 +56,5 @@ submission:
     gallery_images:
       - >-
         https://github.com/jneums/pokedbots-racing/releases/download/v1.0.2-assets/banner-pokedbots-racing.webp
-  git_commit: de533bdd63152bb2a82a1d12561d270d18cd5820
+  git_commit: 3e4e4058a9d10a9df6ea91e892f14eaa16511ef9
   wasm_path: ./out/out_Linux_x86_64.wasm
