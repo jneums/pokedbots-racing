@@ -15,8 +15,8 @@ Instead of sitting idle, underperforming bots become resource gatherers. They ex
 
 ## Mission Types
 
-### 1. **Short Expedition** (1 hour)
-- **Duration:** 1 hour
+### 1. **Short Expedition** (5 hours)
+- **Duration:** 5 hours
 - **Battery Cost:** 20-35 (based on zone danger)
 - **Condition Cost:** 10-20
 - **Parts Yield:** 15-35 parts (RNG + bot stats influence)
@@ -24,7 +24,7 @@ Instead of sitting idle, underperforming bots become resource gatherers. They ex
 - **Risk Level:** Low
 - **Best For:** Bots between races, maintaining activity
 
-### 2. **Deep Salvage** (12 hours)
+### 2. **Deep Salvage** (11 hours)
 - **Duration:** 12 hours
 - **Battery Cost:** 35-55
 - **Condition Cost:** 20-35
@@ -33,7 +33,7 @@ Instead of sitting idle, underperforming bots become resource gatherers. They ex
 - **Risk Level:** Medium
 - **Best For:** Dedicated scavenging runs, good battery reserves
 
-### 3. **Wasteland Expedition** (24 hours)
+### 3. **Wasteland Expedition** (23 hours)
 - **Duration:** 24 hours
 - **Battery Cost:** 60-85
 - **Condition Cost:** 35-60

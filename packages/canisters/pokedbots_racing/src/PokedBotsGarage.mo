@@ -125,9 +125,9 @@ module {
 
   // Scavenging System Types
   public type ScavengingMissionType = {
-    #ShortExpedition; // 1 hour
-    #DeepSalvage; // 12 hours
-    #WastelandExpedition; // 24 hours
+    #ShortExpedition; // 5 hours
+    #DeepSalvage; // 11 hours
+    #WastelandExpedition; // 23 hours
   };
 
   public type ScavengingZone = {
@@ -1315,9 +1315,9 @@ module {
     /// Get mission duration in nanoseconds
     private func getMissionDuration(missionType : ScavengingMissionType) : Int {
       switch (missionType) {
-        case (#ShortExpedition) { 1 * 3600 * 1_000_000_000 }; // 1 hour
-        case (#DeepSalvage) { 12 * 3600 * 1_000_000_000 }; // 12 hours
-        case (#WastelandExpedition) { 24 * 3600 * 1_000_000_000 }; // 24 hours
+        case (#ShortExpedition) { 5 * 3600 * 1_000_000_000 }; // 5 hours
+        case (#DeepSalvage) { 11 * 3600 * 1_000_000_000 }; // 11 hours
+        case (#WastelandExpedition) { 23 * 3600 * 1_000_000_000 }; // 23 hours
       };
     };
 

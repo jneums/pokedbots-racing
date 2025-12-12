@@ -156,10 +156,10 @@ module {
                   switch (stats.activeMission) {
                     case (?mission) {
                       let missionName = switch (mission.missionType) {
-                        case (#ShortExpedition) { "Short Expedition (6h)" };
-                        case (#DeepSalvage) { "Deep Salvage (12h)" };
+                        case (#ShortExpedition) { "Short Expedition (5h)" };
+                        case (#DeepSalvage) { "Deep Salvage (11h)" };
                         case (#WastelandExpedition) {
-                          "Wasteland Expedition (24h)";
+                          "Wasteland Expedition (23h)";
                         };
                       };
                       let zoneName = switch (mission.zone) {

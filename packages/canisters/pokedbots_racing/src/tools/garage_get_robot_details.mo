@@ -281,9 +281,9 @@ module {
                 let minutesRemaining = (timeRemaining % (60 * 60 * 1_000_000_000)) / (60 * 1_000_000_000);
 
                 let missionTypeText = switch (mission.missionType) {
-                  case (#ShortExpedition) { "ShortExpedition (6h)" };
-                  case (#DeepSalvage) { "DeepSalvage (12h)" };
-                  case (#WastelandExpedition) { "WastelandExpedition (24h)" };
+                  case (#ShortExpedition) { "ShortExpedition (5h)" };
+                  case (#DeepSalvage) { "DeepSalvage (11h)" };
+                  case (#WastelandExpedition) { "WastelandExpedition (23h)" };
                 };
 
                 let zoneText = switch (mission.zone) {
