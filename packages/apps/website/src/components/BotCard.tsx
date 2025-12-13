@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BotListItem, initializeBot, rechargeBot, repairBot, generatetokenIdentifier, listBotForSale, unlistBot, transferBot } from '@pokedbots-racing/ic-js';
+import { BotListItem, initializeBot, rechargeBot, repairBot, generatetokenIdentifier, listBotForSale, unlistBot, transferBot, startScavenging, completeScavenging } from '@pokedbots-racing/ic-js';
 import { useAuth } from '../hooks/useAuth';
 import { useUpgradeBot } from '../hooks/useGarage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -25,8 +25,11 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
   const [showListForSale, setShowListForSale] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [showScavenging, setShowScavenging] = useState(false);
   const [upgradeType, setUpgradeType] = useState<'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro'>('Velocity');
   const [paymentMethod, setPaymentMethod] = useState<'icp' | 'parts'>('icp');
+  const [missionType, setMissionType] = useState<'ShortExpedition' | 'DeepSalvage' | 'WastelandExpedition'>('ShortExpedition');
+  const [scavengingZone, setScavengingZone] = useState<'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields'>('ScrapHeaps');
   const [botName, setBotName] = useState('');
   const [listPrice, setListPrice] = useState('');
   const [transferTo, setTransferTo] = useState('');
@@ -39,13 +42,18 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
     setLoading(true);
     setError(null);
     try {
+      console.log('Initializing bot', bot.tokenIndex, 'with name:', botName || 'none');
       const result = await initializeBot(Number(bot.tokenIndex), botName || undefined, user.agent as any);
+      console.log('Initialization result:', result);
       setShowInitialize(false);
+      setBotName(''); // Reset name field
       onUpdate();
       toast.success(result);
     } catch (err) {
+      console.error('Initialization error:', err);
       const errorMsg = err instanceof Error ? err.message : 'Failed to initialize bot';
       setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -76,6 +84,43 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
       onUpdate();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to repair');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartScavenging = async () => {
+    if (!user?.agent) return;
+    
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await startScavenging(Number(bot.tokenIndex), missionType, scavengingZone, user.agent as any);
+      setShowScavenging(false);
+      onUpdate();
+      toast.success(result);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to start scavenging';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCompleteScavenging = async () => {
+    if (!user?.agent) return;
+    
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await completeScavenging(Number(bot.tokenIndex), user.agent as any);
+      onUpdate();
+      toast.success(result);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to complete scavenging';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -241,11 +286,30 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
 
   const formatBigInt = (value: bigint) => Number(value).toLocaleString();
 
+  const formatRelativeTime = (endTimeNanos: bigint): string => {
+    const endTimeMs = Number(endTimeNanos) / 1_000_000;
+    const now = Date.now();
+    const diffMs = endTimeMs - now;
+    
+    if (diffMs <= 0) return 'Ready!';
+    
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m remaining`;
+    }
+    return `${minutes}m remaining`;
+  };
+
   // Generate proper token identifier for image URL
   const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.tokenIndex));
   const imageUrl = `https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=${tokenId}&type=thumbnail`;
 
-  if (!bot.isInitialized) {
+  // Check if bot needs registration: either not initialized OR initialized but owned by someone else
+  const needsRegistration = !bot.isInitialized || (bot.stats && bot.stats.ownerPrincipal && user?.principal && bot.stats.ownerPrincipal.toText() !== user.principal);
+
+  if (needsRegistration) {
     return (
       <>
         <Card className="border-dashed">
@@ -257,11 +321,13 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
               </Avatar>
               <div className="flex-1 flex items-center justify-between">
                 <span>Bot #{bot.tokenIndex.toString()}</span>
-                <Badge variant="secondary">Uninitialized</Badge>
+                <Badge variant="secondary">{!bot.isInitialized ? 'Uninitialized' : 'Needs Re-registration'}</Badge>
               </div>
             </CardTitle>
             <CardDescription>
-              This bot needs to be registered for racing
+              {!bot.isInitialized 
+                ? 'This bot needs to be registered for racing. Costs 0.1 ICP.' 
+                : 'Register this transferred bot to your account. Costs 0.1 ICP.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -274,10 +340,9 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
         <Dialog open={showInitialize} onOpenChange={setShowInitialize}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Initialize Bot #{bot.tokenIndex.toString()}</DialogTitle>
+              <DialogTitle>{!bot.isInitialized ? 'Initialize' : 'Register'} Bot #{bot.tokenIndex.toString()}</DialogTitle>
               <DialogDescription>
-                Register this bot for wasteland racing. Costs 0.1 ICP + 0.0001 ICP fee (one-time payment). 
-                You will be asked to approve the payment first.
+                Register this bot for wasteland racing. Costs 0.1 ICP + 0.0001 ICP fee.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -390,6 +455,38 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
           View Full Stats & Details →
         </Button>
 
+        {/* Active Scavenging Mission */}
+        {bot.activeMission && (
+          <div className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg space-y-2">
+            <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">🔍 Scavenging Mission Active</p>
+            <div className="text-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Mission:</span>
+                <span className="font-medium">{Object.keys(bot.activeMission.missionType)[0]}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Zone:</span>
+                <span className="font-medium">{Object.keys(bot.activeMission.zone)[0]}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Time:</span>
+                <span className="font-medium">
+                  {formatRelativeTime(bot.activeMission.endTime)}
+                </span>
+              </div>
+            </div>
+            <Button
+              onClick={handleCompleteScavenging}
+              disabled={loading || Date.now() < Number(bot.activeMission.endTime) / 1_000_000}
+              size="sm"
+              className="w-full"
+              variant="outline"
+            >
+              {Date.now() < Number(bot.activeMission.endTime) / 1_000_000 ? 'Mission In Progress...' : 'Complete Mission'}
+            </Button>
+          </div>
+        )}
+
         {/* Upcoming Races */}
         {bot.upcomingRaces && bot.upcomingRaces.length > 0 && (
           <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-2">
@@ -451,7 +548,7 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
         </div>
 
         {/* Actions */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <Button
             onClick={handleRecharge}
             disabled={loading || Number(stats.battery) >= 90}
@@ -467,6 +564,14 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
             variant="outline"
           >
             Repair
+          </Button>
+          <Button
+            onClick={() => setShowScavenging(true)}
+            disabled={loading || !!bot.activeMission}
+            size="sm"
+            variant="outline"
+          >
+            {bot.activeMission ? 'On Mission' : 'Scavenge'}
           </Button>
         </div>
 
@@ -619,6 +724,91 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
             <Button
               variant="outline"
               onClick={() => setShowTransfer(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Scavenging Dialog */}
+      <Dialog open={showScavenging} onOpenChange={setShowScavenging}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Start Scavenging Mission</DialogTitle>
+            <DialogDescription>
+              Send your bot to scavenge the wasteland for upgrade parts. No ICP cost - only battery consumption.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="mission-type">Mission Duration</Label>
+              <Select value={missionType} onValueChange={(value: any) => setMissionType(value)}>
+                <SelectTrigger id="mission-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ShortExpedition">⚡ Short Expedition (5h) - 15-35 parts, 10 battery</SelectItem>
+                  <SelectItem value="DeepSalvage">🔍 Deep Salvage (11h) - 40-80 parts, 20 battery</SelectItem>
+                  <SelectItem value="WastelandExpedition">🏜️ Wasteland Expedition (23h) - 100-200 parts, 40 battery</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="scavenging-zone">Scavenging Zone</Label>
+              <Select value={scavengingZone} onValueChange={(value: any) => setScavengingZone(value)}>
+                <SelectTrigger id="scavenging-zone">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ScrapHeaps">🏜️ Scrap Heaps (Safe) - 1.0x costs, 40% Universal Parts</SelectItem>
+                  <SelectItem value="AbandonedSettlements">🏭 Abandoned Settlements (Moderate) - 1.4x parts, 1.2x costs, 25% Universal</SelectItem>
+                  <SelectItem value="DeadMachineFields">⚠️ Dead Machine Fields (High Risk) - 2.0x parts, 1.3x costs, 10% Universal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="p-4 bg-muted rounded-lg space-y-2">
+              <p className="text-sm font-semibold">Mission Details:</p>
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Duration:</span>
+                  <span>{missionType === 'ShortExpedition' ? '5 hours' : missionType === 'DeepSalvage' ? '11 hours' : '23 hours'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Base Battery:</span>
+                  <span>{missionType === 'ShortExpedition' ? '10' : missionType === 'DeepSalvage' ? '20' : '40'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Parts Multiplier:</span>
+                  <span className={scavengingZone === 'DeadMachineFields' ? 'text-orange-600 font-semibold' : ''}>{scavengingZone === 'ScrapHeaps' ? '1.0x' : scavengingZone === 'AbandonedSettlements' ? '1.4x' : '2.0x'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cost Multiplier:</span>
+                  <span className={scavengingZone === 'DeadMachineFields' ? 'text-red-600 font-semibold' : ''}>{scavengingZone === 'ScrapHeaps' ? '1.0x' : scavengingZone === 'AbandonedSettlements' ? '1.2x' : '1.3x'}</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground pt-2">
+                💡 Tip: Riskier zones = more parts but higher battery & condition costs. Universal Parts work for any upgrade!
+              </p>
+            </div>
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleStartScavenging}
+              disabled={loading}
+              className="flex-1"
+            >
+              {loading ? 'Starting...' : 'Start Mission'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowScavenging(false)}
               disabled={loading}
             >
               Cancel

@@ -383,7 +383,7 @@ module {
         minEntries = 6;
         prizePoolBonus = 200_000_000; // Platform adds 2 ICP
         pointsMultiplier = 2.0; // Double points
-        divisions = [#Junker, #Raider, #Elite, #SilentKlan]; // All divisions
+        divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan]; // All divisions
       };
 
       scheduleEvent(
@@ -400,13 +400,13 @@ module {
     public func createDailySprintEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Daily Sprint Challenge";
-        description = "Quick race for XP and rewards - Entry scales by class (Junker 0.05, Raider 0.1, Elite 0.25 ICP). All classes receive platform bonus.";
+        description = "Quick race for XP and rewards - Entry scales by class (Scrap 0.025, Junker 0.05, Raider 0.1, Elite 0.25 ICP). All classes receive platform bonus.";
         entryFee = 5_000_000; // 0.05 ICP base (Junker)
         maxEntries = 12;
         minEntries = 2;
         prizePoolBonus = 50_000_000; // Platform adds 0.5 ICP (Junker base)
         pointsMultiplier = 1.0; // Standard points
-        divisions = [#Junker, #Raider, #Elite]; // Exclude SilentKlan
+        divisions = [#Scrap, #Junker, #Raider, #Elite]; // Include all daily tiers
       };
 
       scheduleEvent(

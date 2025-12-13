@@ -141,6 +141,7 @@ module {
           var racesArray : [Json.Json] = [];
           for (race in races.vals()) {
             let classText = switch (race.raceClass) {
+              case (#Scrap) { "Scrap" };
               case (#Junker) { "Junker" };
               case (#Raider) { "Raider" };
               case (#Elite) { "Elite" };

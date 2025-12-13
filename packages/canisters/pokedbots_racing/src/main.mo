@@ -67,56 +67,35 @@ import ExtIntegration "ExtIntegration";
 import IcpLedger "IcpLedger";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
-
-// Migration to add stats field to RaceEntry type - COMMENTED OUT AFTER MIGRATION COMPLETE
+// Migration to add #Scrap variant to RaceClass type - COMMENTED OUT AFTER MIGRATION COMPLETE
 /*
 (
   with migration = func(
     old_state : {
-      stable_races : Map.Map<Nat, { raceId : Nat; name : Text; distance : Nat; terrain : RacingSimulator.Terrain; trackId : Nat; trackSeed : Nat; raceClass : RacingSimulator.RaceClass; entryFee : Nat; maxEntries : Nat; minEntries : Nat; startTime : Int; duration : Nat; entryDeadline : Int; createdAt : Int; entries : [{ nftId : Text; owner : Principal; entryFee : Nat; enteredAt : Int }]; status : RacingSimulator.RaceStatus; results : ?[RacingSimulator.RaceResult]; prizePool : Nat; platformTax : Nat; platformBonus : Nat; sponsors : [RacingSimulator.Sponsor] }>;
+      stable_races : Map.Map<Nat, { raceId : Nat; name : Text; distance : Nat; terrain : RacingSimulator.Terrain; trackId : Nat; trackSeed : Nat; raceClass : { #Junker; #Raider; #Elite; #SilentKlan }; entryFee : Nat; maxEntries : Nat; minEntries : Nat; startTime : Int; duration : Nat; entryDeadline : Int; createdAt : Int; entries : [RacingSimulator.RaceEntry]; status : RacingSimulator.RaceStatus; results : ?[RacingSimulator.RaceResult]; prizePool : Nat; platformTax : Nat; platformBonus : Nat; sponsors : [RacingSimulator.Sponsor] }>;
+      stable_events : Map.Map<Nat, { eventId : Nat; eventType : RaceCalendar.EventType; scheduledTime : Int; registrationOpens : Int; registrationCloses : Int; status : RaceCalendar.EventStatus; metadata : { name : Text; description : Text; entryFee : Nat; maxEntries : Nat; minEntries : Nat; prizePoolBonus : Nat; pointsMultiplier : Float; divisions : [{ #Junker; #Raider; #Elite; #SilentKlan }] }; raceIds : [Nat]; createdAt : Int }>;
     };
   ) : {
     stable_races : Map.Map<Nat, RacingSimulator.Race>;
+    stable_events : Map.Map<Nat, RaceCalendar.ScheduledEvent>;
   } {
-    // Copy stats from results to entries for live simulation
+    // Migrate races - convert old RaceClass variant to new one (all existing races keep their class)
     let new_races = Map.new<Nat, RacingSimulator.Race>();
     for ((raceId, oldRace) in Map.entries(old_state.stable_races)) {
-      // Migrate entries - add stats field, copying from results if available
-      let migratedEntries = Array.map<{ nftId : Text; owner : Principal; entryFee : Nat; enteredAt : Int }, RacingSimulator.RaceEntry>(
-        oldRace.entries,
-        func(oldEntry) : RacingSimulator.RaceEntry {
-          // Try to find stats from race results
-          let statsFromResults : ?RacingSimulator.RacingStats = switch (oldRace.results) {
-            case (?results) {
-              // Find matching result by nftId
-              let matchingResult = Array.find<RacingSimulator.RaceResult>(
-                results,
-                func(r) { r.nftId == oldEntry.nftId }
-              );
-              switch (matchingResult) {
-                case (?result) { result.stats };
-                case (null) { null };
-              };
-            };
-            case (null) { null };
-          };
-
-          {
-            nftId = oldEntry.nftId;
-            owner = oldEntry.owner;
-            entryFee = oldEntry.entryFee;
-            enteredAt = oldEntry.enteredAt;
-            stats = statsFromResults; // Copy stats from results or null
-          };
-        },
-      );
+      // Map old race class to new race class (preserving existing values)
+      let newRaceClass : RacingSimulator.RaceClass = switch (oldRace.raceClass) {
+        case (#Junker) { #Junker };
+        case (#Raider) { #Raider };
+        case (#Elite) { #Elite };
+        case (#SilentKlan) { #SilentKlan };
+      };
 
       let newRace : RacingSimulator.Race = {
         raceId = oldRace.raceId;
         name = oldRace.name;
         distance = oldRace.distance;
         terrain = oldRace.terrain;
-        raceClass = oldRace.raceClass;
+        raceClass = newRaceClass; // Use migrated race class
         entryFee = oldRace.entryFee;
         maxEntries = oldRace.maxEntries;
         minEntries = oldRace.minEntries;
@@ -124,7 +103,7 @@ import Star "mo:star/star";
         duration = oldRace.duration;
         entryDeadline = oldRace.entryDeadline;
         createdAt = oldRace.createdAt;
-        entries = migratedEntries;
+        entries = oldRace.entries;
         status = oldRace.status;
         results = oldRace.results;
         prizePool = oldRace.prizePool;
@@ -137,8 +116,50 @@ import Star "mo:star/star";
       Map.set(new_races, Map.nhash, raceId, newRace);
     };
 
+    // Migrate events - convert old divisions array to new one
+    let new_events = Map.new<Nat, RaceCalendar.ScheduledEvent>();
+    for ((eventId, oldEvent) in Map.entries(old_state.stable_events)) {
+      // Map old divisions to new divisions (preserving existing values)
+      let newDivisions : [RacingSimulator.RaceClass] = Array.map<{ #Junker; #Raider; #Elite; #SilentKlan }, RacingSimulator.RaceClass>(
+        oldEvent.metadata.divisions,
+        func(oldClass) {
+          switch (oldClass) {
+            case (#Junker) { #Junker };
+            case (#Raider) { #Raider };
+            case (#Elite) { #Elite };
+            case (#SilentKlan) { #SilentKlan };
+          };
+        },
+      );
+
+      let newMetadata : RaceCalendar.EventMetadata = {
+        name = oldEvent.metadata.name;
+        description = oldEvent.metadata.description;
+        divisions = newDivisions;
+        entryFee = oldEvent.metadata.entryFee;
+        maxEntries = oldEvent.metadata.maxEntries;
+        minEntries = oldEvent.metadata.minEntries;
+        prizePoolBonus = oldEvent.metadata.prizePoolBonus;
+        pointsMultiplier = oldEvent.metadata.pointsMultiplier;
+      };
+
+      let newEvent : RaceCalendar.ScheduledEvent = {
+        eventId = oldEvent.eventId;
+        eventType = oldEvent.eventType;
+        scheduledTime = oldEvent.scheduledTime;
+        registrationOpens = oldEvent.registrationOpens;
+        registrationCloses = oldEvent.registrationCloses;
+        status = oldEvent.status;
+        metadata = newMetadata;
+        raceIds = oldEvent.raceIds;
+        createdAt = oldEvent.createdAt;
+      };
+      Map.set(new_events, Map.nhash, eventId, newEvent);
+    };
+
     {
       stable_races = new_races;
+      stable_events = new_events;
     };
   };
 )
@@ -417,15 +438,18 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       #Elite; // High tier: 1600-1799
     } else if (eloRating >= 1400) {
       #Raider; // Mid tier: 1400-1599
+    } else if (eloRating >= 1200) {
+      #Junker; // Low tier: 1200-1399
     } else {
-      #Junker; // Entry tier: <1400
+      #Scrap; // Bottom tier: <1200
     };
   };
 
   /// Check if bot's current ELO matches race class requirements
   func checkEloEligibility(eloRating : Nat, raceClass : RacingSimulator.RaceClass) : Bool {
     switch (raceClass) {
-      case (#Junker) { eloRating < 1400 };
+      case (#Scrap) { eloRating < 1200 };
+      case (#Junker) { eloRating >= 1200 and eloRating < 1400 };
       case (#Raider) { eloRating >= 1400 and eloRating < 1600 };
       case (#Elite) { eloRating >= 1600 and eloRating < 1800 };
       case (#SilentKlan) { eloRating >= 1800 };
@@ -675,6 +699,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
           // Apply class-based entry fee multiplier
           let classFeeMultiplier : Float = switch (division) {
+            case (#Scrap) { 0.5 }; // Base fee
             case (#Junker) { 1.0 }; // Base fee
             case (#Raider) { 2.0 }; // 2x
             case (#Elite) { 5.0 }; // 5x
@@ -686,10 +711,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           // Apply scaled platform bonus to all classes to guarantee top 3 profitability
           let platformBonus : Nat = switch (event.eventType, division) {
             // Daily Sprint bonuses
+            case (#DailySprint, #Scrap) { 40_000_000 }; // 0.4 ICP
             case (#DailySprint, #Junker) { 50_000_000 }; // 0.5 ICP
             case (#DailySprint, #Raider) { 60_000_000 }; // 0.6 ICP
             case (#DailySprint, #Elite) { 140_000_000 }; // 1.4 ICP
             // Weekly League bonuses
+            case (#WeeklyLeague, #Scrap) { 180_000_000 }; // 1.8 ICP
             case (#WeeklyLeague, #Junker) { 200_000_000 }; // 2.0 ICP
             case (#WeeklyLeague, #Raider) { 200_000_000 }; // 2.0 ICP
             case (#WeeklyLeague, #Elite) { 140_000_000 }; // 1.4 ICP
@@ -1265,6 +1292,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   // Base parts awarded by race class (matches original scrap system: 1 scrap = 1 part)
                   // First upgrade costs 100 parts, achievable in ~7-15 Junker races
                   let baseParts : Nat = switch (race.raceClass) {
+                    case (#Scrap) { 2 }; // Rookie: 1-6 parts per race (winner: 6, participation: 1)
                     case (#Junker) { 5 }; // Entry: 2.5-15 parts per race (winner: 15, participation: 2.5)
                     case (#Raider) { 12 }; // Mid: 6-36 parts per race (winner: 36)
                     case (#Elite) { 25 }; // High: 12.5-75 parts per race (winner: 75)
@@ -3696,6 +3724,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     ];
 
     let divisions : [RacingSimulator.RaceClass] = [
+      #Scrap,
       #Junker,
       #Raider,
       #Elite,
@@ -3724,6 +3753,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
         // Division-based multiplier
         let multiplier = switch (division) {
+          case (#Scrap) { 0.5 };
           case (#Junker) { 1.0 };
           case (#Raider) { 1.5 };
           case (#Elite) { 2.0 };
@@ -4385,9 +4415,58 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             case (?existingStats) {
               // Check if owned by caller
               if (existingStats.ownerPrincipal != caller) {
-                // Transfer case - update owner (no fee for ownership transfer)
-                ignore garageManager.updateBotOwner(tokenIndex, caller);
-                #ok("Bot ownership updated to your account");
+                // Transfer case - still charge 0.1 ICP registration fee
+                let REGISTRATION_COST = 10000000 : Nat; // 0.1 ICP in e8s
+                let TRANSFER_FEE = 10000 : Nat; // 0.0001 ICP in e8s
+                let totalCost = REGISTRATION_COST + TRANSFER_FEE;
+
+                let ledgerId = switch (icpLedgerCanisterId) {
+                  case (?id) { id };
+                  case (null) {
+                    return #err("ICP Ledger not configured");
+                  };
+                };
+
+                let icpLedger = actor (Principal.toText(ledgerId)) : actor {
+                  icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
+                };
+
+                let transferResult = try {
+                  await icpLedger.icrc2_transfer_from({
+                    from = { owner = caller; subaccount = null };
+                    to = { owner = thisPrincipal; subaccount = null };
+                    amount = totalCost;
+                    fee = ?TRANSFER_FEE;
+                    memo = null;
+                    created_at_time = null;
+                    spender_subaccount = null;
+                  });
+                } catch (e) {
+                  return #err("Payment failed: " # Error.message(e) # ". Please approve the canister to spend 0.1001 ICP using icrc2_approve.");
+                };
+
+                switch (transferResult) {
+                  case (#Err(e)) {
+                    let errorMsg = switch (e) {
+                      case (#InsufficientFunds({ balance })) {
+                        "Insufficient funds. Balance: " # Nat.toText(balance / 100000000) # " ICP";
+                      };
+                      case (#InsufficientAllowance({ allowance })) {
+                        "Insufficient spending allowance. Current: " # Nat.toText(allowance / 100000000) # " ICP. Please go to the Garage page and set a spending allowance first.";
+                      };
+                      case (#BadFee({ expected_fee })) {
+                        "Bad fee. Expected: " # Nat.toText(expected_fee) # " e8s";
+                      };
+                      case _ { "Transfer failed" };
+                    };
+                    #err(errorMsg);
+                  };
+                  case (#Ok(_)) {
+                    // Payment successful, update owner
+                    ignore garageManager.updateBotOwner(tokenIndex, caller);
+                    #ok("Bot re-registered to your account. 0.1 ICP registration fee paid.");
+                  };
+                };
               } else {
                 #ok("Bot already initialized for your account");
               };
@@ -4517,7 +4596,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
 
     // Process ICRC-2 payment and recharge
-    let RECHARGE_COST : Nat = 100_000_000; // 0.1 ICP
+    let RECHARGE_COST : Nat = 10_000_000; // 0.1 ICP
 
     let ledgerId = switch (icpLedgerCanisterId) {
       case (?id) { id };
@@ -4592,7 +4671,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
 
     // Process ICRC-2 payment and repair
-    let REPAIR_COST : Nat = 50_000_000; // 0.05 ICP
+    let REPAIR_COST : Nat = 5_000_000; // 0.05 ICP
 
     let ledgerId = switch (icpLedgerCanisterId) {
       case (?id) { id };
@@ -4776,6 +4855,20 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       };
     };
 
+    // Verify bot is initialized and registered to current owner
+    let botStats = switch (garageManager.getStats(tokenIndex)) {
+      case (null) {
+        return #err("This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first to register it.");
+      };
+      case (?stats) {
+        // Verify caller is the registered owner
+        if (not Principal.equal(stats.ownerPrincipal, caller)) {
+          return #err("This PokedBot is registered to a different owner. Please use garage_initialize_pokedbot to register it to your account.");
+        };
+        stats;
+      };
+    };
+
     // Get race and verify it exists
     let race = switch (Map.get(stable_races, Map.nhash, raceId)) {
       case (?r) { r };
@@ -4826,81 +4919,110 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
   };
 
-  /// Purchase a bot from the marketplace (with ICRC-2 payment)
-  public shared ({ caller }) func web_purchase_bot(
-    tokenIndex : Nat
+  /// Start a scavenging mission (web method)
+  public shared ({ caller }) func web_start_scavenging(
+    tokenIndex : Nat,
+    missionType : Text,
+    zone : Text,
   ) : async Result.Result<Text, Text> {
-    // Get marketplace listings
-    let listings = await extCanister.listings();
-
-    let tokenId = ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), extCanisterId);
-    let listing = Array.find<(Nat32, ExtIntegration.Listing, ExtIntegration.Metadata)>(
-      listings,
-      func((idx, _listing, _metadata)) {
-        ExtIntegration.encodeTokenIdentifier(idx, extCanisterId) == tokenId;
-      },
+    // Verify ownership
+    let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
+    let ownerResult = await extCanister.bearer(
+      ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), extCanisterId)
     );
 
-    let price = switch (listing) {
-      case (null) { return #err("Bot not listed for sale") };
-      case (?(_, l, _)) {
-        let priceNat : Nat = Nat64.toNat(l.price);
-        priceNat;
+    switch (ownerResult) {
+      case (#err(_)) { return #err("Bot does not exist") };
+      case (#ok(owner)) {
+        if (owner != walletAccountId) {
+          return #err("You do not own this bot");
+        };
       };
     };
 
-    // Two-step payment: User → Canister → Seller
-    let ledgerId = switch (icpLedgerCanisterId) {
-      case (?id) { id };
-      case (null) { return #err("ICP Ledger not configured") };
-    };
-
-    let icpLedger = actor (Principal.toText(ledgerId)) : actor {
-      icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
-    };
-
-    // Step 1: Transfer from user to canister
-    let transferResult = try {
-      await icpLedger.icrc2_transfer_from({
-        from = { owner = caller; subaccount = null };
-        to = { owner = thisPrincipal; subaccount = null };
-        amount = price + TRANSFER_FEE;
-        fee = ?TRANSFER_FEE;
-        memo = null;
-        created_at_time = null;
-        spender_subaccount = null;
-      });
-    } catch (e) {
-      return #err("Payment transfer failed: " # Error.message(e));
-    };
-
-    switch (transferResult) {
-      case (#Err(err)) {
-        return #err("Payment failed: " # debug_show (err));
+    // Parse mission type
+    let parsedMissionType : PokedBotsGarage.ScavengingMissionType = switch (missionType) {
+      case ("ShortExpedition") { #ShortExpedition };
+      case ("DeepSalvage") { #DeepSalvage };
+      case ("WastelandExpedition") { #WastelandExpedition };
+      case (_) {
+        return #err("Invalid mission type. Must be ShortExpedition, DeepSalvage, or WastelandExpedition");
       };
-      case (#Ok(_blockIndex)) {
-        // Step 2: Settle the purchase via EXT
-        let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
-        let settleResult = try {
-          await extCanister.settle(
-            ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), extCanisterId)
-          );
-        } catch (e) {
-          return #err("Purchase settlement failed: " # Error.message(e));
+    };
+
+    // Parse zone
+    let parsedZone : PokedBotsGarage.ScavengingZone = switch (zone) {
+      case ("ScrapHeaps") { #ScrapHeaps };
+      case ("AbandonedSettlements") { #AbandonedSettlements };
+      case ("DeadMachineFields") { #DeadMachineFields };
+      case (_) {
+        return #err("Invalid zone. Must be ScrapHeaps, AbandonedSettlements, or DeadMachineFields");
+      };
+    };
+
+    // Start mission
+    let now = Time.now();
+    switch (garageManager.startScavengingMission(tokenIndex, parsedMissionType, parsedZone, now)) {
+      case (#ok(mission)) {
+        let durationHours = switch (parsedMissionType) {
+          case (#ShortExpedition) { "5" };
+          case (#DeepSalvage) { "11" };
+          case (#WastelandExpedition) { "23" };
+        };
+        #ok("Scavenging mission started! Bot will be on mission for " # durationHours # " hours.");
+      };
+      case (#err(msg)) {
+        #err(msg);
+      };
+    };
+  };
+
+  /// Complete a scavenging mission and collect rewards (web method)
+  public shared ({ caller }) func web_complete_scavenging(
+    tokenIndex : Nat
+  ) : async Result.Result<Text, Text> {
+    // Verify ownership
+    let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
+    let ownerResult = await extCanister.bearer(
+      ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), extCanisterId)
+    );
+
+    switch (ownerResult) {
+      case (#err(_)) { return #err("Bot does not exist") };
+      case (#ok(owner)) {
+        if (owner != walletAccountId) {
+          return #err("You do not own this bot");
+        };
+      };
+    };
+
+    // Complete mission
+    let now = Time.now();
+    let rng = Int.abs(now % 1000000);
+
+    switch (garageManager.completeScavengingMission(tokenIndex, now, rng)) {
+      case (#ok(result)) {
+        var message = "Mission complete! Found " # Nat.toText(result.partsFound) # " parts:\n";
+        message #= "• Speed Chips: " # Nat.toText(result.speedChips) # "\n";
+        message #= "• Power Core Fragments: " # Nat.toText(result.powerCoreFragments) # "\n";
+        message #= "• Thruster Kits: " # Nat.toText(result.thrusterKits) # "\n";
+        message #= "• Gyro Modules: " # Nat.toText(result.gyroModules) # "\n";
+        message #= "• Universal Parts: " # Nat.toText(result.universalParts) # "\n\n";
+        message #= "Battery consumed: " # Nat.toText(result.batteryConsumed) # "\n";
+        message #= "Condition lost: " # Nat.toText(result.conditionLost);
+
+        if (result.worldBuffApplied) {
+          message #= "\n\n🌟 Wasteland resonance discovered! Stat buffs applied for your next race!";
         };
 
-        switch (settleResult) {
-          case (#err(commonErr)) {
-            let errMsg = switch (commonErr) {
-              case (#InvalidToken(tokenId)) { "Invalid token: " # tokenId };
-              case (#Other(txt)) { txt };
-            };
-            #err("Settlement failed: " # errMsg);
-          };
-          case (#ok()) {
-            #ok("Bot purchased successfully and sent to your wallet!");
-          };
+        for (event in result.events.vals()) {
+          message #= "\n" # event;
         };
+
+        #ok(message);
+      };
+      case (#err(msg)) {
+        #err(msg);
       };
     };
   };

@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
+import { Badge } from '../../components/ui/badge';
 import { Alert, AlertDescription } from '../../components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { PurchaseDialog } from '../../components/PurchaseDialog';
 import { useAuth } from '../../hooks/useAuth';
 import { useInfiniteMarketplace, usePurchaseBot } from '../../hooks/useMarketplace';
-import { AlertCircle } from 'lucide-react';
+import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { AlertCircle, ChevronDown } from 'lucide-react';
 
 interface PurchaseDialogState {
   isOpen: boolean;
@@ -17,7 +20,14 @@ interface PurchaseDialogState {
 
 export default function MarketplacePage() {
   const { user } = useAuth();
-  const [sortBy, setSortBy] = useState<'price' | 'rating' | 'winRate' | 'wins'>('price');
+  const [sortBy, setSortBy] = useState<'price' | 'rating'>('price');
+  const [minPrice, setMinPrice] = useState<string>('');
+  const [maxPrice, setMaxPrice] = useState<string>('');
+  const [minRating, setMinRating] = useState<string>('');
+  const [maxRating, setMaxRating] = useState<string>('');
+  const [faction, setFaction] = useState<string>('');
+  const [raceClass, setRaceClass] = useState<string>('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const { mutate: purchaseBot } = usePurchaseBot();
   const [showLoginAlert, setShowLoginAlert] = useState(false);
   const [purchaseDialog, setPurchaseDialog] = useState<PurchaseDialogState>({
@@ -69,22 +79,47 @@ export default function MarketplacePage() {
     isFetching,
     isFetchingNextPage,
     isLoading,
-  } = useInfiniteMarketplace({ sortBy, limit: 20 });
+  } = useInfiniteMarketplace({ 
+    sortBy,
+    minPrice: minPrice ? parseFloat(minPrice) : undefined,
+    maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
+    minRating: minRating ? parseInt(minRating) : undefined,
+    maxRating: maxRating ? parseInt(maxRating) : undefined,
+    faction: faction || undefined,
+    raceClass: raceClass || undefined,
+    limit: 20 
+  });
 
   // Flatten all pages into a single array
   const listings = data?.pages.flatMap(page => page.listings) ?? [];
 
-  const getFactionBadgeColor = (faction: string | null) => {
-    if (!faction) return 'bg-gray-500';
-    
-    const ultraRare = ['UltimateMaster', 'Wild', 'Golden', 'Ultimate'];
-    const superRare = ['Blackhole', 'Dead', 'Master'];
-    const rare = ['Bee', 'Food', 'Box', 'Murder'];
-    
-    if (ultraRare.includes(faction)) return 'bg-purple-600';
-    if (superRare.includes(faction)) return 'bg-blue-600';
-    if (rare.includes(faction)) return 'bg-green-600';
-    return 'bg-gray-600';
+  const getFactionColor = (faction: string | null): string => {
+    if (!faction) return 'from-gray-500 to-gray-700';
+    const colors: Record<string, string> = {
+      UltimateMaster: 'from-purple-500 to-pink-500',
+      Golden: 'from-yellow-400 to-yellow-600',
+      Ultimate: 'from-blue-500 to-purple-500',
+      Wild: 'from-green-500 to-emerald-600',
+      Blackhole: 'from-gray-900 to-purple-900',
+      Dead: 'from-gray-600 to-red-900',
+      Master: 'from-blue-600 to-indigo-700',
+      Bee: 'from-yellow-300 to-orange-400',
+      Food: 'from-red-400 to-orange-500',
+      Box: 'from-amber-600 to-yellow-700',
+      Murder: 'from-red-700 to-black',
+      Game: 'from-teal-500 to-cyan-600',
+      Animal: 'from-green-600 to-lime-500',
+      Industrial: 'from-gray-500 to-slate-600',
+    };
+    return colors[faction] || 'from-gray-500 to-gray-700';
+  };
+
+  const getRaceClassBadge = (rating: number): { emoji: string; name: string; color: string } => {
+    if (rating >= 50) return { emoji: '👑', name: 'Silent Klan', color: 'from-yellow-400 to-amber-500' };
+    if (rating >= 40) return { emoji: '🥇', name: 'Elite', color: 'from-blue-500 to-cyan-500' };
+    if (rating >= 30) return { emoji: '🥈', name: 'Raider', color: 'from-gray-400 to-gray-500' };
+    if (rating >= 20) return { emoji: '🥉', name: 'Junker', color: 'from-amber-700 to-yellow-800' };
+    return { emoji: '🗑️', name: 'Scrap', color: 'from-stone-600 to-stone-700' };
   };
 
   return (
@@ -106,32 +141,159 @@ export default function MarketplacePage() {
           </Alert>
         )}
 
-        <div className="mb-6 flex gap-2">
+        {/* Filter Section */}
+        <Card className="mb-6">
+          <CardHeader 
+            className="cursor-pointer hover:bg-accent/50 transition-colors"
+            onClick={() => setFiltersOpen(!filtersOpen)}
+          >
+            <div className="flex items-center justify-between">
+              <CardTitle>Filters</CardTitle>
+              <ChevronDown 
+                className={`h-5 w-5 transition-transform duration-200 ${
+                  filtersOpen ? 'transform rotate-180' : ''
+                }`}
+              />
+            </div>
+          </CardHeader>
+          {filtersOpen && (
+          <CardContent>
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">Min Price (ICP)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 0.5"
+                    value={minPrice}
+                    onChange={(e) => setMinPrice(e.target.value)}
+                    className="px-3 py-2 border rounded-md bg-background"
+                    step="0.1"
+                    min="0"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">Max Price (ICP)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 10"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(e.target.value)}
+                    className="px-3 py-2 border rounded-md bg-background"
+                    step="0.1"
+                    min="0"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">Min Rating</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 20"
+                    value={minRating}
+                    onChange={(e) => setMinRating(e.target.value)}
+                    className="px-3 py-2 border rounded-md bg-background"
+                    step="1"
+                    min="0"
+                    max="100"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">Max Rating</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 100"
+                    value={maxRating}
+                    onChange={(e) => setMaxRating(e.target.value)}
+                    className="px-3 py-2 border rounded-md bg-background"
+                    step="1"
+                    min="0"
+                    max="100"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Faction</label>
+                <Select value={faction || 'all'} onValueChange={(value) => setFaction(value === 'all' ? '' : value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Factions" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    <SelectItem value="all">All Factions</SelectItem>
+                    <SelectItem value="UltimateMaster">UltimateMaster</SelectItem>
+                    <SelectItem value="Wild">Wild</SelectItem>
+                    <SelectItem value="Golden">Golden</SelectItem>
+                    <SelectItem value="Ultimate">Ultimate</SelectItem>
+                    <SelectItem value="Blackhole">Blackhole</SelectItem>
+                    <SelectItem value="Dead">Dead</SelectItem>
+                    <SelectItem value="Master">Master</SelectItem>
+                    <SelectItem value="Bee">Bee</SelectItem>
+                    <SelectItem value="Food">Food</SelectItem>
+                    <SelectItem value="Box">Box</SelectItem>
+                    <SelectItem value="Murder">Murder</SelectItem>
+                    <SelectItem value="Game">Game</SelectItem>
+                    <SelectItem value="Animal">Animal</SelectItem>
+                    <SelectItem value="Industrial">Industrial</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Race Class</label>
+                <Select value={raceClass || 'all'} onValueChange={(value) => setRaceClass(value === 'all' ? '' : value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Classes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Classes</SelectItem>
+                    <SelectItem value="SilentKlan">👑 Silent Klan (50+)</SelectItem>
+                    <SelectItem value="Elite">🥇 Elite (40-49)</SelectItem>
+                    <SelectItem value="Raider">🥈 Raider (30-39)</SelectItem>
+                    <SelectItem value="Junker">🥉 Junker (20-29)</SelectItem>
+                    <SelectItem value="Scrap">🗑️ Scrap (&lt;20)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {(minPrice || maxPrice || minRating || maxRating || faction || raceClass) && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setMinPrice('');
+                    setMaxPrice('');
+                    setMinRating('');
+                    setMaxRating('');
+                    setFaction('');
+                    setRaceClass('');
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          </CardContent>
+          )}
+        </Card>
+
+        {/* Sort Buttons with horizontal scroll on mobile */}
+        <div className="mb-6 overflow-x-auto">
+          <div className="flex gap-2 flex-nowrap min-w-min">
             <Button
               variant={sortBy === 'price' ? 'default' : 'outline'}
               onClick={() => setSortBy('price')}
+              className="whitespace-nowrap"
             >
               Sort by Price
             </Button>
             <Button
               variant={sortBy === 'rating' ? 'default' : 'outline'}
               onClick={() => setSortBy('rating')}
+              className="whitespace-nowrap"
             >
               Sort by Rating
             </Button>
-            <Button
-              variant={sortBy === 'winRate' ? 'default' : 'outline'}
-              onClick={() => setSortBy('winRate')}
-            >
-              Sort by Win Rate
-            </Button>
-            <Button
-              variant={sortBy === 'wins' ? 'default' : 'outline'}
-              onClick={() => setSortBy('wins')}
-            >
-              Sort by Wins
-            </Button>
           </div>
+        </div>
 
           {error && (
             <Card className="mb-6 border-red-500">
@@ -156,20 +318,27 @@ export default function MarketplacePage() {
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {listings.map((listing) => (
+                {listings.map((listing) => {
+                  const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', listing.tokenIndex);
+                  const imageUrl = generateExtThumbnailLink(tokenId);
+                  
+                  return (
                   <Card key={listing.tokenIndex} className="overflow-hidden hover:shadow-lg transition-shadow">
                     <div className="aspect-square relative bg-gradient-to-br from-gray-800 to-gray-900 overflow-hidden">
                       <img
-                        src={listing.imageUrl}
+                        src={imageUrl}
                         alt={`Bot #${listing.tokenIndex}`}
                         className="w-full h-full object-cover object-top"
                         loading="lazy"
                       />
                       {listing.faction && (
-                        <div className={`absolute top-2 right-2 ${getFactionBadgeColor(listing.faction)} text-white text-xs px-2 py-1 rounded`}>
+                        <Badge className={`absolute top-2 right-2 bg-gradient-to-r ${getFactionColor(listing.faction)} text-white border-0`}>
                           {listing.faction}
-                        </div>
+                        </Badge>
                       )}
+                      <Badge className={`absolute top-2 left-2 bg-gradient-to-r ${getRaceClassBadge(listing.overallRating).color} text-white border-0`}>
+                        {getRaceClassBadge(listing.overallRating).emoji} {getRaceClassBadge(listing.overallRating).name}
+                      </Badge>
                     </div>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-lg flex justify-between items-center">
@@ -232,7 +401,8 @@ export default function MarketplacePage() {
                       </Button>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
 
               {hasNextPage && (

@@ -697,16 +697,20 @@ module {
       // Map rating to starting ELO:
       // 50+ rating = SilentKlan tier (1900 ELO)
       // 40-49 rating = Elite tier (1700 ELO)
+      // 40+ rating = Elite tier (1700 ELO)
       // 30-39 rating = Raider tier (1500 ELO)
-      // <30 rating = Junker tier (1300 ELO)
+      // 20-29 rating = Junker tier (1300 ELO)
+      // <20 rating = Scrap tier (1100 ELO)
       let startingElo = if (averageRating >= 50) {
         1900; // SilentKlan tier
       } else if (averageRating >= 40) {
         1700; // Elite tier
       } else if (averageRating >= 30) {
         1500; // Raider tier
-      } else {
+      } else if (averageRating >= 20) {
         1300; // Junker tier
+      } else {
+        1100; // Scrap tier
       };
 
       let now = Time.now();

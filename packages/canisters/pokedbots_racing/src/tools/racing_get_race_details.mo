@@ -102,7 +102,8 @@ module {
               };
 
               let classText = switch (race.raceClass) {
-                case (#Junker) { "Junker (<1400 ELO)" };
+                case (#Scrap) { "Scrap (<1200 ELO)" };
+                case (#Junker) { "Junker (1200-1399 ELO)" };
                 case (#Raider) { "Raider (1400-1599 ELO)" };
                 case (#Elite) { "Elite (1600-1799 ELO)" };
                 case (#SilentKlan) { "Silent Klan Invitational (1800+ ELO)" };

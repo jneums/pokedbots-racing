@@ -24,9 +24,12 @@ export interface MarketplaceListing {
 export interface BrowseMarketplaceParams {
   after?: number;
   minRating?: number;
+  maxRating?: number;
+  minPrice?: number;
   maxPrice?: number;
   faction?: string;
-  sortBy?: "price" | "rating" | "winRate" | "wins";
+  raceClass?: string;
+  sortBy?: "price" | "rating";
   sortDesc?: boolean;
   limit?: number;
 }
@@ -84,54 +87,78 @@ async function getLedgerActorFromIdentity(identityOrAgent: IdentityOrAgent): Pro
   return getLedgerActor(identityOrAgent);
 }
 
+// Cache for precomputed stats
+type BotStats = { tokenId: number; speed: number; powerCore: number; acceleration: number; stability: number; faction: string };
+let cachedStats: BotStats[] | null = null;
+
+async function loadPrecomputedStats(): Promise<BotStats[]> {
+  if (cachedStats) return cachedStats;
+  
+  const response = await fetch('/precomputed-stats.json');
+  const data = await response.json() as { stats: BotStats[] };
+  cachedStats = data.stats;
+  return cachedStats;
+}
+
 /**
- * Browse marketplace listings using EXT canister directly (fast query call)
- * then enrich with bot details from racing canister
+ * Browse marketplace listings - gets EXT listings and enriches with precomputed stats
  */
 export async function browseMarketplace(
   identityOrAgent: IdentityOrAgent,
   params: BrowseMarketplaceParams = {}
 ): Promise<BrowseMarketplaceResult> {
   const nftActor = await getNFTsActorFromIdentity(identityOrAgent);
-  const racingActor = await getRacingActorFromIdentity(identityOrAgent);
+  const nftCanisterId = getCanisterId('POKEDBOTS_NFTS');
 
-  // Get all listings from EXT canister (fast query call - returns all ~1700 listings)
+  // Load precomputed stats
+  const allStats = await loadPrecomputedStats();
+  const statsMap = new Map(allStats.map(s => [s.tokenId, s]));
+
+  // Get all listings from EXT canister (fast query call)
   const extListings = await nftActor.listings();
   
   if (extListings.length === 0) {
     return { listings: [], hasMore: false };
   }
 
-  // Fetch bot details for ALL listings in one batch call (query is fast)
-  const allTokenIndices = extListings.map(([tokenIndex32, _listing, _metadata]) => 
-    BigInt(Number(tokenIndex32))
-  );
-  const allBotDetails = await racingActor.web_get_bot_details_batch(allTokenIndices);
-
-  // Merge EXT listings with bot details
-  let enrichedListings: MarketplaceListing[] = extListings.map(([tokenIndex32, listing, _metadata], index) => {
+  // Merge EXT listings with precomputed stats
+  let enrichedListings: MarketplaceListing[] = extListings.map(([tokenIndex32, listing, _metadata]) => {
     const tokenIndex = Number(tokenIndex32);
     const priceICP = Number(listing.price) / 100_000_000;
-    const details = allBotDetails[index];
+    const stats = statsMap.get(tokenIndex);
+    
+    // Calculate overall rating from base stats
+    const baseSpeed = stats?.speed || 0;
+    const basePowerCore = stats?.powerCore || 0;
+    const baseAcceleration = stats?.acceleration || 0;
+    const baseStability = stats?.stability || 0;
+    const overallRating = Math.floor((baseSpeed + basePowerCore + baseAcceleration + baseStability) / 4);
+    
+    const tokenId = `${tokenIndex}`.padStart(8, '0');
+    const imageUrl = `https://${nftCanisterId}.raw.icp0.io/?tokenid=${nftCanisterId}-${tokenId}&type=thumbnail`;
     
     return {
       tokenIndex,
       price: priceICP,
-      faction: details.faction.length > 0 ? details.faction[0]! : null,
-      baseSpeed: Number(details.baseSpeed),
-      basePowerCore: Number(details.basePowerCore),
-      baseAcceleration: Number(details.baseAcceleration),
-      baseStability: Number(details.baseStability),
-      overallRating: Number(details.overallRating),
-      wins: Number(details.wins),
-      racesEntered: Number(details.racesEntered),
-      winRate: details.winRate,
-      imageUrl: details.imageUrl,
-      isInitialized: details.isInitialized,
+      faction: stats?.faction || null,
+      baseSpeed,
+      basePowerCore,
+      baseAcceleration,
+      baseStability,
+      overallRating,
+      wins: 0, // Not available from precomputed stats
+      racesEntered: 0, // Not available from precomputed stats
+      winRate: 0, // Not available from precomputed stats
+      imageUrl,
+      isInitialized: false, // Not available from precomputed stats
     };
   });
 
   // Apply filters
+  if (params.minPrice !== undefined) {
+    enrichedListings = enrichedListings.filter(l => l.price >= params.minPrice!);
+  }
+
   if (params.maxPrice !== undefined) {
     enrichedListings = enrichedListings.filter(l => l.price <= params.maxPrice!);
   }
@@ -140,8 +167,26 @@ export async function browseMarketplace(
     enrichedListings = enrichedListings.filter(l => l.overallRating >= params.minRating!);
   }
 
+  if (params.maxRating !== undefined) {
+    enrichedListings = enrichedListings.filter(l => l.overallRating <= params.maxRating!);
+  }
+
   if (params.faction !== undefined) {
     enrichedListings = enrichedListings.filter(l => l.faction === params.faction);
+  }
+
+  if (params.raceClass !== undefined) {
+    enrichedListings = enrichedListings.filter(l => {
+      const rating = l.overallRating;
+      switch (params.raceClass) {
+        case 'SilentKlan': return rating >= 50;
+        case 'Elite': return rating >= 40 && rating < 50;
+        case 'Raider': return rating >= 30 && rating < 40;
+        case 'Junker': return rating >= 20 && rating < 30;
+        case 'Scrap': return rating < 20;
+        default: return true;
+      }
+    });
   }
 
   // Apply sorting
@@ -156,12 +201,6 @@ export async function browseMarketplace(
         break;
       case 'rating':
         comparison = a.overallRating - b.overallRating;
-        break;
-      case 'winRate':
-        comparison = a.winRate - b.winRate;
-        break;
-      case 'wins':
-        comparison = a.wins - b.wins;
         break;
     }
     return descending ? -comparison : comparison;

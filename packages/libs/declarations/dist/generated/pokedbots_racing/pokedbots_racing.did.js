@@ -37,6 +37,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const RaceClass = IDL.Variant({
     'Elite' : IDL.Null,
+    'Scrap' : IDL.Null,
     'Junker' : IDL.Null,
     'SilentKlan' : IDL.Null,
     'Raider' : IDL.Null,
@@ -931,6 +932,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'web_complete_scavenging' : IDL.Func([IDL.Nat], [Result_1], []),
     'web_enter_race' : IDL.Func([IDL.Nat, IDL.Nat], [Result_1], []),
     'web_get_bot_details' : IDL.Func([IDL.Nat], [Result_2], []),
     'web_get_bot_details_batch' : IDL.Func(
@@ -986,9 +988,13 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'web_purchase_bot' : IDL.Func([IDL.Nat], [Result_1], []),
     'web_recharge_bot' : IDL.Func([IDL.Nat], [Result_1], []),
     'web_repair_bot' : IDL.Func([IDL.Nat], [Result_1], []),
+    'web_start_scavenging' : IDL.Func(
+        [IDL.Nat, IDL.Text, IDL.Text],
+        [Result_1],
+        [],
+      ),
     'web_upgrade_bot' : IDL.Func(
         [
           IDL.Nat,

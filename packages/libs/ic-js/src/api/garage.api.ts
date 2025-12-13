@@ -65,6 +65,12 @@ export interface BotListItem {
   isListed?: boolean;
   listPrice?: number;
   activeUpgrade?: any;
+  activeMission?: {
+    missionType: { ShortExpedition: null } | { DeepSalvage: null } | { WastelandExpedition: null };
+    zone: { ScrapHeaps: null } | { AbandonedSettlements: null } | { DeadMachineFields: null };
+    startTime: bigint;
+    endTime: bigint;
+  };
   upcomingRaces?: Array<{
     raceId: number;
     name: string;
@@ -114,15 +120,20 @@ export const listMyBots = async (identityOrAgent: IdentityOrAgent): Promise<BotL
     const tokenIndex = Number(bot.tokenIndex);
     const listingInfo = listingsMap.get(tokenIndex);
     
+    // Extract activeMission from stats if available
+    const stats = bot.stats.length > 0 ? bot.stats[0] : undefined;
+    const activeMission = stats && stats.activeMission && stats.activeMission.length > 0 ? stats.activeMission[0] : undefined;
+    
     return {
       tokenIndex: bot.tokenIndex,
       isInitialized: bot.isInitialized,
       name: bot.name.length > 0 ? bot.name[0] : undefined,
       currentOwner: bot.currentOwner,
-      stats: bot.stats.length > 0 ? bot.stats[0] : undefined,
+      stats,
       isListed: !!listingInfo,
       listPrice: listingInfo?.price,
       activeUpgrade: bot.activeUpgrade.length > 0 ? bot.activeUpgrade[0] : undefined,
+      activeMission,
       upcomingRaces: bot.upcomingRaces.map(race => ({
         raceId: Number(race.raceId),
         name: race.name,
@@ -353,4 +364,56 @@ export const approveIcpSpending = async (
   // TODO: Implement ICRC-2 approval
   // This will need to call the ICP Ledger canister's icrc2_approve method
   throw new Error('Not implemented - ICRC-2 approval coming soon');
+};
+
+/**
+ * Start a scavenging mission for a bot.
+ * @param tokenIndex The token index of the bot
+ * @param missionType The duration of the mission
+ * @param zone The zone to scavenge in
+ * @param identityOrAgent Required identity for authentication
+ * @returns Success message
+ */
+export const startScavenging = async (
+  tokenIndex: number,
+  missionType: 'ShortExpedition' | 'DeepSalvage' | 'WastelandExpedition',
+  zone: 'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields',
+  identityOrAgent: IdentityOrAgent
+): Promise<string> => {
+  const actor = await getActor(identityOrAgent);
+  
+  const result = await actor.web_start_scavenging(
+    BigInt(tokenIndex),
+    missionType,
+    zone
+  );
+  
+  if ('ok' in result) {
+    return result.ok as string;
+  } else if ('err' in result) {
+    throw new Error(result.err as string);
+  }
+  throw new Error('Unexpected response from canister');
+};
+
+/**
+ * Complete a scavenging mission and collect rewards.
+ * @param tokenIndex The token index of the bot
+ * @param identityOrAgent Required identity for authentication
+ * @returns Success message with rewards
+ */
+export const completeScavenging = async (
+  tokenIndex: number,
+  identityOrAgent: IdentityOrAgent
+): Promise<string> => {
+  const actor = await getActor(identityOrAgent);
+  
+  const result = await actor.web_complete_scavenging(BigInt(tokenIndex));
+  
+  if ('ok' in result) {
+    return result.ok as string;
+  } else if ('err' in result) {
+    throw new Error(result.err as string);
+  }
+  throw new Error('Unexpected response from canister');
 };

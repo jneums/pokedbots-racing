@@ -35,12 +35,14 @@ function getFactionColor(faction: string): string {
 function getRaceClassBadge(raceClass: any): string {
   // Handle string format from backend
   if (typeof raceClass === 'string') {
+    if (raceClass.includes('Scrap')) return '🗑️ Scrap';
     if (raceClass.includes('Junker')) return '🥉 Junker';
     if (raceClass.includes('Raider')) return '🥈 Raider';
     if (raceClass.includes('Elite')) return '🥇 Elite';
     if (raceClass.includes('SilentKlan') || raceClass.includes('Silent Klan')) return '👑 Silent Klan';
   }
   // Handle variant object format
+  if ('Scrap' in raceClass) return '🗑️ Scrap';
   if ('Junker' in raceClass) return '🥉 Junker';
   if ('Raider' in raceClass) return '🥈 Raider';
   if ('Elite' in raceClass) return '🥇 Elite';

@@ -69,10 +69,11 @@ module {
   // ===== RACE TYPES =====
 
   public type RaceClass = {
-    #Junker; // 0-2 wins
-    #Raider; // 3-5 wins
-    #Elite; // 6-9 wins
-    #SilentKlan; // 10+ wins
+    #Scrap; // <1200 ELO
+    #Junker; // 1200-1399 ELO
+    #Raider; // 1400-1599 ELO
+    #Elite; // 1600-1799 ELO
+    #SilentKlan; // 1800+ ELO
   };
 
   public type RaceStatus = {
@@ -699,6 +700,7 @@ module {
       };
 
       let classPrefix = switch (raceClass) {
+        case (#Scrap) { "Scrap" };
         case (#Junker) { "Junker" };
         case (#Raider) { "Raider" };
         case (#Elite) { "Elite" };

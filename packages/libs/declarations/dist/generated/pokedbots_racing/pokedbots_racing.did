@@ -258,6 +258,7 @@ type RaceClass =
    Elite;
    Junker;
    Raider;
+   Scrap;
    SilentKlan;
  };
 type Race = 
@@ -767,6 +768,8 @@ type McpServer =
            wins: nat;
          };
      });
+   /// Complete a scavenging mission and collect rewards (web method)
+   web_complete_scavenging: (tokenIndex: nat) -> (Result_1);
    /// Enter a race (with ICRC-2 payment for entry fee)
    web_enter_race: (raceId: nat, tokenIndex: nat) -> (Result_1);
    /// Get detailed stats for a specific bot
@@ -812,12 +815,13 @@ type McpServer =
             terrain: Terrain;
           };
       });
-   /// Purchase a bot from the marketplace (with ICRC-2 payment)
-   web_purchase_bot: (tokenIndex: nat) -> (Result_1);
    /// Recharge a bot's battery (0.1 ICP + fee via ICRC-2)
    web_recharge_bot: (tokenIndex: nat) -> (Result_1);
    /// Repair a bot to restore condition (0.05 ICP + fee via ICRC-2)
    web_repair_bot: (tokenIndex: nat) -> (Result_1);
+   /// Start a scavenging mission (web method)
+   web_start_scavenging: (tokenIndex: nat, missionType: text, zone: text) ->
+    (Result_1);
    /// Upgrade a bot stat (via ICRC-2 payment or parts)
    web_upgrade_bot: (tokenIndex: nat, upgradeType: UpgradeType,
     paymentMethod: variant {

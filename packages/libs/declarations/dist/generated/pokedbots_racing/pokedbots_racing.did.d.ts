@@ -526,6 +526,7 @@ export interface McpServer {
       >,
     }
   >,
+  'web_complete_scavenging' : ActorMethod<[bigint], Result_1>,
   'web_enter_race' : ActorMethod<[bigint, bigint], Result_1>,
   'web_get_bot_details' : ActorMethod<[bigint], Result_2>,
   'web_get_bot_details_batch' : ActorMethod<
@@ -571,9 +572,9 @@ export interface McpServer {
       }
     >
   >,
-  'web_purchase_bot' : ActorMethod<[bigint], Result_1>,
   'web_recharge_bot' : ActorMethod<[bigint], Result_1>,
   'web_repair_bot' : ActorMethod<[bigint], Result_1>,
+  'web_start_scavenging' : ActorMethod<[bigint, string, string], Result_1>,
   'web_upgrade_bot' : ActorMethod<
     [bigint, UpgradeType, { 'icp' : null } | { 'parts' : null }],
     Result_1
@@ -647,6 +648,7 @@ export interface Race {
   'prizePool' : bigint,
 }
 export type RaceClass = { 'Elite' : null } |
+  { 'Scrap' : null } |
   { 'Junker' : null } |
   { 'SilentKlan' : null } |
   { 'Raider' : null };

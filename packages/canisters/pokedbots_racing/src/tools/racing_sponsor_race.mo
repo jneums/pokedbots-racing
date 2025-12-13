@@ -142,6 +142,7 @@ module {
                 let hoursUntilStart = timeUntilStart / 3_600_000_000_000;
 
                 let classText = switch (updatedRace.raceClass) {
+                  case (#Scrap) { "Scrap" };
                   case (#Junker) { "Junker" };
                   case (#Raider) { "Raider" };
                   case (#Elite) { "Elite" };

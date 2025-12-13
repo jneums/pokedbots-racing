@@ -21,7 +21,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Your bot's token index. When provided, only shows races this bot is eligible to enter."))])), ("after_race_id", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Race ID to start after. Returns the next 5 races after this ID."))])), ("race_class", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Junker"), Json.str("Raider"), Json.str("Elite"), Json.str("SilentKlan")])), ("description", Json.str("Optional: Filter by race class"))])), ("terrain", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("ScrapHeaps"), Json.str("WastelandSand"), Json.str("MetalRoads")])), ("description", Json.str("Optional: Filter by terrain type"))])), ("status", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("open"), Json.str("full"), Json.str("closed")])), ("description", Json.str("Optional: Filter by entry status - open (accepting entries), full (max entries reached), closed (past deadline)"))])), ("min_distance", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Minimum race distance in km"))])), ("max_distance", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Maximum race distance in km"))])), ("has_spots", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show races with available spots (true) or full races (false)"))])), ("sort_by", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("prize_pool"), Json.str("start_time"), Json.str("entry_fee"), Json.str("distance")])), ("description", Json.str("Optional: Sort races by prize_pool (highest first), start_time (soonest first), entry_fee (lowest first), or distance (shortest first). Default: start_time"))]))])),
+      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Your bot's token index. When provided, only shows races this bot is eligible to enter."))])), ("after_race_id", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Race ID to start after. Returns the next 5 races after this ID."))])), ("race_class", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Scrap"), Json.str("Junker"), Json.str("Raider"), Json.str("Elite"), Json.str("SilentKlan")])), ("description", Json.str("Optional: Filter by race class"))])), ("terrain", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("ScrapHeaps"), Json.str("WastelandSand"), Json.str("MetalRoads")])), ("description", Json.str("Optional: Filter by terrain type"))])), ("status", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("open"), Json.str("full"), Json.str("closed")])), ("description", Json.str("Optional: Filter by entry status - open (accepting entries), full (max entries reached), closed (past deadline)"))])), ("min_distance", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Minimum race distance in km"))])), ("max_distance", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Maximum race distance in km"))])), ("has_spots", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show races with available spots (true) or full races (false)"))])), ("sort_by", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("prize_pool"), Json.str("start_time"), Json.str("entry_fee"), Json.str("distance")])), ("description", Json.str("Optional: Sort races by prize_pool (highest first), start_time (soonest first), entry_fee (lowest first), or distance (shortest first). Default: start_time"))]))])),
     ]);
     outputSchema = null;
   };
@@ -90,6 +90,7 @@ module {
             filteredRaces,
             func(r) {
               let classMatch = switch (r.raceClass, className) {
+                case (#Scrap, "Scrap") { true };
                 case (#Junker, "Junker") { true };
                 case (#Raider, "Raider") { true };
                 case (#Elite, "Elite") { true };
@@ -276,7 +277,8 @@ module {
         };
 
         let classText = switch (race.raceClass) {
-          case (#Junker) { "Junker (<1400 ELO)" };
+          case (#Scrap) { "Scrap (<1200 ELO)" };
+          case (#Junker) { "Junker (1200-1399 ELO)" };
           case (#Raider) { "Raider (1400-1599 ELO)" };
           case (#Elite) { "Elite (1600-1799 ELO)" };
           case (#SilentKlan) {

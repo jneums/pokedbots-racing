@@ -91,8 +91,10 @@ module {
         "Elite (1600-1799 ELO)";
       } else if (racingStats.eloRating >= 1400) {
         "Raider (1400-1599 ELO)";
+      } else if (racingStats.eloRating >= 1200) {
+        "Junker (1200-1399 ELO)";
       } else {
-        "Junker (<1400 ELO)";
+        "Scrap (<1200 ELO)";
       };
 
       // Get wasteland flavor text

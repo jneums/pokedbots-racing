@@ -142,7 +142,10 @@ module {
 
       // Check class requirements (ELO-based)
       let meetsClass = switch (race.raceClass) {
-        case (#Junker) { botStats.eloRating < 1400 };
+        case (#Scrap) { botStats.eloRating < 1200 };
+        case (#Junker) {
+          botStats.eloRating >= 1200 and botStats.eloRating < 1400
+        };
         case (#Raider) {
           botStats.eloRating >= 1400 and botStats.eloRating < 1600
         };
@@ -205,6 +208,7 @@ module {
                 ctx.garageManager.updateStats(tokenIndex, updatedStats);
 
                 let classText = switch (race.raceClass) {
+                  case (#Scrap) { "Scrap" };
                   case (#Junker) { "Junker" };
                   case (#Raider) { "Raider" };
                   case (#Elite) { "Elite" };

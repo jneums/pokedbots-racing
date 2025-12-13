@@ -21,7 +21,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_initialize_pokedbot";
     title = ?"Register PokedBot Racing License";
-    description = ?"Register your PokedBot for a wasteland racing license (0.1 ICP registration fee, one-time). Reveals faction and racing stats based on NFT traits. Starting ELO is based on bot quality: 50+ rating = SilentKlan tier (1900 ELO), 40-49 = Elite (1700), 30-39 = Raider (1500), <30 = Junker (1300). Required before entering races. Requires ICRC-2 approval.\n\nUse help_get_compendium tool to see all faction bonuses and mechanics.";
+    description = ?"Register your PokedBot for a wasteland racing license (0.1 ICP registration fee, one-time). Reveals faction and racing stats based on NFT traits. Starting ELO is based on bot quality: 70+ rating = SilentKlan tier (1900 ELO), 50-69 = Elite (1700), 30-49 = Raider (1500), 20-29 = Junker (1300), <20 = Scrap (<1200 ELO). Required before entering races. Requires ICRC-2 approval.\n\nUse help_get_compendium tool to see all faction bonuses and mechanics.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
