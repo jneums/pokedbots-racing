@@ -21,7 +21,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_initialize_pokedbot";
     title = ?"Register PokedBot Racing License";
-    description = ?"Register your PokedBot for a wasteland racing license (0.1 ICP registration fee, one-time). Reveals faction and racing stats based on NFT traits. Starting ELO is based on bot quality: 60+ rating = SilentKlan tier (1800 ELO), 40-60 = Elite (1600), 20-40 = Raider (1400), <20 = Junker (1200). Required before entering races. Requires ICRC-2 approval.\n\nUse help_get_compendium tool to see all faction bonuses and mechanics.";
+    description = ?"Register your PokedBot for a wasteland racing license (0.1 ICP registration fee, one-time). Reveals faction and racing stats based on NFT traits. Starting ELO is based on bot quality: 50+ rating = SilentKlan tier (1900 ELO), 40-49 = Elite (1700), 30-39 = Raider (1500), <30 = Junker (1300). Required before entering races. Requires ICRC-2 approval.\n\nUse help_get_compendium tool to see all faction bonuses and mechanics.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -85,9 +85,8 @@ module {
           // If owned by someone else, verify new ownership and update owner
           // (This handles the transfer case - preserve all stats except owner)
 
-          // Verify ownership via EXT canister
-          let garageSubaccount = ExtIntegration.deriveGarageSubaccount(user);
-          let garageAccountId = ExtIntegration.principalToAccountIdentifier(ctx.canisterPrincipal, ?garageSubaccount);
+          // Verify ownership via EXT canister - check user's wallet
+          let walletAccountId = ExtIntegration.principalToAccountIdentifier(user, null);
 
           let ownerResult = try {
             await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(tokenIndexNat32, ctx.extCanisterId));
@@ -100,8 +99,8 @@ module {
               return ToolContext.makeError("This PokedBot does not exist.", cb);
             };
             case (#ok(currentOwner)) {
-              if (currentOwner != garageAccountId) {
-                return ToolContext.makeError("You do not own this PokedBot. It must be in your garage to register.", cb);
+              if (currentOwner != walletAccountId) {
+                return ToolContext.makeError("You do not own this PokedBot. It must be in your wallet to register.", cb);
               };
             };
           };
@@ -116,9 +115,8 @@ module {
         };
       };
 
-      // Verify ownership via EXT canister before initializing
-      let garageSubaccount = ExtIntegration.deriveGarageSubaccount(user);
-      let garageAccountId = ExtIntegration.principalToAccountIdentifier(ctx.canisterPrincipal, ?garageSubaccount);
+      // Verify ownership via EXT canister before initializing - check user's wallet
+      let walletAccountId = ExtIntegration.principalToAccountIdentifier(user, null);
 
       let ownerResult = try {
         await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(tokenIndexNat32, ctx.extCanisterId));
@@ -131,8 +129,8 @@ module {
           return ToolContext.makeError("This PokedBot does not exist.", cb);
         };
         case (#ok(currentOwner)) {
-          if (currentOwner != garageAccountId) {
-            return ToolContext.makeError("You do not own this PokedBot. It must be in your garage to initialize.", cb);
+          if (currentOwner != walletAccountId) {
+            return ToolContext.makeError("You do not own this PokedBot. It must be in your wallet to initialize.", cb);
           };
         };
       };

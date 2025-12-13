@@ -25,7 +25,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "purchase_pokedbot";
     title = ?"Purchase PokedBot";
-    description = ?"Purchase a PokedBot NFT from the marketplace. The bot will be sent directly to your garage subaccount for racing.";
+    description = ?"Purchase a PokedBot NFT from the marketplace. The bot will be sent directly to your wallet for racing.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -89,23 +89,19 @@ module {
         };
       };
 
-      // Derive garage subaccount for the user
-      let garageSubaccount = ExtIntegration.deriveGarageSubaccount(userPrincipal);
-
-      // Create garage account identifier (buyer address for the lock)
-      // This is where the NFT should be sent after settlement
-      let garageAccountId = ExtIntegration.principalToAccountIdentifier(
-        context.canisterPrincipal,
-        ?garageSubaccount,
+      // Get user's wallet account identifier (where NFT will be sent - non-custodial!)
+      let walletAccountId = ExtIntegration.principalToAccountIdentifier(
+        userPrincipal,
+        null, // No subaccount - direct to wallet
       );
 
       try {
-        // Lock the NFT for purchase
+        // Lock the NFT for purchase - will go to buyer's wallet
         let lockResult = await context.extCanister.lock(
           tokenId,
           listing.price,
-          garageAccountId, // Use garage account as buyer address
-          garageSubaccount,
+          walletAccountId, // NFT goes directly to user's wallet
+          [], // No subaccount needed
         );
 
         switch (lockResult) {
@@ -117,13 +113,15 @@ module {
           };
           case (#ok(paymentAddress)) {
             // NFT is locked, proceed with two-step payment:
-            // 1. ICRC-2 transfer from user to their garage subaccount
-            // 2. Legacy transfer from garage subaccount to marketplace payment address
+            // 1. ICRC-2 transfer from user to canister
+            // 2. Legacy transfer from canister to marketplace payment address
 
             // Create ICP ledger actor
             let ledgerCanisterId = switch (context.icpLedgerCanisterId()) {
               case (?id) { id };
-              case (null) { return ToolContext.makeError("ICP Ledger not configured", cb); };
+              case (null) {
+                return ToolContext.makeError("ICP Ledger not configured", cb);
+              };
             };
             let icpLedger = actor (Principal.toText(ledgerCanisterId)) : actor {
               icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
@@ -138,10 +136,10 @@ module {
               };
             };
 
-            // Step 1: Transfer from user to their garage subaccount using ICRC-2
-            let garageAccount : IcpLedger.Account = {
+            // Step 1: Transfer from user to canister using ICRC-2 (temporary holding)
+            let canisterAccount : IcpLedger.Account = {
               owner = context.canisterPrincipal;
-              subaccount = ?Blob.fromArray(garageSubaccount);
+              subaccount = null;
             };
 
             let transferFromArgs : IcpLedger.TransferFromArgs = {
@@ -150,7 +148,7 @@ module {
                 owner = userPrincipal;
                 subaccount = null;
               };
-              to = garageAccount;
+              to = canisterAccount;
               amount = Nat64.toNat(listing.price) + 10_000; // listing price + transfer fee
               fee = null;
               memo = null;
@@ -161,12 +159,12 @@ module {
 
             switch (transferFromResult) {
               case (#Ok(blockIndex1)) {
-                // Step 2: Transfer from garage to marketplace payment address using legacy transfer
+                // Step 2: Transfer from canister to marketplace payment address using legacy transfer
                 let transferArgs : IcpLedger.TransferArgs = {
                   to = paymentAddressBlob;
                   fee = { e8s = 10_000 }; // Standard ICP transfer fee
                   memo = 0;
-                  from_subaccount = ?Blob.fromArray(garageSubaccount);
+                  from_subaccount = null;
                   created_at_time = ?{
                     timestamp_nanos = Nat64.fromNat(Int.abs(Time.now()));
                   };
@@ -198,11 +196,12 @@ module {
 
                         let priceIcp = Float.fromInt(Nat64.toNat(listing.price)) / 100_000_000.0;
                         let message = "✅ Purchase Complete!\n\n" #
-                        "PokedBot #" # Nat32.toText(tokenIndex) # " is now in your garage!\n\n" #
+                        "PokedBot #" # Nat32.toText(tokenIndex) # " is now in your wallet!\n\n" #
                         "Price paid: " # Float.format(#fix 2, priceIcp) # " ICP\n" #
                         "Transaction 1: Block #" # Nat.toText(blockIndex1) # "\n" #
                         "Transaction 2: Block #" # Nat64.toText(blockIndex2) # "\n\n" #
-                        "🎮 Next: Use garage_list_my_pokedbots to see your bot";
+                        "🎮 Next: Use garage_list_my_pokedbots to see your bot\n" #
+                        "🏆 Your NFT is in YOUR wallet - fully non-custodial!";
 
                         ToolContext.makeTextSuccess(message, cb);
                       };
@@ -217,7 +216,7 @@ module {
                   case (#Err(error)) {
                     let errorMsg = switch (error) {
                       case (#InsufficientFunds({ balance })) {
-                        "Insufficient funds in garage. Balance: " # Nat64.toText(balance.e8s) # " e8s";
+                        "Insufficient funds. Balance: " # Nat64.toText(balance.e8s) # " e8s";
                       };
                       case (#BadFee({ expected_fee })) {
                         "Bad fee. Expected: " # Nat64.toText(expected_fee.e8s) # " e8s";

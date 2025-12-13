@@ -1,10 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
+import { useAuth } from '../hooks/useAuth';
+import WalletButton from '../components/WalletButton';
 
 export default function Navigation() {
   const location = useLocation();
   const pathname = location.pathname;
   const [isOpen, setIsOpen] = useState(false);
+  const { isAuthenticated, logout } = useAuth();
   
   const isActive = (path: string) => {
     if (path === '/') return pathname === '/';
@@ -37,6 +40,12 @@ export default function Navigation() {
           
           {/* Desktop Navigation */}
           <nav className="hidden sm:flex items-center gap-6">
+            <Link to="/marketplace" className={linkClass('/marketplace')}>
+              Marketplace
+            </Link>
+            <Link to="/garage" className={linkClass('/garage')}>
+              Garage
+            </Link>
             <Link to="/leaderboard" className={linkClass('/leaderboard')}>
               Leaderboard
             </Link>
@@ -46,23 +55,7 @@ export default function Navigation() {
             <Link to="/simulator" className={linkClass('/simulator')}>
               Simulator
             </Link>
-            <Link to="/guides" className={linkClass('/guides')}>
-              Guides
-            </Link>
-            <Link to="/docs" className={linkClass('/docs')}>
-              Docs
-            </Link>
-            <a 
-              href="https://github.com/jneums/pokedbots-racing" 
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
-            >
-              GitHub
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
+            <WalletButton />
           </nav>
           
           {/* Mobile Hamburger Button */}
@@ -92,6 +85,24 @@ export default function Navigation() {
               {/* Drawer */}
               <div className="fixed top-[80px] right-0 bottom-0 w-64 border-l-2 border-primary/40 z-40 sm:hidden shadow-2xl">
                 <nav className="flex flex-col py-4 bg-card">
+                  <div className="px-4 pb-4">
+                    <WalletButton />
+                  </div>
+                  <div className="h-px bg-border mb-2" />
+                  <Link 
+                    to="/marketplace" 
+                    className={mobileLinkClass('/marketplace')}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Marketplace
+                  </Link>
+                  <Link 
+                    to="/garage" 
+                    className={mobileLinkClass('/garage')}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Garage
+                  </Link>
                   <Link 
                     to="/leaderboard" 
                     className={mobileLinkClass('/leaderboard')}
@@ -113,6 +124,18 @@ export default function Navigation() {
                   >
                     Simulator
                   </Link>
+                  {isAuthenticated && (
+                    <button
+                      onClick={() => {
+                        logout();
+                        setIsOpen(false);
+                      }}
+                      className="block px-4 py-3 text-base font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all border-l-4 border-transparent text-left"
+                    >
+                      Sign Out
+                    </button>
+                  )}
+                  <div className="h-px bg-border my-2" />
                   <Link 
                     to="/guides" 
                     className={mobileLinkClass('/guides')}

@@ -1,0 +1,125 @@
+/**
+ * React hook for authentication
+ */
+
+import { create } from 'zustand';
+import { getAuthService, type WalletProvider, type UserObject } from '../lib/auth';
+
+interface AuthStore {
+  user: UserObject | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+  login: (provider: WalletProvider) => Promise<void>;
+  logout: () => Promise<void>;
+  getAgent: () => any;
+  getPrincipal: () => string | null;
+}
+
+const network = process.env.DFX_NETWORK || 'local'; // 'ic' for mainnet, 'local' for local dev
+const host = network === 'ic' ? 'https://icp0.io' : 'http://127.0.0.1:4943';
+
+// Initialize auth service with proper host
+const authService = getAuthService(host);
+
+/**
+ * Zustand store for authentication state
+ * Using Zustand for simple global state management
+ */
+export const useAuthStore = create<AuthStore>((set: any, get: any) => ({
+  user: null,
+  isAuthenticated: false,
+  isLoading: true, // Start as loading to prevent flash of logged-out state
+  error: null,
+
+  login: async (provider: WalletProvider) => {
+    set({ isLoading: true, error: null });
+    
+    try {
+      const user = await authService.login(provider);
+      set({ 
+        user, 
+        isAuthenticated: true, 
+        isLoading: false,
+        error: null
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Login failed';
+      set({ 
+        user: null, 
+        isAuthenticated: false, 
+        isLoading: false,
+        error: message
+      });
+      throw error;
+    }
+  },
+
+  logout: async () => {
+    await authService.logout();
+    set({ 
+      user: null, 
+      isAuthenticated: false, 
+      error: null 
+    });
+  },
+
+  getAgent: () => {
+    return authService.getAgent();
+  },
+
+  getPrincipal: () => {
+    return authService.getPrincipal();
+  },
+}));
+
+// Initialize authentication state on app load
+(async () => {
+  try {
+    await authService.init();
+    const isAuth = authService.isAuthenticated();
+    const agent = authService.getAgent();
+    const principal = authService.getPrincipal();
+    
+    if (isAuth && agent && principal) {
+      useAuthStore.setState({
+        user: {
+          principal,
+          agent,
+          provider: authService.getProvider() || 'identity',
+        },
+        isAuthenticated: true,
+        isLoading: false,
+      });
+    } else {
+      useAuthStore.setState({
+        isLoading: false,
+      });
+    }
+  } catch (error) {
+    console.error('[Auth] Failed to restore session:', error);
+    useAuthStore.setState({
+      isLoading: false,
+    });
+  }
+})();
+
+/**
+ * Hook to access authentication state and methods
+ */
+export const useAuth = () => {
+  const store = useAuthStore();
+  
+  return {
+    user: store.user,
+    isAuthenticated: store.isAuthenticated,
+    isLoading: store.isLoading,
+    error: store.error,
+    login: store.login,
+    logout: store.logout,
+    getAgent: store.getAgent,
+    getPrincipal: store.getPrincipal,
+    provider: authService.getProvider(),
+    lastProvider: authService.getLastProvider(),
+  };
+};

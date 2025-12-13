@@ -1,10 +1,16 @@
 import { useNavigate, Link } from 'react-router-dom';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useGetEventDetails, useGetRaceById, useGetBotProfile } from "@/hooks/useRacing";
+import { useMyBots, useEnterRace } from "@/hooks/useGarage";
+import { useAuth } from "@/hooks/useAuth";
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
 import { RaceVisualizer } from '@/components/RaceVisualizer';
+import { toast } from 'sonner';
 
 function formatICP(amount: bigint): string {
   const icp = Number(amount) / 100_000_000;
@@ -129,6 +135,11 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
 
 function RaceCard({ raceId }: { raceId: bigint }) {
   const { data: race } = useGetRaceById(Number(raceId));
+  const { user } = useAuth();
+  const { data: myBots, isLoading: botsLoading } = useMyBots();
+  const enterRaceMutation = useEnterRace();
+  const [showEnterDialog, setShowEnterDialog] = useState(false);
+  const [selectedBotIndex, setSelectedBotIndex] = useState<string>('');
 
   if (!race) {
     return (
@@ -142,7 +153,41 @@ function RaceCard({ raceId }: { raceId: bigint }) {
 
   const prizePool = Number(race.prizePool) + Number(race.platformBonus);
   const entryCount = race.entries.length;
+
+  // Check if user is authenticated
+  const isAuthenticated = !!user;
   
+  // Check if race is open for entry
+  const isUpcoming = 'Upcoming' in race.status;
+  const isFull = race.entries.length >= Number(race.maxEntries);
+  const now = Date.now();
+  const entryDeadlinePassed = Number(race.entryDeadline) / 1_000_000 < now;
+  const canEnter = isAuthenticated && isUpcoming && !isFull && !entryDeadlinePassed;
+
+  // Check if user already entered
+  const userEnteredBots = race.entries
+    .filter((entry: any) => entry.owner.toString() === user?.principal)
+    .map((entry: any) => Number(entry.nftId));
+  
+  const handleEnterRace = async () => {
+    if (!selectedBotIndex) {
+      toast.error('Please select a bot');
+      return;
+    }
+    
+    try {
+      await enterRaceMutation.mutateAsync({
+        raceId: Number(raceId),
+        tokenIndex: Number(selectedBotIndex),
+      });
+      toast.success(`Bot #${selectedBotIndex} entered the race!`);
+      setShowEnterDialog(false);
+      setSelectedBotIndex('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to enter race');
+    }
+  };
+
   // Get class name from race name
   const getClassName = (name: string): string => {
     if (name.includes('Junker')) return 'Junker';
@@ -151,6 +196,32 @@ function RaceCard({ raceId }: { raceId: bigint }) {
     if (name.includes('SilentKlan') || name.includes('Silent Klan')) return 'SilentKlan';
     return 'Unknown';
   };
+
+  const raceClass = getClassName(race.name);
+
+  // Check if a bot is eligible for this race class based on ELO
+  const isBotEligible = (bot: any): boolean => {
+    if (!bot.stats || !bot.stats.eloRating) return false;
+    const elo = Number(bot.stats.eloRating);
+    
+    switch (raceClass) {
+      case 'Junker': return elo < 1400;
+      case 'Raider': return elo >= 1400 && elo < 1600;
+      case 'Elite': return elo >= 1600 && elo < 1800;
+      case 'SilentKlan': return elo >= 1800;
+      default: return false;
+    }
+  };
+
+  // Filter bots that are initialized and not already entered
+  const initializeBotsNotEntered = myBots?.filter(
+    bot => bot.isInitialized && !userEnteredBots.includes(Number(bot.tokenIndex))
+  ) || [];
+
+  // Separate eligible and ineligible bots
+  const eligibleBots = initializeBotsNotEntered.filter(isBotEligible);
+  const ineligibleBots = initializeBotsNotEntered.filter(bot => !isBotEligible(bot));
+  const availableBots = [...eligibleBots, ...ineligibleBots]; // Show all, but mark ineligible
 
   return (
     <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur">
@@ -194,9 +265,71 @@ function RaceCard({ raceId }: { raceId: bigint }) {
           </div>
           <div className="text-center p-3 bg-card/50 border border-primary/20 rounded-lg">
             <p className="text-xs text-muted-foreground mb-1">Entries</p>
-            <p className="text-base font-bold text-primary">{entryCount}</p>
+            <p className="text-base font-bold text-primary">{entryCount}/{Number(race.maxEntries)}</p>
           </div>
         </div>
+
+        {/* Enter Race Button */}
+        {userEnteredBots.length > 0 && (
+          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+            <p className="text-sm text-green-500 font-semibold">
+              ✓ You have {userEnteredBots.length} bot{userEnteredBots.length !== 1 ? 's' : ''} entered in this race
+            </p>
+          </div>
+        )}
+        
+        {isAuthenticated && isUpcoming && botsLoading && (
+          <div className="flex items-center justify-center p-4 bg-card/50 border border-primary/20 rounded-lg">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mr-3"></div>
+            <p className="text-sm text-muted-foreground">Loading your bots...</p>
+          </div>
+        )}
+        
+        {canEnter && !botsLoading && eligibleBots.length > 0 && (
+          <Button 
+            className="w-full" 
+            onClick={() => setShowEnterDialog(true)}
+            disabled={enterRaceMutation.isPending}
+          >
+            🏁 Enter Race
+          </Button>
+        )}
+        
+        {!isAuthenticated && isUpcoming && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+            <p className="text-sm text-yellow-600">Sign in to enter this race</p>
+          </div>
+        )}
+        
+        {isAuthenticated && isUpcoming && !botsLoading && eligibleBots.length === 0 && ineligibleBots.length > 0 && userEnteredBots.length === 0 && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+            <p className="text-sm text-yellow-600">
+              You have bots but none are eligible for this {raceClass} class race.
+              {raceClass === 'Junker' && ' (Need ELO < 1400)'}
+              {raceClass === 'Raider' && ' (Need ELO 1400-1599)'}
+              {raceClass === 'Elite' && ' (Need ELO 1600-1799)'}
+              {raceClass === 'SilentKlan' && ' (Need ELO ≥ 1800)'}
+            </p>
+          </div>
+        )}
+        
+        {isAuthenticated && isUpcoming && !botsLoading && availableBots.length === 0 && userEnteredBots.length === 0 && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+            <p className="text-sm text-yellow-600">You don't have any available bots. Visit your garage to initialize a bot!</p>
+          </div>
+        )}
+        
+        {isFull && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+            <p className="text-sm text-red-500">Race is full ({Number(race.maxEntries)} entries)</p>
+          </div>
+        )}
+        
+        {entryDeadlinePassed && isUpcoming && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+            <p className="text-sm text-red-500">Entry deadline has passed</p>
+          </div>
+        )}
 
         {/* Entries List */}
         {entryCount > 0 && (
@@ -204,19 +337,25 @@ function RaceCard({ raceId }: { raceId: bigint }) {
             <p className="text-sm font-semibold">Racers ({entryCount}):</p>
             <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
               {race.entries.map((entry: any, idx: number) => {
-                const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(entry.nftId));
+                // entry.nftId could be either a token index (string number) or EXT token identifier
+                // If it's already an EXT token identifier, use it directly; otherwise generate it
+                const isExtIdentifier = entry.nftId.length > 10; // EXT identifiers are long
+                const tokenId = isExtIdentifier ? entry.nftId : generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(entry.nftId));
                 const imageUrl = generateExtThumbnailLink(tokenId);
                 
+                // Extract token index: if it's a number string, use it; otherwise it's an EXT ID
+                const tokenIndex = isExtIdentifier ? entry.nftId : Number(entry.nftId);
+                
                 return (
-                  <Link key={idx} to={`/bot/${entry.nftId}`} className="block hover:bg-card/70 transition-colors rounded">
+                  <Link key={idx} to={`/bot/${tokenIndex}`} className="block hover:bg-card/70 transition-colors rounded">
                     <div className="flex items-center gap-3 p-2 bg-card/50 border border-primary/10 rounded">
                       <img
                         src={imageUrl}
-                        alt={`Bot #${entry.nftId}`}
+                        alt={`Bot #${tokenIndex}`}
                         className="w-10 h-10 rounded border-2 border-primary/30"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold"><BotName tokenIndex={Number(entry.nftId)} /></p>
+                        <p className="text-sm font-semibold"><BotName tokenIndex={typeof tokenIndex === 'number' ? tokenIndex : 0} /></p>
                       </div>
                       <Badge variant="outline" className="text-xs">
                         #{idx + 1}
@@ -359,6 +498,101 @@ function RaceCard({ raceId }: { raceId: bigint }) {
           </>
         )}
       </CardContent>
+
+      {/* Enter Race Dialog */}
+      <Dialog open={showEnterDialog} onOpenChange={setShowEnterDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enter Race - {raceClass} Class</DialogTitle>
+            <DialogDescription>
+              Select a bot to enter in {race.name}. Entry fee: {formatICP(race.entryFee)}
+              <br />
+              <span className="text-xs">
+                {raceClass === 'Junker' && 'ELO Requirement: < 1400'}
+                {raceClass === 'Raider' && 'ELO Requirement: 1400-1599'}
+                {raceClass === 'Elite' && 'ELO Requirement: 1600-1799'}
+                {raceClass === 'SilentKlan' && 'ELO Requirement: ≥ 1800'}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Select Bot</label>
+              <Select value={selectedBotIndex} onValueChange={setSelectedBotIndex}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a bot..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {eligibleBots.length > 0 && eligibleBots.map((bot) => (
+                    <SelectItem key={bot.tokenIndex.toString()} value={bot.tokenIndex.toString()}>
+                      <div className="flex items-center gap-2">
+                        <span>Bot #{bot.tokenIndex.toString()}</span>
+                        {bot.name && <span className="text-muted-foreground">- {bot.name}</span>}
+                        {bot.stats && (
+                          <span className="text-xs text-muted-foreground">
+                            (ELO: {Number(bot.stats.eloRating)})
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                  {ineligibleBots.length > 0 && ineligibleBots.map((bot) => (
+                    <SelectItem 
+                      key={bot.tokenIndex.toString()} 
+                      value={bot.tokenIndex.toString()}
+                      disabled
+                    >
+                      <div className="flex items-center gap-2 opacity-50">
+                        <span>Bot #{bot.tokenIndex.toString()}</span>
+                        {bot.name && <span className="text-muted-foreground">- {bot.name}</span>}
+                        {bot.stats && (
+                          <span className="text-xs text-red-500">
+                            (ELO: {Number(bot.stats.eloRating)} - Not eligible)
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {eligibleBots.length === 0 && availableBots.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No available bots. All your initialized bots are already entered in this race.
+              </p>
+            )}
+
+            {eligibleBots.length === 0 && ineligibleBots.length > 0 && (
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                <p className="text-sm text-yellow-600">
+                  None of your bots meet the ELO requirement for this {raceClass} class race.
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                className="flex-1"
+                variant="outline"
+                onClick={() => {
+                  setShowEnterDialog(false);
+                  setSelectedBotIndex('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleEnterRace}
+                disabled={!selectedBotIndex || enterRaceMutation.isPending}
+              >
+                {enterRaceMutation.isPending ? 'Entering...' : 'Confirm Entry'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

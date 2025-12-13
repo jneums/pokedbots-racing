@@ -34,6 +34,9 @@ export interface Destination {
   'owner' : Principal,
   'subaccount' : [] | [Subaccount],
 }
+export type Distance = { 'MediumHaul' : null } |
+  { 'LongTrek' : null } |
+  { 'ShortSprint' : null };
 export interface EventMetadata {
   'pointsMultiplier' : number,
   'minEntries' : bigint,
@@ -113,21 +116,13 @@ export type LeaderboardType = { 'AllTime' : null } |
   { 'Monthly' : bigint } |
   { 'Season' : bigint };
 export interface McpServer {
+  'admin_fix_race_entry' : ActorMethod<[bigint, string], Result_1>,
   'cancel_actions_by_filter' : ActorMethod<[ActionFilter], CancellationResult>,
   'cancel_actions_by_ids' : ActorMethod<[Array<bigint>], CancellationResult>,
   'cancel_races_by_ids' : ActorMethod<[Array<bigint>], Array<[bigint, string]>>,
   'clear_event_race_ids' : ActorMethod<[], string>,
   'clear_reconstitution_traces' : ActorMethod<[], undefined>,
   'create_my_api_key' : ActorMethod<[string, Array<string>], string>,
-  'debug_check_bot_owner' : ActorMethod<
-    [number, Principal],
-    {
-      'extCanister' : string,
-      'tokenIdentifier' : string,
-      'garageAccountId' : string,
-      'ownerResult' : string,
-    }
-  >,
   'debug_create_test_race' : ActorMethod<[bigint], string>,
   'debug_get_all_tracks' : ActorMethod<
     [],
@@ -341,7 +336,6 @@ export interface McpServer {
     ]
   >,
   'get_ext_canister' : ActorMethod<[], Principal>,
-  'get_garage_account_id' : ActorMethod<[Principal], string>,
   'get_icp_ledger' : ActorMethod<[], [] | [Principal]>,
   'get_latest_reconstitution_trace' : ActorMethod<
     [],
@@ -467,11 +461,11 @@ export interface McpServer {
   'reattach_races_to_event' : ActorMethod<[bigint, Array<bigint>], string>,
   'recalculate_bot_stats' : ActorMethod<[], string>,
   'reset_all_elos' : ActorMethod<[], string>,
-  'reset_bot_stats' : ActorMethod<[bigint], Result_1>,
+  'reset_bot_stats' : ActorMethod<[bigint], Result_3>,
   'revoke_my_api_key' : ActorMethod<[string], undefined>,
-  'set_ext_canister' : ActorMethod<[Principal], Result_1>,
-  'set_icp_ledger' : ActorMethod<[Principal], Result_1>,
-  'set_owner' : ActorMethod<[Principal], Result_2>,
+  'set_ext_canister' : ActorMethod<[Principal], Result_3>,
+  'set_icp_ledger' : ActorMethod<[Principal], Result_3>,
+  'set_owner' : ActorMethod<[Principal], Result_4>,
   'transformJwksResponse' : ActorMethod<
     [{ 'context' : Uint8Array | number[], 'response' : HttpRequestResult }],
     HttpRequestResult
@@ -498,13 +492,137 @@ export interface McpServer {
     ],
     undefined
   >,
-  'upload_nft_stats_batch' : ActorMethod<[Array<[bigint, NFTStats]>], Result_1>,
-  'upload_trait_schema' : ActorMethod<[TraitSchema], Result_1>,
+  'upload_nft_stats_batch' : ActorMethod<[Array<[bigint, NFTStats]>], Result_3>,
+  'upload_trait_schema' : ActorMethod<[TraitSchema], Result_3>,
   'validate_timer_state' : ActorMethod<[], Array<string>>,
+  'web_browse_marketplace' : ActorMethod<
+    [
+      [] | [bigint],
+      [] | [bigint],
+      [] | [number],
+      [] | [string],
+      [] | [string],
+      [] | [boolean],
+      [] | [bigint],
+    ],
+    {
+      'hasMore' : boolean,
+      'listings' : Array<
+        {
+          'baseAcceleration' : bigint,
+          'tokenIndex' : bigint,
+          'isInitialized' : boolean,
+          'wins' : bigint,
+          'baseStability' : bigint,
+          'imageUrl' : string,
+          'overallRating' : bigint,
+          'baseSpeed' : bigint,
+          'basePowerCore' : bigint,
+          'racesEntered' : bigint,
+          'faction' : [] | [string],
+          'price' : number,
+          'winRate' : number,
+        }
+      >,
+    }
+  >,
+  'web_enter_race' : ActorMethod<[bigint, bigint], Result_1>,
+  'web_get_bot_details' : ActorMethod<[bigint], Result_2>,
+  'web_get_bot_details_batch' : ActorMethod<
+    [Array<bigint>],
+    Array<
+      {
+        'baseAcceleration' : bigint,
+        'tokenIndex' : bigint,
+        'isInitialized' : boolean,
+        'wins' : bigint,
+        'baseStability' : bigint,
+        'imageUrl' : string,
+        'overallRating' : bigint,
+        'baseSpeed' : bigint,
+        'basePowerCore' : bigint,
+        'racesEntered' : bigint,
+        'faction' : [] | [string],
+        'winRate' : number,
+      }
+    >
+  >,
+  'web_get_user_inventory' : ActorMethod<[], UserInventory>,
+  'web_initialize_bot' : ActorMethod<[bigint, [] | [string]], Result_1>,
+  'web_list_my_bots' : ActorMethod<
+    [],
+    Array<
+      {
+        'activeUpgrade' : [] | [UpgradeSession],
+        'tokenIndex' : bigint,
+        'isInitialized' : boolean,
+        'name' : [] | [string],
+        'currentOwner' : string,
+        'stats' : [] | [PokedBotRacingStats],
+        'upcomingRaces' : Array<
+          {
+            'startTime' : bigint,
+            'terrain' : Terrain,
+            'name' : string,
+            'raceId' : bigint,
+            'entryFee' : bigint,
+          }
+        >,
+      }
+    >
+  >,
+  'web_purchase_bot' : ActorMethod<[bigint], Result_1>,
+  'web_recharge_bot' : ActorMethod<[bigint], Result_1>,
+  'web_repair_bot' : ActorMethod<[bigint], Result_1>,
+  'web_upgrade_bot' : ActorMethod<
+    [bigint, UpgradeType, { 'icp' : null } | { 'parts' : null }],
+    Result_1
+  >,
   'withdraw' : ActorMethod<[Principal, bigint, Destination], Result>,
 }
 export type NFTMetadata = Array<[string, string]>;
 export type NFTStats = Array<bigint>;
+export interface PokedBotRacingStats {
+  'accelerationBonus' : bigint,
+  'preferredDistance' : Distance,
+  'totalPartsScavenged' : bigint,
+  'stabilityBonus' : bigint,
+  'lastRepaired' : [] | [bigint],
+  'lastRaced' : [] | [bigint],
+  'tokenIndex' : bigint,
+  'places' : bigint,
+  'activatedAt' : bigint,
+  'ownerPrincipal' : Principal,
+  'bestHaul' : bigint,
+  'name' : [] | [string],
+  'scavengingReputation' : bigint,
+  'lastRecharged' : [] | [bigint],
+  'worldBuff' : [] | [WorldBuff],
+  'wins' : bigint,
+  'eloRating' : bigint,
+  'factionReputation' : bigint,
+  'stabilityUpgrades' : bigint,
+  'scavengingMissions' : bigint,
+  'accelerationUpgrades' : bigint,
+  'overcharge' : bigint,
+  'speedUpgrades' : bigint,
+  'experience' : bigint,
+  'shows' : bigint,
+  'lastDiagnostics' : [] | [bigint],
+  'preferredTerrain' : Terrain,
+  'lastDecayed' : bigint,
+  'listedForSale' : boolean,
+  'racesEntered' : bigint,
+  'powerCoreBonus' : bigint,
+  'faction' : FactionType,
+  'battery' : bigint,
+  'speedBonus' : bigint,
+  'totalScrapEarned' : bigint,
+  'activeMission' : [] | [ScavengingMission],
+  'powerCoreUpgrades' : bigint,
+  'upgradeEndsAt' : [] | [bigint],
+  'condition' : bigint,
+}
 export interface Race {
   'startTime' : bigint,
   'status' : RaceStatus,
@@ -568,10 +686,48 @@ export interface ReconstitutionTrace {
 }
 export type Result = { 'ok' : bigint } |
   { 'err' : TreasuryError };
-export type Result_1 = { 'ok' : null } |
+export type Result_1 = { 'ok' : string } |
   { 'err' : string };
-export type Result_2 = { 'ok' : null } |
+export type Result_2 = {
+    'ok' : {
+      'activeUpgrade' : [] | [UpgradeSession],
+      'stats' : PokedBotRacingStats,
+      'baseStats' : {
+        'stability' : bigint,
+        'speed' : bigint,
+        'acceleration' : bigint,
+        'powerCore' : bigint,
+      },
+      'isOwner' : boolean,
+      'currentBattery' : bigint,
+      'upgradeCosts' : {
+        'Gyro' : { 'icp' : bigint, 'parts' : bigint },
+        'PowerCore' : { 'icp' : bigint, 'parts' : bigint },
+        'Thruster' : { 'icp' : bigint, 'parts' : bigint },
+        'Velocity' : { 'icp' : bigint, 'parts' : bigint },
+      },
+      'currentCondition' : bigint,
+    }
+  } |
+  { 'err' : string };
+export type Result_3 = { 'ok' : null } |
+  { 'err' : string };
+export type Result_4 = { 'ok' : null } |
   { 'err' : TreasuryError };
+export interface ScavengingMission {
+  'startTime' : bigint,
+  'endTime' : bigint,
+  'missionType' : ScavengingMissionType,
+  'tokenIndex' : bigint,
+  'zone' : ScavengingZone,
+  'missionId' : bigint,
+}
+export type ScavengingMissionType = { 'DeepSalvage' : null } |
+  { 'ShortExpedition' : null } |
+  { 'WastelandExpedition' : null };
+export type ScavengingZone = { 'AbandonedSettlements' : null } |
+  { 'ScrapHeaps' : null } |
+  { 'DeadMachineFields' : null };
 export interface ScheduledEvent {
   'status' : EventStatus,
   'eventId' : bigint,
@@ -646,6 +802,29 @@ export type TrendDirection = { 'Up' : bigint } |
 export type UpgradeFinishedResult = { 'Failed' : [bigint, string] } |
   { 'Success' : bigint } |
   { 'InProgress' : bigint };
+export interface UpgradeSession {
+  'startedAt' : bigint,
+  'tokenIndex' : bigint,
+  'upgradeType' : UpgradeType,
+  'endsAt' : bigint,
+}
+export type UpgradeType = { 'Gyro' : null } |
+  { 'PowerCore' : null } |
+  { 'Thruster' : null } |
+  { 'Velocity' : null };
+export interface UserInventory {
+  'powerCoreFragments' : bigint,
+  'universalParts' : bigint,
+  'owner' : Principal,
+  'gyroModules' : bigint,
+  'speedChips' : bigint,
+  'thrusterKits' : bigint,
+}
+export interface WorldBuff {
+  'appliedAt' : bigint,
+  'expiresAt' : bigint,
+  'stats' : Array<[string, bigint]>,
+}
 export interface _SERVICE extends McpServer {}
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

@@ -1,3 +1,35 @@
+type WorldBuff = 
+ record {
+   appliedAt: int;
+   expiresAt: int;
+   stats: vec record {
+                text;
+                nat;
+              };
+ };
+type UserInventory = 
+ record {
+   gyroModules: nat;
+   owner: principal;
+   powerCoreFragments: nat;
+   speedChips: nat;
+   thrusterKits: nat;
+   universalParts: nat;
+ };
+type UpgradeType = 
+ variant {
+   Gyro;
+   PowerCore;
+   Thruster;
+   Velocity;
+ };
+type UpgradeSession = 
+ record {
+   endsAt: int;
+   startedAt: int;
+   tokenIndex: nat;
+   upgradeType: UpgradeType;
+ };
 type UpgradeFinishedResult = 
  variant {
    Failed: record {
@@ -101,15 +133,79 @@ type ScheduledEvent =
    scheduledTime: int;
    status: EventStatus;
  };
-type Result_2 = 
+type ScavengingZone = 
+ variant {
+   AbandonedSettlements;
+   DeadMachineFields;
+   ScrapHeaps;
+ };
+type ScavengingMissionType = 
+ variant {
+   DeepSalvage;
+   ShortExpedition;
+   WastelandExpedition;
+ };
+type ScavengingMission = 
+ record {
+   endTime: int;
+   missionId: nat;
+   missionType: ScavengingMissionType;
+   startTime: int;
+   tokenIndex: nat;
+   zone: ScavengingZone;
+ };
+type Result_4 = 
  variant {
    err: TreasuryError;
    ok;
  };
-type Result_1 = 
+type Result_3 = 
  variant {
    err: text;
    ok;
+ };
+type Result_2 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      activeUpgrade: opt UpgradeSession;
+      baseStats:
+       record {
+         acceleration: nat;
+         powerCore: nat;
+         speed: nat;
+         stability: nat;
+       };
+      currentBattery: nat;
+      currentCondition: nat;
+      isOwner: bool;
+      stats: PokedBotRacingStats;
+      upgradeCosts:
+       record {
+         Gyro: record {
+                 icp: nat;
+                 parts: nat;
+               };
+         PowerCore: record {
+                      icp: nat;
+                      parts: nat;
+                    };
+         Thruster: record {
+                     icp: nat;
+                     parts: nat;
+                   };
+         Velocity: record {
+                     icp: nat;
+                     parts: nat;
+                   };
+       };
+    };
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok: text;
  };
 type Result = 
  variant {
@@ -188,6 +284,48 @@ type Race =
    trackId: nat;
    trackSeed: nat;
  };
+type PokedBotRacingStats = 
+ record {
+   accelerationBonus: nat;
+   accelerationUpgrades: nat;
+   activatedAt: int;
+   activeMission: opt ScavengingMission;
+   battery: nat;
+   bestHaul: nat;
+   condition: nat;
+   eloRating: nat;
+   experience: nat;
+   faction: FactionType;
+   factionReputation: nat;
+   lastDecayed: int;
+   lastDiagnostics: opt int;
+   lastRaced: opt int;
+   lastRecharged: opt int;
+   lastRepaired: opt int;
+   listedForSale: bool;
+   name: opt text;
+   overcharge: nat;
+   ownerPrincipal: principal;
+   places: nat;
+   powerCoreBonus: nat;
+   powerCoreUpgrades: nat;
+   preferredDistance: Distance;
+   preferredTerrain: Terrain;
+   racesEntered: nat;
+   scavengingMissions: nat;
+   scavengingReputation: nat;
+   shows: nat;
+   speedBonus: nat;
+   speedUpgrades: nat;
+   stabilityBonus: nat;
+   stabilityUpgrades: nat;
+   tokenIndex: nat;
+   totalPartsScavenged: nat;
+   totalScrapEarned: nat;
+   upgradeEndsAt: opt int;
+   wins: nat;
+   worldBuff: opt WorldBuff;
+ };
 type NFTStats = vec nat;
 type NFTMetadata = 
  vec record {
@@ -196,6 +334,8 @@ type NFTMetadata =
      };
 type McpServer = 
  service {
+   /// Fix a broken race entry by converting EXT token identifier to token index
+   admin_fix_race_entry: (raceId: nat, extTokenId: text) -> (Result_1);
    cancel_actions_by_filter: (filter: ActionFilter) -> (CancellationResult);
    cancel_actions_by_ids: (ids: vec nat) -> (CancellationResult);
    cancel_races_by_ids: (raceIds: vec nat) -> (vec record {
@@ -208,14 +348,6 @@ type McpServer =
    ///    * @param name A human-readable name for the key.
    ///    * @returns The raw, unhashed API key. THIS IS THE ONLY TIME IT WILL BE VISIBLE.
    create_my_api_key: (name: text, scopes: vec text) -> (text);
-   /// Debug method to check ownership verification
-   debug_check_bot_owner: (tokenIndex: nat32, userPrincipal: principal) ->
-    (record {
-       extCanister: text;
-       garageAccountId: text;
-       ownerResult: text;
-       tokenIdentifier: text;
-     });
    debug_create_test_race: (startInMinutes: nat) -> (text);
    /// Test/debug: Get all available tracks
    debug_get_all_tracks: () ->
@@ -431,9 +563,6 @@ type McpServer =
       }) query;
    /// Get the currently configured EXT NFT canister ID.
    get_ext_canister: () -> (principal) query;
-   /// Get the garage account ID for a given user principal
-   /// This is useful for testing and external tools that need to know where to send NFTs
-   get_garage_account_id: (userPrincipal: principal) -> (text) query;
    /// Get the currently configured ICP ledger canister ID.
    get_icp_ledger: () -> (opt principal) query;
    get_latest_reconstitution_trace: () -> (opt ReconstitutionTrace) query;
@@ -571,17 +700,17 @@ type McpServer =
    reset_all_elos: () -> (text);
    /// Reset a bot's racing stats (owner only) - allows re-initialization with correct faction
    /// This is useful after faction system changes or data migrations
-   reset_bot_stats: (tokenIndex: nat) -> (Result_1);
+   reset_bot_stats: (tokenIndex: nat) -> (Result_3);
    /// Revoke (delete) an API key owned by the caller.
    ///    * @param key_id The ID of the key to revoke.
    ///    * @returns True if the key was found and revoked, false otherwise.
    revoke_my_api_key: (key_id: text) -> ();
    /// Set the EXT NFT canister ID. Only the current owner can call this.
-   set_ext_canister: (canister_id: principal) -> (Result_1);
+   set_ext_canister: (canister_id: principal) -> (Result_3);
    /// Set the ICP ledger canister ID. Only the current owner can call this.
-   set_icp_ledger: (ledger_id: principal) -> (Result_1);
+   set_icp_ledger: (ledger_id: principal) -> (Result_3);
    /// Set a new owner for the canister. Only the current owner can call this.
-   set_owner: (new_owner: principal) -> (Result_2);
+   set_owner: (new_owner: principal) -> (Result_4);
    transformJwksResponse:
     (record {
        context: blob;
@@ -610,10 +739,91 @@ type McpServer =
    upload_nft_stats_batch: (batch: vec record {
                                          nat;
                                          NFTStats;
-                                       }) -> (Result_1);
+                                       }) -> (Result_3);
    /// Upload trait schema (owner only, done once)
-   upload_trait_schema: (schemaData: TraitSchema) -> (Result_1);
+   upload_trait_schema: (schemaData: TraitSchema) -> (Result_3);
    validate_timer_state: () -> (vec text) query;
+   /// Browse marketplace listings with filtering and pagination
+   web_browse_marketplace: (after: opt nat, minRating: opt nat, maxPrice:
+    opt float64, faction: opt text, sortBy: opt text, sortDesc: opt bool,
+    limit: opt nat) ->
+    (record {
+       hasMore: bool;
+       listings:
+        vec
+         record {
+           baseAcceleration: nat;
+           basePowerCore: nat;
+           baseSpeed: nat;
+           baseStability: nat;
+           faction: opt text;
+           imageUrl: text;
+           isInitialized: bool;
+           overallRating: nat;
+           price: float64;
+           racesEntered: nat;
+           tokenIndex: nat;
+           winRate: float64;
+           wins: nat;
+         };
+     });
+   /// Enter a race (with ICRC-2 payment for entry fee)
+   web_enter_race: (raceId: nat, tokenIndex: nat) -> (Result_1);
+   /// Get detailed stats for a specific bot
+   web_get_bot_details: (tokenIndex: nat) -> (Result_2);
+   /// Get bot details for multiple token indices (query call for performance)
+   web_get_bot_details_batch: (tokenIndices: vec nat) ->
+    (vec
+      record {
+        baseAcceleration: nat;
+        basePowerCore: nat;
+        baseSpeed: nat;
+        baseStability: nat;
+        faction: opt text;
+        imageUrl: text;
+        isInitialized: bool;
+        overallRating: nat;
+        racesEntered: nat;
+        tokenIndex: nat;
+        winRate: float64;
+        wins: nat;
+      }) query;
+   /// Get user's parts inventory
+   web_get_user_inventory: () -> (UserInventory) query;
+   /// Initialize a bot for racing (web equivalent of garage_initialize_pokedbot)
+   web_initialize_bot: (tokenIndex: nat, name: opt text) -> (Result_1);
+   /// List all PokedBots owned by the caller in their wallet
+   web_list_my_bots: () ->
+    (vec
+      record {
+        activeUpgrade: opt UpgradeSession;
+        currentOwner: text;
+        isInitialized: bool;
+        name: opt text;
+        stats: opt PokedBotRacingStats;
+        tokenIndex: nat;
+        upcomingRaces:
+         vec
+          record {
+            entryFee: nat;
+            name: text;
+            raceId: nat;
+            startTime: int;
+            terrain: Terrain;
+          };
+      });
+   /// Purchase a bot from the marketplace (with ICRC-2 payment)
+   web_purchase_bot: (tokenIndex: nat) -> (Result_1);
+   /// Recharge a bot's battery (0.1 ICP + fee via ICRC-2)
+   web_recharge_bot: (tokenIndex: nat) -> (Result_1);
+   /// Repair a bot to restore condition (0.05 ICP + fee via ICRC-2)
+   web_repair_bot: (tokenIndex: nat) -> (Result_1);
+   /// Upgrade a bot stat (via ICRC-2 payment or parts)
+   web_upgrade_bot: (tokenIndex: nat, upgradeType: UpgradeType,
+    paymentMethod: variant {
+                     icp;
+                     parts;
+                   }) -> (Result_1);
    /// Withdraw tokens from the canister's treasury to a specified destination.
    withdraw: (ledger_id: principal, amount: nat, destination: Destination) ->
     (Result);
@@ -720,6 +930,12 @@ type EventMetadata =
    name: text;
    pointsMultiplier: float64;
    prizePoolBonus: nat;
+ };
+type Distance = 
+ variant {
+   LongTrek;
+   MediumHaul;
+   ShortSprint;
  };
 type Destination = 
  record {

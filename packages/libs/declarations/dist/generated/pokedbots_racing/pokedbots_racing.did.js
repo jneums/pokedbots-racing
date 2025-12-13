@@ -1,4 +1,5 @@
 export const idlFactory = ({ IDL }) => {
+  const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
   const Time__1 = IDL.Nat;
   const ActionFilter = IDL.Variant({
     'All' : IDL.Null,
@@ -245,7 +246,7 @@ export const idlFactory = ({ IDL }) => {
     'info' : ApiKeyInfo,
     'hashed_key' : HashedApiKey,
   });
-  const Result_1 = IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text });
+  const Result_3 = IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text });
   const Timestamp = IDL.Nat64;
   const TransferError = IDL.Variant({
     'GenericError' : IDL.Record({
@@ -265,12 +266,123 @@ export const idlFactory = ({ IDL }) => {
     'NotOwner' : IDL.Null,
     'TransferFailed' : TransferError,
   });
-  const Result_2 = IDL.Variant({ 'ok' : IDL.Null, 'err' : TreasuryError });
+  const Result_4 = IDL.Variant({ 'ok' : IDL.Null, 'err' : TreasuryError });
   const HttpHeader = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
   const HttpRequestResult = IDL.Record({
     'status' : IDL.Nat,
     'body' : IDL.Vec(IDL.Nat8),
     'headers' : IDL.Vec(HttpHeader),
+  });
+  const UpgradeType = IDL.Variant({
+    'Gyro' : IDL.Null,
+    'PowerCore' : IDL.Null,
+    'Thruster' : IDL.Null,
+    'Velocity' : IDL.Null,
+  });
+  const UpgradeSession = IDL.Record({
+    'startedAt' : IDL.Int,
+    'tokenIndex' : IDL.Nat,
+    'upgradeType' : UpgradeType,
+    'endsAt' : IDL.Int,
+  });
+  const Distance = IDL.Variant({
+    'MediumHaul' : IDL.Null,
+    'LongTrek' : IDL.Null,
+    'ShortSprint' : IDL.Null,
+  });
+  const WorldBuff = IDL.Record({
+    'appliedAt' : IDL.Int,
+    'expiresAt' : IDL.Int,
+    'stats' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat)),
+  });
+  const ScavengingMissionType = IDL.Variant({
+    'DeepSalvage' : IDL.Null,
+    'ShortExpedition' : IDL.Null,
+    'WastelandExpedition' : IDL.Null,
+  });
+  const ScavengingZone = IDL.Variant({
+    'AbandonedSettlements' : IDL.Null,
+    'ScrapHeaps' : IDL.Null,
+    'DeadMachineFields' : IDL.Null,
+  });
+  const ScavengingMission = IDL.Record({
+    'startTime' : IDL.Int,
+    'endTime' : IDL.Int,
+    'missionType' : ScavengingMissionType,
+    'tokenIndex' : IDL.Nat,
+    'zone' : ScavengingZone,
+    'missionId' : IDL.Nat,
+  });
+  const PokedBotRacingStats = IDL.Record({
+    'accelerationBonus' : IDL.Nat,
+    'preferredDistance' : Distance,
+    'totalPartsScavenged' : IDL.Nat,
+    'stabilityBonus' : IDL.Nat,
+    'lastRepaired' : IDL.Opt(IDL.Int),
+    'lastRaced' : IDL.Opt(IDL.Int),
+    'tokenIndex' : IDL.Nat,
+    'places' : IDL.Nat,
+    'activatedAt' : IDL.Int,
+    'ownerPrincipal' : IDL.Principal,
+    'bestHaul' : IDL.Nat,
+    'name' : IDL.Opt(IDL.Text),
+    'scavengingReputation' : IDL.Nat,
+    'lastRecharged' : IDL.Opt(IDL.Int),
+    'worldBuff' : IDL.Opt(WorldBuff),
+    'wins' : IDL.Nat,
+    'eloRating' : IDL.Nat,
+    'factionReputation' : IDL.Nat,
+    'stabilityUpgrades' : IDL.Nat,
+    'scavengingMissions' : IDL.Nat,
+    'accelerationUpgrades' : IDL.Nat,
+    'overcharge' : IDL.Nat,
+    'speedUpgrades' : IDL.Nat,
+    'experience' : IDL.Nat,
+    'shows' : IDL.Nat,
+    'lastDiagnostics' : IDL.Opt(IDL.Int),
+    'preferredTerrain' : Terrain,
+    'lastDecayed' : IDL.Int,
+    'listedForSale' : IDL.Bool,
+    'racesEntered' : IDL.Nat,
+    'powerCoreBonus' : IDL.Nat,
+    'faction' : FactionType,
+    'battery' : IDL.Nat,
+    'speedBonus' : IDL.Nat,
+    'totalScrapEarned' : IDL.Nat,
+    'activeMission' : IDL.Opt(ScavengingMission),
+    'powerCoreUpgrades' : IDL.Nat,
+    'upgradeEndsAt' : IDL.Opt(IDL.Int),
+    'condition' : IDL.Nat,
+  });
+  const Result_2 = IDL.Variant({
+    'ok' : IDL.Record({
+      'activeUpgrade' : IDL.Opt(UpgradeSession),
+      'stats' : PokedBotRacingStats,
+      'baseStats' : IDL.Record({
+        'stability' : IDL.Nat,
+        'speed' : IDL.Nat,
+        'acceleration' : IDL.Nat,
+        'powerCore' : IDL.Nat,
+      }),
+      'isOwner' : IDL.Bool,
+      'currentBattery' : IDL.Nat,
+      'upgradeCosts' : IDL.Record({
+        'Gyro' : IDL.Record({ 'icp' : IDL.Nat, 'parts' : IDL.Nat }),
+        'PowerCore' : IDL.Record({ 'icp' : IDL.Nat, 'parts' : IDL.Nat }),
+        'Thruster' : IDL.Record({ 'icp' : IDL.Nat, 'parts' : IDL.Nat }),
+        'Velocity' : IDL.Record({ 'icp' : IDL.Nat, 'parts' : IDL.Nat }),
+      }),
+      'currentCondition' : IDL.Nat,
+    }),
+    'err' : IDL.Text,
+  });
+  const UserInventory = IDL.Record({
+    'powerCoreFragments' : IDL.Nat,
+    'universalParts' : IDL.Nat,
+    'owner' : IDL.Principal,
+    'gyroModules' : IDL.Nat,
+    'speedChips' : IDL.Nat,
+    'thrusterKits' : IDL.Nat,
   });
   const Subaccount = IDL.Vec(IDL.Nat8);
   const Destination = IDL.Record({
@@ -279,6 +391,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const Result = IDL.Variant({ 'ok' : IDL.Nat, 'err' : TreasuryError });
   const McpServer = IDL.Service({
+    'admin_fix_race_entry' : IDL.Func([IDL.Nat, IDL.Text], [Result_1], []),
     'cancel_actions_by_filter' : IDL.Func(
         [ActionFilter],
         [CancellationResult],
@@ -299,18 +412,6 @@ export const idlFactory = ({ IDL }) => {
     'create_my_api_key' : IDL.Func(
         [IDL.Text, IDL.Vec(IDL.Text)],
         [IDL.Text],
-        [],
-      ),
-    'debug_check_bot_owner' : IDL.Func(
-        [IDL.Nat32, IDL.Principal],
-        [
-          IDL.Record({
-            'extCanister' : IDL.Text,
-            'tokenIdentifier' : IDL.Text,
-            'garageAccountId' : IDL.Text,
-            'ownerResult' : IDL.Text,
-          }),
-        ],
         [],
       ),
     'debug_create_test_race' : IDL.Func([IDL.Nat], [IDL.Text], []),
@@ -579,7 +680,6 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_ext_canister' : IDL.Func([], [IDL.Principal], ['query']),
-    'get_garage_account_id' : IDL.Func([IDL.Principal], [IDL.Text], ['query']),
     'get_icp_ledger' : IDL.Func([], [IDL.Opt(IDL.Principal)], ['query']),
     'get_latest_reconstitution_trace' : IDL.Func(
         [],
@@ -752,11 +852,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'recalculate_bot_stats' : IDL.Func([], [IDL.Text], []),
     'reset_all_elos' : IDL.Func([], [IDL.Text], []),
-    'reset_bot_stats' : IDL.Func([IDL.Nat], [Result_1], []),
+    'reset_bot_stats' : IDL.Func([IDL.Nat], [Result_3], []),
     'revoke_my_api_key' : IDL.Func([IDL.Text], [], []),
-    'set_ext_canister' : IDL.Func([IDL.Principal], [Result_1], []),
-    'set_icp_ledger' : IDL.Func([IDL.Principal], [Result_1], []),
-    'set_owner' : IDL.Func([IDL.Principal], [Result_2], []),
+    'set_ext_canister' : IDL.Func([IDL.Principal], [Result_3], []),
+    'set_icp_ledger' : IDL.Func([IDL.Principal], [Result_3], []),
+    'set_owner' : IDL.Func([IDL.Principal], [Result_4], []),
     'transformJwksResponse' : IDL.Func(
         [
           IDL.Record({
@@ -792,11 +892,112 @@ export const idlFactory = ({ IDL }) => {
       ),
     'upload_nft_stats_batch' : IDL.Func(
         [IDL.Vec(IDL.Tuple(IDL.Nat, NFTStats))],
+        [Result_3],
+        [],
+      ),
+    'upload_trait_schema' : IDL.Func([TraitSchema], [Result_3], []),
+    'validate_timer_state' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+    'web_browse_marketplace' : IDL.Func(
+        [
+          IDL.Opt(IDL.Nat),
+          IDL.Opt(IDL.Nat),
+          IDL.Opt(IDL.Float64),
+          IDL.Opt(IDL.Text),
+          IDL.Opt(IDL.Text),
+          IDL.Opt(IDL.Bool),
+          IDL.Opt(IDL.Nat),
+        ],
+        [
+          IDL.Record({
+            'hasMore' : IDL.Bool,
+            'listings' : IDL.Vec(
+              IDL.Record({
+                'baseAcceleration' : IDL.Nat,
+                'tokenIndex' : IDL.Nat,
+                'isInitialized' : IDL.Bool,
+                'wins' : IDL.Nat,
+                'baseStability' : IDL.Nat,
+                'imageUrl' : IDL.Text,
+                'overallRating' : IDL.Nat,
+                'baseSpeed' : IDL.Nat,
+                'basePowerCore' : IDL.Nat,
+                'racesEntered' : IDL.Nat,
+                'faction' : IDL.Opt(IDL.Text),
+                'price' : IDL.Float64,
+                'winRate' : IDL.Float64,
+              })
+            ),
+          }),
+        ],
+        [],
+      ),
+    'web_enter_race' : IDL.Func([IDL.Nat, IDL.Nat], [Result_1], []),
+    'web_get_bot_details' : IDL.Func([IDL.Nat], [Result_2], []),
+    'web_get_bot_details_batch' : IDL.Func(
+        [IDL.Vec(IDL.Nat)],
+        [
+          IDL.Vec(
+            IDL.Record({
+              'baseAcceleration' : IDL.Nat,
+              'tokenIndex' : IDL.Nat,
+              'isInitialized' : IDL.Bool,
+              'wins' : IDL.Nat,
+              'baseStability' : IDL.Nat,
+              'imageUrl' : IDL.Text,
+              'overallRating' : IDL.Nat,
+              'baseSpeed' : IDL.Nat,
+              'basePowerCore' : IDL.Nat,
+              'racesEntered' : IDL.Nat,
+              'faction' : IDL.Opt(IDL.Text),
+              'winRate' : IDL.Float64,
+            })
+          ),
+        ],
+        ['query'],
+      ),
+    'web_get_user_inventory' : IDL.Func([], [UserInventory], ['query']),
+    'web_initialize_bot' : IDL.Func(
+        [IDL.Nat, IDL.Opt(IDL.Text)],
         [Result_1],
         [],
       ),
-    'upload_trait_schema' : IDL.Func([TraitSchema], [Result_1], []),
-    'validate_timer_state' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+    'web_list_my_bots' : IDL.Func(
+        [],
+        [
+          IDL.Vec(
+            IDL.Record({
+              'activeUpgrade' : IDL.Opt(UpgradeSession),
+              'tokenIndex' : IDL.Nat,
+              'isInitialized' : IDL.Bool,
+              'name' : IDL.Opt(IDL.Text),
+              'currentOwner' : IDL.Text,
+              'stats' : IDL.Opt(PokedBotRacingStats),
+              'upcomingRaces' : IDL.Vec(
+                IDL.Record({
+                  'startTime' : IDL.Int,
+                  'terrain' : Terrain,
+                  'name' : IDL.Text,
+                  'raceId' : IDL.Nat,
+                  'entryFee' : IDL.Nat,
+                })
+              ),
+            })
+          ),
+        ],
+        [],
+      ),
+    'web_purchase_bot' : IDL.Func([IDL.Nat], [Result_1], []),
+    'web_recharge_bot' : IDL.Func([IDL.Nat], [Result_1], []),
+    'web_repair_bot' : IDL.Func([IDL.Nat], [Result_1], []),
+    'web_upgrade_bot' : IDL.Func(
+        [
+          IDL.Nat,
+          UpgradeType,
+          IDL.Variant({ 'icp' : IDL.Null, 'parts' : IDL.Null }),
+        ],
+        [Result_1],
+        [],
+      ),
     'withdraw' : IDL.Func([IDL.Principal, IDL.Nat, Destination], [Result], []),
   });
   return McpServer;

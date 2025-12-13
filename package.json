@@ -37,5 +37,14 @@
   "dependencies": {
     "@icp-sdk/canisters": "^2.0.1",
     "pem-file": "^1.0.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "@dfinity/agent": "3.4.3",
+      "@dfinity/auth-client": "3.4.3",
+      "@dfinity/candid": "3.4.3",
+      "@dfinity/principal": "3.4.3",
+      "@dfinity/identity": "3.4.3"
+    }
   }
 }

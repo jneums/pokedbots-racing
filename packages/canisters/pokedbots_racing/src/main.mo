@@ -6,6 +6,7 @@ import Principal "mo:base/Principal";
 import Option "mo:base/Option";
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
+import Nat64 "mo:base/Nat64";
 import Int "mo:base/Int";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
@@ -39,9 +40,6 @@ import ToolContext "tools/ToolContext";
 import GarageListMyPokedBots "tools/garage_list_my_pokedbots";
 import MarketplaceBrowsePokedBots "tools/marketplace_browse_pokedbots";
 import MarketplacePurchasePokedBot "tools/marketplace_purchase_pokedbot";
-import MarketplaceListPokedBot "tools/marketplace_list_pokedbot";
-import MarketplaceUnlistPokedBot "tools/marketplace_unlist_pokedbot";
-import GarageTransferPokedBot "tools/garage_transfer_pokedbot";
 import GarageInitializePokedBot "tools/garage_initialize_pokedbot";
 import GarageGetRobotDetails "tools/garage_get_robot_details";
 import GarageRechargeRobot "tools/garage_recharge_robot";
@@ -1422,9 +1420,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     GarageListMyPokedBots.config(),
     MarketplaceBrowsePokedBots.config(),
     MarketplacePurchasePokedBot.config(),
-    MarketplaceListPokedBot.config(),
-    MarketplaceUnlistPokedBot.config(),
-    GarageTransferPokedBot.config(),
     GarageInitializePokedBot.config(),
     GarageGetRobotDetails.config(),
     GarageRechargeRobot.config(),
@@ -1458,9 +1453,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       ("garage_list_my_pokedbots", GarageListMyPokedBots.handler(toolContext)),
       ("browse_pokedbots", MarketplaceBrowsePokedBots.handle(toolContext)),
       ("purchase_pokedbot", MarketplacePurchasePokedBot.handle(toolContext)),
-      ("list_pokedbot", MarketplaceListPokedBot.handle(toolContext)),
-      ("unlist_pokedbot", MarketplaceUnlistPokedBot.handle(toolContext)),
-      ("transfer_pokedbot", GarageTransferPokedBot.handle(toolContext)),
       ("garage_initialize_pokedbot", GarageInitializePokedBot.handle(toolContext)),
       ("garage_get_robot_details", GarageGetRobotDetails.handle(toolContext)),
       ("garage_recharge_robot", GarageRechargeRobot.handle(toolContext)),
@@ -1487,12 +1479,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   /// Get the current owner of the canister.
   public query func get_owner() : async Principal { return owner };
-
-  /// Get the garage account ID for a given user principal
-  /// This is useful for testing and external tools that need to know where to send NFTs
-  public query func get_garage_account_id(userPrincipal : Principal) : async Text {
-    ExtIntegration.getGarageAccountId(Principal.fromActor(self), userPrincipal);
-  };
 
   /// Set a new owner for the canister. Only the current owner can call this.
   public shared ({ caller }) func set_owner(new_owner : Principal) : async Result.Result<(), Payments.TreasuryError> {
@@ -1530,35 +1516,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   /// Get the currently configured EXT NFT canister ID.
   public query func get_ext_canister() : async Principal {
     return extCanisterId;
-  };
-
-  /// Debug method to check ownership verification
-  public shared func debug_check_bot_owner(tokenIndex : Nat32, userPrincipal : Principal) : async {
-    garageAccountId : Text;
-    tokenIdentifier : Text;
-    ownerResult : Text;
-    extCanister : Text;
-  } {
-    let garageSubaccount = ExtIntegration.deriveGarageSubaccount(userPrincipal);
-    let garageAccountId = ExtIntegration.principalToAccountIdentifier(Principal.fromActor(self), ?garageSubaccount);
-    let tokenId = ExtIntegration.encodeTokenIdentifier(tokenIndex, extCanisterId);
-
-    let ownerResult = try {
-      let result = await extCanister.bearer(tokenId);
-      switch (result) {
-        case (#ok(owner)) { "Owner: " # owner };
-        case (#err(e)) { "Error: " # debug_show (e) };
-      };
-    } catch (e) {
-      "Exception: " # Error.message(e);
-    };
-
-    return {
-      garageAccountId = garageAccountId;
-      tokenIdentifier = tokenId;
-      ownerResult = ownerResult;
-      extCanister = Principal.toText(extCanisterId);
-    };
   };
 
   /// Find all races that are not associated with any event
@@ -3935,5 +3892,1087 @@ shared ({ caller = deployer }) persistent actor class McpServer(
    */
   public func icrc120_upgrade_finished() : async UpgradeFinishedResult {
     #Success(natNow());
+  };
+
+  // ============================================================================
+  // WEB API FUNCTIONS - For website gameplay
+  // ============================================================================
+
+  /// Browse marketplace listings with filtering and pagination
+  public func web_browse_marketplace(
+    after : ?Nat,
+    minRating : ?Nat,
+    maxPrice : ?Float,
+    faction : ?Text,
+    sortBy : ?Text,
+    sortDesc : ?Bool,
+    limit : ?Nat,
+  ) : async {
+    listings : [{
+      tokenIndex : Nat;
+      price : Float;
+      faction : ?Text;
+      baseSpeed : Nat;
+      basePowerCore : Nat;
+      baseAcceleration : Nat;
+      baseStability : Nat;
+      overallRating : Nat;
+      wins : Nat;
+      racesEntered : Nat;
+      winRate : Float;
+      imageUrl : Text;
+      isInitialized : Bool;
+    }];
+    hasMore : Bool;
+  } {
+    // Get cached listings
+    let listingsResult = await getMarketplaceListings();
+
+    if (listingsResult.size() == 0) {
+      return {
+        listings = [];
+        hasMore = false;
+      };
+    };
+
+    // Enrich listings with stats
+    type EnrichedListing = {
+      tokenIndex : Nat;
+      price : Float;
+      faction : ?Text;
+      baseSpeed : Nat;
+      basePowerCore : Nat;
+      baseAcceleration : Nat;
+      baseStability : Nat;
+      overallRating : Nat;
+      wins : Nat;
+      racesEntered : Nat;
+      winRate : Float;
+      imageUrl : Text;
+      isInitialized : Bool;
+      listing : ExtIntegration.Listing;
+    };
+
+    var enriched : [EnrichedListing] = [];
+
+    for ((tokenIndex32, listing, _metadata) in listingsResult.vals()) {
+      let tokenIndex = Nat32.toNat(tokenIndex32);
+      let baseStats = garageManager.getBaseStats(tokenIndex);
+      let racingStats = garageManager.getStats(tokenIndex);
+      let priceICP = Float.fromInt(Nat64.toNat(listing.price)) / 100_000_000.0;
+
+      let tokenId = ExtIntegration.encodeTokenIdentifier(tokenIndex32, extCanisterId);
+      let imageUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId # "&type=thumbnail";
+
+      let item : EnrichedListing = switch (racingStats) {
+        case (?stats) {
+          let rating = garageManager.calculateOverallRating(stats);
+          let winRate = if (stats.racesEntered > 0) {
+            Float.fromInt(stats.wins) / Float.fromInt(stats.racesEntered) * 100.0;
+          } else { 0.0 };
+
+          let factionText = switch (stats.faction) {
+            case (#UltimateMaster) { ?"UltimateMaster" };
+            case (#Wild) { ?"Wild" };
+            case (#Golden) { ?"Golden" };
+            case (#Ultimate) { ?"Ultimate" };
+            case (#Blackhole) { ?"Blackhole" };
+            case (#Dead) { ?"Dead" };
+            case (#Master) { ?"Master" };
+            case (#Bee) { ?"Bee" };
+            case (#Food) { ?"Food" };
+            case (#Box) { ?"Box" };
+            case (#Murder) { ?"Murder" };
+            case (#Game) { ?"Game" };
+            case (#Animal) { ?"Animal" };
+            case (#Industrial) { ?"Industrial" };
+          };
+
+          {
+            tokenIndex;
+            price = priceICP;
+            faction = factionText;
+            baseSpeed = baseStats.speed;
+            basePowerCore = baseStats.powerCore;
+            baseAcceleration = baseStats.acceleration;
+            baseStability = baseStats.stability;
+            overallRating = rating;
+            wins = stats.wins;
+            racesEntered = stats.racesEntered;
+            winRate;
+            imageUrl;
+            isInitialized = true;
+            listing;
+          };
+        };
+        case (null) {
+          // Uninitialized bots don't have faction visible yet
+          let avgStat = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
+          {
+            tokenIndex;
+            price = priceICP;
+            faction = null; // Faction revealed upon initialization
+            baseSpeed = baseStats.speed;
+            basePowerCore = baseStats.powerCore;
+            baseAcceleration = baseStats.acceleration;
+            baseStability = baseStats.stability;
+            overallRating = avgStat;
+            wins = 0;
+            racesEntered = 0;
+            winRate = 0.0;
+            imageUrl;
+            isInitialized = false;
+            listing;
+          };
+        };
+      };
+
+      enriched := Array.append(enriched, [item]);
+    };
+
+    // Apply filters
+    var filtered = enriched;
+
+    switch (minRating) {
+      case (?rating) {
+        filtered := Array.filter<EnrichedListing>(
+          filtered,
+          func(item) {
+            item.overallRating >= rating;
+          },
+        );
+      };
+      case (null) {};
+    };
+
+    switch (maxPrice) {
+      case (?price) {
+        filtered := Array.filter<EnrichedListing>(
+          filtered,
+          func(item) {
+            item.price <= price;
+          },
+        );
+      };
+      case (null) {};
+    };
+
+    switch (faction) {
+      case (?fac) {
+        filtered := Array.filter<EnrichedListing>(
+          filtered,
+          func(item) {
+            switch (item.faction) {
+              case (?f) { f == fac };
+              case (null) { false };
+            };
+          },
+        );
+      };
+      case (null) {};
+    };
+
+    // Apply sorting
+    let sortKey = switch (sortBy) {
+      case (?s) { s };
+      case (null) { "price" };
+    };
+
+    let descending = switch (sortDesc) {
+      case (?d) { d };
+      case (null) {
+        switch (sortKey) {
+          case ("price") { false };
+          case (_) { true };
+        };
+      };
+    };
+
+    filtered := Array.sort<EnrichedListing>(
+      filtered,
+      func(a, b) {
+        let comparison = switch (sortKey) {
+          case ("price") { Float.compare(a.price, b.price) };
+          case ("rating") { Nat.compare(a.overallRating, b.overallRating) };
+          case ("winRate") { Float.compare(a.winRate, b.winRate) };
+          case ("wins") { Nat.compare(a.wins, b.wins) };
+          case (_) { Float.compare(a.price, b.price) };
+        };
+
+        if (descending) {
+          switch (comparison) {
+            case (#less) { #greater };
+            case (#greater) { #less };
+            case (#equal) { #equal };
+          };
+        } else {
+          comparison;
+        };
+      },
+    );
+
+    // Apply pagination
+    let pageSize = switch (limit) {
+      case (?l) { l };
+      case (null) { 20 };
+    };
+
+    let startIdx = switch (after) {
+      case (?a) {
+        // Find index of the tokenIndex we're starting after
+        let foundIdx = Array.indexOf<EnrichedListing>(
+          {
+            tokenIndex = a;
+            price = 0.0;
+            faction = null;
+            baseSpeed = 0;
+            basePowerCore = 0;
+            baseAcceleration = 0;
+            baseStability = 0;
+            overallRating = 0;
+            wins = 0;
+            racesEntered = 0;
+            winRate = 0.0;
+            imageUrl = "";
+            isInitialized = false;
+            listing = {
+              locked = null;
+              seller = Principal.fromText("aaaaa-aa");
+              price = 0;
+            };
+          },
+          filtered,
+          func(a, b) { a.tokenIndex == b.tokenIndex },
+        );
+        switch (foundIdx) {
+          case (?idx) { idx + 1 };
+          case (null) { 0 };
+        };
+      };
+      case (null) { 0 };
+    };
+
+    let endIdx = Nat.min(startIdx + pageSize, filtered.size());
+    let page = Array.tabulate<EnrichedListing>(
+      endIdx - startIdx,
+      func(i) { filtered[startIdx + i] },
+    );
+
+    // Convert to response type (remove listing field)
+    let responseListings = Array.map<EnrichedListing, { tokenIndex : Nat; price : Float; faction : ?Text; baseSpeed : Nat; basePowerCore : Nat; baseAcceleration : Nat; baseStability : Nat; overallRating : Nat; wins : Nat; racesEntered : Nat; winRate : Float; imageUrl : Text; isInitialized : Bool }>(
+      page,
+      func(item) {
+        {
+          tokenIndex = item.tokenIndex;
+          price = item.price;
+          faction = item.faction;
+          baseSpeed = item.baseSpeed;
+          basePowerCore = item.basePowerCore;
+          baseAcceleration = item.baseAcceleration;
+          baseStability = item.baseStability;
+          overallRating = item.overallRating;
+          wins = item.wins;
+          racesEntered = item.racesEntered;
+          winRate = item.winRate;
+          imageUrl = item.imageUrl;
+          isInitialized = item.isInitialized;
+        };
+      },
+    );
+
+    {
+      listings = responseListings;
+      hasMore = endIdx < filtered.size();
+    };
+  };
+
+  /// Get bot details for multiple token indices (query call for performance)
+  public query func web_get_bot_details_batch(tokenIndices : [Nat]) : async [{
+    tokenIndex : Nat;
+    faction : ?Text;
+    baseSpeed : Nat;
+    basePowerCore : Nat;
+    baseAcceleration : Nat;
+    baseStability : Nat;
+    overallRating : Nat;
+    wins : Nat;
+    racesEntered : Nat;
+    winRate : Float;
+    imageUrl : Text;
+    isInitialized : Bool;
+  }] {
+    let extCanisterIdBytes = Principal.toBlob(extCanisterId);
+
+    Array.map<Nat, { tokenIndex : Nat; faction : ?Text; baseSpeed : Nat; basePowerCore : Nat; baseAcceleration : Nat; baseStability : Nat; overallRating : Nat; wins : Nat; racesEntered : Nat; winRate : Float; imageUrl : Text; isInitialized : Bool }>(
+      tokenIndices,
+      func(tokenIndex) {
+        let baseStats = garageManager.getBaseStats(tokenIndex);
+        let racingStats = garageManager.getStats(tokenIndex);
+
+        let tokenIndex32 = Nat32.fromNat(tokenIndex);
+        let tokenId = ExtIntegration.encodeTokenIdentifier(tokenIndex32, extCanisterId);
+        let imageUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId # "&type=thumbnail";
+
+        switch (racingStats) {
+          case (?stats) {
+            let rating = garageManager.calculateOverallRating(stats);
+            let winRate = if (stats.racesEntered > 0) {
+              Float.fromInt(stats.wins) / Float.fromInt(stats.racesEntered) * 100.0;
+            } else { 0.0 };
+
+            let factionText = switch (stats.faction) {
+              case (#UltimateMaster) { ?"UltimateMaster" };
+              case (#Wild) { ?"Wild" };
+              case (#Golden) { ?"Golden" };
+              case (#Ultimate) { ?"Ultimate" };
+              case (#Blackhole) { ?"Blackhole" };
+              case (#Dead) { ?"Dead" };
+              case (#Master) { ?"Master" };
+              case (#Bee) { ?"Bee" };
+              case (#Food) { ?"Food" };
+              case (#Box) { ?"Box" };
+              case (#Murder) { ?"Murder" };
+              case (#Game) { ?"Game" };
+              case (#Animal) { ?"Animal" };
+              case (#Industrial) { ?"Industrial" };
+            };
+
+            {
+              tokenIndex;
+              faction = factionText;
+              baseSpeed = baseStats.speed;
+              basePowerCore = baseStats.powerCore;
+              baseAcceleration = baseStats.acceleration;
+              baseStability = baseStats.stability;
+              overallRating = rating;
+              wins = stats.wins;
+              racesEntered = stats.racesEntered;
+              winRate;
+              imageUrl;
+              isInitialized = true;
+            };
+          };
+          case (null) {
+            // Uninitialized bots don't have faction visible yet
+            let avgStat = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
+            {
+              tokenIndex;
+              faction = null; // Faction revealed upon initialization
+              baseSpeed = baseStats.speed;
+              basePowerCore = baseStats.powerCore;
+              baseAcceleration = baseStats.acceleration;
+              baseStability = baseStats.stability;
+              overallRating = avgStat;
+              wins = 0;
+              racesEntered = 0;
+              winRate = 0.0;
+              imageUrl;
+              isInitialized = false;
+            };
+          };
+        };
+      },
+    );
+  };
+
+  /// List all PokedBots owned by the caller in their wallet
+  public shared ({ caller }) func web_list_my_bots() : async [{
+    tokenIndex : Nat;
+    name : ?Text;
+    stats : ?PokedBotsGarage.PokedBotRacingStats;
+    isInitialized : Bool;
+    currentOwner : Text;
+    activeUpgrade : ?PokedBotsGarage.UpgradeSession;
+    upcomingRaces : [{
+      raceId : Nat;
+      name : Text;
+      startTime : Int;
+      entryFee : Nat;
+      terrain : RacingSimulator.Terrain;
+    }];
+  }] {
+    let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
+    let tokensResult = await ExtIntegration.getOwnedTokens(extCanister, walletAccountId);
+
+    switch (tokensResult) {
+      case (#err(_)) { [] };
+      case (#ok(tokens)) {
+        // Get all upcoming races once
+        let allRaces = raceManager.getAllRaces();
+        let upcomingRaces = Array.filter<RacingSimulator.Race>(
+          allRaces,
+          func(race) {
+            race.status == #Upcoming;
+          },
+        );
+
+        let results = Array.mapFilter<Nat32, { tokenIndex : Nat; name : ?Text; stats : ?PokedBotsGarage.PokedBotRacingStats; isInitialized : Bool; currentOwner : Text; activeUpgrade : ?PokedBotsGarage.UpgradeSession; upcomingRaces : [{ raceId : Nat; name : Text; startTime : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }] }>(
+          tokens,
+          func(tokenIndex32) {
+            let tokenIndex = Nat32.toNat(tokenIndex32);
+            let stats = garageManager.getStats(tokenIndex);
+            let isInit = Option.isSome(stats);
+            let activeUpgrade = Map.get(stable_active_upgrades, Map.nhash, tokenIndex);
+
+            // Find races this bot is entered in
+            let nftId = Nat.toText(tokenIndex);
+            let botRaces = Array.mapFilter<RacingSimulator.Race, { raceId : Nat; name : Text; startTime : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }>(
+              upcomingRaces,
+              func(race) {
+                let isEntered = Array.find<RacingSimulator.RaceEntry>(
+                  race.entries,
+                  func(entry) { entry.nftId == nftId },
+                );
+                switch (isEntered) {
+                  case (?_) {
+                    ?{
+                      raceId = race.raceId;
+                      name = race.name;
+                      startTime = race.startTime;
+                      entryFee = race.entryFee;
+                      terrain = race.terrain;
+                    };
+                  };
+                  case (null) { null };
+                };
+              },
+            );
+
+            ?{
+              tokenIndex = tokenIndex;
+              name = switch (stats) { case (?s) { s.name }; case null { null } };
+              stats = stats;
+              isInitialized = isInit;
+              currentOwner = walletAccountId;
+              activeUpgrade = activeUpgrade;
+              upcomingRaces = botRaces;
+            };
+          },
+        );
+        results;
+      };
+    };
+  };
+
+  /// Get user's parts inventory
+  public shared query ({ caller }) func web_get_user_inventory() : async PokedBotsGarage.UserInventory {
+    garageManager.getUserInventory(caller);
+  };
+
+  /// Initialize a bot for racing (web equivalent of garage_initialize_pokedbot)
+  public shared ({ caller }) func web_initialize_bot(
+    tokenIndex : Nat,
+    name : ?Text,
+  ) : async Result.Result<Text, Text> {
+    // Verify caller owns the NFT in their wallet
+    let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
+    let ownerResult = try {
+      await extCanister.bearer(
+        ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), extCanisterId)
+      );
+    } catch (_) {
+      return #err("Failed to verify ownership");
+    };
+
+    switch (ownerResult) {
+      case (#err(_)) { #err("Bot does not exist") };
+      case (#ok(owner)) {
+        if (owner != walletAccountId) {
+          #err("You do not own this bot - it must be in your wallet");
+        } else {
+          // Check if already initialized by someone else
+          switch (garageManager.getStats(tokenIndex)) {
+            case (?existingStats) {
+              // Check if owned by caller
+              if (existingStats.ownerPrincipal != caller) {
+                // Transfer case - update owner (no fee for ownership transfer)
+                ignore garageManager.updateBotOwner(tokenIndex, caller);
+                #ok("Bot ownership updated to your account");
+              } else {
+                #ok("Bot already initialized for your account");
+              };
+            };
+            case (null) {
+              // First time initialization - charge 0.1 ICP registration fee
+              let REGISTRATION_COST = 10000000 : Nat; // 0.1 ICP in e8s
+              let TRANSFER_FEE = 10000 : Nat; // 0.0001 ICP in e8s
+              let totalCost = REGISTRATION_COST + TRANSFER_FEE;
+
+              let ledgerId = switch (icpLedgerCanisterId) {
+                case (?id) { id };
+                case (null) {
+                  return #err("ICP Ledger not configured");
+                };
+              };
+
+              let icpLedger = actor (Principal.toText(ledgerId)) : actor {
+                icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
+              };
+
+              let transferResult = try {
+                await icpLedger.icrc2_transfer_from({
+                  from = { owner = caller; subaccount = null };
+                  to = { owner = thisPrincipal; subaccount = null };
+                  amount = totalCost;
+                  fee = ?TRANSFER_FEE;
+                  memo = null;
+                  created_at_time = null;
+                  spender_subaccount = null;
+                });
+              } catch (e) {
+                return #err("Payment failed: " # Error.message(e) # ". Please approve the canister to spend 0.1001 ICP using icrc2_approve.");
+              };
+
+              switch (transferResult) {
+                case (#Err(e)) {
+                  let errorMsg = switch (e) {
+                    case (#InsufficientFunds({ balance })) {
+                      "Insufficient funds. Balance: " # Nat.toText(balance / 100000000) # " ICP";
+                    };
+                    case (#InsufficientAllowance({ allowance })) {
+                      "Insufficient spending allowance. Current: " # Nat.toText(allowance / 100000000) # " ICP. Please go to the Garage page and set a spending allowance first.";
+                    };
+                    case (#BadFee({ expected_fee })) {
+                      "Bad fee. Expected: " # Nat.toText(expected_fee) # " e8s";
+                    };
+                    case _ { "Transfer failed" };
+                  };
+                  #err(errorMsg);
+                };
+                case (#Ok(_)) {
+                  // Payment successful, initialize bot
+                  ignore garageManager.initializeBot(tokenIndex, caller, null, name);
+                  #ok("Bot initialized successfully. 0.1 ICP registration fee paid.");
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+
+  /// Get detailed stats for a specific bot
+  public shared ({ caller }) func web_get_bot_details(
+    tokenIndex : Nat
+  ) : async Result.Result<{ stats : PokedBotsGarage.PokedBotRacingStats; baseStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; isOwner : Bool; currentCondition : Nat; currentBattery : Nat; activeUpgrade : ?PokedBotsGarage.UpgradeSession; upgradeCosts : { Velocity : { parts : Nat; icp : Nat }; PowerCore : { parts : Nat; icp : Nat }; Thruster : { parts : Nat; icp : Nat }; Gyro : { parts : Nat; icp : Nat } } }, Text> {
+    let stats = switch (garageManager.getStats(tokenIndex)) {
+      case (?s) { s };
+      case (null) { return #err("Bot not initialized") };
+    };
+
+    // Check ownership
+    let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
+    let ownerResult = await extCanister.bearer(
+      ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), extCanisterId)
+    );
+
+    let isOwner = switch (ownerResult) {
+      case (#ok(owner)) { owner == walletAccountId };
+      case (#err(_)) { false };
+    };
+
+    let baseStats = garageManager.getBaseStats(tokenIndex);
+    let activeUpgrade = Map.get(stable_active_upgrades, Map.nhash, tokenIndex);
+
+    // Calculate upgrade costs based on upgrade counts
+    let velocityCost = garageManager.calculateUpgradeCost(stats.speedUpgrades);
+    let powerCoreCost = garageManager.calculateUpgradeCost(stats.powerCoreUpgrades);
+    let thrusterCost = garageManager.calculateUpgradeCost(stats.accelerationUpgrades);
+    let gyroCost = garageManager.calculateUpgradeCost(stats.stabilityUpgrades);
+
+    #ok({
+      stats = stats;
+      baseStats = baseStats;
+      isOwner = isOwner;
+      currentCondition = stats.condition;
+      currentBattery = stats.battery;
+      activeUpgrade = activeUpgrade;
+      upgradeCosts = {
+        Velocity = { parts = velocityCost; icp = velocityCost * 10_000 };
+        PowerCore = { parts = powerCoreCost; icp = powerCoreCost * 10_000 };
+        Thruster = { parts = thrusterCost; icp = thrusterCost * 10_000 };
+        Gyro = { parts = gyroCost; icp = gyroCost * 10_000 };
+      };
+    });
+  };
+
+  /// Recharge a bot's battery (0.1 ICP + fee via ICRC-2)
+  public shared ({ caller }) func web_recharge_bot(
+    tokenIndex : Nat
+  ) : async Result.Result<Text, Text> {
+    // Verify ownership
+    let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
+    let ownerResult = await extCanister.bearer(
+      ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), extCanisterId)
+    );
+
+    switch (ownerResult) {
+      case (#err(_)) { return #err("Bot does not exist") };
+      case (#ok(owner)) {
+        if (owner != walletAccountId) {
+          return #err("You do not own this bot");
+        };
+      };
+    };
+
+    // Process ICRC-2 payment and recharge
+    let RECHARGE_COST : Nat = 100_000_000; // 0.1 ICP
+
+    let ledgerId = switch (icpLedgerCanisterId) {
+      case (?id) { id };
+      case (null) { return #err("ICP Ledger not configured") };
+    };
+
+    let icpLedger = actor (Principal.toText(ledgerId)) : actor {
+      icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
+    };
+
+    let transferResult = try {
+      await icpLedger.icrc2_transfer_from({
+        from = { owner = caller; subaccount = null };
+        to = { owner = thisPrincipal; subaccount = null };
+        amount = RECHARGE_COST + TRANSFER_FEE;
+        fee = ?TRANSFER_FEE;
+        memo = null;
+        created_at_time = null;
+        spender_subaccount = null;
+      });
+    } catch (e) {
+      return #err("Payment transfer failed: " # Error.message(e));
+    };
+
+    switch (transferResult) {
+      case (#Err(e)) {
+        let errorMsg = switch (e) {
+          case (#InsufficientAllowance({ allowance })) {
+            "Insufficient spending allowance. Current: " # Nat.toText(allowance / 100000000) # " ICP. Please go to the Garage page and set a spending allowance first.";
+          };
+          case _ { "Payment failed: " # debug_show (e) };
+        };
+        #err(errorMsg);
+      };
+      case (#Ok(_blockIndex)) {
+        // Update battery directly
+        let stats = switch (garageManager.getStats(tokenIndex)) {
+          case (null) { return #err("Bot not found in garage") };
+          case (?s) { s };
+        };
+
+        let newBattery = Nat.min(100, stats.battery + 75);
+        let updatedStats = {
+          stats with
+          battery = newBattery;
+          lastRecharged = ?Time.now();
+        };
+
+        garageManager.updateStats(tokenIndex, updatedStats);
+        #ok("Battery recharged successfully!");
+      };
+    };
+  };
+
+  /// Repair a bot to restore condition (0.05 ICP + fee via ICRC-2)
+  public shared ({ caller }) func web_repair_bot(
+    tokenIndex : Nat
+  ) : async Result.Result<Text, Text> {
+    // Verify ownership
+    let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
+    let ownerResult = await extCanister.bearer(
+      ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), extCanisterId)
+    );
+
+    switch (ownerResult) {
+      case (#err(_)) { return #err("Bot does not exist") };
+      case (#ok(owner)) {
+        if (owner != walletAccountId) {
+          return #err("You do not own this bot");
+        };
+      };
+    };
+
+    // Process ICRC-2 payment and repair
+    let REPAIR_COST : Nat = 50_000_000; // 0.05 ICP
+
+    let ledgerId = switch (icpLedgerCanisterId) {
+      case (?id) { id };
+      case (null) { return #err("ICP Ledger not configured") };
+    };
+
+    let icpLedger = actor (Principal.toText(ledgerId)) : actor {
+      icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
+    };
+
+    let transferResult = try {
+      await icpLedger.icrc2_transfer_from({
+        from = { owner = caller; subaccount = null };
+        to = { owner = thisPrincipal; subaccount = null };
+        amount = REPAIR_COST + TRANSFER_FEE;
+        fee = ?TRANSFER_FEE;
+        memo = null;
+        created_at_time = null;
+        spender_subaccount = null;
+      });
+    } catch (e) {
+      return #err("Payment transfer failed: " # Error.message(e));
+    };
+
+    switch (transferResult) {
+      case (#Err(e)) {
+        let errorMsg = switch (e) {
+          case (#InsufficientAllowance({ allowance })) {
+            "Insufficient spending allowance. Current: " # Nat.toText(allowance / 100000000) # " ICP. Please go to the Garage page and set a spending allowance first.";
+          };
+          case _ { "Payment failed: " # debug_show (e) };
+        };
+        #err(errorMsg);
+      };
+      case (#Ok(_blockIndex)) {
+        // Update condition directly
+        let stats = switch (garageManager.getStats(tokenIndex)) {
+          case (null) { return #err("Bot not found in garage") };
+          case (?s) { s };
+        };
+
+        let newCondition = Nat.min(100, stats.condition + 30);
+        let updatedStats = {
+          stats with
+          condition = newCondition;
+          lastRepaired = ?Time.now();
+        };
+
+        garageManager.updateStats(tokenIndex, updatedStats);
+        #ok("Bot repaired successfully!");
+      };
+    };
+  };
+
+  /// Upgrade a bot stat (via ICRC-2 payment or parts)
+  public shared ({ caller }) func web_upgrade_bot(
+    tokenIndex : Nat,
+    upgradeType : PokedBotsGarage.UpgradeType,
+    paymentMethod : { #icp; #parts },
+  ) : async Result.Result<Text, Text> {
+    // Verify ownership
+    let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
+    let ownerResult = await extCanister.bearer(
+      ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), extCanisterId)
+    );
+
+    switch (ownerResult) {
+      case (#err(_)) { return #err("Bot does not exist") };
+      case (#ok(owner)) {
+        if (owner != walletAccountId) {
+          return #err("You do not own this bot");
+        };
+      };
+    };
+
+    // Get current stats to determine upgrade count
+    let stats = switch (garageManager.getStats(tokenIndex)) {
+      case (null) { return #err("Bot not found in garage") };
+      case (?s) { s };
+    };
+
+    let upgradeCount = switch (upgradeType) {
+      case (#Velocity) { stats.speedUpgrades };
+      case (#PowerCore) { stats.powerCoreUpgrades };
+      case (#Thruster) { stats.accelerationUpgrades };
+      case (#Gyro) { stats.stabilityUpgrades };
+    };
+
+    let icpCost = garageManager.calculateUpgradeCost(upgradeCount);
+    let partsCost = icpCost / 10_000_000; // Convert from e8s to parts (10M e8s = 1 part)
+
+    switch (paymentMethod) {
+      case (#icp) {
+        // Process ICP payment via ICRC-2
+        let ledgerId = switch (icpLedgerCanisterId) {
+          case (?id) { id };
+          case (null) { return #err("ICP Ledger not configured") };
+        };
+
+        let icpLedger = actor (Principal.toText(ledgerId)) : actor {
+          icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
+        };
+
+        let transferResult = try {
+          await icpLedger.icrc2_transfer_from({
+            from = { owner = caller; subaccount = null };
+            to = { owner = thisPrincipal; subaccount = null };
+            amount = icpCost;
+            fee = null;
+            memo = null;
+            created_at_time = null;
+            spender_subaccount = null;
+          });
+        } catch (e) {
+          return #err("Payment transfer failed: " # Error.message(e));
+        };
+
+        switch (transferResult) {
+          case (#Err(e)) {
+            let errorMsg = switch (e) {
+              case (#InsufficientAllowance({ allowance })) {
+                "Insufficient spending allowance. Current: " # Nat.toText(allowance / 100000000) # " ICP. Please go to the Garage page and set a spending allowance first.";
+              };
+              case _ { "Payment failed: " # debug_show (e) };
+            };
+            #err(errorMsg);
+          };
+          case (#Ok(_blockIndex)) {
+            // Start upgrade session
+            let now = Time.now();
+            let UPGRADE_DURATION : Int = 12 * 60 * 60 * 1_000_000_000; // 12 hours in nanoseconds
+            let endsAt = now + UPGRADE_DURATION;
+
+            garageManager.startUpgrade(tokenIndex, upgradeType, now, endsAt);
+
+            #ok("Upgrade started! Will complete in 12 hours.");
+          };
+        };
+      };
+      case (#parts) {
+        // Deduct parts from inventory
+        let partType : PokedBotsGarage.PartType = switch (upgradeType) {
+          case (#Velocity) { #SpeedChip };
+          case (#PowerCore) { #PowerCoreFragment };
+          case (#Thruster) { #ThrusterKit };
+          case (#Gyro) { #GyroModule };
+        };
+
+        if (not garageManager.removeParts(caller, partType, partsCost)) {
+          return #err("Insufficient parts. Needed: " # Nat.toText(partsCost) # " " # debug_show (partType));
+        };
+
+        // Start upgrade
+        let now = Time.now();
+        let UPGRADE_DURATION : Int = 12 * 60 * 60 * 1_000_000_000;
+        let endsAt = now + UPGRADE_DURATION;
+
+        garageManager.startUpgrade(tokenIndex, upgradeType, now, endsAt);
+        #ok("Upgrade started with parts! Will complete in 12 hours.");
+      };
+    };
+  };
+
+  /// Enter a race (with ICRC-2 payment for entry fee)
+  public shared ({ caller }) func web_enter_race(
+    raceId : Nat,
+    tokenIndex : Nat,
+  ) : async Result.Result<Text, Text> {
+    // Verify ownership
+    let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
+    let ownerResult = await extCanister.bearer(
+      ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), extCanisterId)
+    );
+
+    switch (ownerResult) {
+      case (#err(_)) { return #err("Bot does not exist") };
+      case (#ok(owner)) {
+        if (owner != walletAccountId) {
+          return #err("You do not own this bot");
+        };
+      };
+    };
+
+    // Get race and verify it exists
+    let race = switch (Map.get(stable_races, Map.nhash, raceId)) {
+      case (?r) { r };
+      case (null) { return #err("Race not found") };
+    };
+
+    // Process entry fee via ICRC-2
+    let ledgerId = switch (icpLedgerCanisterId) {
+      case (?id) { id };
+      case (null) { return #err("ICP Ledger not configured") };
+    };
+
+    let icpLedger = actor (Principal.toText(ledgerId)) : actor {
+      icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
+    };
+
+    let transferResult = try {
+      await icpLedger.icrc2_transfer_from({
+        from = { owner = caller; subaccount = null };
+        to = { owner = thisPrincipal; subaccount = null };
+        amount = race.entryFee;
+        fee = null;
+        memo = null;
+        created_at_time = null;
+        spender_subaccount = null;
+      });
+    } catch (e) {
+      return #err("Payment transfer failed: " # Error.message(e));
+    };
+
+    switch (transferResult) {
+      case (#Err(err)) {
+        #err("Entry fee payment failed: " # debug_show (err));
+      };
+      case (#Ok(_blockIndex)) {
+        // Enter the race
+        let now = Time.now();
+        let nftId = Nat.toText(tokenIndex); // Store token index as text, not EXT identifier
+        switch (raceManager.enterRace(raceId, nftId, caller, now)) {
+          case (?_updatedRace) {
+            #ok("Successfully entered race!");
+          };
+          case (null) {
+            #err("Failed to enter race - may be full or closed");
+          };
+        };
+      };
+    };
+  };
+
+  /// Purchase a bot from the marketplace (with ICRC-2 payment)
+  public shared ({ caller }) func web_purchase_bot(
+    tokenIndex : Nat
+  ) : async Result.Result<Text, Text> {
+    // Get marketplace listings
+    let listings = await extCanister.listings();
+
+    let tokenId = ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), extCanisterId);
+    let listing = Array.find<(Nat32, ExtIntegration.Listing, ExtIntegration.Metadata)>(
+      listings,
+      func((idx, _listing, _metadata)) {
+        ExtIntegration.encodeTokenIdentifier(idx, extCanisterId) == tokenId;
+      },
+    );
+
+    let price = switch (listing) {
+      case (null) { return #err("Bot not listed for sale") };
+      case (?(_, l, _)) {
+        let priceNat : Nat = Nat64.toNat(l.price);
+        priceNat;
+      };
+    };
+
+    // Two-step payment: User → Canister → Seller
+    let ledgerId = switch (icpLedgerCanisterId) {
+      case (?id) { id };
+      case (null) { return #err("ICP Ledger not configured") };
+    };
+
+    let icpLedger = actor (Principal.toText(ledgerId)) : actor {
+      icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
+    };
+
+    // Step 1: Transfer from user to canister
+    let transferResult = try {
+      await icpLedger.icrc2_transfer_from({
+        from = { owner = caller; subaccount = null };
+        to = { owner = thisPrincipal; subaccount = null };
+        amount = price + TRANSFER_FEE;
+        fee = ?TRANSFER_FEE;
+        memo = null;
+        created_at_time = null;
+        spender_subaccount = null;
+      });
+    } catch (e) {
+      return #err("Payment transfer failed: " # Error.message(e));
+    };
+
+    switch (transferResult) {
+      case (#Err(err)) {
+        return #err("Payment failed: " # debug_show (err));
+      };
+      case (#Ok(_blockIndex)) {
+        // Step 2: Settle the purchase via EXT
+        let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
+        let settleResult = try {
+          await extCanister.settle(
+            ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), extCanisterId)
+          );
+        } catch (e) {
+          return #err("Purchase settlement failed: " # Error.message(e));
+        };
+
+        switch (settleResult) {
+          case (#err(commonErr)) {
+            let errMsg = switch (commonErr) {
+              case (#InvalidToken(tokenId)) { "Invalid token: " # tokenId };
+              case (#Other(txt)) { txt };
+            };
+            #err("Settlement failed: " # errMsg);
+          };
+          case (#ok()) {
+            #ok("Bot purchased successfully and sent to your wallet!");
+          };
+        };
+      };
+    };
+  };
+
+  // ========================================
+  // ADMIN DEBUG METHODS
+  // ========================================
+
+  /// Fix a broken race entry by converting EXT token identifier to token index
+  public shared ({ caller }) func admin_fix_race_entry(
+    raceId : Nat,
+    extTokenId : Text,
+  ) : async Result.Result<Text, Text> {
+    if (caller != owner) {
+      return #err("Unauthorized: Only owner can fix race entries");
+    };
+
+    // Extract token index from EXT token identifier
+    let tokenObj = ExtIntegration.decodeTokenIdentifier(extTokenId);
+    let tokenIndexText = Nat.toText(Nat32.toNat(tokenObj.index));
+
+    // Get the race
+    switch (raceManager.getRace(raceId)) {
+      case (null) {
+        return #err("Race not found: " # Nat.toText(raceId));
+      };
+      case (?race) {
+        // Find the entry with the broken EXT ID
+        var foundIndex : ?Nat = null;
+        var i = 0;
+        label searchLoop for (entry in race.entries.vals()) {
+          if (entry.nftId == extTokenId) {
+            foundIndex := ?i;
+            break searchLoop;
+          };
+          i += 1;
+        };
+
+        switch (foundIndex) {
+          case (null) {
+            return #err("Entry not found with EXT ID: " # extTokenId);
+          };
+          case (?idx) {
+            // Create updated entries array with fixed nftId
+            let oldEntry = race.entries[idx];
+            let fixedEntry : RacingSimulator.RaceEntry = {
+              nftId = tokenIndexText;
+              owner = oldEntry.owner;
+              entryFee = oldEntry.entryFee;
+              enteredAt = oldEntry.enteredAt;
+              stats = oldEntry.stats;
+            };
+
+            let updatedEntries = Array.tabulate<RacingSimulator.RaceEntry>(
+              race.entries.size(),
+              func(i) {
+                if (i == idx) { fixedEntry } else { race.entries[i] };
+              },
+            );
+
+            // Update the race with fixed entry
+            let updatedRace = {
+              race with
+              entries = updatedEntries;
+            };
+
+            ignore Map.put(stable_races, Map.nhash, raceId, updatedRace);
+
+            #ok("Fixed entry for race " # Nat.toText(raceId) # ": " # extTokenId # " -> " # tokenIndexText);
+          };
+        };
+      };
+    };
   };
 };

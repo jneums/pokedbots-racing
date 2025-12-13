@@ -1,7 +1,10 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Link } from 'react-router-dom';
 import { useEffect } from 'react';
+import { Toaster } from 'sonner';
 import Navigation from './app/navigation';
 import HomePage from './app/page';
+import MarketplacePage from './app/marketplace/page';
+import GaragePage from './app/garage/page';
 import SchedulePage from './app/schedule/page';
 import EventDetailsPage from './app/schedule/[eventId]/page';
 import LeaderboardPage from './app/leaderboard/page';
@@ -19,14 +22,18 @@ import { configure as configureIcJs } from '@pokedbots-racing/ic-js';
 // access with a static string.
 const canisterIds = {
   POKEDBOTS_RACING: process.env.CANISTER_ID_POKEDBOTS_RACING!,
+  POKEDBOTS_NFTS: process.env.CANISTER_ID_POKEDBOTS_NFTS!,
+  ICP_LEDGER: process.env.CANISTER_ID_ICP_LEDGER!,
   // ... add all other canister IDs your app needs
 };
 
 const network = process.env.DFX_NETWORK || 'local'; // 'ic' for mainnet, 'local' for local dev
-const host = network === 'ic' ? 'https://icp-api.io' : 'http://127.0.0.1:4943';
+const host = network === 'ic' ? 'https://icp0.io' : 'http://127.0.0.1:4943';
+
+console.log('[PokedBots] Initializing with:', { network, host, canisterIds });
 
 // Pass the static, build-time configuration to the shared library.
-configureIcJs({ canisterIds, host });
+configureIcJs({ canisterIds, host, verbose: true });
 // ------------------------------------
 
 function ScrollToTop() {
@@ -42,11 +49,14 @@ function ScrollToTop() {
 export default function App() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <Toaster position="top-right" richColors />
       <ScrollToTop />
       <Navigation />
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/marketplace" element={<MarketplacePage />} />
+          <Route path="/garage" element={<GaragePage />} />
           <Route path="/schedule" element={<SchedulePage />} />
           <Route path="/schedule/:eventId" element={<EventDetailsPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
@@ -61,6 +71,28 @@ export default function App() {
       <footer className="border-t-2 border-primary/20 py-12 bg-card/30">
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center gap-6">
+            {/* Navigation Links */}
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm">
+              <Link to="/guides" className="text-muted-foreground hover:text-foreground transition-colors font-medium">
+                Guides
+              </Link>
+              <Link to="/docs" className="text-muted-foreground hover:text-foreground transition-colors font-medium">
+                Docs
+              </Link>
+              <a 
+                href="https://github.com/jneums/pokedbots-racing" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground transition-colors font-medium inline-flex items-center gap-1"
+              >
+                GitHub
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+            
+            {/* Platform Info */}
             <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 text-sm sm:text-base text-muted-foreground font-medium">
               <div className="flex items-center gap-1">
                 <span>Live on</span>
@@ -92,6 +124,8 @@ export default function App() {
                 </a>
               </div>
             </div>
+            
+            {/* MCP URL */}
             <div className="inline-flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 bg-primary/5 border border-primary/20 rounded-lg">
               <span className="text-xs sm:text-sm text-muted-foreground font-medium whitespace-nowrap">MCP URL</span>
               <code className="text-xs sm:text-sm font-mono text-foreground">

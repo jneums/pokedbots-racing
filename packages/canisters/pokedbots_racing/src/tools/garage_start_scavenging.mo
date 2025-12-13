@@ -83,9 +83,8 @@ module {
         };
       };
 
-      // Verify ownership via EXT (source of truth)
-      let garageSubaccount = ExtIntegration.deriveGarageSubaccount(user);
-      let garageAccountId = ExtIntegration.principalToAccountIdentifier(ctx.canisterPrincipal, ?garageSubaccount);
+      // Verify ownership via EXT (source of truth) - check user's wallet
+      let walletAccountId = ExtIntegration.principalToAccountIdentifier(user, null);
       let ownerResult = try {
         await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId));
       } catch (_) {
@@ -96,7 +95,7 @@ module {
           return ToolContext.makeError("This PokedBot does not exist.", cb);
         };
         case (#ok(currentOwner)) {
-          if (currentOwner != garageAccountId) {
+          if (currentOwner != walletAccountId) {
             return ToolContext.makeError("You do not own this PokedBot.", cb);
           };
         };

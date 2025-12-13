@@ -24,6 +24,10 @@
         "id": {
           "ic": "ryjl3-tyaaa-aaaaa-aaaba-cai"
         }
+      },
+      "declarations": {
+        "output": "packages/libs/declarations/src/generated/icp_ledger",
+        "node_compatibility": true
       }
     },
     "pokedbots_nfts": {
@@ -32,8 +36,12 @@
       "type": "custom",
       "remote": {
         "id": {
-          "ic": "ryjl3-tyaaa-aaaaa-aaaba-cai"
+          "ic": "bzsui-sqaaa-aaaah-qce2a-cai"
         }
+      },
+      "declarations": {
+        "output": "packages/libs/declarations/src/generated/pokedbots_nfts",
+        "node_compatibility": true
       }
     }
   },

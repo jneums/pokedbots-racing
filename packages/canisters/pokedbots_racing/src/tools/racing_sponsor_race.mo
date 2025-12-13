@@ -23,20 +23,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([
-        ("race_id", Json.obj([
-          ("type", Json.str("number")), 
-          ("description", Json.str("The race ID to sponsor"))
-        ])), 
-        ("amount_icp", Json.obj([
-          ("type", Json.str("number")), 
-          ("description", Json.str("Amount of ICP to contribute (e.g., 1.5 for 1.5 ICP). Minimum 0.1 ICP."))
-        ])),
-        ("message", Json.obj([
-          ("type", Json.str("string")), 
-          ("description", Json.str("Optional sponsor message to display (max 100 chars)"))
-        ]))
-      ])),
+      ("properties", Json.obj([("race_id", Json.obj([("type", Json.str("number")), ("description", Json.str("The race ID to sponsor"))])), ("amount_icp", Json.obj([("type", Json.str("number")), ("description", Json.str("Amount of ICP to contribute (e.g., 1.5 for 1.5 ICP). Minimum 0.1 ICP."))])), ("message", Json.obj([("type", Json.str("string")), ("description", Json.str("Optional sponsor message to display (max 100 chars)"))]))])),
       ("required", Json.arr([Json.str("race_id"), Json.str("amount_icp")])),
     ]);
     outputSchema = null;
@@ -72,7 +59,7 @@ module {
 
       // Convert ICP to e8s (1 ICP = 100,000,000 e8s)
       let amountE8s = Int.abs(Float.toInt(amountIcp * 100_000_000.0));
-      
+
       // Minimum 0.1 ICP (10,000,000 e8s)
       if (amountE8s < 10_000_000) {
         return ToolContext.makeError("Minimum sponsorship is 0.1 ICP", cb);
@@ -114,7 +101,9 @@ module {
       // Process payment using ICRC-2 transfer_from
       let ledgerCanisterId = switch (ctx.icpLedgerCanisterId()) {
         case (?id) { id };
-        case (null) { return ToolContext.makeError("ICP Ledger not configured", cb); };
+        case (null) {
+          return ToolContext.makeError("ICP Ledger not configured", cb);
+        };
       };
       let icpLedger = actor (Principal.toText(ledgerCanisterId)) : actor {
         icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
@@ -122,14 +111,14 @@ module {
 
       try {
         let transferResult = await icpLedger.icrc2_transfer_from({
-        from = { owner = user; subaccount = null };
-        to = { owner = ctx.canisterPrincipal; subaccount = null };
-        amount = amountE8s;
-        fee = null;
-        memo = null;
-        created_at_time = null;
-        spender_subaccount = null;
-      });
+          from = { owner = user; subaccount = null };
+          to = { owner = ctx.canisterPrincipal; subaccount = null };
+          amount = amountE8s;
+          fee = null;
+          memo = null;
+          created_at_time = null;
+          spender_subaccount = null;
+        });
 
         switch (transferResult) {
           case (#Err(error)) {
@@ -161,13 +150,13 @@ module {
 
                 // Calculate sponsor tier
                 let tier = if (amountE8s >= 500_000_000) {
-                  "🏆 PLATINUM"
+                  "🏆 PLATINUM";
                 } else if (amountE8s >= 200_000_000) {
-                  "🥇 GOLD"
+                  "🥇 GOLD";
                 } else if (amountE8s >= 50_000_000) {
-                  "🥈 SILVER"
+                  "🥈 SILVER";
                 } else {
-                  "🥉 BRONZE"
+                  "🥉 BRONZE";
                 };
 
                 let response = Json.obj([

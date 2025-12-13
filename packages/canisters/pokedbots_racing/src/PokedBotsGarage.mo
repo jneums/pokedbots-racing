@@ -695,18 +695,18 @@ module {
       let averageRating = totalStats / 4;
 
       // Map rating to starting ELO:
-      // 60+ rating = SilentKlan tier (1800 ELO)
-      // 40-59 rating = Elite tier (1600 ELO)
-      // 20-39 rating = Raider tier (1400 ELO)
-      // <20 rating = Junker tier (1200 ELO)
-      let startingElo = if (averageRating >= 60) {
-        1800; // SilentKlan tier
+      // 50+ rating = SilentKlan tier (1900 ELO)
+      // 40-49 rating = Elite tier (1700 ELO)
+      // 30-39 rating = Raider tier (1500 ELO)
+      // <30 rating = Junker tier (1300 ELO)
+      let startingElo = if (averageRating >= 50) {
+        1900; // SilentKlan tier
       } else if (averageRating >= 40) {
-        1600; // Elite tier
-      } else if (averageRating >= 20) {
-        1400; // Raider tier
+        1700; // Elite tier
+      } else if (averageRating >= 30) {
+        1500; // Raider tier
       } else {
-        1200; // Junker tier
+        1300; // Junker tier
       };
 
       let now = Time.now();

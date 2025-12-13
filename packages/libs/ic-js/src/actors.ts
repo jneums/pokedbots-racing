@@ -2,6 +2,8 @@ import { Actor, HttpAgent, type Identity } from '@icp-sdk/core/agent';
 import { Principal } from '@icp-sdk/core/principal';
 import {
   PokedBotsRacing,
+  PokedBotsNFTs,
+  Ledger,
 } from '@pokedbots-racing/declarations';
 import { getCanisterId, getHost } from './config.js';
 
@@ -46,6 +48,32 @@ export const getRacingActor = (identity?: Identity) => {
   return createActor<PokedBotsRacing._SERVICE>(
     PokedBotsRacing.idlFactory,
     getCanisterId('POKEDBOTS_RACING'),
+    identity,
+  );
+};
+
+/**
+ * Gets an actor for the PokedBots NFTs (EXT) canister
+ * @param identity Optional identity to use for the actor
+ * @returns An actor instance for the PokedBots NFTs canister
+ */
+export const getNFTsActor = (identity?: Identity) => {
+  return createActor<PokedBotsNFTs._SERVICE>(
+    PokedBotsNFTs.idlFactory,
+    getCanisterId('POKEDBOTS_NFTS'),
+    identity,
+  );
+};
+
+/**
+ * Gets an actor for the ICP Ledger canister
+ * @param identity Optional identity to use for the actor
+ * @returns An actor instance for the ICP Ledger canister
+ */
+export const getLedgerActor = (identity?: Identity) => {
+  return createActor<Ledger._SERVICE>(
+    Ledger.idlFactory,
+    getCanisterId('ICP_LEDGER'),
     identity,
   );
 };

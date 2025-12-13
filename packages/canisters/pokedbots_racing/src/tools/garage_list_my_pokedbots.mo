@@ -17,7 +17,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_list_my_pokedbots";
     title = ?"List My PokedBots";
-    description = ?"List all PokedBots in your garage subaccount with detailed stats, full power stats, racing status, scavenging status, and overall ratings";
+    description = ?"List all PokedBots in your wallet with detailed stats, full power stats, racing status, scavenging status, and overall ratings";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -39,17 +39,17 @@ module {
         };
       };
 
-      let garageSubaccount = ExtIntegration.deriveGarageSubaccount(userPrincipal);
-      let garageAccountId = ExtIntegration.principalToAccountIdentifier(ctx.canisterPrincipal, ?garageSubaccount);
-      let tokensResult = await ExtIntegration.getOwnedTokens(ctx.extCanister, garageAccountId);
+      // Check user's wallet (non-custodial)
+      let walletAccountId = ExtIntegration.principalToAccountIdentifier(userPrincipal, null);
+      let tokensResult = await ExtIntegration.getOwnedTokens(ctx.extCanister, walletAccountId);
 
       let message = switch (tokensResult) {
         case (#err(msg)) {
-          "🤖 Empty Garage\n\nNo PokedBots found.\n\nGarage ID: " # garageAccountId;
+          "🤖 Empty Garage\n\nNo PokedBots found in your wallet.\n\nWallet ID: " # walletAccountId;
         };
         case (#ok(tokens)) {
           if (tokens.size() == 0) {
-            "🤖 Empty Garage\n\nNo PokedBots found.\n\nGarage ID: " # garageAccountId;
+            "🤖 Empty Garage\n\nNo PokedBots found in your wallet.\n\nWallet ID: " # walletAccountId;
           } else {
             // Get user inventory
             let inventory = ctx.garageManager.getUserInventory(userPrincipal);
@@ -264,7 +264,7 @@ module {
               msg #= "   🖼️  Thumbnail: " # thumbnailUrl # "\n\n";
             };
 
-            msg #= "Garage ID: " # garageAccountId # "\n\n";
+            msg #= "Wallet ID: " # walletAccountId # "\n\n";
             msg #= "💡 Use garage_get_robot_details for full bot info\n";
             msg #= "💡 Use marketplace_browse_pokedbots to compare with available bots";
             msg;

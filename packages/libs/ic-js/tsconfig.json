@@ -6,7 +6,10 @@
     "outDir": "dist",
     "rootDir": "src",
     "noEmit": false,
-    "declaration": true
+    "declaration": true,
+    "module": "Node16",
+    "moduleResolution": "node16",
+    "target": "ES2022"
   },
   "include": ["src"]
 }
