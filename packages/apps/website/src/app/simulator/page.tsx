@@ -159,8 +159,8 @@ export default function SimulatorPage() {
       
       setLoadingProfiles(true);
       try {
-        // Fetch profiles for top 20 bots in parallel
-        const topEntries = leaderboardData.slice(0, 20);
+        // Fetch profiles for all available bots in parallel
+        const topEntries = leaderboardData;
         const profilePromises = topEntries.map(entry => 
           getBotProfile(Number(entry.tokenIndex))
         );

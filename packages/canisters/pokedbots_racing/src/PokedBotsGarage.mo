@@ -121,14 +121,26 @@ module {
     upgradeType : UpgradeType;
     startedAt : Int;
     endsAt : Int;
+    consecutiveFails : Nat; // For pity system
+    costPaid : Nat; // In e8s, for refunds (ICP only)
+    paymentMethod : Text; // "icp" or "parts"
+    partsUsed : Nat; // Number of parts consumed (for parts payment refunds)
+  };
+
+  public type UpgradeResult = {
+    success : Bool;
+    pointsAwarded : Nat; // 0, 1, or 2
+    refundAmount : Nat; // In e8s
+    newPityCounter : Nat;
   };
 
   // Scavenging System Types
-  public type ScavengingMissionType = {
-    #ShortExpedition; // 5 hours
-    #DeepSalvage; // 11 hours
-    #WastelandExpedition; // 23 hours
-  };
+  // Removed - continuous scavenging has no fixed durations
+  // public type ScavengingMissionType = {
+  //   #ShortExpedition; // 5 hours
+  //   #DeepSalvage; // 11 hours
+  //   #WastelandExpedition; // 23 hours
+  // };
 
   public type ScavengingZone = {
     #ScrapHeaps; // 1.0x multipliers (safe)
@@ -136,13 +148,21 @@ module {
     #DeadMachineFields; // 1.5x battery, 1.8x condition, 2.0x parts
   };
 
+  // Continuous scavenging mission - toggle on/off, accumulate rewards every 15 minutes
   public type ScavengingMission = {
     missionId : Nat;
     tokenIndex : Nat;
-    missionType : ScavengingMissionType;
-    zone : ScavengingZone;
-    startTime : Int;
-    endTime : Int;
+    zone : ScavengingZone; // Locked at start, cannot change without ending mission
+    startTime : Int; // When mission started (calculate hours elapsed from this)
+    lastAccumulation : Int; // Last time rewards were accumulated (15-min intervals)
+    // Pending rewards (accumulated but not yet collected - LOST if bot dies)
+    pendingParts : {
+      speedChips : Nat;
+      powerCoreFragments : Nat;
+      thrusterKits : Nat;
+      gyroModules : Nat;
+      universalParts : Nat;
+    };
   };
 
   public type WorldBuff = {
@@ -194,6 +214,7 @@ module {
     initStats : Map.Map<Nat, PokedBotRacingStats>,
     initActiveUpgrades : Map.Map<Nat, UpgradeSession>,
     initUserInventories : Map.Map<Principal, UserInventory>,
+    initPityCounters : Map.Map<Nat, Nat>,
     statsProvider : {
       getNFTMetadata : (Nat) -> ?[(Text, Text)];
       getPrecomputedStats : (Nat) -> ?{
@@ -208,6 +229,7 @@ module {
     private let stats = initStats;
     private let activeUpgrades = initActiveUpgrades;
     private let userInventories = initUserInventories;
+    private let pityCounters = initPityCounters;
 
     // Mission ID counter for scavenging
     private var nextMissionId : Nat = 0;
@@ -992,12 +1014,26 @@ module {
     // ===== UPGRADE SYSTEM =====
 
     /// Start upgrade session
-    public func startUpgrade(tokenIndex : Nat, upgradeType : UpgradeType, startedAt : Int, endsAt : Int) {
+    /// Start upgrade session with V2 parameters
+    public func startUpgrade(
+      tokenIndex : Nat,
+      upgradeType : UpgradeType,
+      startedAt : Int,
+      endsAt : Int,
+      consecutiveFails : Nat,
+      costPaid : Nat,
+      paymentMethod : Text,
+      partsUsed : Nat,
+    ) {
       let session : UpgradeSession = {
         tokenIndex = tokenIndex;
         upgradeType = upgradeType;
         startedAt = startedAt;
         endsAt = endsAt;
+        consecutiveFails = consecutiveFails;
+        costPaid = costPaid;
+        paymentMethod = paymentMethod;
+        partsUsed = partsUsed;
       };
       Map.set(activeUpgrades, nhash, tokenIndex, session);
     };
@@ -1010,6 +1046,23 @@ module {
     /// Clear upgrade
     public func clearUpgrade(tokenIndex : Nat) {
       Map.delete(activeUpgrades, nhash, tokenIndex);
+    };
+
+    /// Get pity counter for a bot (from last session if it failed)
+    /// Stored in stable memory to persist across canister upgrades
+    public func getPityCounter(tokenIndex : Nat) : Nat {
+      switch (Map.get(pityCounters, nhash, tokenIndex)) {
+        case (?count) { count };
+        case null { 0 };
+      };
+    };
+
+    public func setPityCounter(tokenIndex : Nat, count : Nat) {
+      if (count > 0) {
+        Map.set(pityCounters, nhash, tokenIndex, count);
+      } else {
+        Map.delete(pityCounters, nhash, tokenIndex);
+      };
     };
 
     /// Apply faction modifier to upgrade gains
@@ -1192,6 +1245,11 @@ module {
       ignore Map.put(userInventories, phash, user, updatedInv);
     };
 
+    /// Refund parts to user (same as addParts, just clearer naming for refund context)
+    public func refundParts(user : Principal, partType : PartType, amount : Nat) {
+      addParts(user, partType, amount);
+    };
+
     /// Remove parts from user inventory (returns false if insufficient)
     /// Universal Parts can substitute for any specific part type
     public func removeParts(user : Principal, partType : PartType, amount : Nat) : Bool {
@@ -1277,6 +1335,37 @@ module {
     /// Calculate upgrade cost based on current upgrade count
     /// Original scrap progression: 100 -> 200 -> 300 -> 900 -> 2700 -> 8100 parts (at 100 parts = 1 ICP)
     /// ICP equivalent: 1.0 -> 2.0 -> 3.0 -> 9.0 -> 27.0 -> 81.0 ICP
+    // ===== UPGRADE SYSTEM V2 COST CALCULATION =====
+
+    /// Get premium multiplier based on overall rating (continuous scaling)
+    /// Uses actual rating value (0-100+) for smooth progression
+    /// Formula: 0.5 + (rating / 40)^1.5
+    /// Examples: rating 20 = 0.86×, rating 40 = 1.5×, rating 60 = 2.37×, rating 80 = 3.36×, rating 100 = 4.48×
+    private func getPremiumMultiplier(rating : Nat) : Float {
+      // Continuous scaling: 0.5 + (rating/40)^1.5
+      // This creates smooth progression that rewards high ratings without harsh breakpoints
+      let ratingFloat = Float.fromInt(rating);
+      let scaledRating = ratingFloat / 40.0;
+      let premium = 0.5 + (scaledRating ** 1.5);
+
+      // Floor at 0.5× for very low ratings, cap at 5.0× for ultra-high ratings
+      Float.max(0.5, Float.min(5.0, premium));
+    };
+
+    /// Calculate dynamic upgrade cost in ICP (e8s)
+    /// Formula: baseCost = 0.5 + (currentStat / 40.0)^2
+    /// finalCost = baseCost × premiumMultiplier
+    public func calculateUpgradeCostV2(baseStat : Nat, currentStat : Nat, rating : Nat) : Nat {
+      let baseICP = 0.5 + (Float.fromInt(currentStat) / 40.0) ** 2.0;
+      let premiumMultiplier = getPremiumMultiplier(rating);
+      let finalICP = baseICP * premiumMultiplier;
+
+      // Convert to e8s (1 ICP = 100_000_000 e8s)
+      let costE8s = Float.toInt(finalICP * 100_000_000.0);
+      Int.abs(costE8s);
+    };
+
+    /// Legacy function for backwards compatibility with parts system
     public func calculateUpgradeCost(currentUpgradeCount : Nat) : Nat {
       if (currentUpgradeCount == 0) { 100 } else if (currentUpgradeCount == 1) {
         200;
@@ -1314,36 +1403,180 @@ module {
       };
     };
 
-    // ===== SCAVENGING SYSTEM =====
+    // ===== UPGRADE SYSTEM V2 RNG MECHANICS =====
 
-    /// Get mission duration in nanoseconds
-    private func getMissionDuration(missionType : ScavengingMissionType) : Int {
-      switch (missionType) {
-        case (#ShortExpedition) { 5 * 3600 * 1_000_000_000 }; // 5 hours
-        case (#DeepSalvage) { 11 * 3600 * 1_000_000_000 }; // 11 hours
-        case (#WastelandExpedition) { 23 * 3600 * 1_000_000_000 }; // 23 hours
+    /// Calculate base success rate based on attempt number
+    /// Success rate decreases: 85% → 15% for attempts 1-15, then drops to 1% at +20
+    private func calculateBaseSuccessRate(attemptNumber : Nat) : Float {
+      if (attemptNumber <= 15) {
+        // Linear decrease from 85% to 15% over first 15 attempts
+        let baseRate = 85.0 - (Float.fromInt(attemptNumber) * 4.67);
+        Float.max(15.0, baseRate);
+      } else {
+        // Harsh drop after +15: 15% at +15, 8% at +16, 4% at +17, 2% at +18, 1% at +19+
+        let beyondFifteen = attemptNumber - 15;
+        if (beyondFifteen == 1) { 8.0 } else if (beyondFifteen == 2) { 4.0 } else if (beyondFifteen == 3) {
+          2.0;
+        } else { 1.0 }; // 1% at +19 and beyond (soft cap)
       };
     };
 
-    /// Get base parts yield for mission type
-    private func getBaseParts(missionType : ScavengingMissionType) : {
-      min : Nat;
-      max : Nat;
+    /// Calculate pity bonus based on consecutive failures
+    /// +5% per consecutive failure, caps at +25%
+    private func calculatePityBonus(consecutiveFails : Nat) : Float {
+      Float.min(Float.fromInt(consecutiveFails) * 5.0, 25.0);
+    };
+
+    /// Calculate adjusted success rate with pity
+    public func calculateSuccessRate(attemptNumber : Nat, consecutiveFails : Nat) : Float {
+      let baseRate = calculateBaseSuccessRate(attemptNumber);
+      let pityBonus = calculatePityBonus(consecutiveFails);
+      Float.min(baseRate + pityBonus, 100.0);
+    };
+
+    /// Calculate double point chance based on attempt number
+    /// Starts at 15%, decreases by 0.87% per attempt, minimum 2%, disabled after +15
+    private func calculateDoubleChance(attemptNumber : Nat) : Float {
+      if (attemptNumber > 15) {
+        0.0; // No double points beyond +15
+      } else {
+        let baseChance = 15.0 - (Float.fromInt(attemptNumber) * 0.87);
+        Float.max(2.0, baseChance);
+      };
+    };
+
+    /// Roll for upgrade success using RNG
+    /// Returns true if successful based on success rate
+    private func rollUpgradeSuccess(successRate : Float, seed : Nat32) : Bool {
+      let roll = Nat32.toNat(seed % 100);
+      Float.fromInt(roll) < successRate;
+    };
+
+    /// Roll for double points using RNG
+    /// Returns true if double points should be awarded
+    private func rollDoublePoints(doubleChance : Float, seed : Nat32) : Bool {
+      let roll = Nat32.toNat((seed / 100) % 100); // Use different part of seed
+      Float.fromInt(roll) < doubleChance;
+    };
+
+    // ===== CONTINUOUS SCAVENGING SYSTEM =====
+
+    /// Get accumulation rates per 15-minute interval
+    /// These are constant (no diminishing returns - battery is the natural limiter)
+    private func get15MinuteRates() : {
+      basePartsPer15Min : Float;
+      baseBatteryDrain : Float;
+      baseConditionLoss : Float;
     } {
-      switch (missionType) {
-        case (#ShortExpedition) { { min = 15; max = 35 } };
-        case (#DeepSalvage) { { min = 40; max = 80 } };
-        case (#WastelandExpedition) { { min = 100; max = 200 } };
+      // Tuned for ~4-5 day drain with all multipliers considered
+      // Good bot (0.7x faction, 0.8x power core) in safe zone: 8*1.0*0.7*0.8 = 4.48 → 4 battery/15min = 16/hour = ~6.25 days
+      // Average bot (0.9x faction, 0.9x power core) in safe zone: 8*1.0*0.9*0.9 = 6.48 → 6 battery/15min = 24/hour = ~4.2 days
+      // Bad bot (1.0x faction, 1.0x power core) in dangerous zone: 8*1.5*1.0*1.0 = 12 battery/15min = 48/hour = ~2 days
+      {
+        basePartsPer15Min = 8.0; // 32 parts/hour
+        baseBatteryDrain = 6.0; // 24 battery/hour base (but faction/power core bonuses reduce this significantly)
+        baseConditionLoss = 4.0; // 16 condition/hour base
       };
     };
 
-    /// Get base battery cost for mission type
-    private func getBaseBatteryCost(missionType : ScavengingMissionType) : Nat {
-      switch (missionType) {
-        case (#ShortExpedition) { 10 };
-        case (#DeepSalvage) { 20 };
-        case (#WastelandExpedition) { 40 };
+    /// Get part distribution percentages by zone
+    private func getPartDistributionForZone(zone : ScavengingZone) : [(PartType, Float)] {
+      switch (zone) {
+        case (#ScrapHeaps) {
+          // 40% universal, balanced specialized
+          [
+            (#UniversalPart, 0.4),
+            (#SpeedChip, 0.15),
+            (#PowerCoreFragment, 0.15),
+            (#ThrusterKit, 0.15),
+            (#GyroModule, 0.15),
+          ];
+        };
+        case (#AbandonedSettlements) {
+          // 25% universal, more specialized
+          [
+            (#UniversalPart, 0.25),
+            (#SpeedChip, 0.20),
+            (#PowerCoreFragment, 0.20),
+            (#ThrusterKit, 0.20),
+            (#GyroModule, 0.15),
+          ];
+        };
+        case (#DeadMachineFields) {
+          // 10% universal, mostly specialized
+          [
+            (#UniversalPart, 0.10),
+            (#SpeedChip, 0.25),
+            (#PowerCoreFragment, 0.25),
+            (#ThrusterKit, 0.20),
+            (#GyroModule, 0.20),
+          ];
+        };
       };
+    };
+
+    /// Distribute new parts across types and add to pending
+    /// Uses weighted random selection for each part to create variety
+    private func distributeParts(
+      currentPending : {
+        speedChips : Nat;
+        powerCoreFragments : Nat;
+        thrusterKits : Nat;
+        gyroModules : Nat;
+        universalParts : Nat;
+      },
+      newParts : Nat,
+      distribution : [(PartType, Float)],
+    ) : {
+      speedChips : Nat;
+      powerCoreFragments : Nat;
+      thrusterKits : Nat;
+      gyroModules : Nat;
+      universalParts : Nat;
+    } {
+      var speedChips = currentPending.speedChips;
+      var powerCoreFragments = currentPending.powerCoreFragments;
+      var thrusterKits = currentPending.thrusterKits;
+      var gyroModules = currentPending.gyroModules;
+      var universalParts = currentPending.universalParts;
+
+      // Roll for each part individually using weighted random
+      let now = Time.now();
+      var i = 0;
+      while (i < newParts) {
+        let seed = Int.abs(now + i * 7919); // Prime number for better distribution
+        let roll = Float.fromInt(seed % 10000) / 100.0; // 0-100.00
+
+        // Find which part type this roll corresponds to
+        var cumulative = 0.0;
+        label checkType for ((partType, weight) in distribution.vals()) {
+          cumulative += weight * 100.0;
+          if (roll < cumulative) {
+            switch (partType) {
+              case (#SpeedChip) { speedChips += 1 };
+              case (#PowerCoreFragment) { powerCoreFragments += 1 };
+              case (#ThrusterKit) { thrusterKits += 1 };
+              case (#GyroModule) { gyroModules += 1 };
+              case (#UniversalPart) { universalParts += 1 };
+            };
+            break checkType;
+          };
+        };
+        i += 1;
+      };
+
+      {
+        speedChips;
+        powerCoreFragments;
+        thrusterKits;
+        gyroModules;
+        universalParts;
+      };
+    };
+
+    /// Calculate total pending parts
+    private func getTotalPendingParts(pending : { speedChips : Nat; powerCoreFragments : Nat; thrusterKits : Nat; gyroModules : Nat; universalParts : Nat }) : Nat {
+      pending.speedChips + pending.powerCoreFragments + pending.thrusterKits + pending.gyroModules + pending.universalParts;
     };
 
     /// Get zone multipliers
@@ -1488,10 +1721,153 @@ module {
       };
     };
 
-    /// Start a scavenging mission
+    // ===== NEW CONTINUOUS SCAVENGING FUNCTIONS =====
+
+    /// Accumulate rewards for a bot on scavenging mission (called every 15 minutes by timer)
+    public func accumulateScavengingRewards(tokenIndex : Nat, now : Int) : Result.Result<Text, Text> {
+      switch (getStats(tokenIndex)) {
+        case (null) { #err("Bot not found") };
+        case (?botStats) {
+          switch (botStats.activeMission) {
+            case (null) { #err("No active mission") };
+            case (?mission) {
+              // Check if bot is dead (0 battery OR 0 condition) - LOSE ALL PENDING REWARDS
+              if (botStats.battery == 0 or botStats.condition == 0) {
+                let updatedStats = {
+                  botStats with
+                  activeMission = null;
+                };
+                updateStats(tokenIndex, updatedStats);
+                return #err("Bot died (0 battery or condition) - mission failed, all pending rewards lost");
+              };
+
+              // Calculate 15-minute intervals since last accumulation
+              let nanosSince = now - mission.lastAccumulation;
+              let intervalsSince = nanosSince / (15 * 60 * 1_000_000_000); // 15 minutes in nanos
+
+              if (intervalsSince < 1) {
+                return #ok("Not yet 15 minutes elapsed since last accumulation");
+              };
+
+              // Get rates and multipliers
+              let rates = get15MinuteRates();
+              let zoneMultipliers = getZoneMultipliers(mission.zone);
+              let factionBonus = getFactionScavengingBonus(botStats.faction, mission.zone);
+
+              // Get current stats for stat-based bonuses
+              let currentStats = getCurrentStats(botStats);
+
+              // Power Core reduces battery cost (energy efficiency) - scales smoothly
+              // At 0: 1.0x, at 50: 0.90x (-10%), at 100: 0.80x (-20%)
+              let powerCoreBonus = 1.0 - (Float.fromInt(currentStats.powerCore) / 100.0 * 0.20);
+
+              // Stability reduces condition loss in dangerous zones - scales smoothly
+              // At 0: 1.0x, at 50: 0.875x (-12.5%), at 100: 0.75x (-25%)
+              let stabilityBonus = if (mission.zone == #DeadMachineFields) {
+                1.0 - (Float.fromInt(currentStats.stability) / 100.0 * 0.25);
+              } else {
+                1.0; // Normal condition loss in safe/moderate zones
+              };
+
+              // Speed increases parts yield (faster scavenging) - scales smoothly
+              // At 0: 1.0x, at 50: 1.05x (+5%), at 100: 1.10x (+10%)
+              let speedBonus = 1.0 + (Float.fromInt(currentStats.speed) / 100.0 * 0.10);
+
+              // Acceleration increases world buff chance - scales smoothly
+              // At 0: 3.75%, at 50: 4.875% (+30%), at 100: 6.0% (+60%)
+              let accelBuffBonus = 1.0 + (Float.fromInt(currentStats.acceleration) / 100.0 * 0.60);
+
+              // Calculate accumulation for this 15-min interval (constant rate, no diminishing)
+              let partsThis15Min = rates.basePartsPer15Min * zoneMultipliers.parts * factionBonus.partsMultiplier * speedBonus;
+              let batteryDrain = rates.baseBatteryDrain * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus;
+              let conditionLoss = rates.baseConditionLoss * zoneMultipliers.condition * factionBonus.conditionMultiplier * stabilityBonus;
+
+              // Deduct battery and condition (saturating subtraction)
+              // Truncate floats to Nat - higher base rates ensure faction bonuses are preserved
+              let newBattery = if (botStats.battery > Int.abs(Float.toInt(batteryDrain))) {
+                botStats.battery - Int.abs(Float.toInt(batteryDrain));
+              } else { 0 };
+
+              let newCondition = if (botStats.condition > Int.abs(Float.toInt(conditionLoss))) {
+                botStats.condition - Int.abs(Float.toInt(conditionLoss));
+              } else { 0 };
+
+              // Accumulate parts into pending
+              // Truncate floats to Nat - higher base rates ensure faction bonuses are preserved
+              let newPendingParts = distributeParts(
+                mission.pendingParts,
+                Int.abs(Float.toInt(partsThis15Min)),
+                getPartDistributionForZone(mission.zone),
+              );
+
+              // World buff chance: 15% per hour = 3.75% per 15-min interval
+              // Total chance scales with time: hours_elapsed * 15% (capped at 90%)
+              // Acceleration stat increases buff chance (at 100 accel: 6.0% instead of 3.75%)
+              let hoursElapsed = (now - mission.startTime) / (3600 * 1_000_000_000);
+              let totalBuffChance = Float.min(90.0, Float.fromInt(hoursElapsed) * 15.0);
+              let buffRoll = Float.fromInt((Int.abs(now / 1_000_000) * tokenIndex) % 1000) / 10.0; // 0-100
+
+              var newWorldBuff = botStats.worldBuff; // Keep existing buff by default
+              var buffMessage = "";
+
+              let baseBuffChance = 3.75 * accelBuffBonus; // 3.75% base, up to 6.0% with max accel
+              if (buffRoll < baseBuffChance) {
+                // Acceleration-modified buff chance
+                // Buff strength scales with hours elapsed
+                let buffStats = if (hoursElapsed <= 3) {
+                  [("speed", 2 : Nat)];
+                } else if (hoursElapsed <= 8) {
+                  [("speed", 3 : Nat), ("acceleration", 2 : Nat)];
+                } else {
+                  [("speed", 4 : Nat), ("acceleration", 3 : Nat), ("powerCore", 2 : Nat)];
+                };
+
+                // Blackhole faction converts to racing stats
+                let finalBuffStats = if (botStats.faction == #Blackhole) {
+                  [("speed", 3 : Nat), ("acceleration", 3 : Nat)];
+                } else {
+                  buffStats;
+                };
+
+                newWorldBuff := ?{
+                  stats = finalBuffStats;
+                  appliedAt = now;
+                  expiresAt = now + (48 * 3600 * 1_000_000_000); // 48 hours
+                };
+
+                buffMessage := " 🌟 WORLD BUFF DISCOVERED!";
+              };
+
+              // Update mission with new pending parts
+              let updatedMission = {
+                mission with
+                lastAccumulation = now;
+                pendingParts = newPendingParts;
+              };
+
+              let updatedStats = {
+                botStats with
+                battery = newBattery;
+                condition = newCondition;
+                activeMission = ?updatedMission;
+                worldBuff = newWorldBuff;
+              };
+              updateStats(tokenIndex, updatedStats);
+
+              let totalPending = getTotalPendingParts(newPendingParts);
+              #ok("Accumulated " # Float.format(#fix 1, partsThis15Min) # " parts. Battery: " # Nat.toText(newBattery) # ", Condition: " # Nat.toText(newCondition) # ", Total pending: " # Nat.toText(totalPending) # buffMessage);
+            };
+          };
+        };
+      };
+    };
+
+    // ===== LEGACY SCAVENGING FUNCTIONS (TO BE REPLACED) =====
+
+    /// Start continuous scavenging mission (toggle on)
+    /// No duration - bot scavenges until manually collected or dies
     public func startScavengingMission(
       tokenIndex : Nat,
-      missionType : ScavengingMissionType,
       zone : ScavengingZone,
       now : Int,
     ) : Result.Result<ScavengingMission, Text> {
@@ -1500,28 +1876,35 @@ module {
         case (?botStats) {
           // Check if bot is already on a mission
           switch (botStats.activeMission) {
-            case (?_) { return #err("Bot is already on a scavenging mission") };
+            case (?_) {
+              return #err("Bot is already on a scavenging mission - collect rewards first");
+            };
             case (null) {};
           };
 
-          // Check battery requirement
-          let baseBattery = getBaseBatteryCost(missionType);
-          if (botStats.battery < baseBattery) {
-            return #err("Insufficient battery. Need " # Nat.toText(baseBattery) # ", have " # Nat.toText(botStats.battery));
+          // Minimum battery/condition check (need at least 10 to start)
+          if (botStats.battery < 10) {
+            return #err("Insufficient battery - need at least 10 to start scavenging");
+          };
+          if (botStats.condition < 10) {
+            return #err("Bot too damaged - need at least 10 condition to start scavenging");
           };
 
-          // Create mission
+          // Create continuous mission
           let missionId = getNextMissionId();
-          let duration = getMissionDuration(missionType);
-          let endTime = now + duration;
-
           let mission : ScavengingMission = {
             missionId = missionId;
             tokenIndex = tokenIndex;
-            missionType = missionType;
-            zone = zone;
+            zone = zone; // LOCKED - cannot change without ending mission
             startTime = now;
-            endTime = endTime;
+            lastAccumulation = now;
+            pendingParts = {
+              speedChips = 0;
+              powerCoreFragments = 0;
+              thrusterKits = 0;
+              gyroModules = 0;
+              universalParts = 0;
+            };
           };
 
           // Update bot stats with active mission
@@ -1537,7 +1920,7 @@ module {
     };
 
     /// Pull bot from active scavenging mission (used when entering races)
-    /// Returns penalties applied: reduced parts yield and condition damage
+    /// V2: Apply 50% penalty to accumulated pending parts, award them, and clear mission
     public func pullFromScavenging(
       tokenIndex : Nat,
       now : Int,
@@ -1549,65 +1932,55 @@ module {
           switch (botStats.activeMission) {
             case (null) { #err("Bot is not on a scavenging mission") };
             case (?mission) {
-              // Calculate progress percentage (0-100)
-              let totalDuration = mission.endTime - mission.startTime;
-              let elapsed = now - mission.startTime;
-              let progress = if (totalDuration > 0) {
-                Int.abs(Float.toInt((Float.fromInt(elapsed) / Float.fromInt(totalDuration)) * 100.0));
-              } else { 0 };
+              // Force final accumulation before pulling
+              ignore accumulateScavengingRewards(tokenIndex, now);
 
-              // Calculate partial rewards based on progress
-              let basePartsData = getBaseParts(mission.missionType);
-              let avgBaseParts = (basePartsData.min + basePartsData.max) / 2;
-              let zoneMultipliers = getZoneMultipliers(mission.zone);
-              let factionBonus = getFactionScavengingBonus(botStats.faction, mission.zone);
-
-              // Parts scaled by progress (50% progress = 50% parts)
-              let progressMultiplier = Float.fromInt(progress) / 100.0;
-              let partsFloat = Float.fromInt(avgBaseParts) * zoneMultipliers.parts * factionBonus.partsMultiplier * progressMultiplier;
-              let partsFound = Int.abs(Float.toInt(partsFloat));
-
-              // Early withdrawal penalty: lose 50% of potential parts (harsh penalty to prevent exploitation)
-              let earlyWithdrawalPenalty = 0.50;
-              let finalParts = Int.abs(Float.toInt(Float.fromInt(partsFound) * earlyWithdrawalPenalty));
-
-              // Condition damage from rushed withdrawal
-              // Base damage scales with mission type, then reduced by progress
-              // This prevents exploiting long missions for short durations
-              let fullMissionConditionLoss = switch (mission.missionType) {
-                case (#ShortExpedition) { 10 }; // Reduced penalty for abandoning mission
-                case (#DeepSalvage) { 18 }; // Reduced penalty for abandoning mission
-                case (#WastelandExpedition) { 28 }; // Reduced penalty for abandoning mission
+              // Get updated stats with final accumulation
+              let finalStats = switch (getStats(tokenIndex)) {
+                case (?s) { s };
+                case (null) { return #err("Bot disappeared") };
               };
-              // Minimum 50% of full penalty even at 0% progress (prevents gaming system)
-              let progressConditionMultiplier = 0.5 + (progressMultiplier * 0.5); // 50-100% of full penalty
-              let conditionFloat = Float.fromInt(fullMissionConditionLoss) * progressConditionMultiplier * zoneMultipliers.condition * factionBonus.conditionMultiplier;
-              let conditionLost = Int.abs(Float.toInt(conditionFloat));
-
-              // Apply condition damage
-              let newCondition : Nat = if (botStats.condition > conditionLost) {
-                botStats.condition - conditionLost;
-              } else {
-                0;
+              let finalMission = switch (finalStats.activeMission) {
+                case (?m) { m };
+                case (null) {
+                  return #err("Mission was cleared (bot may have died)");
+                };
               };
 
-              // Update bot stats: clear mission, reduce condition, award partial parts
+              // Calculate hours elapsed
+              let hoursElapsed = Int.abs((now - finalMission.startTime) / (3600 * 1_000_000_000));
+
+              // Get pending parts with 50% early withdrawal penalty
+              let pending = finalMission.pendingParts;
+              let penaltyMultiplier = 0.50; // Keep only 50% of parts
+
+              let penalizedSpeedChips = Int.abs(Float.toInt(Float.fromInt(pending.speedChips) * penaltyMultiplier));
+              let penalizedPowerCore = Int.abs(Float.toInt(Float.fromInt(pending.powerCoreFragments) * penaltyMultiplier));
+              let penalizedThrusterKits = Int.abs(Float.toInt(Float.fromInt(pending.thrusterKits) * penaltyMultiplier));
+              let penalizedGyroModules = Int.abs(Float.toInt(Float.fromInt(pending.gyroModules) * penaltyMultiplier));
+              let penalizedUniversalParts = Int.abs(Float.toInt(Float.fromInt(pending.universalParts) * penaltyMultiplier));
+
+              let totalPenalizedParts = penalizedSpeedChips + penalizedPowerCore + penalizedThrusterKits + penalizedGyroModules + penalizedUniversalParts;
+
+              // Award penalized parts to inventory
+              let owner = botStats.ownerPrincipal;
+              if (totalPenalizedParts > 0) {
+                addParts(owner, #SpeedChip, penalizedSpeedChips);
+                addParts(owner, #PowerCoreFragment, penalizedPowerCore);
+                addParts(owner, #ThrusterKit, penalizedThrusterKits);
+                addParts(owner, #GyroModule, penalizedGyroModules);
+                addParts(owner, #UniversalPart, penalizedUniversalParts);
+              };
+
+              // Update bot stats: clear mission
               let updatedStats = {
-                botStats with
+                finalStats with
                 activeMission = null;
-                condition = newCondition;
-                totalPartsScavenged = botStats.totalPartsScavenged + finalParts;
+                totalPartsScavenged = finalStats.totalPartsScavenged + totalPenalizedParts;
               };
               updateStats(tokenIndex, updatedStats);
 
-              // Award partial parts to owner's inventory
-              let owner = botStats.ownerPrincipal;
-              // For early withdrawal, give all parts as UniversalParts for simplicity
-              if (finalParts > 0) {
-                addParts(owner, #UniversalPart, finalParts);
-              };
-
-              let penaltyText = "⚠️ Pulled from mission early! Progress: " # Nat.toText(progress) # "%. Partial parts awarded: " # Nat.toText(finalParts) # " (50% penalty). Condition damage: -" # Nat.toText(conditionLost) # "%.";
+              let penaltyText = "⚠️ Pulled from scavenging for race! Time out: " # Nat.toText(hoursElapsed) # "h. Parts awarded (50% penalty): " # Nat.toText(totalPenalizedParts);
 
               #ok({ penalties = penaltyText });
             };
@@ -1616,8 +1989,8 @@ module {
       };
     };
 
-    /// Complete a scavenging mission and award parts
-    public func completeScavengingMission(
+    /// LEGACY V1: Complete a scavenging mission and award parts (REPLACED BY V2 - completeScavengingMissionV2)
+    /* public func completeScavengingMission(
       tokenIndex : Nat,
       now : Int,
       rng : Nat, // For randomness
@@ -1802,6 +2175,12 @@ module {
                 partsFound;
               } else { botStats.bestHaul };
 
+              // Preserve existing world buff if new one wasn't earned
+              let finalWorldBuff = switch (worldBuff) {
+                case (?newBuff) { ?newBuff }; // New buff earned, use it
+                case (null) { botStats.worldBuff }; // No new buff, keep existing
+              };
+
               let updatedStats = {
                 botStats with
                 battery = newBattery;
@@ -1811,7 +2190,7 @@ module {
                 scavengingReputation = botStats.scavengingReputation + 1; // +1 per mission
                 bestHaul = newBestHaul;
                 activeMission = null; // Clear mission
-                worldBuff = worldBuff; // Apply new buff if earned
+                worldBuff = finalWorldBuff; // Keep existing buff if new one not earned
               };
               updateStats(tokenIndex, updatedStats);
 
@@ -1898,6 +2277,114 @@ module {
                 worldBuffApplied = worldBuffApplied;
                 worldBuff = worldBuff;
                 events = events;
+              });
+            };
+          };
+        };
+      };
+    }; */
+
+    /// NEW: Complete continuous scavenging mission (collect rewards anytime)
+    public func completeScavengingMissionV2(
+      tokenIndex : Nat,
+      now : Int,
+    ) : Result.Result<{ totalParts : Nat; speedChips : Nat; powerCoreFragments : Nat; thrusterKits : Nat; gyroModules : Nat; universalParts : Nat; hoursOut : Nat }, Text> {
+      switch (getStats(tokenIndex)) {
+        case (null) { #err("Bot not found") };
+        case (?botStats) {
+          switch (botStats.activeMission) {
+            case (null) { #err("No active mission") };
+            case (?mission) {
+              // Force final accumulation for any partial interval
+              ignore accumulateScavengingRewards(tokenIndex, now);
+
+              // Get updated mission with final accumulation
+              let finalStats = switch (getStats(tokenIndex)) {
+                case (?s) { s };
+                case (null) { return #err("Bot disappeared") };
+              };
+              let finalMission = switch (finalStats.activeMission) {
+                case (?m) { m };
+                case (null) {
+                  return #err("Mission was cleared (bot may have died)");
+                };
+              };
+
+              // Calculate total pending parts
+              let pending = finalMission.pendingParts;
+              var totalParts = getTotalPendingParts(pending);
+              let hoursOut = Int.abs((now - finalMission.startTime) / (3600 * 1_000_000_000));
+
+              // Apply faction-specific bonuses to final parts total
+              let rngSeed = Int.abs(now % 1000000) + tokenIndex;
+              var partsMultiplier : Float = 1.0;
+
+              // Golden faction: 15% chance to double parts
+              if (botStats.faction == #Golden and (rngSeed % 100) < 15) {
+                partsMultiplier := 2.0;
+              };
+
+              // Box faction: 5% chance to triple parts (overrides Golden if both proc)
+              if (botStats.faction == #Box and ((rngSeed * 7) % 100) < 5) {
+                partsMultiplier := 3.0;
+              };
+
+              // Master faction: Every 10th mission doubles parts
+              let nextMissionCount = finalStats.scavengingMissions + 1;
+              if (botStats.faction == #Master and nextMissionCount % 10 == 0) {
+                partsMultiplier := 2.0;
+              };
+
+              // Game faction: Every 5th mission +10 parts (additive)
+              var bonusParts = 0;
+              if (botStats.faction == #Game and nextMissionCount % 5 == 0) {
+                bonusParts := 10;
+              };
+
+              // Apply multiplier and bonus
+              totalParts := Int.abs(Float.toInt(Float.fromInt(totalParts) * partsMultiplier)) + bonusParts;
+
+              // Scale individual part types by the same multiplier
+              var finalSpeedChips = Int.abs(Float.toInt(Float.fromInt(pending.speedChips) * partsMultiplier));
+              var finalPowerCore = Int.abs(Float.toInt(Float.fromInt(pending.powerCoreFragments) * partsMultiplier));
+              var finalThrusterKits = Int.abs(Float.toInt(Float.fromInt(pending.thrusterKits) * partsMultiplier));
+              var finalGyroModules = Int.abs(Float.toInt(Float.fromInt(pending.gyroModules) * partsMultiplier));
+              var finalUniversalParts = Int.abs(Float.toInt(Float.fromInt(pending.universalParts) * partsMultiplier));
+
+              // Distribute bonus parts to universal if Game faction bonus triggered
+              if (bonusParts > 0) {
+                finalUniversalParts += bonusParts;
+              };
+
+              // Award parts to inventory
+              let owner = botStats.ownerPrincipal;
+              addParts(owner, #SpeedChip, finalSpeedChips);
+              addParts(owner, #PowerCoreFragment, finalPowerCore);
+              addParts(owner, #ThrusterKit, finalThrusterKits);
+              addParts(owner, #GyroModule, finalGyroModules);
+              addParts(owner, #UniversalPart, finalUniversalParts);
+
+              // Update stats - clear mission, update counters
+              let updatedStats = {
+                finalStats with
+                activeMission = null;
+                scavengingMissions = finalStats.scavengingMissions + 1;
+                totalPartsScavenged = finalStats.totalPartsScavenged + totalParts;
+                scavengingReputation = finalStats.scavengingReputation + 1;
+                bestHaul = if (totalParts > finalStats.bestHaul) {
+                  totalParts;
+                } else { finalStats.bestHaul };
+              };
+              updateStats(tokenIndex, updatedStats);
+
+              #ok({
+                totalParts = totalParts;
+                speedChips = finalSpeedChips;
+                powerCoreFragments = finalPowerCore;
+                thrusterKits = finalThrusterKits;
+                gyroModules = finalGyroModules;
+                universalParts = finalUniversalParts;
+                hoursOut = hoursOut;
               });
             };
           };

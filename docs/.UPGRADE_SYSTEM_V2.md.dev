@@ -1,0 +1,376 @@
+# Upgrade System V2: Gacha-Style Design
+
+## Overview
+
+This document specifies the redesigned upgrade system that replaces the deterministic part-based progression with an exciting gacha-style RNG system. The new system maintains the same external UX (12-hour sessions, four upgrade types) while introducing lottery mechanics, dynamic pricing, and inverse prestige bonuses that make upgrades more accessible for lower-tier bots while preserving the power hierarchy.
+
+## Core Philosophy
+
+- **Same UX, Better Feel**: 12-hour upgrade sessions, same button clicks, but with exciting lottery moments
+- **Accessible Entry**: Cheaper initial upgrades (0.5 ICP) that scale naturally with stat progression
+- **Natural Economics**: No artificial caps—costs scale quadratically to create soft limits
+- **Inverse Prestige**: Scrap bots get more prestige bonuses (15 max) than god-tier bots (5 max)
+- **Premium Pricing**: Higher-tier bots pay 3.5-5x multipliers for the same upgrades
+- **RNG Excitement**: Variable success rates and double-point lottery create memorable moments
+
+## Power Targets
+
+The system preserves bot tier hierarchy while making progression more achievable:
+
+| Bot Tier | Base Stat | Prestige Bonus | Upgrade Potential | Total Power |
+|----------|-----------|----------------|-------------------|-------------|
+| Scrap    | 15        | +15            | +15               | 45          |
+| Elite    | 50        | +11            | +15               | 76          |
+| S-Tier   | 70        | +7             | +15               | 92          |
+| God      | 80        | +5             | +15               | 100         |
+
+## Upgrade Types
+
+Four upgrade types remain unchanged from V1:
+
+1. **Velocity** - Increases Speed stat
+2. **Thruster** - Increases Acceleration stat  
+3. **Gyro** - Increases Stability stat
+4. **PowerCore** - Increases Power Core stat
+
+## Payment Model
+
+### ICP-Only System
+- All upgrades cost ICP or parts (100 parts = 1 ICP)
+- 12-hour upgrade sessions maintained for pacing
+
+### Dynamic Cost Formula
+
+```motoko
+baseCost = 0.5 + (currentStat / 40.0)^2
+finalCost = baseCost × premiumMultiplier
+```
+
+**Premium Multipliers by Bot Tier:**
+- Scrap (rating 0-20): `0.7×` (0.35 ICP starting)
+- Below Average (21-39): `1.0×` (0.5 ICP starting)
+- Average (40-59): `1.5×` (0.75 ICP starting)
+- Elite (60-79): `2.5×` (1.25 ICP starting)
+- S-Tier (80-94): `3.5×` (1.75 ICP starting)
+- God Tier (95-100): `3.5×` (1.75 ICP starting)
+
+**Cost Progression Examples:**
+
+*Scrap Bot (15 → 30):*
+- Attempt 1: 0.5 × 0.7 = **0.35 ICP**
+- Attempt 5: 0.65 × 0.7 = **0.46 ICP**
+- Attempt 10: 1.06 × 0.7 = **0.74 ICP**
+- Attempt 15: 1.64 × 0.7 = **1.15 ICP**
+
+*God-Tier Bot (80 → 95):*
+- Attempt 1: 4.5 × 3.5 = **15.75 ICP**
+- Attempt 5: 5.3 × 3.5 = **18.55 ICP**
+- Attempt 10: 7.1 × 3.5 = **24.85 ICP**
+- Attempt 15: 9.5 × 3.5 = **33.25 ICP**
+
+## RNG Mechanics
+
+### Base Success Rate
+
+Success rate decreases linearly based on upgrade attempts:
+
+```motoko
+attemptNumber = currentStat - baseStat  // How many upgrades so far
+baseSuccessRate = 85% - (attemptNumber × 4.67%)
+```
+
+**Success Rate Schedule:**
+- Attempts 1-3: 85%, 80%, 75%
+- Attempts 4-6: 71%, 66%, 61%
+- Attempts 7-9: 57%, 52%, 47%
+- Attempts 10-12: 43%, 38%, 33%
+- Attempts 13-15: 28%, 24%, 19%, **15%**
+
+### Pity System
+
+Consecutive failures increase success rate to prevent frustration:
+
+```motoko
+pityBonus = min(consecutiveFails × 5%, 25%)
+adjustedSuccessRate = baseSuccessRate + pityBonus
+```
+
+- +5% per consecutive failure
+- Caps at +25% (after 5 failures)
+- Resets to 0 on any success
+- Can push late-game attempts up to 40% success (15% base + 25% pity)
+
+### Double Point Lottery
+
+Each successful upgrade has a chance to award **+2 stat points** instead of +1:
+
+```motoko
+doubleChance = 15% - (attemptNumber × 0.87%)
+```
+
+**Double Point Schedule:**
+- Attempts 1-3: 15%, 14%, 13%
+- Attempts 4-6: 12%, 12%, 11%
+- Attempts 7-9: 9%, 8%, 7%
+- Attempts 10-12: 6%, 5%, 4%
+- Attempts 13-15: 3%, 2%, 2%
+
+**User Experience:**
+- Success message: "Upgrade successful! +1 Speed"
+- Jackpot message: "🎰 **DOUBLE UPGRADE!** +2 Speed"
+
+## Prestige System
+
+### Inverse Scaling Formula
+
+Lower-tier bots receive larger prestige bonuses to improve accessibility:
+
+```motoko
+maxPrestigeBonus = 15.0 - ((baseStat - 15.0) × 0.154)
+prestigeProgress = Float.sqrt(Float.fromInt(currentPrestige) / 100.0)
+prestigeBonus = maxPrestigeBonus × prestigeProgress
+```
+
+**Max Prestige Bonuses by Tier:**
+- Scrap (15 base): **+15 max** (30 total)
+- Below Average (30 base): **+13 max** (43 total)
+- Average (50 base): **+10 max** (60 total)
+- Elite (65 base): **+7 max** (72 total)
+- S-Tier (80 base): **+5 max** (85 total)
+- God (95 base): **+3 max** (98 total)
+
+### Prestige Progression
+
+Square root scaling creates front-loaded progression:
+
+| Prestiges | √Progress | % of Max Bonus |
+|-----------|-----------|----------------|
+| 0         | 0.00      | 0%             |
+| 10        | 0.32      | 32%            |
+| 25        | 0.50      | 50%            |
+| 50        | 0.71      | 71%            |
+| 75        | 0.87      | 87%            |
+| 100       | 1.00      | 100%           |
+
+**Example for Scrap Bot (15 base, +15 max):**
+- 10 prestiges: +4.8 bonus (19.8 total)
+- 25 prestiges: +7.5 bonus (22.5 total)
+- 50 prestiges: +10.7 bonus (25.7 total)
+- 100 prestiges: +15.0 bonus (30.0 total)
+
+## User Experience Flow
+
+### 1. Starting an Upgrade
+
+**UI Elements:**
+- Same four upgrade buttons (Velocity, Thruster, Gyro, PowerCore)
+- Display current cost in ICP
+- Show current success rate with pity bonus
+- Display consecutive fails (if any)
+
+**Example Display:**
+```
+Velocity Upgrade
+Speed: 42 → 43
+Cost: 1.89 ICP
+Success Rate: 61% (+10% pity bonus)
+Consecutive Fails: 2
+
+[Start Upgrade] (12 hours)
+```
+
+### 2. Upgrade Completion
+
+**Success Outcomes:**
+
+*Standard Success (85% of wins):*
+```
+✅ Velocity Upgrade Complete!
+Speed: 42 → 43 (+1)
+Next upgrade: 1.97 ICP (57% success)
+```
+
+*Double Point Jackpot (15% of wins):*
+```
+🎰 DOUBLE UPGRADE! 🎰
+Velocity Upgrade Complete!
+Speed: 42 → 44 (+2)
+Next upgrade: 2.13 ICP (52% success)
+```
+
+*Failure:*
+```
+❌ Upgrade Failed
+Speed remains at 42
+0.95 ICP refunded (50%)
+Pity bonus: +15% on next attempt
+```
+
+### 3. Post-Completion State
+
+- 50% ICP refunded on failure
+- Pity counter increments (displayed on next attempt)
+- Success resets pity counter to 0
+- Bot immediately available for next upgrade or racing
+
+## Backend Implementation
+
+### Data Structure Changes
+
+```motoko
+type RobotUpgradeState = {
+    // Existing fields
+    upgradeType: UpgradeType;
+    startsAt: Time.Time;
+    endsAt: Time.Time;
+    
+    // New fields for RNG tracking
+    consecutiveFails: Nat;  // For pity system
+    totalAttempts: Nat;     // For cost calculation
+};
+
+type UpgradeResult = {
+    success: Bool;
+    pointsAwarded: Nat;  // 0, 1, or 2
+    refundAmount: Nat;   // In e8s
+    newPityCounter: Nat;
+};
+```
+
+### Key Functions
+
+```motoko
+// Calculate upgrade cost
+func calculateUpgradeCost(baseStat: Nat, currentStat: Nat, rating: Nat) : Nat
+
+// Calculate success rate with pity
+func calculateSuccessRate(attemptNumber: Nat, pityBonus: Nat) : Float
+
+// Roll for success
+func rollUpgradeSuccess(successRate: Float, seed: Blob) : Bool
+
+// Roll for double points
+func rollDoublePoints(attemptNumber: Nat, seed: Blob) : Bool
+
+// Complete upgrade and award points
+func completeUpgrade(tokenIndex: Nat, robotId: Principal) : Result<UpgradeResult, Text>
+```
+
+### RNG Implementation
+
+Use IC's `Random.Finite` for deterministic randomness:
+
+```motoko
+import Random "mo:base/Random";
+
+let seed = await Random.blob();
+let finite = Random.Finite(seed);
+
+// Roll 0-100 for success check
+switch (finite.range(8)) {  // 8 bits = 0-255
+    case null { /* fallback */ };
+    case (?roll) {
+        let percent = (roll * 100) / 255;
+        let success = Float.fromInt(percent) <= successRate * 100.0;
+    };
+};
+```
+
+## Economic Balance
+
+### Expected Costs Per Full Upgrade (15 attempts)
+
+Taking into account failure refunds and success rates:
+
+| Bot Tier | Base Stat | Expected Total | Avg Per Attempt |
+|----------|-----------|----------------|-----------------|
+| Scrap    | 15        | ~8 ICP         | ~0.53 ICP       |
+| Elite    | 65        | ~45 ICP        | ~3.0 ICP        |
+| S-Tier   | 80        | ~280 ICP       | ~18.7 ICP       |
+| God      | 95        | ~900 ICP       | ~60 ICP         |
+
+### Revenue Impact vs Current System
+
+**Current System Pain Points:**
+- Too expensive too quickly (exponential scaling)
+- No exciting moments (deterministic)
+- Parts feel like busywork
+- Artificial caps frustrate players
+
+**V2 Improvements:**
+- Cheaper entry (0.35-0.5 ICP vs 1+ ICP)
+- Natural scaling through formula
+- Exciting jackpot moments
+- Better accessibility for casual players
+- Premium pricing extracts value from whales
+
+**Expected Revenue:**
+- More upgrade attempts per player (+40%)
+- Better retention from exciting moments (+25%)
+- Premium tier willing to pay 3.5x
+- Net revenue neutral or positive
+
+## Migration Path
+
+### Existing Players
+
+**No Data Wipe:**
+- Current stat values preserved
+- Upgrade attempts reset to 0 for new cost calculation
+- Pity counters start at 0
+- Active upgrades complete using old system
+
+**Communication:**
+```
+Upgrade System V2 is Live!
+
+✨ What's New:
+- Cheaper starting costs (0.35-0.5 ICP)
+- Chance for double stat points
+- Better success rates early on
+- Pity system prevents long losing streaks
+
+🎰 Same 12-hour upgrades, way more exciting!
+```
+
+### Testing Checklist
+
+- [ ] Cost formula produces expected values across stat ranges
+- [ ] RNG properly seeds and generates fair randomness
+- [ ] Pity system correctly increments and resets
+- [ ] Double point lottery triggers at correct rates
+- [ ] Refunds process correctly on failures
+- [ ] Prestige bonuses calculate correctly
+- [ ] Premium multipliers apply to all bot tiers
+- [ ] UI displays success rates and costs accurately
+- [ ] 12-hour cooldown enforced correctly
+- [ ] Bots can race/scavenge during upgrades
+
+## Future Enhancements
+
+### Potential V2.1 Features
+- **Streak Bonuses**: Small discount after 3+ consecutive upgrades
+- **Faction Synergies**: Specific factions get slight bonuses to certain upgrade types
+- **Weekend Events**: Temporary success rate boosts or cost discounts
+- **Upgrade History**: Show last 10 attempts with outcomes for transparency
+- **Leaderboard**: Track players with most jackpots or highest prestiges
+
+### Analytics to Track
+- Average attempts per bot tier
+- Double point frequency (should match 15% → 2% curve)
+- Pity trigger frequency
+- Player spending patterns by tier
+- Retention correlation with jackpot moments
+
+## Summary
+
+The V2 upgrade system transforms upgrades from a deterministic grind into an exciting gacha experience while maintaining the same UX flow. Key improvements:
+
+1. **Accessibility**: 0.35-0.5 ICP starting costs vs 1+ ICP currently
+2. **Excitement**: 15% double-point lottery creates memorable moments
+3. **Fairness**: Pity system prevents brutal RNG streaks
+4. **Balance**: Inverse prestige helps scrap bots without breaking god-tier dominance
+5. **Economics**: Premium pricing + quadratic scaling creates sustainable revenue
+6. **UX**: Same 12-hour sessions and buttons—just better outcomes
+
+The system naturally balances itself through exponential cost scaling while providing early accessibility and exciting progression moments for all player types.

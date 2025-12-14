@@ -8,8 +8,12 @@ import {
   upgradeBot,
   enterRace,
   getUserInventory,
+  listMyApiKeys,
+  createApiKey,
+  revokeApiKey,
   type UpgradeType,
   type PaymentMethod,
+  type ApiKeyMetadata,
 } from '@pokedbots-racing/ic-js';
 import { useAuth } from './useAuth';
 
@@ -187,5 +191,65 @@ export function useUserInventory() {
     enabled: !!user?.agent,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
+ * Hook to fetch user's API keys
+ */
+export function useMyApiKeys() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['my-api-keys', user?.principal],
+    queryFn: async () => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return listMyApiKeys(user.agent);
+    },
+    enabled: !!user?.agent,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
+ * Hook to create a new API key
+ */
+export function useCreateApiKey() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ name, scopes }: { name: string; scopes: string[] }) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return createApiKey(name, scopes, user.agent);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-api-keys'] });
+    },
+  });
+}
+
+/**
+ * Hook to revoke an API key
+ */
+export function useRevokeApiKey() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (keyId: string) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return revokeApiKey(keyId, user.agent);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-api-keys'] });
+    },
   });
 }

@@ -12,6 +12,7 @@ import ToolContext "ToolContext";
 import PokedBotsGarage "../PokedBotsGarage";
 import ExtIntegration "../ExtIntegration";
 import IcpLedger "../IcpLedger";
+import UsernameValidator "../UsernameValidator";
 
 module {
   // Registration cost: 0.1 ICP + 0.0001 ICP fee
@@ -57,10 +58,13 @@ module {
       let customName = switch (Result.toOption(Json.getAsText(_args, "name"))) {
         case (null) { null };
         case (?name) {
-          if (Text.size(name) > 30) {
-            return ToolContext.makeError("Bot name must be 30 characters or less", cb);
+          // Validate username
+          switch (UsernameValidator.validateUsername(name)) {
+            case (?error) {
+              return ToolContext.makeError(error, cb);
+            };
+            case (null) { ?name };
           };
-          ?name;
         };
       };
 

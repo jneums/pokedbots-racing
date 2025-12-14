@@ -3,10 +3,41 @@
 import { Identity } from '@icp-sdk/core/agent';
 import { getRacingActor } from '../actors.js';
 import { PokedBotsRacing } from '@pokedbots-racing/declarations';
+import { getCanisterId } from '../config.js';
 
 export type ScheduledEvent = PokedBotsRacing.ScheduledEvent;
 export type EventStatus = PokedBotsRacing.EventStatus;
 export type Race = PokedBotsRacing.Race;
+
+// Accept either Identity or Plug agent (which has call/getPrincipal methods)
+type IdentityOrAgent = Identity | any;
+
+// Helper function to detect if this is a Plug agent
+// Plug agents are HttpAgent instances with specific structure, not standard Identity objects
+function isPlugAgent(identityOrAgent: any): boolean {
+  // Plug agents have 'agent' property and are not standard Identity objects
+  // Standard Identity objects from AuthClient don't have nested 'agent' property
+  return identityOrAgent && 
+         typeof identityOrAgent === 'object' && 
+         'agent' in identityOrAgent &&
+         'getPrincipal' in identityOrAgent &&
+         typeof identityOrAgent.getPrincipal === 'function';
+}
+
+// Helper to get racing actor from Identity or Plug agent
+async function getActor(identityOrAgent: IdentityOrAgent): Promise<PokedBotsRacing._SERVICE> {
+  // Check if it's a Plug agent - use window.ic.plug.createActor
+  if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
+    const canisterId = getCanisterId('POKEDBOTS_RACING');
+    return await (globalThis as any).window.ic.plug.createActor({
+      canisterId,
+      interfaceFactory: PokedBotsRacing.idlFactory,
+    });
+  }
+  
+  // It's a standard Identity - use our standard actor creation
+  return getRacingActor(identityOrAgent as Identity);
+}
 
 /**
  * Fetches upcoming scheduled race events.
@@ -18,7 +49,7 @@ export const getUpcomingEvents = async (
   daysAhead: number = 7,
   identity?: Identity
 ): Promise<ScheduledEvent[]> => {
-  const racingActor = getRacingActor(identity);
+  const racingActor = await getActor(identity);
   const result = await racingActor.get_upcoming_events(BigInt(daysAhead));
   return result;
 };
@@ -31,7 +62,7 @@ export const getUpcomingEvents = async (
 export const getAllScheduledEvents = async (
   identity?: Identity
 ): Promise<ScheduledEvent[]> => {
-  const racingActor = getRacingActor(identity);
+  const racingActor = await getActor(identity);
   const result = await racingActor.get_all_scheduled_events();
   return result;
 };
@@ -48,7 +79,7 @@ export const getPastEvents = async (
   limit: number,
   identity?: Identity
 ): Promise<ScheduledEvent[]> => {
-  const racingActor = getRacingActor(identity);
+  const racingActor = await getActor(identity);
   const result = await racingActor.get_past_events(BigInt(offset), BigInt(limit));
   return result;
 };
@@ -63,7 +94,7 @@ export const getEventDetails = async (
   eventId: number,
   identity?: Identity
 ): Promise<ScheduledEvent | null> => {
-  const racingActor = getRacingActor(identity);
+  const racingActor = await getActor(identity);
   const result = await racingActor.get_event_details(BigInt(eventId));
   return result.length > 0 ? (result[0] ?? null) : null;
 };
@@ -78,7 +109,7 @@ export const getRaceById = async (
   raceId: number,
   identity?: Identity
 ): Promise<Race | null> => {
-  const racingActor = getRacingActor(identity);
+  const racingActor = await getActor(identity);
   const result = await racingActor.get_race_by_id(BigInt(raceId));
   return result.length > 0 ? (result[0] ?? null) : null;
 };
@@ -93,7 +124,7 @@ export const getBotProfile = async (
   tokenIndex: number,
   identity?: Identity
 ): Promise<any> => {
-  const racingActor = getRacingActor(identity);
+  const racingActor = await getActor(identity);
   const result = await racingActor.get_bot_profile(BigInt(tokenIndex));
   return result.length > 0 ? (result[0] ?? null) : null;
 };
@@ -116,7 +147,7 @@ export const getUpcomingEventsWithRaces = async (
     totalParticipants: bigint;
   };
 }>> => {
-  const racingActor = getRacingActor(identity);
+  const racingActor = await getActor(identity);
   const result = await racingActor.get_upcoming_events_with_races(BigInt(daysAhead));
   return result;
 };
@@ -144,7 +175,7 @@ export const getEventWithRaces = async (
     participantTokens: Array<bigint>;
   }>;
 } | null> => {
-  const racingActor = getRacingActor(identity);
+  const racingActor = await getActor(identity);
   const result = await racingActor.get_event_with_races(BigInt(eventId));
   return result.length > 0 ? (result[0] ?? null) : null;
 };
@@ -163,7 +194,7 @@ export const getBotRaceHistory = async (
   afterRaceId?: number,
   identity?: Identity
 ): Promise<{ races: Array<any>, hasMore: boolean, nextRaceId: number | null }> => {
-  const racingActor = getRacingActor(identity);
+  const racingActor = await getActor(identity);
   const result = await racingActor.get_bot_race_history(
     BigInt(tokenIndex), 
     BigInt(limit),
@@ -191,7 +222,7 @@ export const debugTestSimulation = async (
   trackSeed: number,
   identity?: Identity
 ): Promise<{ tokenIndex: number; finalTime: number }[] | null> => {
-  const racingActor = getRacingActor(identity);
+  const racingActor = await getActor(identity);
   const result = await racingActor.debug_test_simulation(
     tokenIndexes.map(BigInt),
     BigInt(trackId),

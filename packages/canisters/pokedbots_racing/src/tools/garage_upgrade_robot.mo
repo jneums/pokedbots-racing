@@ -3,6 +3,7 @@ import Principal "mo:base/Principal";
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
 import Int "mo:base/Int";
+import Float "mo:base/Float";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
 import Error "mo:base/Error";
@@ -25,7 +26,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_upgrade_robot";
     title = ?"Upgrade Robot";
-    description = ?"Start a 12-hour upgrade session. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability). Pay with specific parts, Universal Parts (can substitute), or ICP. Use garage_get_robot_details to see exact costs.\n\nFor detailed upgrade mechanics (difficulty scaling, faction bonuses), use help_get_compendium tool.";
+    description = ?"Start a 12-hour V2 upgrade session with RNG mechanics. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability).\n\n**V2 MECHANICS:**\n• Dynamic ICP costs: 0.5 + (stat/40)² × tier premium (0.7-3.5×)\n• Success rates: 85% → 15% (attempts 1-15), then 8% → 1% (brutal soft cap)\n• Pity system: +5% per consecutive fail (max +25%), persists across deploys\n• Double lottery: 15% → 2% chance for +2 points (disabled after +15)\n• 50% refund on failure (ICP or parts returned based on payment method)\n• Pay with ICP or parts (100 parts = 1 ICP)\n\nUse garage_get_robot_details to see exact costs/rates. For full V2 mechanics, use help_get_compendium tool.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -114,11 +115,31 @@ module {
         case _ { #Velocity }; // default
       };
 
-      // Determine cost
-      let upgradeCount = ctx.garageManager.getUpgradeCount(tokenIndex, upgradeType);
-      let partsNeeded = ctx.garageManager.calculateUpgradeCost(upgradeCount);
+      // Get current stats for cost calculation (V2)
+      let currentStats = ctx.garageManager.getCurrentStats(racingStats);
+      let overallRating = ctx.garageManager.calculateOverallRating(racingStats);
 
-      // Determine part type
+      // Get base stat and current stat value for this upgrade type
+      let (baseStat, currentStatValue) = switch (upgradeType) {
+        case (#Velocity) {
+          (currentStats.speed - racingStats.speedBonus, currentStats.speed);
+        };
+        case (#PowerCore) {
+          (currentStats.powerCore - racingStats.powerCoreBonus, currentStats.powerCore);
+        };
+        case (#Thruster) {
+          (currentStats.acceleration - racingStats.accelerationBonus, currentStats.acceleration);
+        };
+        case (#Gyro) {
+          (currentStats.stability - racingStats.stabilityBonus, currentStats.stability);
+        };
+      };
+
+      // Calculate cost using V2 formula
+      let costE8s = ctx.garageManager.calculateUpgradeCostV2(baseStat, currentStatValue, overallRating);
+      let totalCost = costE8s + TRANSFER_FEE;
+
+      // Determine part type (for parts payment option)
       let partType : PokedBotsGarage.PartType = switch (upgradeType) {
         case (#Velocity) { #SpeedChip };
         case (#PowerCore) { #PowerCoreFragment };
@@ -127,10 +148,14 @@ module {
       };
 
       // Handle payment
+      var partsUsed : Nat = 0;
       if (paymentMethod == "parts") {
+        // Legacy parts system: 100 parts = 1 ICP
+        let partsNeeded = (costE8s / PART_PRICE_E8S) + 1; // Round up
         if (not ctx.garageManager.removeParts(user, partType, partsNeeded)) {
           return ToolContext.makeError("Insufficient parts. Needed: " # Nat.toText(partsNeeded) # " " # debug_show (partType) # " (Universal Parts can substitute). Race on appropriate terrain or go scavenging to earn them!", cb);
         };
+        partsUsed := partsNeeded;
       } else {
         // ICP payment
         // Get ICP Ledger canister ID from context
@@ -144,7 +169,6 @@ module {
         let icpLedger = actor (Principal.toText(ledgerId)) : actor {
           icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
         };
-        let totalCost = (partsNeeded * PART_PRICE_E8S) + TRANSFER_FEE;
 
         try {
           let transferResult = await icpLedger.icrc2_transfer_from({
@@ -159,7 +183,7 @@ module {
 
           switch (transferResult) {
             case (#Err(_)) {
-              return ToolContext.makeError("Payment failed - check ICRC-2 allowance. Cost: " # Nat.toText(totalCost) # " e8s", cb);
+              return ToolContext.makeError("Payment failed - check ICRC-2 allowance. Cost: " # Nat.toText(totalCost) # " e8s (" # Float.format(#fix 2, Float.fromInt(totalCost) / 100_000_000.0) # " ICP)", cb);
             };
             case (#Ok(_)) {};
           };
@@ -174,8 +198,13 @@ module {
       // Get flavor text for this upgrade and faction
       let upgradeFlavor = WastelandFlavor.getUpgradeFlavor(upgradeType, racingStats.faction);
 
-      // Track the upgrade session
-      ctx.garageManager.startUpgrade(tokenIndex, upgradeType, now, endsAt);
+      // Calculate attempt number and success rate with pity
+      let attemptNumber = currentStatValue - baseStat;
+      let pityCounter = ctx.garageManager.getPityCounter(tokenIndex);
+      let successRate = ctx.garageManager.calculateSuccessRate(attemptNumber, pityCounter);
+
+      // Track the upgrade session with V2 parameters (including payment method for refunds)
+      ctx.garageManager.startUpgrade(tokenIndex, upgradeType, now, endsAt, pityCounter, costE8s, paymentMethod, partsUsed);
 
       // Schedule timer to complete the upgrade
       let actionId = ctx.timerTool.setActionSync<system>(
@@ -188,40 +217,28 @@ module {
 
       let updatedStats = {
         racingStats with
-        battery = if (racingStats.battery >= 15) {
-          racingStats.battery - 15;
-        } else { 0 };
         upgradeEndsAt = ?endsAt;
       };
 
       ctx.garageManager.updateStats(tokenIndex, updatedStats);
 
-      let expectedGain = switch (racingStats.faction) {
-        // Ultra-Rare: 10% chance for 2x
-        case (#UltimateMaster or #Wild or #Golden or #Ultimate) {
-          "1-3 points (10% chance for 2x bonus!)";
-        };
-        // Super-Rare: 20% chance for 2x
-        case (#Blackhole or #Dead or #Master) {
-          "1-3 points (20% chance for 2x bonus!)";
-        };
-        // Rare: 35% chance for 2x (CATCH-UP mechanic)
-        case (#Bee or #Food or #Box or #Murder) {
-          "1-3 points (35% chance for 2x bonus!)";
-        };
-        // Common: 25% chance for 2x
-        case (#Game or #Animal or #Industrial) {
-          "1-3 points (25% chance for 2x bonus!)";
-        };
-      };
+      // Calculate double point chance
+      let doubleChance = Float.max(2.0, 15.0 - (Float.fromInt(attemptNumber) * 0.87));
+
+      let costIcp = Float.fromInt(costE8s) / 100_000_000.0;
+      let pityText = if (pityCounter > 0) {
+        " (+" # Nat.toText(pityCounter * 5) # "% pity bonus!)";
+      } else { "" };
 
       let response = Json.obj([
         ("token_index", Json.int(tokenIndex)),
         ("upgrade_type", Json.str(upgradeFlavor)),
         ("duration_hours", Json.int(12)),
-        ("parts_used", Json.int(partsNeeded)),
-        ("expected_gain", Json.str(expectedGain)),
-        ("message", Json.str("🔧 Upgrade in progress. Your bot is in the garage bay, scavenging wasteland tech. Check back in 12 hours.")),
+        ("cost_icp", Json.str(Float.format(#fix 2, costIcp))),
+        ("attempt_number", Json.int(attemptNumber + 1)),
+        ("success_rate", Json.str(Float.format(#fix 1, successRate) # "%" # pityText)),
+        ("double_chance", Json.str(Float.format(#fix 1, doubleChance) # "%")),
+        ("message", Json.str("🔧 Upgrade in progress! Success rate: " # Float.format(#fix 1, successRate) # "%" # pityText # ". If successful, " # Float.format(#fix 1, doubleChance) # "% chance for +2 stat points! Check back in 12 hours.")),
       ]);
 
       ToolContext.makeSuccess(response, cb);

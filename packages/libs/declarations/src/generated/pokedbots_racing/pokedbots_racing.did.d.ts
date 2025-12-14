@@ -116,14 +116,11 @@ export type LeaderboardType = { 'AllTime' : null } |
   { 'Monthly' : bigint } |
   { 'Season' : bigint };
 export interface McpServer {
-  'admin_fix_race_entry' : ActorMethod<[bigint, string], Result_1>,
   'cancel_actions_by_filter' : ActorMethod<[ActionFilter], CancellationResult>,
   'cancel_actions_by_ids' : ActorMethod<[Array<bigint>], CancellationResult>,
   'cancel_races_by_ids' : ActorMethod<[Array<bigint>], Array<[bigint, string]>>,
-  'clear_event_race_ids' : ActorMethod<[], string>,
   'clear_reconstitution_traces' : ActorMethod<[], undefined>,
   'create_my_api_key' : ActorMethod<[string, Array<string>], string>,
-  'debug_create_test_race' : ActorMethod<[bigint], string>,
   'debug_get_all_tracks' : ActorMethod<
     [],
     Array<
@@ -138,39 +135,6 @@ export interface McpServer {
       }
     >
   >,
-  'debug_preview_stats' : ActorMethod<
-    [bigint],
-    {
-      'hasPrecomputedStats' : boolean,
-      'precomputedStats' : [] | [
-        {
-          'stability' : bigint,
-          'speed' : bigint,
-          'acceleration' : bigint,
-          'powerCore' : bigint,
-          'faction' : string,
-        }
-      ],
-      'currentStoredStats' : [] | [
-        {
-          'accelerationBonus' : bigint,
-          'baseAcceleration' : bigint,
-          'stabilityBonus' : bigint,
-          'stability' : bigint,
-          'baseStability' : bigint,
-          'speed' : bigint,
-          'baseSpeed' : bigint,
-          'acceleration' : bigint,
-          'powerCore' : bigint,
-          'basePowerCore' : bigint,
-          'powerCoreBonus' : bigint,
-          'faction' : string,
-          'speedBonus' : bigint,
-        }
-      ],
-    }
-  >,
-  'debug_seed_leaderboard' : ActorMethod<[bigint], string>,
   'debug_simulate_race' : ActorMethod<
     [bigint, Array<bigint>, bigint],
     [] | [
@@ -219,9 +183,7 @@ export interface McpServer {
     ]
   >,
   'decode_token_identifier' : ActorMethod<[string], bigint>,
-  'delete_events_after' : ActorMethod<[bigint], string>,
   'delete_events_and_races' : ActorMethod<[Array<bigint>], string>,
-  'delete_orphaned_races' : ActorMethod<[], string>,
   'emergency_clear_all_timers' : ActorMethod<[], bigint>,
   'encode_token_identifier' : ActorMethod<[number], string>,
   'force_finish_race' : ActorMethod<[bigint], string>,
@@ -230,18 +192,6 @@ export interface McpServer {
   'get_actions_by_filter' : ActorMethod<[ActionFilter], Array<ActionDetail>>,
   'get_all_scheduled_events' : ActorMethod<[], Array<ScheduledEvent>>,
   'get_all_token_ids' : ActorMethod<[], Array<bigint>>,
-  'get_base_stat' : ActorMethod<
-    [bigint],
-    [] | [
-      {
-        'stability' : bigint,
-        'speed' : bigint,
-        'acceleration' : bigint,
-        'powerCore' : bigint,
-        'faction' : string,
-      }
-    ]
-  >,
   'get_base_stats_count' : ActorMethod<[], bigint>,
   'get_bot_profile' : ActorMethod<
     [bigint],
@@ -363,71 +313,9 @@ export interface McpServer {
   'get_nft_stats_by_identifier' : ActorMethod<[string], [] | [NFTStats]>,
   'get_nft_trait' : ActorMethod<[bigint, string], [] | [string]>,
   'get_nft_trait_value' : ActorMethod<[bigint, bigint], [] | [bigint]>,
-  'get_orphaned_races' : ActorMethod<
-    [],
-    Array<
-      {
-        'startTime' : bigint,
-        'status' : RaceStatus,
-        'name' : string,
-        'entries' : bigint,
-        'raceId' : bigint,
-        'raceClass' : RaceClass,
-      }
-    >
-  >,
   'get_owner' : ActorMethod<[], Principal>,
   'get_past_events' : ActorMethod<[bigint, bigint], Array<ScheduledEvent>>,
   'get_race_by_id' : ActorMethod<[bigint], [] | [Race]>,
-  'get_race_replay_data' : ActorMethod<
-    [bigint],
-    [] | [
-      {
-        'participants' : Array<
-          {
-            'owner' : Principal,
-            'stats' : {
-              'stability' : bigint,
-              'speed' : bigint,
-              'acceleration' : bigint,
-              'powerCore' : bigint,
-            },
-            'nftId' : string,
-          }
-        >,
-        'track' : {
-          'laps' : bigint,
-          'name' : string,
-          'segments' : Array<
-            {
-              'angle' : bigint,
-              'terrain' : Terrain,
-              'difficulty' : number,
-              'length' : bigint,
-            }
-          >,
-          'description' : string,
-          'trackId' : bigint,
-          'totalDistance' : bigint,
-          'primaryTerrain' : Terrain,
-        },
-        'trackSeed' : bigint,
-        'results' : [] | [
-          Array<
-            {
-              'owner' : Principal,
-              'prizeAmount' : bigint,
-              'finalTime' : number,
-              'nftId' : string,
-              'position' : bigint,
-            }
-          >
-        ],
-        'trackId' : bigint,
-        'raceId' : bigint,
-      }
-    ]
-  >,
   'get_reconstitution_traces' : ActorMethod<[], Array<ReconstitutionTrace>>,
   'get_timer_diagnostics' : ActorMethod<[], TimerDiagnostics>,
   'get_total_nft_count' : ActorMethod<[], bigint>,
@@ -455,13 +343,8 @@ export interface McpServer {
   >,
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
   'icrc120_upgrade_finished' : ActorMethod<[], UpgradeFinishedResult>,
-  'initialize_race_timer' : ActorMethod<[], string>,
   'list_my_api_keys' : ActorMethod<[], Array<ApiKeyMetadata>>,
-  'process_overdue_timers' : ActorMethod<[], string>,
-  'reattach_races_to_event' : ActorMethod<[bigint, Array<bigint>], string>,
   'recalculate_bot_stats' : ActorMethod<[], string>,
-  'reset_all_elos' : ActorMethod<[], string>,
-  'reset_bot_stats' : ActorMethod<[bigint], Result_3>,
   'revoke_my_api_key' : ActorMethod<[string], undefined>,
   'set_ext_canister' : ActorMethod<[Principal], Result_3>,
   'set_icp_ledger' : ActorMethod<[Principal], Result_3>,
@@ -470,11 +353,8 @@ export interface McpServer {
     [{ 'context' : Uint8Array | number[], 'response' : HttpRequestResult }],
     HttpRequestResult
   >,
-  'trigger_event_creation' : ActorMethod<[], string>,
-  'trigger_race_creation' : ActorMethod<[], string>,
   'trigger_race_finish' : ActorMethod<[bigint], string>,
   'trigger_race_start' : ActorMethod<[bigint], string>,
-  'trigger_stuck_races' : ActorMethod<[], string>,
   'upload_base_stats_batch' : ActorMethod<
     [
       Array<
@@ -555,6 +435,14 @@ export interface McpServer {
     Array<
       {
         'activeUpgrade' : [] | [UpgradeSession],
+        'maxStats' : [] | [
+          {
+            'stability' : bigint,
+            'speed' : bigint,
+            'acceleration' : bigint,
+            'powerCore' : bigint,
+          }
+        ],
         'tokenIndex' : bigint,
         'isInitialized' : boolean,
         'name' : [] | [string],
@@ -569,12 +457,29 @@ export interface McpServer {
             'entryFee' : bigint,
           }
         >,
+        'currentStats' : [] | [
+          {
+            'stability' : bigint,
+            'speed' : bigint,
+            'acceleration' : bigint,
+            'powerCore' : bigint,
+          }
+        ],
+        'upgradeCostsV2' : [] | [
+          {
+            'stability' : { 'successRate' : number, 'costE8s' : bigint },
+            'speed' : { 'successRate' : number, 'costE8s' : bigint },
+            'acceleration' : { 'successRate' : number, 'costE8s' : bigint },
+            'powerCore' : { 'successRate' : number, 'costE8s' : bigint },
+            'pityCounter' : bigint,
+          }
+        ],
       }
     >
   >,
   'web_recharge_bot' : ActorMethod<[bigint], Result_1>,
   'web_repair_bot' : ActorMethod<[bigint], Result_1>,
-  'web_start_scavenging' : ActorMethod<[bigint, string, string], Result_1>,
+  'web_start_scavenging' : ActorMethod<[bigint, string], Result_1>,
   'web_upgrade_bot' : ActorMethod<
     [bigint, UpgradeType, { 'icp' : null } | { 'parts' : null }],
     Result_1
@@ -718,15 +623,18 @@ export type Result_4 = { 'ok' : null } |
   { 'err' : TreasuryError };
 export interface ScavengingMission {
   'startTime' : bigint,
-  'endTime' : bigint,
-  'missionType' : ScavengingMissionType,
   'tokenIndex' : bigint,
   'zone' : ScavengingZone,
+  'pendingParts' : {
+    'powerCoreFragments' : bigint,
+    'universalParts' : bigint,
+    'gyroModules' : bigint,
+    'speedChips' : bigint,
+    'thrusterKits' : bigint,
+  },
+  'lastAccumulation' : bigint,
   'missionId' : bigint,
 }
-export type ScavengingMissionType = { 'DeepSalvage' : null } |
-  { 'ShortExpedition' : null } |
-  { 'WastelandExpedition' : null };
 export type ScavengingZone = { 'AbandonedSettlements' : null } |
   { 'ScrapHeaps' : null } |
   { 'DeadMachineFields' : null };
@@ -806,7 +714,11 @@ export type UpgradeFinishedResult = { 'Failed' : [bigint, string] } |
   { 'InProgress' : bigint };
 export interface UpgradeSession {
   'startedAt' : bigint,
+  'paymentMethod' : string,
+  'costPaid' : bigint,
   'tokenIndex' : bigint,
+  'partsUsed' : bigint,
+  'consecutiveFails' : bigint,
   'upgradeType' : UpgradeType,
   'endsAt' : bigint,
 }

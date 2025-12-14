@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import { getAuthService, type WalletProvider, type UserObject } from '../lib/auth';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AuthStore {
   user: UserObject | null;
@@ -14,6 +15,7 @@ interface AuthStore {
   logout: () => Promise<void>;
   getAgent: () => any;
   getPrincipal: () => string | null;
+  invalidateQueries?: () => void;
 }
 
 const network = process.env.DFX_NETWORK || 'local'; // 'ic' for mainnet, 'local' for local dev
@@ -43,6 +45,12 @@ export const useAuthStore = create<AuthStore>((set: any, get: any) => ({
         isLoading: false,
         error: null
       });
+      
+      // Invalidate all React Query caches after login to force re-fetch with new agent
+      const invalidate = get().invalidateQueries;
+      if (invalidate) {
+        invalidate();
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Login failed';
       set({ 
@@ -62,6 +70,12 @@ export const useAuthStore = create<AuthStore>((set: any, get: any) => ({
       isAuthenticated: false, 
       error: null 
     });
+    
+    // Invalidate all React Query caches after logout
+    const invalidate = get().invalidateQueries;
+    if (invalidate) {
+      invalidate();
+    }
   },
 
   getAgent: () => {
@@ -109,6 +123,17 @@ export const useAuthStore = create<AuthStore>((set: any, get: any) => ({
  */
 export const useAuth = () => {
   const store = useAuthStore();
+  const queryClient = useQueryClient();
+  
+  // Set up the invalidateQueries function in the store if not already set
+  if (!store.invalidateQueries) {
+    useAuthStore.setState({
+      invalidateQueries: () => {
+        console.log('[Auth] Invalidating all React Query caches after auth change');
+        queryClient.invalidateQueries();
+      }
+    });
+  }
   
   return {
     user: store.user,

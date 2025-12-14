@@ -190,37 +190,41 @@ Currency for upgrading your bot's stats permanently. You gather them through sca
 - **Gyro Modules** → Upgrade Stability (Gyro)
 - **Universal Parts** → Can substitute for ANY type (most valuable!)
 
-## UPGRADE COSTS (Escalating)
+## UPGRADE SYSTEM V2 (Gacha-Style)
 
-- 1st upgrade: 100 parts
-- 2nd upgrade: 200 parts
-- 3rd upgrade: 300 parts
-- 4th upgrade: 900 parts
-- 5th upgrade: 2,700 parts
-- 6th upgrade: 8,100 parts
+**Dynamic ICP Costs:**
+- Costs scale with current stat: 0.5 + (stat/40)²
+- Bot tier premium: Scrap 0.7×, Elite 2.5×, God 3.5×
+- Scrap bot: 0.35 ICP → 1.15 ICP (attempts 1-15)
+- Elite bot: 1.25 ICP → 33+ ICP (attempts 1-15)
 
-*Note: These costs may be adjusted for balance*
+**Or Pay With Parts:**
+- 100 parts = 1 ICP equivalent
+- Use Speed Chips, Power Core Fragments, Thruster Kits, Gyro Modules
+- Universal Parts work for any upgrade type
 
-## STAT GAINS (RNG-based)
+**Success Rates (RNG):**
+- Start at 85%, drop to 15% by attempt 15
+- After +15 upgrades: drops to 1% (brutal soft cap)
+- Pity system: +5% per fail (max +25%), resets on success
 
-- **1st upgrade:** +1 to +3 points (guaranteed at least +1)
-- **2nd-3rd:** +1 to +2 points (guaranteed at least +1)
-- **4th+:** Usually +1 point (can be 0 if unlucky)
-
-Faction bonuses can double your gains (20-35% chance depending on rarity).
-
-## DIFFICULTY SCALING
-
-Higher stats = harder to upgrade. At 60+ you get reduced gains, at 90+ only 20% effectiveness.
+**Rewards:**
+- Success: +1 stat point (base)
+- Double lottery: 15% chance for +2 points (disabled after +15)
+- Faction bonuses: 10-35% chance to double final points (varies by rarity)
+- Best case: Double lottery + faction bonus = 4+ points!
+- Failure: 50% ICP refund, pity bonus increases
 
 ## STRATEGY
 
-- Use Universal Parts for expensive upgrades (900+)
-- Scavenge in dangerous zones for 2x specialized parts
-- Scavenge in safe zones for more Universal Parts (40% vs 10%)
-- Upgrade takes 12 hours but you can race during it!
+- Early upgrades cheap & reliable (85% success, 0.35-1.25 ICP)
+- Gets expensive & risky after +10 upgrades
+- Soft cap at +15 (15% success, then 1%)
+- Use Universal Parts to avoid scavenging for specific types
+- Pity system prevents long losing streaks
+- 12 hours per upgrade (can race during it)
 
-**Example:** Upgrading a bot's Speed (1st upgrade) costs 100 Speed Chips or 100 Universal Parts, takes 12h, gives +1 to +3 Speed.
+**Example:** Scrap bot upgrading Speed from 15→16 costs 0.35 ICP, 85% success, 15% chance for +2.
 
 ---
 

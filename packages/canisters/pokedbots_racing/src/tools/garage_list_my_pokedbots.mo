@@ -2,6 +2,7 @@ import Principal "mo:base/Principal";
 import Result "mo:base/Result";
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
+import Int "mo:base/Int";
 import Time "mo:base/Time";
 
 import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
@@ -155,23 +156,15 @@ module {
                   let now = Time.now();
                   switch (stats.activeMission) {
                     case (?mission) {
-                      let missionName = switch (mission.missionType) {
-                        case (#ShortExpedition) { "Short Expedition (5h)" };
-                        case (#DeepSalvage) { "Deep Salvage (11h)" };
-                        case (#WastelandExpedition) {
-                          "Wasteland Expedition (23h)";
-                        };
-                      };
+                      let hoursElapsed = (now - mission.startTime) / (3600 * 1_000_000_000);
+                      let totalPending = mission.pendingParts.speedChips + mission.pendingParts.powerCoreFragments + mission.pendingParts.thrusterKits + mission.pendingParts.gyroModules + mission.pendingParts.universalParts;
+                      
                       let zoneName = switch (mission.zone) {
                         case (#ScrapHeaps) { "ScrapHeaps" };
                         case (#AbandonedSettlements) { "AbandonedSettlements" };
                         case (#DeadMachineFields) { "DeadMachineFields" };
                       };
-                      msg #= "   🔍 SCAVENGING: " # missionName # " in " # zoneName;
-                      if (now >= mission.endTime) {
-                        msg #= " ✅ Ready to collect!";
-                      };
-                      msg #= "\n";
+                      msg #= "   🔍 SCAVENGING: Active (" # Nat.toText(Int.abs(hoursElapsed)) # "h elapsed) in " # zoneName # " | Pending: " # Nat.toText(totalPending) # " parts ✅ Ready to collect!\n";
                     };
                     case (null) {};
                   };

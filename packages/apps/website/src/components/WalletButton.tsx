@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useWalletDrawer } from '../contexts/WalletDrawerContext';
 import { Button } from './ui/button';
 import {
   Dialog,
@@ -9,14 +10,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from './ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from './ui/dropdown-menu';
 import { Wallet } from 'lucide-react';
 import type { WalletProvider } from '../lib/auth';
 
@@ -39,10 +32,10 @@ const WALLET_OPTIONS: { id: WalletProvider; name: string; description: string }[
 ];
 
 export default function WalletButton() {
-  const { user, isAuthenticated, isLoading, error, login, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, error, login } = useAuth();
+  const { openDrawer } = useWalletDrawer();
   const [isOpen, setIsOpen] = useState(false);
   const [connectingProvider, setConnectingProvider] = useState<WalletProvider | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const handleLogin = async (provider: WalletProvider) => {
     setConnectingProvider(provider);
@@ -63,50 +56,11 @@ export default function WalletButton() {
 
   if (isAuthenticated && user) {
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
-            <span className="hidden sm:inline">{truncatePrincipal(user.principal)}</span>
-            <span className="sm:hidden">Wallet</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>My Account</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <div 
-            className="px-2 py-1.5 text-sm font-mono cursor-pointer hover:bg-accent rounded-sm transition-colors group"
-            onClick={() => {
-              navigator.clipboard.writeText(user.principal);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
-            }}
-            title="Click to copy"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs">{truncatePrincipal(user.principal)}</span>
-              {copied ? (
-                <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                <svg className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              )}
-            </div>
-          </div>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive cursor-pointer">
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            Log out
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Button variant="outline" className="gap-2" onClick={openDrawer}>
+        <Wallet className="h-4 w-4" />
+        <span className="hidden sm:inline">{truncatePrincipal(user.principal)}</span>
+        <span className="sm:hidden">Wallet</span>
+      </Button>
     );
   }
 

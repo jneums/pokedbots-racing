@@ -18,7 +18,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_complete_scavenging";
     title = ?"Complete Scavenging Mission";
-    description = ?"Complete a scavenging mission and collect rewards. Awards parts to your inventory and potentially world buffs.\n\n**Rewards:**\n• Parts distributed across multiple types (Speed Chips, Power Core Fragments, Thruster Kits, Gyro Modules, Universal Parts)\n• Distribution varies by zone: ScrapHeaps (40% universal), AbandonedSettlements (25% universal), DeadMachineFields (10% universal)\n• Battery and condition consumed based on zone difficulty\n• 15% chance for world buff (expires in 48h)\n• Faction-specific bonuses and specials applied\n\n**Mission durations: ShortExpedition (5h), DeepSalvage (11h), WastelandExpedition (23h)**\n**Can only complete after mission duration has elapsed.**";
+    description = ?"Retrieve your PokedBot from scavenging and collect accumulated rewards. Can be called anytime.\n\n**Rewards:**\n• Parts distributed across multiple types (Speed Chips, Power Core Fragments, Thruster Kits, Gyro Modules, Universal Parts)\n• Distribution varies by zone: ScrapHeaps (40% universal), AbandonedSettlements (25% universal), DeadMachineFields (10% universal)\n• All pending parts awarded to inventory\n• World buff chance: 3.75% per 15-min check, strength scales with time\n• Faction-specific bonuses and specials applied\n\n**RETRIEVE ON DEMAND:**\n• Retrieve anytime - no waiting required\n• Rewards accumulate every 15 minutes automatically\n• Ends mission and stops accumulation\n• Returns total hours elapsed and parts collected";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -68,36 +68,28 @@ module {
         };
       };
 
-      // Complete mission
+      // Complete mission (forces final accumulation)
       let garage = ctx.garageManager;
       let now = Time.now();
-      let rng = Int.abs(now / 1000); // Simple RNG seed
 
-      switch (garage.completeScavengingMission(tokenIndex, now, rng)) {
+      switch (garage.completeScavengingMissionV2(tokenIndex, now)) {
         case (#err(e)) {
           return ToolContext.makeError(e, cb);
         };
         case (#ok(result)) {
-          // Build event messages
-          var eventText = "";
-          for (event in result.events.vals()) {
-            eventText := eventText # event # ", ";
-          };
-
-          // Build world buff description
-          let buffText = if (result.worldBuffApplied) {
-            switch (result.worldBuff) {
-              case (?buff) {
-                var statsText = "";
-                for ((stat, value) in buff.stats.vals()) {
-                  statsText := statsText # "+" # Nat.toText(value) # " " # stat # " ";
+          // Cancel all pending scavenge_accumulate timers for this bot
+          let scavengeTimers = ctx.timerTool.getActionsByFilter(#ByType("scavenge_accumulate"));
+          for ((timerId, timerAction) in scavengeTimers.vals()) {
+            let timerTokenOpt : ?Nat = from_candid (timerAction.params);
+            switch (timerTokenOpt) {
+              case (?timerToken) {
+                if (timerToken == tokenIndex) {
+                  ignore ctx.timerTool.cancelActionsByIds<system>([timerId.id]);
                 };
-                "World buff earned: " # statsText # "(expires in 48h)";
               };
-              case (null) { "" };
+              case (null) {};
             };
-          } else { "" };
-
+          };
           // Build parts breakdown
           let partsBreakdown = "Speed Chips: " # Nat.toText(result.speedChips) #
           ", Power Cells: " # Nat.toText(result.powerCoreFragments) #
@@ -105,20 +97,25 @@ module {
           ", Gyro Units: " # Nat.toText(result.gyroModules) #
           ", Universal: " # Nat.toText(result.universalParts);
 
+          // Format hours elapsed
+          let hoursElapsed = result.hoursOut;
+          let hoursText = if (hoursElapsed < 1) {
+            "< 1 hour";
+          } else {
+            Nat.toText(hoursElapsed) # " hours";
+          };
+
           let response = Json.obj([
             ("token_index", Json.int(tokenIndex)),
-            ("parts_found", Json.int(result.partsFound)),
+            ("hours_elapsed", Json.int(result.hoursOut)),
+            ("total_parts", Json.int(result.totalParts)),
             ("speed_chips", Json.int(result.speedChips)),
             ("power_core_fragments", Json.int(result.powerCoreFragments)),
             ("thruster_kits", Json.int(result.thrusterKits)),
             ("gyro_modules", Json.int(result.gyroModules)),
             ("universal_parts", Json.int(result.universalParts)),
-            ("battery_consumed", Json.int(result.batteryConsumed)),
-            ("condition_lost", Json.int(result.conditionLost)),
-            ("world_buff_applied", Json.bool(result.worldBuffApplied)),
-            ("events", Json.str(eventText)),
             ("parts_breakdown", Json.str(partsBreakdown)),
-            ("message", Json.str("✅ Mission complete! Found " # Nat.toText(result.partsFound) # " parts: " # partsBreakdown # ". " # buffText)),
+            ("message", Json.str("✅ Bot retrieved! Time out: " # hoursText # ". Collected " # Nat.toText(result.totalParts) # " parts: " # partsBreakdown)),
           ]);
 
           ToolContext.makeSuccess(response, cb);

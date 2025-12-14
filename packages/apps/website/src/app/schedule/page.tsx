@@ -100,6 +100,7 @@ function getStatusBadge(status: ScheduledEvent['status'], registrationCloses: bi
 }
 
 function getDivisionName(division: any): string {
+  if ('Scrap' in division) return 'Scrap';
   if ('Junker' in division) return 'Junker';
   if ('Raider' in division) return 'Raider';
   if ('Elite' in division) return 'Elite';

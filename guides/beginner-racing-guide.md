@@ -275,10 +275,11 @@ The average of all four stats:
    - Note which terrain you do well on
    - Compare against other bots' stats
 
-4. **Upgrade Strategically**
+4. **Upgrade Strategically (V2 Gacha System)**
    - Don't upgrade immediately - learn your bot first
-   - Focus on your bot's weakest stat or double down on strengths
-   - Upgrades cost ICP/parts and take 12 hours
+   - V2 uses RNG: 85% → 15% success rates, pity system, 50% refunds
+   - Costs scale dynamically (0.35-1.25 ICP start, based on tier)
+   - Takes 12 hours, can race during upgrade
 
 ---
 

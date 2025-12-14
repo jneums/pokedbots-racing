@@ -62,14 +62,41 @@ export interface BotListItem {
   name: string | undefined;
   currentOwner: string;
   stats: any | undefined;
+  currentStats?: {
+    speed: bigint;
+    powerCore: bigint;
+    acceleration: bigint;
+    stability: bigint;
+  };
+  maxStats?: {
+    speed: bigint;
+    powerCore: bigint;
+    acceleration: bigint;
+    stability: bigint;
+  };
+  upgradeCostsV2?: {
+    speed: { costE8s: bigint; successRate: number };
+    powerCore: { costE8s: bigint; successRate: number };
+    acceleration: { costE8s: bigint; successRate: number };
+    stability: { costE8s: bigint; successRate: number };
+    pityCounter: bigint;
+  };
   isListed?: boolean;
   listPrice?: number;
   activeUpgrade?: any;
   activeMission?: {
-    missionType: { ShortExpedition: null } | { DeepSalvage: null } | { WastelandExpedition: null };
+    missionId: bigint;
+    tokenIndex: bigint;
     zone: { ScrapHeaps: null } | { AbandonedSettlements: null } | { DeadMachineFields: null };
     startTime: bigint;
-    endTime: bigint;
+    lastAccumulation: bigint;
+    pendingParts: {
+      speedChips: bigint;
+      powerCoreFragments: bigint;
+      thrusterKits: bigint;
+      gyroModules: bigint;
+      universalParts: bigint;
+    };
   };
   upcomingRaces?: Array<{
     raceId: number;
@@ -78,6 +105,11 @@ export interface BotListItem {
     entryFee: bigint;
     terrain: any;
   }>;
+  worldBuff?: {
+    appliedAt: bigint;
+    expiresAt: bigint;
+    stats: Array<[string, bigint]>;
+  };
 }
 
 export interface BotDetailsResponse {
@@ -124,12 +156,22 @@ export const listMyBots = async (identityOrAgent: IdentityOrAgent): Promise<BotL
     const stats = bot.stats.length > 0 ? bot.stats[0] : undefined;
     const activeMission = stats && stats.activeMission && stats.activeMission.length > 0 ? stats.activeMission[0] : undefined;
     
+    // Extract currentStats and maxStats from backend response
+    const currentStats = bot.currentStats.length > 0 ? bot.currentStats[0] : undefined;
+    const maxStats = bot.maxStats.length > 0 ? bot.maxStats[0] : undefined;
+    
+    // Extract upgradeCostsV2 from backend response
+    const upgradeCostsV2 = bot.upgradeCostsV2.length > 0 ? bot.upgradeCostsV2[0] : undefined;
+    
     return {
       tokenIndex: bot.tokenIndex,
       isInitialized: bot.isInitialized,
       name: bot.name.length > 0 ? bot.name[0] : undefined,
       currentOwner: bot.currentOwner,
       stats,
+      currentStats,
+      maxStats,
+      upgradeCostsV2,
       isListed: !!listingInfo,
       listPrice: listingInfo?.price,
       activeUpgrade: bot.activeUpgrade.length > 0 ? bot.activeUpgrade[0] : undefined,
@@ -367,16 +409,14 @@ export const approveIcpSpending = async (
 };
 
 /**
- * Start a scavenging mission for a bot.
+ * Start continuous scavenging for a bot (V2).
  * @param tokenIndex The token index of the bot
- * @param missionType The duration of the mission
  * @param zone The zone to scavenge in
  * @param identityOrAgent Required identity for authentication
  * @returns Success message
  */
 export const startScavenging = async (
   tokenIndex: number,
-  missionType: 'ShortExpedition' | 'DeepSalvage' | 'WastelandExpedition',
   zone: 'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields',
   identityOrAgent: IdentityOrAgent
 ): Promise<string> => {
@@ -384,7 +424,6 @@ export const startScavenging = async (
   
   const result = await actor.web_start_scavenging(
     BigInt(tokenIndex),
-    missionType,
     zone
   );
   
@@ -416,4 +455,59 @@ export const completeScavenging = async (
     throw new Error(result.err as string);
   }
   throw new Error('Unexpected response from canister');
+};
+
+/**
+ * API Key Management
+ */
+
+export interface ApiKeyMetadata {
+  hashed_key: string;
+  info: {
+    name: string;
+    principal: any;
+    scopes: string[];
+    created: bigint;
+  };
+}
+
+/**
+ * List all API keys owned by the caller.
+ * @param identityOrAgent Required identity for authentication
+ * @returns Array of API key metadata (without the raw keys)
+ */
+export const listMyApiKeys = async (
+  identityOrAgent: IdentityOrAgent
+): Promise<ApiKeyMetadata[]> => {
+  const actor = await getActor(identityOrAgent);
+  return await actor.list_my_api_keys();
+};
+
+/**
+ * Create a new API key.
+ * @param name Human-readable name for the key
+ * @param scopes Array of scope strings (e.g., ['read', 'write'])
+ * @param identityOrAgent Required identity for authentication
+ * @returns The raw API key (THIS IS THE ONLY TIME IT WILL BE VISIBLE)
+ */
+export const createApiKey = async (
+  name: string,
+  scopes: string[],
+  identityOrAgent: IdentityOrAgent
+): Promise<string> => {
+  const actor = await getActor(identityOrAgent);
+  return await actor.create_my_api_key(name, scopes);
+};
+
+/**
+ * Revoke (delete) an API key.
+ * @param keyId The hashed key ID to revoke
+ * @param identityOrAgent Required identity for authentication
+ */
+export const revokeApiKey = async (
+  keyId: string,
+  identityOrAgent: IdentityOrAgent
+): Promise<void> => {
+  const actor = await getActor(identityOrAgent);
+  await actor.revoke_my_api_key(keyId);
 };

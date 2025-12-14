@@ -25,7 +25,11 @@ type UpgradeType =
  };
 type UpgradeSession = 
  record {
+   consecutiveFails: nat;
+   costPaid: nat;
    endsAt: int;
+   partsUsed: nat;
+   paymentMethod: text;
    startedAt: int;
    tokenIndex: nat;
    upgradeType: UpgradeType;
@@ -139,17 +143,18 @@ type ScavengingZone =
    DeadMachineFields;
    ScrapHeaps;
  };
-type ScavengingMissionType = 
- variant {
-   DeepSalvage;
-   ShortExpedition;
-   WastelandExpedition;
- };
 type ScavengingMission = 
  record {
-   endTime: int;
+   lastAccumulation: int;
    missionId: nat;
-   missionType: ScavengingMissionType;
+   pendingParts:
+    record {
+      gyroModules: nat;
+      powerCoreFragments: nat;
+      speedChips: nat;
+      thrusterKits: nat;
+      universalParts: nat;
+    };
    startTime: int;
    tokenIndex: nat;
    zone: ScavengingZone;
@@ -335,21 +340,17 @@ type NFTMetadata =
      };
 type McpServer = 
  service {
-   /// Fix a broken race entry by converting EXT token identifier to token index
-   admin_fix_race_entry: (raceId: nat, extTokenId: text) -> (Result_1);
    cancel_actions_by_filter: (filter: ActionFilter) -> (CancellationResult);
    cancel_actions_by_ids: (ids: vec nat) -> (CancellationResult);
    cancel_races_by_ids: (raceIds: vec nat) -> (vec record {
                                                      nat;
                                                      text;
                                                    });
-   clear_event_race_ids: () -> (text);
    clear_reconstitution_traces: () -> ();
    /// * Creates a new API key. This API key is linked to the caller's principal.
    ///    * @param name A human-readable name for the key.
    ///    * @returns The raw, unhashed API key. THIS IS THE ONLY TIME IT WILL BE VISIBLE.
    create_my_api_key: (name: text, scopes: vec text) -> (text);
-   debug_create_test_race: (startInMinutes: nat) -> (text);
    /// Test/debug: Get all available tracks
    debug_get_all_tracks: () ->
     (vec
@@ -362,39 +363,6 @@ type McpServer =
         totalDistance: nat;
         trackId: nat;
       }) query;
-   /// Debug: Preview what stats would be derived for a token index
-   /// Shows both metadata-based and fallback stats for comparison
-   debug_preview_stats: (tokenIndex: nat) ->
-    (record {
-       currentStoredStats:
-        opt
-         record {
-           acceleration: nat;
-           accelerationBonus: nat;
-           baseAcceleration: nat;
-           basePowerCore: nat;
-           baseSpeed: nat;
-           baseStability: nat;
-           faction: text;
-           powerCore: nat;
-           powerCoreBonus: nat;
-           speed: nat;
-           speedBonus: nat;
-           stability: nat;
-           stabilityBonus: nat;
-         };
-       hasPrecomputedStats: bool;
-       precomputedStats:
-        opt
-         record {
-           acceleration: nat;
-           faction: text;
-           powerCore: nat;
-           speed: nat;
-           stability: nat;
-         };
-     }) query;
-   debug_seed_leaderboard: (count: nat) -> (text);
    /// Test/debug: Simulate a race with specific bots on a specific track
    /// Returns detailed results for balance testing
    debug_simulate_race: (trackId: nat, tokenIndices: vec nat, seed: nat) ->
@@ -448,9 +416,7 @@ type McpServer =
                               };}) query;
    /// Decode EXT token identifier to get token index (public query)
    decode_token_identifier: (tokenIdentifier: text) -> (nat) query;
-   delete_events_after: (afterEventId: nat) -> (text);
    delete_events_and_races: (eventIds: vec nat) -> (text);
-   delete_orphaned_races: () -> (text);
    emergency_clear_all_timers: () -> (nat);
    /// Encode token index to EXT token identifier (public query)
    encode_token_identifier: (tokenIndex: nat32) -> (text) query;
@@ -461,16 +427,6 @@ type McpServer =
    get_all_scheduled_events: () -> (vec ScheduledEvent) query;
    /// Get all token IDs that have metadata
    get_all_token_ids: () -> (vec nat) query;
-   /// Get a specific pre-computed base stat
-   get_base_stat: (tokenId: nat) ->
-    (opt
-      record {
-        acceleration: nat;
-        faction: text;
-        powerCore: nat;
-        speed: nat;
-        stability: nat;
-      }) query;
    /// Get total count of pre-computed base stats
    get_base_stats_count: () -> (nat) query;
    /// Get public bot profile (stats + career, no sensitive info like battery/condition)
@@ -597,71 +553,10 @@ type McpServer =
    get_nft_trait: (tokenId: nat, traitName: text) -> (opt text) query;
    /// Get a specific trait value ID by trait index (for calculations)
    get_nft_trait_value: (tokenId: nat, traitIndex: nat) -> (opt nat) query;
-   /// Find all races that are not associated with any event
-   /// Useful for finding orphaned races created outside the event system
-   get_orphaned_races: () ->
-    (vec
-      record {
-        entries: nat;
-        name: text;
-        raceClass: RaceClass;
-        raceId: nat;
-        startTime: int;
-        status: RaceStatus;
-      }) query;
    /// Get the current owner of the canister.
    get_owner: () -> (principal) query;
    get_past_events: (offset: nat, limit: nat) -> (vec ScheduledEvent) query;
    get_race_by_id: (raceId: nat) -> (opt Race) query;
-   /// Get race replay data for deterministic frontend replay
-   /// Returns track info, race seed, and participants for frontend simulation
-   get_race_replay_data: (raceId: nat) ->
-    (opt
-      record {
-        participants:
-         vec
-          record {
-            nftId: text;
-            owner: principal;
-            stats:
-             record {
-               acceleration: nat;
-               powerCore: nat;
-               speed: nat;
-               stability: nat;
-             };
-          };
-        raceId: nat;
-        results:
-         opt
-          vec
-           record {
-             finalTime: float64;
-             nftId: text;
-             owner: principal;
-             position: nat;
-             prizeAmount: nat;
-           };
-        track:
-         record {
-           description: text;
-           laps: nat;
-           name: text;
-           primaryTerrain: Terrain;
-           segments:
-            vec
-             record {
-               angle: int;
-               difficulty: float64;
-               length: nat;
-               terrain: Terrain;
-             };
-           totalDistance: nat;
-           trackId: nat;
-         };
-        trackId: nat;
-        trackSeed: nat;
-      }) query;
    get_reconstitution_traces: () -> (vec ReconstitutionTrace) query;
    get_timer_diagnostics: () -> (TimerDiagnostics) query;
    /// Get total count of NFTs with metadata stored
@@ -691,17 +586,10 @@ type McpServer =
    /// Handle incoming HTTP requests that modify state (e.g., POST).
    http_request_update: (req: HttpRequest) -> (HttpResponse);
    icrc120_upgrade_finished: () -> (UpgradeFinishedResult);
-   initialize_race_timer: () -> (text);
    /// List all API keys owned by the caller.
    ///    * @returns A list of API key metadata (but not the raw keys).
    list_my_api_keys: () -> (vec ApiKeyMetadata) query;
-   process_overdue_timers: () -> (text);
-   reattach_races_to_event: (eventId: nat, raceIds: vec nat) -> (text);
    recalculate_bot_stats: () -> (text);
-   reset_all_elos: () -> (text);
-   /// Reset a bot's racing stats (owner only) - allows re-initialization with correct faction
-   /// This is useful after faction system changes or data migrations
-   reset_bot_stats: (tokenIndex: nat) -> (Result_3);
    /// Revoke (delete) an API key owned by the caller.
    ///    * @param key_id The ID of the key to revoke.
    ///    * @returns True if the key was found and revoked, false otherwise.
@@ -717,11 +605,8 @@ type McpServer =
        context: blob;
        response: HttpRequestResult;
      }) -> (HttpRequestResult) query;
-   trigger_event_creation: () -> (text);
-   trigger_race_creation: () -> (text);
    trigger_race_finish: (raceId: nat) -> (text);
    trigger_race_start: (raceId: nat) -> (text);
-   trigger_stuck_races: () -> (text);
    /// Upload a batch of pre-computed base stats
    upload_base_stats_batch: (batch:
     vec
@@ -801,7 +686,23 @@ type McpServer =
       record {
         activeUpgrade: opt UpgradeSession;
         currentOwner: text;
+        currentStats:
+         opt
+          record {
+            acceleration: nat;
+            powerCore: nat;
+            speed: nat;
+            stability: nat;
+          };
         isInitialized: bool;
+        maxStats:
+         opt
+          record {
+            acceleration: nat;
+            powerCore: nat;
+            speed: nat;
+            stability: nat;
+          };
         name: opt text;
         stats: opt PokedBotRacingStats;
         tokenIndex: nat;
@@ -814,14 +715,34 @@ type McpServer =
             startTime: int;
             terrain: Terrain;
           };
+        upgradeCostsV2:
+         opt
+          record {
+            acceleration: record {
+                            costE8s: nat;
+                            successRate: float64;
+                          };
+            pityCounter: nat;
+            powerCore: record {
+                         costE8s: nat;
+                         successRate: float64;
+                       };
+            speed: record {
+                     costE8s: nat;
+                     successRate: float64;
+                   };
+            stability: record {
+                         costE8s: nat;
+                         successRate: float64;
+                       };
+          };
       });
    /// Recharge a bot's battery (0.1 ICP + fee via ICRC-2)
    web_recharge_bot: (tokenIndex: nat) -> (Result_1);
    /// Repair a bot to restore condition (0.05 ICP + fee via ICRC-2)
    web_repair_bot: (tokenIndex: nat) -> (Result_1);
    /// Start a scavenging mission (web method)
-   web_start_scavenging: (tokenIndex: nat, missionType: text, zone: text) ->
-    (Result_1);
+   web_start_scavenging: (tokenIndex: nat, zone: text) -> (Result_1);
    /// Upgrade a bot stat (via ICRC-2 payment or parts)
    web_upgrade_bot: (tokenIndex: nat, upgradeType: UpgradeType,
     paymentMethod: variant {

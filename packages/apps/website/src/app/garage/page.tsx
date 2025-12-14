@@ -1,30 +1,151 @@
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyBots, useUserInventory } from '../../hooks/useGarage';
-import { useICPBalance, useTransferICP } from '../../hooks/useLedger';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { WalletConnect } from '../../components/WalletConnect';
 import { BotCard } from '../../components/BotCard';
-import { TransferICPDialog } from '../../components/TransferICPDialog';
-import { AllowanceManager } from '../../components/AllowanceManager';
-import { AccountIdentifier } from '@icp-sdk/canisters/ledger/icp';
-import { Principal } from '@icp-sdk/core/principal';
-import { Copy, RefreshCw, Check } from 'lucide-react';
-import { useState } from 'react';
+import { RefreshCw, Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import type { BotListItem } from '@pokedbots-racing/ic-js';
+import { Progress } from '../../components/ui/progress';
+import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
+import { generatetokenIdentifier } from '@pokedbots-racing/ic-js';
+
+// Helper to format time remaining
+function formatTimeRemaining(timestampNanos: bigint): string {
+  const targetNanos = typeof timestampNanos === 'bigint' ? timestampNanos : BigInt(timestampNanos);
+  const nowNanos = BigInt(Date.now()) * 1_000_000n;
+  const diffNanos = targetNanos - nowNanos;
+  
+  if (diffNanos < 0n) return 'Ready';
+  
+  const diffMs = Number(diffNanos / 1_000_000n);
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+  if (diffDays > 0) return `${diffDays}d ${diffHours % 24}h`;
+  if (diffHours > 0) return `${diffHours}h ${diffMinutes % 60}m`;
+  if (diffMinutes > 0) return `${diffMinutes}m`;
+  return '< 1m';
+}
 
 export default function GaragePage() {
   const { isAuthenticated, user } = useAuth();
   const queryClient = useQueryClient();
-  const [copiedPrincipal, setCopiedPrincipal] = useState(false);
-  const [copiedAccount, setCopiedAccount] = useState(false);
+  const [selectedBotIndex, setSelectedBotIndex] = useState<bigint | null>(null);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [customOrder, setCustomOrder] = useState<string[]>([]);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   
   // Use React Query hooks
   const { data: bots = [], isLoading: loading, error: botsError } = useMyBots();
-  const { data: balance, isLoading: balanceLoading, refetch: refetchBalance } = useICPBalance();
   const { data: inventory, isLoading: inventoryLoading, refetch: refetchInventory } = useUserInventory();
-  const transferICP = useTransferICP();
+
+  // Load favorites and custom order from localStorage
+  useEffect(() => {
+    if (user?.principal) {
+      const storageKey = `garage_favorites_${user.principal}`;
+      const orderKey = `garage_order_${user.principal}`;
+      const savedFavorites = localStorage.getItem(storageKey);
+      const savedOrder = localStorage.getItem(orderKey);
+      
+      if (savedFavorites) {
+        setFavorites(new Set(JSON.parse(savedFavorites)));
+      }
+      if (savedOrder) {
+        setCustomOrder(JSON.parse(savedOrder));
+      }
+    }
+  }, [user?.principal]);
+
+  // Save favorites to localStorage
+  const toggleFavorite = (tokenIndex: string) => {
+    setFavorites(prev => {
+      const newFavorites = new Set(prev);
+      if (newFavorites.has(tokenIndex)) {
+        newFavorites.delete(tokenIndex);
+      } else {
+        newFavorites.add(tokenIndex);
+      }
+      
+      if (user?.principal) {
+        const storageKey = `garage_favorites_${user.principal}`;
+        localStorage.setItem(storageKey, JSON.stringify(Array.from(newFavorites)));
+      }
+      
+      return newFavorites;
+    });
+  };
+
+  // Sort bots: favorites first, then by custom order, then by token index
+  const sortedBots = useMemo(() => {
+    const botsArray = [...bots];
+    
+    // Sort by custom order if exists
+    if (customOrder.length > 0) {
+      botsArray.sort((a, b) => {
+        const aIndex = customOrder.indexOf(a.tokenIndex.toString());
+        const bIndex = customOrder.indexOf(b.tokenIndex.toString());
+        
+        // If both have custom order, sort by that
+        if (aIndex !== -1 && bIndex !== -1) {
+          return aIndex - bIndex;
+        }
+        // If only one has custom order, it goes first
+        if (aIndex !== -1) return -1;
+        if (bIndex !== -1) return 1;
+        // Otherwise maintain original order
+        return 0;
+      });
+    }
+    
+    // Favorites always on top
+    return botsArray.sort((a, b) => {
+      const aFav = favorites.has(a.tokenIndex.toString());
+      const bFav = favorites.has(b.tokenIndex.toString());
+      if (aFav && !bFav) return -1;
+      if (!aFav && bFav) return 1;
+      return 0;
+    });
+  }, [bots, favorites, customOrder]);
+
+  // Handle drag and drop
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      return;
+    }
+
+    const newBots = [...sortedBots];
+    const [draggedBot] = newBots.splice(draggedIndex, 1);
+    newBots.splice(dropIndex, 0, draggedBot);
+    
+    const newOrder = newBots.map(bot => bot.tokenIndex.toString());
+    setCustomOrder(newOrder);
+    
+    if (user?.principal) {
+      const orderKey = `garage_order_${user.principal}`;
+      localStorage.setItem(orderKey, JSON.stringify(newOrder));
+    }
+    
+    setDraggedIndex(null);
+  };
 
   // Force immediate refetch of bots by invalidating cache
   const refetchBots = () => {
@@ -33,28 +154,15 @@ export default function GaragePage() {
 
   const error = botsError ? (botsError instanceof Error ? botsError.message : 'Failed to load bots') : null;
 
-  const handleTransfer = async (to: string, amount: number) => {
-    await transferICP.mutateAsync({ to, amount });
-  };
+  // Get the selected bot
+  const selectedBot = selectedBotIndex !== null 
+    ? sortedBots.find(b => b.tokenIndex === selectedBotIndex) 
+    : null;
 
-  const copyPrincipal = () => {
-    if (user?.principal) {
-      navigator.clipboard.writeText(user.principal);
-      setCopiedPrincipal(true);
-      setTimeout(() => setCopiedPrincipal(false), 2000);
-    }
-  };
-
-  const copyAccount = () => {
-    if (user?.principal) {
-      const accountId = AccountIdentifier.fromPrincipal({
-        principal: Principal.fromText(user.principal),
-      }).toHex();
-      navigator.clipboard.writeText(accountId);
-      setCopiedAccount(true);
-      setTimeout(() => setCopiedAccount(false), 2000);
-    }
-  };
+  // Auto-select first bot when loaded
+  if (sortedBots.length > 0 && selectedBotIndex === null) {
+    setSelectedBotIndex(sortedBots[0].tokenIndex);
+  }
 
   if (!isAuthenticated) {
     return (
@@ -76,7 +184,7 @@ export default function GaragePage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-4xl font-bold mb-2">Wasteland Garage</h1>
           <p className="text-muted-foreground">
@@ -84,160 +192,47 @@ export default function GaragePage() {
           </p>
         </div>
         <Button onClick={() => refetchBots()} disabled={loading}>
-          {loading ? 'Loading...' : 'Refresh'}
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          {loading ? 'Refreshing...' : 'Refresh'}
         </Button>
       </div>
 
-      {/* Top Cards Grid - Wallet, Account Details, Parts Inventory */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Wallet Section */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Wallet</CardTitle>
-                <CardDescription>Manage your ICP balance</CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => refetchBalance()}
-                  disabled={balanceLoading}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${balanceLoading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-                <TransferICPDialog
-                  onTransfer={handleTransfer}
-                  maxBalance={balance ? Number(balance) / 100_000_000 : 0}
-                />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="text-sm font-medium text-muted-foreground">Balance</div>
-              <div className="text-3xl font-bold">
-                {balance !== null && balance !== undefined 
-                  ? (Number(balance) / 100_000_000).toFixed(8) 
-                  : '—'}{' '}
-                <span className="text-lg text-muted-foreground">ICP</span>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {balance !== null && balance !== undefined 
-                  ? `${balance.toString()} e8s` 
-                  : 'Click refresh to load'}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Account Details Section */}
-        <Card>
-        <CardHeader>
-          <CardTitle>Account Details</CardTitle>
-          <CardDescription>Your identity and receiving addresses</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Principal ID */}
-            <div>
-              <div className="text-sm font-medium text-muted-foreground mb-2">Principal ID</div>
-              <div className="flex items-center gap-2">
-                <code className="text-xs bg-muted px-3 py-2 rounded-md font-mono flex-1 truncate">
-                  {user?.principal}
-                </code>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9"
-                  onClick={copyPrincipal}
-                >
-                  {copiedPrincipal ? (
-                    <Check className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Account ID */}
-            <div>
-              <div className="text-sm font-medium text-muted-foreground mb-2">
-                Account ID <span className="text-xs font-normal">(for receiving)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <code className="text-xs bg-muted px-3 py-2 rounded-md font-mono flex-1 truncate">
-                  {user?.principal && AccountIdentifier.fromPrincipal({
-                    principal: Principal.fromText(user.principal),
-                  }).toHex()}
-                </code>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9"
-                  onClick={copyAccount}
-                >
-                  {copiedAccount ? (
-                    <Check className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      </div>
-
-      {/* Allowance Manager Section */}
-      <div className="mb-8">
-        <AllowanceManager />
-      </div>
-
-      {/* Parts Inventory Section */}
-      <Card className="mb-8">
-        <CardHeader>
+      {/* Parts Inventory - Compact */}
+      <Card className="mb-6">
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Parts Inventory</CardTitle>
-              <CardDescription>Components for bot upgrades</CardDescription>
-            </div>
+            <CardTitle className="text-lg">Parts Inventory</CardTitle>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => refetchInventory()}
               disabled={inventoryLoading}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${inventoryLoading ? 'animate-spin' : ''}`} />
-              Refresh
+              <RefreshCw className={`h-3 w-3 ${inventoryLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold">{inventory ? Number(inventory.speedChips) : '—'}</div>
-              <div className="text-xs text-muted-foreground">Speed Chips</div>
+          <div className="flex gap-4 text-sm">
+            <div className="flex items-center gap-1">
+              <span className="font-semibold">{inventory ? Number(inventory.speedChips) : '—'}</span>
+              <span className="text-muted-foreground">SPD</span>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">{inventory ? Number(inventory.powerCoreFragments) : '—'}</div>
-              <div className="text-xs text-muted-foreground">Power Core Fragments</div>
+            <div className="flex items-center gap-1">
+              <span className="font-semibold">{inventory ? Number(inventory.powerCoreFragments) : '—'}</span>
+              <span className="text-muted-foreground">PWR</span>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">{inventory ? Number(inventory.thrusterKits) : '—'}</div>
-              <div className="text-xs text-muted-foreground">Thruster Kits</div>
+            <div className="flex items-center gap-1">
+              <span className="font-semibold">{inventory ? Number(inventory.thrusterKits) : '—'}</span>
+              <span className="text-muted-foreground">ACC</span>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">{inventory ? Number(inventory.gyroModules) : '—'}</div>
-              <div className="text-xs text-muted-foreground">Gyro Modules</div>
+            <div className="flex items-center gap-1">
+              <span className="font-semibold">{inventory ? Number(inventory.gyroModules) : '—'}</span>
+              <span className="text-muted-foreground">STB</span>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">{inventory ? Number(inventory.universalParts) : '—'}</div>
-              <div className="text-xs text-muted-foreground">Universal Parts</div>
+            <div className="flex items-center gap-1">
+              <span className="font-semibold text-primary">{inventory ? Number(inventory.universalParts) : '—'}</span>
+              <span className="text-primary">Universal</span>
             </div>
           </div>
         </CardContent>
@@ -252,12 +247,23 @@ export default function GaragePage() {
       )}
 
       {loading && bots.length === 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse">
+        <div className="flex flex-col lg:flex-row gap-6">
+          <Card className="w-full lg:w-[480px] shrink-0 animate-pulse">
+            <CardHeader>
+              <div className="h-6 bg-muted rounded w-3/4"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-16 bg-muted rounded"></div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          <div className="flex-1">
+            <Card className="animate-pulse">
               <CardHeader>
-                <div className="h-6 bg-muted rounded w-3/4"></div>
-                <div className="h-4 bg-muted rounded w-1/2 mt-2"></div>
+                <div className="h-6 bg-muted rounded w-1/3"></div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -267,7 +273,7 @@ export default function GaragePage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+          </div>
         </div>
       ) : bots.length === 0 ? (
         <Card>
@@ -281,18 +287,177 @@ export default function GaragePage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {bots.map((bot) => (
-            <BotCard key={bot.tokenIndex.toString()} bot={bot} onUpdate={() => refetchBots()} />
-          ))}
-        </div>
-      )}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Bot List - Responsive */}
+          <Card className="w-full lg:w-[480px] shrink-0">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Your Bots ({bots.length})</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div 
+                className="max-h-[calc(100vh-400px)] overflow-y-auto"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => e.preventDefault()}
+              >
+                {sortedBots.map((bot, index) => {
+                  const faction = bot.stats?.faction;
+                  const factionName = faction ? Object.keys(faction)[0] : 'Unknown';
+                  const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.tokenIndex));
+                  const imageUrl = `https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=${tokenId}&type=thumbnail`;
+                  const isFavorite = favorites.has(bot.tokenIndex.toString());
+                  
+                  return (
+                    <div
+                      key={bot.tokenIndex.toString()}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDrop={(e) => handleDrop(e, index)}
+                      className={`flex items-center border-b transition-colors ${
+                        selectedBotIndex === bot.tokenIndex
+                          ? 'bg-primary/10 border-l-4 border-l-primary'
+                          : 'hover:bg-muted/50 border-l-4 border-l-transparent'
+                      } ${draggedIndex === index ? 'opacity-50' : ''}`}
+                    >
+                      <div 
+                        draggable="true"
+                        onDragStart={(e) => {
+                          handleDragStart(index);
+                        }}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        className="px-2 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex items-center"
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </div>
+                      <button
+                        onClick={() => setSelectedBotIndex(bot.tokenIndex)}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        className="flex-1 text-left px-2 py-3"
+                      >
+                        <div className="space-y-2">
+                          {/* Header with Avatar and Name */}
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-12 w-12">
+                              <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
+                              <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold truncate text-sm text-foreground">
+                                #{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}
+                              </div>
+                              <div className="text-xs text-muted-foreground/60 mb-1">{factionName}</div>
+                              
+                              {bot.stats && (
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                  <div className="flex items-center gap-1">
+                                    <Battery className="h-3 w-3" />
+                                    <span className="font-mono">{Number(bot.stats.battery)}%</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Wrench className="h-3 w-3" />
+                                    <span className="font-mono">{Number(bot.stats.condition)}%</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        
+                        {bot.stats ? (
+                          <>
+                            
+                            {/* Cooldowns and Status */}
+                            <div className="flex flex-wrap gap-1">
+                              {(() => {
+                                const now = Date.now();
+                                const rechargeReady = bot.stats.lastRecharged 
+                                  ? Number(bot.stats.lastRecharged) / 1_000_000 + (6 * 60 * 60 * 1000)
+                                  : 0;
+                                const repairReady = bot.stats.lastRepaired
+                                  ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
+                                  : 0;
+                                
+                                const rechargeTime = bot.stats.lastRecharged 
+                                  ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + 21_600_000_000_000n)
+                                  : null;
+                                const repairTime = bot.stats.lastRepaired
+                                  ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)
+                                  : null;
+                                
+                                return (
+                                  <>
+                                    {rechargeReady > now && rechargeTime && (
+                                      <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                        <Zap className="h-3 w-3" />
+                                        {rechargeTime}
+                                      </Badge>
+                                    )}
+                                    {repairReady > now && repairTime && (
+                                      <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                        <Hammer className="h-3 w-3" />
+                                        {repairTime}
+                                      </Badge>
+                                    )}
+                                    {bot.activeUpgrade && (
+                                      <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        {Object.keys(bot.activeUpgrade.upgradeType)[0]} {formatTimeRemaining(bot.activeUpgrade.endsAt)}
+                                      </Badge>
+                                    )}
+                                    {bot.activeMission && (
+                                      <Badge 
+                                        variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
+                                        className="text-xs"
+                                      >
+                                        {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}Scavenging
+                                      </Badge>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">Not Initialized</Badge>
+                        )}
+                      </div>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(bot.tokenIndex.toString());
+                      }}
+                      className="px-3 text-muted-foreground hover:text-yellow-500 transition-colors"
+                      title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                    >
+                      <Star className={`h-4 w-4 ${isFavorite ? 'fill-yellow-500 text-yellow-500' : ''}`} />
+                    </button>
+                  </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
 
-      {!loading && bots.length > 0 && (
-        <div className="mt-8 text-center">
-          <Badge variant="secondary" className="px-4 py-2">
-            {bots.length} {bots.length === 1 ? 'Bot' : 'Bots'} in Garage
-          </Badge>
+          {/* Right Panel - Bot Details */}
+          <div className="flex-1 min-w-0">
+            {selectedBot ? (
+              <BotCard bot={selectedBot} onUpdate={() => refetchBots()} />
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-muted-foreground">
+                    Select a bot from the list to view details
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       )}
     </div>

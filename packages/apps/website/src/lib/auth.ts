@@ -220,6 +220,7 @@ export class AuthService {
     const whitelist = [
       'bzsui-sqaaa-aaaah-qce2a-cai', // NFT canister
       'p6nop-vyaaa-aaaai-q4djq-cai', // Racing canister
+      'ryjl3-tyaaa-aaaaa-aaaba-cai' // ICP Ledger canister
     ];
 
     if (!window.ic?.plug?.requestConnect) {

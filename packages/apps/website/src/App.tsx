@@ -14,6 +14,8 @@ import DocPage from './app/docs/[slug]/page';
 import GuidesListPage from './app/guides/page';
 import GuidePage from './app/guides/[slug]/page';
 import BotDetailsPage from './app/bot/[tokenIndex]/page';
+import { WalletDrawerProvider } from './contexts/WalletDrawerContext';
+import { WalletDrawer } from './components/WalletDrawer';
 
 import { configure as configureIcJs } from '@pokedbots-racing/ic-js';
 
@@ -48,12 +50,26 @@ function ScrollToTop() {
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <Toaster position="top-right" richColors />
-      <ScrollToTop />
-      <Navigation />
-      <main className="flex-1">
-        <Routes>
+    <WalletDrawerProvider>
+      <div className="min-h-screen bg-background flex flex-col">
+        <Toaster 
+          position="top-right" 
+          richColors 
+          theme="dark"
+          toastOptions={{
+            className: '',
+            style: {
+              background: 'oklch(0.16 0.025 35)',
+              border: '1px solid oklch(0.28 0.03 40)',
+              color: 'oklch(0.95 0.01 60)',
+            },
+          }}
+        />
+        <ScrollToTop />
+        <Navigation />
+        <WalletDrawer />
+        <main className="flex-1">
+          <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/marketplace" element={<MarketplacePage />} />
           <Route path="/garage" element={<GaragePage />} />
@@ -135,6 +151,7 @@ export default function App() {
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </WalletDrawerProvider>
   );
 }

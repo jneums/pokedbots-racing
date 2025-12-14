@@ -78,6 +78,14 @@ module {
         case (?stats) { stats };
       };
 
+      // Check if bot is currently scavenging
+      switch (racingStats.activeMission) {
+        case (?mission) {
+          return ToolContext.makeError("Cannot repair while bot is on a scavenging mission. Complete the mission first.", cb);
+        };
+        case (null) {};
+      };
+
       let now = Time.now();
       switch (racingStats.lastRepaired) {
         case (?lastTime) {

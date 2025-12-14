@@ -143,29 +143,41 @@ Repair damage to improve condition.
 
 ### `garage_upgrade_robot`
 
-Start a 12-hour upgrade session.
+Start a 12-hour V2 upgrade session with RNG mechanics.
 
-**Cost:** 0.2 ICP + 0.0001 ICP fee (total: 0.2001 ICP)
+**V2 System Features:**
+- **Flexible Payment:** Pay with ICP or parts (100 parts = 1 ICP equivalent)
+  - ICP: Requires ICRC-2 approval, instant payment
+  - Parts: Deducted from inventory (earned via racing/scavenging)
+- **Dynamic Costs:** 0.5 + (currentStat/40)² × tier premium (0.7-3.5×)
+- **Success Rates:** 85% → 15% (attempts 1-15), then 8% → 1% (brutal soft cap)
+- **Pity System:** +5% per consecutive fail (max +25%), persists across upgrades
+- **Double Lottery:** 15% → 2% chance for +2 points (disabled after +15)
+- **50% Refund on Failure:** Both ICP and parts are refunded at 50% rate
+
 **Duration:** 12 hours  
 **Types:** Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability)
-**Requirements:** Battery ≥30, Condition ≥50
 
 **Input:**
 ```json
 {
   "token_index": 4079,
-  "upgrade_type": "Velocity"
+  "upgrade_type": "Velocity",
+  "payment_method": "icp"  // or "parts"
 }
 ```
 
 **Output:** JSON object with:
 - `token_index`: Bot ID
-- `upgrade_type`: Faction-specific upgrade flavor text
-- `duration_hours`: 12
-- `expected_gain`: Stat gain description (varies by faction)
+- `upgrade_type`: Type name
+- `cost_icp`: Dynamic cost based on current stat
+- `success_rate`: Base rate + pity bonus
+- `double_chance`: Lottery chance for +2 points
+- `attempt_number`: Which upgrade attempt this is
+- `pity_counter`: Consecutive failures
 - `message`: "🔧 Upgrade in progress. Check back in 12 hours."
 
-**Note:** UltimateMaster bots have 50% chance for 2x bonus, Wild bots have unstable results
+**Note:** Success/failure determined after 12 hours. Failures grant pity bonus for next attempt.
 
 ---
 

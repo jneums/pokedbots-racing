@@ -188,16 +188,24 @@ function RaceCard({ raceId }: { raceId: bigint }) {
     }
   };
 
-  // Get class name from race name
-  const getClassName = (name: string): string => {
-    if (name.includes('Junker')) return 'Junker';
-    if (name.includes('Raider')) return 'Raider';
-    if (name.includes('Elite')) return 'Elite';
-    if (name.includes('SilentKlan') || name.includes('Silent Klan')) return 'SilentKlan';
+  // Get class name from race object - uses actual raceClass field from backend
+  const getClassName = (race: any): string => {
+    // Use actual raceClass field from backend (comes as variant like { Junker: null })
+    if (race.raceClass) {
+      const classKey = Object.keys(race.raceClass)[0];
+      return classKey || 'Unknown';
+    }
+    
+    // Fallback to name parsing (for backward compatibility)
+    if (race.name.includes('Scrap')) return 'Scrap';
+    if (race.name.includes('Junker') || race.name.includes('Scavenger')) return 'Junker';
+    if (race.name.includes('Raider')) return 'Raider';
+    if (race.name.includes('Elite')) return 'Elite';
+    if (race.name.includes('SilentKlan') || race.name.includes('Silent Klan')) return 'SilentKlan';
     return 'Unknown';
   };
 
-  const raceClass = getClassName(race.name);
+  const raceClass = getClassName(race);
 
   // Check if a bot is eligible for this race class based on ELO
   const isBotEligible = (bot: any): boolean => {
@@ -205,7 +213,8 @@ function RaceCard({ raceId }: { raceId: bigint }) {
     const elo = Number(bot.stats.eloRating);
     
     switch (raceClass) {
-      case 'Junker': return elo < 1400;
+      case 'Scrap': return elo < 1200;
+      case 'Junker': return elo >= 1200 && elo < 1400;
       case 'Raider': return elo >= 1400 && elo < 1600;
       case 'Elite': return elo >= 1600 && elo < 1800;
       case 'SilentKlan': return elo >= 1800;
@@ -257,7 +266,7 @@ function RaceCard({ raceId }: { raceId: bigint }) {
           <div className="text-center p-3 bg-card/50 border border-primary/20 rounded-lg">
             <p className="text-xs text-muted-foreground mb-1">Entry Fee</p>
             <p className="text-base font-bold text-primary">{formatICP(race.entryFee)}</p>
-            <p className="text-xs text-muted-foreground mt-1">{getClassName(race.name)}</p>
+            <p className="text-xs text-muted-foreground mt-1">{raceClass}</p>
           </div>
           <div className="text-center p-3 bg-card/50 border border-primary/20 rounded-lg">
             <p className="text-xs text-muted-foreground mb-1">Prize Pool</p>
@@ -331,8 +340,8 @@ function RaceCard({ raceId }: { raceId: bigint }) {
           </div>
         )}
 
-        {/* Entries List */}
-        {entryCount > 0 && (
+        {/* Entries List - Only show for upcoming races without visualizer */}
+        {entryCount > 0 && 'Upcoming' in race.status && (
           <div className="space-y-2">
             <p className="text-sm font-semibold">Racers ({entryCount}):</p>
             <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
@@ -438,65 +447,56 @@ function RaceCard({ raceId }: { raceId: bigint }) {
           </div>
         )}
 
-        {/* Results if completed */}
-        {race.results && race.results.length > 0 && race.results[0] && (
-          <>            
-            <div className="space-y-2">
-              <p className="text-sm font-semibold">Results:</p>
+        {/* Prize Distribution - Only show winners with prizes */}
+        {race.results && race.results.length > 0 && race.results[0] && 'Completed' in race.status && (() => {
+          const finalResults = race.results[0];
+          const winnersWithPrizes = finalResults.filter((result: any) => result.prizeAmount && result.prizeAmount > 0n);
+          return winnersWithPrizes.length > 0 && (
+            <>            
               <div className="space-y-2">
-                {race.results[0].map((result: any, idx: number) => {
-                const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(result.nftId));
-                const imageUrl = generateExtThumbnailLink(tokenId);
-                const winnerTime = race.results?.[0]?.[0]?.finalTime;
-                const isDNF = result.finalTime > 100000; // DNF threshold
-                const timeGap = idx > 0 && winnerTime && !isDNF ? (result.finalTime - winnerTime).toFixed(2) : null;
+                <p className="text-sm font-semibold">💰 Prize Distribution:</p>
+                <div className="space-y-2">
+                  {winnersWithPrizes.map((result: any, idx: number) => {
+                  const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(result.nftId));
+                  const imageUrl = generateExtThumbnailLink(tokenId);
+                  const position = finalResults.findIndex((r: any) => r.nftId === result.nftId) + 1;
                 
                 return (
                   <Link key={idx} to={`/bot/${result.nftId}`} className="block hover:bg-card/70 transition-colors rounded-lg">
-                    <div className="flex items-center gap-3 p-3 bg-card border-2 border-primary/20 rounded-lg">
+                    <div className="flex items-center gap-3 p-3 bg-green-500/5 border-2 border-green-500/20 rounded-lg">
                       <div className="text-2xl font-bold w-8">
-                        {idx === 0 && '🥇'}
-                        {idx === 1 && '🥈'}
-                        {idx === 2 && '🥉'}
-                        {idx > 2 && `#${idx + 1}`}
+                        {position === 1 && '🥇'}
+                        {position === 2 && '🥈'}
+                        {position === 3 && '🥉'}
+                        {position > 3 && `#${position}`}
                       </div>
                       <img
                         src={imageUrl}
                         alt={`Bot #${result.nftId}`}
-                        className="w-12 h-12 rounded border-2 border-primary/40"
+                        className="w-12 h-12 rounded border-2 border-green-500/40"
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold"><BotName tokenIndex={Number(result.nftId)} /></p>
-                        <p className="text-sm text-muted-foreground">
-                          {result.finalTime !== undefined ? (
-                            isDNF ? (
-                              <span className="text-red-500 font-bold">DNF</span>
-                            ) : (
-                              <>
-                                {result.finalTime.toFixed(2)}s
-                                {timeGap && <span className="text-xs ml-1">(+{timeGap}s)</span>}
-                              </>
-                            )
-                          ) : (
-                            `Position ${idx + 1}`
-                          )}
+                        <p className="text-xs text-muted-foreground">
+                          {result.finalTime && result.finalTime < 100000 
+                            ? `${result.finalTime.toFixed(2)}s` 
+                            : 'DNF'}
                         </p>
                       </div>
-                      {result.prizeAmount !== undefined && result.prizeAmount > 0n && (
-                        <div className="text-right">
-                          <p className="text-sm text-green-500 font-bold">
-                            +{formatICP(result.prizeAmount)}
-                          </p>
-                        </div>
-                      )}
+                      <div className="text-right">
+                        <p className="text-sm text-green-500 font-bold">
+                          +{formatICP(result.prizeAmount)}
+                        </p>
+                      </div>
                     </div>
                   </Link>
                 );
-              })}
+                })}
+              </div>
             </div>
-          </div>
-          </>
-        )}
+            </>
+          );
+        })()}
       </CardContent>
 
       {/* Enter Race Dialog */}

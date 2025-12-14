@@ -867,7 +867,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
           <CardTitle className="flex flex-wrap items-center gap-2">
             <span className="whitespace-nowrap">🏁 Race Visualizer</span>
             <span className="text-sm font-normal text-muted-foreground whitespace-nowrap">
-              {getTerrainIcon(terrain)} {trackName}
+              {getTerrainIcon(terrain)} {trackName} • {distance}km
             </span>
             {/* Validation indicator */}
             <span className={`text-xs px-2 py-0.5 rounded-full border whitespace-nowrap ${

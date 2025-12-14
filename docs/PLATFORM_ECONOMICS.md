@@ -29,17 +29,22 @@ The platform takes 5% of all race entry fees before distributing the prize pool.
 - Platform tax: 1.6 × 5% = **0.08 ICP**
 - Prize pool: 1.6 - 0.08 = 1.52 ICP
 
-### 2. Upgrade Fees
-Players pay ICP for bot upgrades when not using scrap parts.
+### 2. Upgrade Fees (V2 System)
+Players pay ICP for bot upgrades with dynamic RNG-based pricing.
 
-**Pricing:**
-- 1 part = 3.33 ICP (production) / 0.033 ICP (testing)
-- Progressive costs: 3→5→8→12→18→25 parts per upgrade
-- Upgrade costs: 10 ICP → 17 ICP → 27 ICP → 40 ICP → 60 ICP
+**V2 Pricing:**
+- Formula: 0.5 + (currentStat/40)² × premiumMultiplier
+- Premium tiers: Scrap 0.7×, Elite 2.5×, God 3.5×
+- Cost progression examples:
+  - Scrap bot (15→30): 0.35 → 1.15 ICP per attempt
+  - Elite bot (65→80): 1.25 → 33+ ICP per attempt
+- 50% refund on failures (reduces effective cost)
+- Players can use parts instead (100 parts = 1 ICP)
 
 **Revenue per bot:**
-- Average player: 2-3 upgrades = **30-50 ICP** over bot lifetime
-- Competitive player: 4-5 upgrades = **90-150 ICP**
+- Casual player: 5-10 attempts = **5-20 ICP** (after refunds)
+- Competitive player: 15-25 attempts = **50-150 ICP**
+- Whale pushing +15: 20+ attempts = **200+ ICP**
 
 ### 3. Maintenance Services
 - **Recharge:** 0.1 ICP (restores +20 condition, +10 battery, 6hr cooldown)

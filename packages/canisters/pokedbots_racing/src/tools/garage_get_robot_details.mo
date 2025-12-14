@@ -3,6 +3,7 @@ import Principal "mo:base/Principal";
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
 import Int "mo:base/Int";
+import Float "mo:base/Float";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
 
@@ -139,22 +140,20 @@ module {
       // Generate terrain bonus explanation
       let terrainBonusNote = "PREFERRED TERRAIN: +5% all stats when racing on " # terrainText # ". This stacks with faction bonuses!";
 
-      // Generate upgrade mechanics explanation
-      let factionBonusDescription = switch (racingStats.faction) {
+      // Generate upgrade mechanics explanation for V2
+      let factionBonusText = switch (racingStats.faction) {
         case (#UltimateMaster or #Golden or #Ultimate) {
-          "10% chance to double gain (ultra-rare)";
+          "10% to double (ultra-rare)";
         };
-        case (#Wild) { "±2 variance instead of doubling (high variance)" };
-        case (#Blackhole or #Dead or #Master) {
-          "20% chance to double gain (super-rare)";
-        };
+        case (#Wild) { "±2 variance (wild)" };
+        case (#Blackhole or #Dead or #Master) { "20% to double (super-rare)" };
         case (#Bee or #Food or #Box or #Murder) {
-          "35% chance to double gain (rare, catch-up mechanic)";
+          "35% to double (rare catch-up)";
         };
-        case (_) { "25% chance to double gain (common)" };
+        case (_) { "25% to double (common)" };
       };
 
-      let upgradeMechanicsNote = "UPGRADE MECHANICS: Base gain = 1-3 points (1st upgrade: 1-3, 2nd-3rd: 1-2, 4th+: 1). Difficulty scaling: stats <60 get full bonus, 60-70 (×0.8), 70-80 (×0.6), 80-90 (×0.4), 90+ (×0.2). " # factionText # " faction bonus: " # factionBonusDescription # ". First 3 upgrades guaranteed ≥1 point, later upgrades can give 0.";
+      let upgradeMechanicsNote = "UPGRADE SYSTEM V2: Gacha-style RNG with dynamic costs. Success rates: 85% → 15% (attempts 1-15), then 8% → 1% (brutal soft cap). Pity system: +5% per consecutive fail (max +25%). Double lottery: 15% → 2% chance for +2 points (disabled after +15). Faction bonus: " # factionBonusText # ". 50% ICP refund on failures. Costs scale with stat: 0.5 + (stat/40)² × tier premium. See upgrade_costs_v2 below for exact costs.";
 
       // Check for active upgrade
       let now = Time.now();
@@ -198,17 +197,39 @@ module {
         stability = baseStats.stability + racingStats.stabilityBonus;
       };
 
-      // Calculate next upgrade costs for each stat (in parts and ICP)
-      let PART_PRICE_E8S = 1_000_000 : Nat; // 0.01 ICP per part (100 parts = 1 ICP)
-      let speedUpgradeCost = ctx.garageManager.calculateUpgradeCost(racingStats.speedUpgrades);
-      let powerCoreUpgradeCost = ctx.garageManager.calculateUpgradeCost(racingStats.powerCoreUpgrades);
-      let accelerationUpgradeCost = ctx.garageManager.calculateUpgradeCost(racingStats.accelerationUpgrades);
-      let stabilityUpgradeCost = ctx.garageManager.calculateUpgradeCost(racingStats.stabilityUpgrades);
+      // Calculate next upgrade costs using V2 dynamic formula
+      let speedUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
+        currentStats.speed - racingStats.speedBonus,
+        currentStats.speed,
+        overallRating,
+      );
+      let powerCoreUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
+        currentStats.powerCore - racingStats.powerCoreBonus,
+        currentStats.powerCore,
+        overallRating,
+      );
+      let accelerationUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
+        currentStats.acceleration - racingStats.accelerationBonus,
+        currentStats.acceleration,
+        overallRating,
+      );
+      let stabilityUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
+        currentStats.stability - racingStats.stabilityBonus,
+        currentStats.stability,
+        overallRating,
+      );
 
-      let speedUpgradeICP = (speedUpgradeCost * PART_PRICE_E8S) / 100_000_000;
-      let powerCoreUpgradeICP = (powerCoreUpgradeCost * PART_PRICE_E8S) / 100_000_000;
-      let accelerationUpgradeICP = (accelerationUpgradeCost * PART_PRICE_E8S) / 100_000_000;
-      let stabilityUpgradeICP = (stabilityUpgradeCost * PART_PRICE_E8S) / 100_000_000;
+      // Calculate success rates and pity bonus
+      let pityCounter = ctx.garageManager.getPityCounter(tokenIndex);
+      let speedAttempt = currentStats.speed - (currentStats.speed - racingStats.speedBonus);
+      let powerCoreAttempt = currentStats.powerCore - (currentStats.powerCore - racingStats.powerCoreBonus);
+      let accelerationAttempt = currentStats.acceleration - (currentStats.acceleration - racingStats.accelerationBonus);
+      let stabilityAttempt = currentStats.stability - (currentStats.stability - racingStats.stabilityBonus);
+
+      let speedSuccessRate = ctx.garageManager.calculateSuccessRate(speedAttempt, pityCounter);
+      let powerCoreSuccessRate = ctx.garageManager.calculateSuccessRate(powerCoreAttempt, pityCounter);
+      let accelerationSuccessRate = ctx.garageManager.calculateSuccessRate(accelerationAttempt, pityCounter);
+      let stabilitySuccessRate = ctx.garageManager.calculateSuccessRate(stabilityAttempt, pityCounter);
 
       // Generate image URLs
       let tokenId = ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId);
@@ -227,8 +248,8 @@ module {
           ("is_owner", Json.bool(true)),
           ("faction", Json.str(factionText)),
           ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability)), ("total_current", Json.int(currentStats.speed + currentStats.powerCore + currentStats.acceleration + currentStats.stability)), ("stats_at_100_percent", Json.obj([("speed", Json.int(statsAt100.speed)), ("power_core", Json.int(statsAt100.powerCore)), ("acceleration", Json.int(statsAt100.acceleration)), ("stability", Json.int(statsAt100.stability)), ("total_at_100", Json.int(statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability))])), ("base_speed", Json.int(baseStats.speed)), ("base_power_core", Json.int(baseStats.powerCore)), ("base_acceleration", Json.int(baseStats.acceleration)), ("base_stability", Json.int(baseStats.stability)), ("total_base", Json.int(baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability)), ("speed_bonus", Json.int(racingStats.speedBonus)), ("power_core_bonus", Json.int(racingStats.powerCoreBonus)), ("acceleration_bonus", Json.int(racingStats.accelerationBonus)), ("stability_bonus", Json.int(racingStats.stabilityBonus)), ("speed_upgrades", Json.int(racingStats.speedUpgrades)), ("power_core_upgrades", Json.int(racingStats.powerCoreUpgrades)), ("acceleration_upgrades", Json.int(racingStats.accelerationUpgrades)), ("stability_upgrades", Json.int(racingStats.stabilityUpgrades))])),
-          ("upgrade_costs", Json.obj([("speed_parts", Json.int(speedUpgradeCost)), ("speed_icp", Json.int(speedUpgradeICP)), ("power_core_parts", Json.int(powerCoreUpgradeCost)), ("power_core_icp", Json.int(powerCoreUpgradeICP)), ("acceleration_parts", Json.int(accelerationUpgradeCost)), ("acceleration_icp", Json.int(accelerationUpgradeICP)), ("stability_parts", Json.int(stabilityUpgradeCost)), ("stability_icp", Json.int(stabilityUpgradeICP))])),
-          ("upgrade_mechanics", Json.str(upgradeMechanicsNote)),
+          ("upgrade_costs_v2", Json.obj([("speed", Json.obj([("cost_e8s", Json.int(speedUpgradeCostE8s)), ("cost_icp", Json.str(Float.format(#fix 2, Float.fromInt(speedUpgradeCostE8s) / 100_000_000.0))), ("success_rate", Json.str(Float.format(#fix 1, speedSuccessRate) # "%"))])), ("power_core", Json.obj([("cost_e8s", Json.int(powerCoreUpgradeCostE8s)), ("cost_icp", Json.str(Float.format(#fix 2, Float.fromInt(powerCoreUpgradeCostE8s) / 100_000_000.0))), ("success_rate", Json.str(Float.format(#fix 1, powerCoreSuccessRate) # "%"))])), ("acceleration", Json.obj([("cost_e8s", Json.int(accelerationUpgradeCostE8s)), ("cost_icp", Json.str(Float.format(#fix 2, Float.fromInt(accelerationUpgradeCostE8s) / 100_000_000.0))), ("success_rate", Json.str(Float.format(#fix 1, accelerationSuccessRate) # "%"))])), ("stability", Json.obj([("cost_e8s", Json.int(stabilityUpgradeCostE8s)), ("cost_icp", Json.str(Float.format(#fix 2, Float.fromInt(stabilityUpgradeCostE8s) / 100_000_000.0))), ("success_rate", Json.str(Float.format(#fix 1, stabilitySuccessRate) # "%"))])), ("pity_counter", Json.int(pityCounter)), ("pity_bonus", Json.str("+" # Nat.toText(pityCounter * 5) # "%"))])),
+          ("upgrade_mechanics", Json.str("V2 Gacha System: Success rate decreases with attempts (85% → 15%). Pity system adds +5% per failure (max +25%). Successful upgrades have chance for double points (15% → 2%). Failed upgrades refund 50% of cost.")),
           (
             "condition",
             Json.obj([
@@ -277,15 +298,13 @@ module {
             switch (racingStats.activeMission) {
               case null { Json.obj([("status", Json.str("None"))]) };
               case (?mission) {
-                let timeRemaining = mission.endTime - now;
-                let hoursRemaining = timeRemaining / (60 * 60 * 1_000_000_000);
-                let minutesRemaining = (timeRemaining % (60 * 60 * 1_000_000_000)) / (60 * 1_000_000_000);
+                let elapsed = now - mission.startTime;
+                let hoursElapsed = elapsed / (60 * 60 * 1_000_000_000);
+                let minutesSinceAccumulation = (now - mission.lastAccumulation) / (60 * 1_000_000_000);
+                
+                let totalPending = mission.pendingParts.speedChips + mission.pendingParts.powerCoreFragments + mission.pendingParts.thrusterKits + mission.pendingParts.gyroModules + mission.pendingParts.universalParts;
 
-                let missionTypeText = switch (mission.missionType) {
-                  case (#ShortExpedition) { "ShortExpedition (5h)" };
-                  case (#DeepSalvage) { "DeepSalvage (11h)" };
-                  case (#WastelandExpedition) { "WastelandExpedition (23h)" };
-                };
+                let missionTypeText = "Continuous Scavenging";
 
                 let zoneText = switch (mission.zone) {
                   case (#ScrapHeaps) { "ScrapHeaps" };
@@ -293,16 +312,15 @@ module {
                   case (#DeadMachineFields) { "DeadMachineFields" };
                 };
 
-                let isComplete = now >= mission.endTime;
-
                 Json.obj([
-                  ("status", Json.str(if isComplete { "Ready to collect" } else { "In progress" })),
+                  ("status", Json.str("Active - collect anytime")),
                   ("mission_type", Json.str(missionTypeText)),
                   ("zone", Json.str(zoneText)),
-                  ("time_remaining_hours", Json.int(Int.abs(hoursRemaining))),
-                  ("time_remaining_minutes", Json.int(Int.abs(minutesRemaining))),
-                  ("end_time", Json.int(mission.endTime)),
-                  ("is_complete", Json.bool(isComplete)),
+                  ("hours_elapsed", Json.int(Int.abs(hoursElapsed))),
+                  ("minutes_since_last_accumulation", Json.int(Int.abs(minutesSinceAccumulation))),
+                  ("pending_parts", Json.int(totalPending)),
+                  ("start_time", Json.int(mission.startTime)),
+                  ("last_accumulation", Json.int(mission.lastAccumulation)),
                 ]);
               };
             },
