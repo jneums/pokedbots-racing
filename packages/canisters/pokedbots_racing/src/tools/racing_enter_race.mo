@@ -8,6 +8,7 @@ import Time "mo:base/Time";
 import Error "mo:base/Error";
 import Blob "mo:base/Blob";
 import Nat64 "mo:base/Nat64";
+import Array "mo:base/Array";
 
 import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
@@ -16,6 +17,7 @@ import ToolContext "ToolContext";
 import PokedBotsGarage "../PokedBotsGarage";
 import IcpLedger "../IcpLedger";
 import ExtIntegration "../ExtIntegration";
+import RacingSimulator "../RacingSimulator";
 
 module {
   let TRANSFER_FEE = 10000 : Nat;
@@ -161,6 +163,18 @@ module {
         return ToolContext.makeError("Bot does not meet race class requirements", cb);
       };
 
+      // Check if bot is already entered in this race BEFORE taking payment
+      let alreadyEntered = Array.find<RacingSimulator.RaceEntry>(
+        race.entries,
+        func(e : RacingSimulator.RaceEntry) : Bool { e.nftId == nftId },
+      );
+      switch (alreadyEntered) {
+        case (?_) {
+          return ToolContext.makeError("This bot is already entered in this race", cb);
+        };
+        case (null) {};
+      };
+
       // Process payment using ICRC-2 transfer_from
       let ledgerCanisterId = switch (ctx.icpLedgerCanisterId()) {
         case (?id) { id };
@@ -248,7 +262,7 @@ module {
                 ToolContext.makeSuccess(response, cb);
               };
               case (null) {
-                return ToolContext.makeError("Failed to enter race", cb);
+                return ToolContext.makeError("Failed to enter race - bot may already be entered, race may be full, or entry deadline has passed", cb);
               };
             };
           };

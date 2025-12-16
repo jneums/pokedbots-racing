@@ -14,29 +14,35 @@ import { getCanisterId, getHost } from './config.js';
  * @param identity Optional identity to use for the actor
  * @returns An actor instance for the specified canister
  */
-const createActor = <T>(
+const createActor = async <T>(
   idlFactoryFn: any,
   canisterId: string,
   identity?: Identity,
-): T => {
+): Promise<T> => {
+  console.log('[createActor] Starting for canister:', canisterId);
   const host = getHost();
   const isLocal =
     host.includes('localhost') ||
     host.includes('127.0.0.1') ||
     host.includes('host.docker.internal');
 
-  // In v3, use HttpAgent.createSync with shouldFetchRootKey for local development
-  // This will fetch the root key before the first request is made
-  const agent = HttpAgent.createSync({
+  console.log('[createActor] Creating HttpAgent, host:', host, 'isLocal:', isLocal);
+  
+  const agent = await HttpAgent.create({
     host,
     identity,
     shouldFetchRootKey: isLocal,
   });
+  console.log('[createActor] HttpAgent created successfully');
 
-  return Actor.createActor<T>(idlFactoryFn, {
+  console.log('[createActor] Creating actor...');
+  const actor = Actor.createActor<T>(idlFactoryFn, {
     agent,
     canisterId,
   });
+  console.log('[createActor] Actor created successfully');
+  
+  return actor;
 };
 
 /**
@@ -44,7 +50,7 @@ const createActor = <T>(
  * @param identity Optional identity to use for the actor
  * @returns An actor instance for the PokedBots Racing canister
  */
-export const getRacingActor = (identity?: Identity) => {
+export const getRacingActor = async (identity?: Identity) => {
   return createActor<PokedBotsRacing._SERVICE>(
     PokedBotsRacing.idlFactory,
     getCanisterId('POKEDBOTS_RACING'),
@@ -53,11 +59,11 @@ export const getRacingActor = (identity?: Identity) => {
 };
 
 /**
- * Gets an actor for the PokedBots NFTs (EXT) canister
+ * Gets an actor for the PokedBots NFTs canister
  * @param identity Optional identity to use for the actor
  * @returns An actor instance for the PokedBots NFTs canister
  */
-export const getNFTsActor = (identity?: Identity) => {
+export const getNFTsActor = async (identity?: Identity) => {
   return createActor<PokedBotsNFTs._SERVICE>(
     PokedBotsNFTs.idlFactory,
     getCanisterId('POKEDBOTS_NFTS'),
@@ -70,7 +76,7 @@ export const getNFTsActor = (identity?: Identity) => {
  * @param identity Optional identity to use for the actor
  * @returns An actor instance for the ICP Ledger canister
  */
-export const getLedgerActor = (identity?: Identity) => {
+export const getLedgerActor = async (identity?: Identity) => {
   return createActor<Ledger._SERVICE>(
     Ledger.idlFactory,
     getCanisterId('ICP_LEDGER'),

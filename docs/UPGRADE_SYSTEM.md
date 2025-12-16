@@ -325,11 +325,9 @@ let newStat = min(currentStat + actualGain, 100);
 
 ## Upgrade Constraints
 
-- Robot must have Battery ≥ 30
-- Robot must have Condition ≥ 50  
 - Only one upgrade session active per robot (12-hour cooldown while upgrade processes)
-- Upgrades consume 15 battery per session
 - Stat gains use progressive cost curve (3→5→8→12→18→25 parts for successive upgrades to same stat)
+- Upgrades can be started at any battery/condition level
 
 ---
 

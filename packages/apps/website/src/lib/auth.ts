@@ -5,6 +5,7 @@
 
 import { AuthClient } from '@dfinity/auth-client';
 import type { Identity } from '@dfinity/agent';
+import { HttpAgent } from '@dfinity/agent';
 import { clearPlugLedgerCache } from '@pokedbots-racing/ic-js';
 
 // Plug wallet global interface

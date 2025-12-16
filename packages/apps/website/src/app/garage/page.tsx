@@ -1,17 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { useMyBots, useUserInventory } from '../../hooks/useGarage';
+import { useMyBots, useUserInventory, useCollectionBonuses } from '../../hooks/useGarage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { WalletConnect } from '../../components/WalletConnect';
 import { BotCard } from '../../components/BotCard';
-import { RefreshCw, Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical } from 'lucide-react';
+import { Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { BotListItem } from '@pokedbots-racing/ic-js';
 import { Progress } from '../../components/ui/progress';
 import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
-import { generatetokenIdentifier } from '@pokedbots-racing/ic-js';
+import { generatetokenIdentifier, completeScavenging } from '@pokedbots-racing/ic-js';
+import { toast } from 'sonner';
 
 // Helper to format time remaining
 function formatTimeRemaining(timestampNanos: bigint): string {
@@ -32,6 +33,21 @@ function formatTimeRemaining(timestampNanos: bigint): string {
   return '< 1m';
 }
 
+// Convert upgrade type to display name
+function getUpgradeDisplayName(upgradeType: string): string {
+  const nameMap: Record<string, string> = {
+    'Velocity': 'Speed',
+    'velocity': 'Speed',
+    'PowerCore': 'Power',
+    'powerCore': 'Power',
+    'Thruster': 'Accel',
+    'thruster': 'Accel',
+    'Gyro': 'Stability',
+    'gyro': 'Stability',
+  };
+  return nameMap[upgradeType] || upgradeType;
+}
+
 export default function GaragePage() {
   const { isAuthenticated, user } = useAuth();
   const queryClient = useQueryClient();
@@ -39,10 +55,20 @@ export default function GaragePage() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [customOrder, setCustomOrder] = useState<string[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [recallingAll, setRecallingAll] = useState(false);
   
-  // Use React Query hooks
-  const { data: bots = [], isLoading: loading, error: botsError } = useMyBots();
+  // Per-bot loading states (keyed by tokenIndex)
+  const [botLoadingStates, setBotLoadingStates] = useState<Map<string, boolean>>(new Map());
+  const [botRechargingStates, setBotRechargingStates] = useState<Map<string, boolean>>(new Map());
+  const [botRepairingStates, setBotRepairingStates] = useState<Map<string, boolean>>(new Map());
+  
+  // Use React Query hooks - isFetching is true during both initial load and refetch
+  const { data: bots = [], isLoading, isFetching, error: botsError } = useMyBots();
   const { data: inventory, isLoading: inventoryLoading, refetch: refetchInventory } = useUserInventory();
+  const { data: bonuses, isLoading: bonusesLoading } = useCollectionBonuses();
+  
+  // Use isFetching for loading state (shows on both initial load and manual refetch)
+  const loading = isFetching;
 
   // Load favorites and custom order from localStorage
   useEffect(() => {
@@ -150,6 +176,44 @@ export default function GaragePage() {
   // Force immediate refetch of bots by invalidating cache
   const refetchBots = () => {
     queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+    // Also refetch inventory since maintenance affects parts
+    queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+  };
+
+  // Recall all scavengers
+  const handleRecallAll = async () => {
+    if (!user?.agent) return;
+    
+    const scavengingBots = bots.filter(bot => bot.activeMission);
+    if (scavengingBots.length === 0) {
+      toast.info('No bots are currently scavenging');
+      return;
+    }
+
+    setRecallingAll(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const bot of scavengingBots) {
+      try {
+        await completeScavenging(Number(bot.tokenIndex), user.agent as any);
+        successCount++;
+      } catch (err) {
+        console.error(`Failed to recall bot #${bot.tokenIndex}:`, err);
+        errorCount++;
+      }
+    }
+
+    setRecallingAll(false);
+    refetchBots();
+
+    if (errorCount === 0) {
+      toast.success(`Successfully recalled ${successCount} bot${successCount > 1 ? 's' : ''}`);
+    } else if (successCount > 0) {
+      toast.warning(`Recalled ${successCount} bot${successCount > 1 ? 's' : ''}, ${errorCount} failed`);
+    } else {
+      toast.error(`Failed to recall bots`);
+    }
   };
 
   const error = botsError ? (botsError instanceof Error ? botsError.message : 'Failed to load bots') : null;
@@ -167,7 +231,7 @@ export default function GaragePage() {
   if (!isAuthenticated) {
     return (
       <div className="container mx-auto px-4 py-12">
-        <Card className="max-w-2xl mx-auto">
+        <Card className="max-w-2xl mx-auto border-2 border-primary/20 bg-card/80 backdrop-blur">
           <CardHeader>
             <CardTitle className="text-3xl">Wasteland Garage</CardTitle>
             <CardDescription>
@@ -184,62 +248,143 @@ export default function GaragePage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-4xl font-bold mb-2">Wasteland Garage</h1>
-          <p className="text-muted-foreground">
-            Manage your racing machines. Repair, recharge, and upgrade your bots.
-          </p>
-        </div>
-        <Button onClick={() => refetchBots()} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </Button>
+      <div className="mb-6">
+        <h1 className="text-4xl font-bold mb-2">Wasteland Garage</h1>
+        <p className="text-muted-foreground">
+          Manage your racing machines. Repair, recharge, and upgrade your bots.
+        </p>
       </div>
 
-      {/* Parts Inventory - Compact */}
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+      <div className="grid md:grid-cols-2 gap-6 mb-6">
+        {/* Parts Inventory */}
+        <Card className="border-2 border-primary/20 bg-card/80 backdrop-blur">
+          <CardHeader className="pb-3">
             <CardTitle className="text-lg">Parts Inventory</CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => refetchInventory()}
-              disabled={inventoryLoading}
-            >
-              <RefreshCw className={`h-3 w-3 ${inventoryLoading ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 text-sm">
-            <div className="flex items-center gap-1">
-              <span className="font-semibold">{inventory ? Number(inventory.speedChips) : '—'}</span>
-              <span className="text-muted-foreground">SPD</span>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4 text-sm">
+              <div className="flex items-center gap-1">
+                <span className="font-semibold">{inventory ? Number(inventory.speedChips) : '—'}</span>
+                <span className="text-muted-foreground">SPD</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-semibold">{inventory ? Number(inventory.powerCoreFragments) : '—'}</span>
+                <span className="text-muted-foreground">PWR</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-semibold">{inventory ? Number(inventory.thrusterKits) : '—'}</span>
+                <span className="text-muted-foreground">ACC</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-semibold">{inventory ? Number(inventory.gyroModules) : '—'}</span>
+                <span className="text-muted-foreground">STB</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-primary">{inventory ? Number(inventory.universalParts) : '—'}</span>
+                <span className="text-primary">Universal</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="font-semibold">{inventory ? Number(inventory.powerCoreFragments) : '—'}</span>
-              <span className="text-muted-foreground">PWR</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="font-semibold">{inventory ? Number(inventory.thrusterKits) : '—'}</span>
-              <span className="text-muted-foreground">ACC</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="font-semibold">{inventory ? Number(inventory.gyroModules) : '—'}</span>
-              <span className="text-muted-foreground">STB</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="font-semibold text-primary">{inventory ? Number(inventory.universalParts) : '—'}</span>
-              <span className="text-primary">Universal</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        {/* Collection Bonuses (Faction Synergies) */}
+        <Card className="border-2 border-amber-500/20 bg-card/80 backdrop-blur">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Star className="h-4 w-4 text-amber-500" />
+              Collection Bonuses
+            </CardTitle>
+            <CardDescription className="text-xs">Apply to all your bots</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {bonusesLoading ? (
+              <p className="text-sm text-muted-foreground">Loading bonuses...</p>
+            ) : !bonuses || bots.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Collect faction bots for bonuses</p>
+            ) : (
+              <div className="space-y-2 text-sm">
+                {/* Stat Bonuses */}
+                {(bonuses.statBonuses.speed !== 0 || bonuses.statBonuses.powerCore !== 0 || 
+                  bonuses.statBonuses.acceleration !== 0 || bonuses.statBonuses.stability !== 0) && (
+                  <div className="flex flex-wrap gap-2">
+                    {bonuses.statBonuses.speed !== 0 && (
+                      <Badge variant="secondary" className="text-xs font-semibold">
+                        🏎️ +{bonuses.statBonuses.speed} SPD
+                      </Badge>
+                    )}
+                    {bonuses.statBonuses.powerCore !== 0 && (
+                      <Badge variant="secondary" className="text-xs font-semibold">
+                        ⚡ +{bonuses.statBonuses.powerCore} PWR
+                      </Badge>
+                    )}
+                    {bonuses.statBonuses.acceleration !== 0 && (
+                      <Badge variant="secondary" className="text-xs font-semibold">
+                        🚀 +{bonuses.statBonuses.acceleration} ACC
+                      </Badge>
+                    )}
+                    {bonuses.statBonuses.stability !== 0 && (
+                      <Badge variant="secondary" className="text-xs font-semibold">
+                        🎯 +{bonuses.statBonuses.stability} STB
+                      </Badge>
+                    )}
+                  </div>
+                )}
+
+                {/* Economic Bonuses */}
+                <div className="flex flex-wrap gap-2">
+                  {bonuses.costMultipliers.repair < 1 && (
+                    <Badge variant="outline" className="text-xs">
+                      🔧 -{Math.round((1 - bonuses.costMultipliers.repair) * 100)}% Repairs
+                    </Badge>
+                  )}
+                  {bonuses.costMultipliers.upgrade < 1 && (
+                    <Badge variant="outline" className="text-xs">
+                      💰 -{Math.round((1 - bonuses.costMultipliers.upgrade) * 100)}% Upgrades
+                    </Badge>
+                  )}
+                  {bonuses.costMultipliers.rechargeCooldown < 1 && (
+                    <Badge variant="outline" className="text-xs">
+                      ⏱️ -{Math.round((1 - bonuses.costMultipliers.rechargeCooldown) * 100)}% Cooldown
+                    </Badge>
+                  )}
+                  {bonuses.yieldMultipliers.parts > 1 && (
+                    <Badge variant="outline" className="text-xs text-green-600">
+                      📦 +{Math.round((bonuses.yieldMultipliers.parts - 1) * 100)}% Parts
+                    </Badge>
+                  )}
+                  {bonuses.yieldMultipliers.prizes > 1 && (
+                    <Badge variant="outline" className="text-xs text-green-600">
+                      🏆 +{Math.round((bonuses.yieldMultipliers.prizes - 1) * 100)}% Prizes
+                    </Badge>
+                  )}
+                  {bonuses.drainMultipliers.scavenging < 1 && (
+                    <Badge variant="outline" className="text-xs text-green-600">
+                      🛡️ -{Math.round((1 - bonuses.drainMultipliers.scavenging) * 100)}% Drain
+                    </Badge>
+                  )}
+                </div>
+
+                {/* No bonuses message */}
+                {bonuses.statBonuses.speed === 0 &&
+                 bonuses.statBonuses.powerCore === 0 &&
+                 bonuses.statBonuses.acceleration === 0 &&
+                 bonuses.statBonuses.stability === 0 &&
+                 bonuses.costMultipliers.repair >= 1 &&
+                 bonuses.costMultipliers.upgrade >= 1 &&
+                 bonuses.costMultipliers.rechargeCooldown >= 1 &&
+                 bonuses.yieldMultipliers.parts <= 1 &&
+                 bonuses.yieldMultipliers.prizes <= 1 &&
+                 bonuses.drainMultipliers.scavenging >= 1 && (
+                  <p className="text-xs text-muted-foreground">Collect more faction bots to unlock bonuses</p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {error && (
-        <Card className="mb-6 border-destructive">
+        <Card className="mb-6 border-2 border-destructive bg-card/80 backdrop-blur">
           <CardContent className="pt-6">
             <p className="text-destructive">{error}</p>
           </CardContent>
@@ -248,7 +393,7 @@ export default function GaragePage() {
 
       {loading && bots.length === 0 ? (
         <div className="flex flex-col lg:flex-row gap-6">
-          <Card className="w-full lg:w-[480px] shrink-0 animate-pulse">
+          <Card className="w-full lg:w-[480px] shrink-0 animate-pulse border-2 border-primary/20 bg-card/80 backdrop-blur">
             <CardHeader>
               <div className="h-6 bg-muted rounded w-3/4"></div>
             </CardHeader>
@@ -289,13 +434,25 @@ export default function GaragePage() {
       ) : (
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Bot List - Responsive */}
-          <Card className="w-full lg:w-[480px] shrink-0">
+          <Card className="w-full lg:w-[480px] shrink-0 border-2 border-primary/20 bg-card/80 backdrop-blur">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Your Bots ({bots.length})</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Your Bots ({bots.length})</CardTitle>
+                {bots.some(bot => bot.activeMission) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRecallAll}
+                    disabled={recallingAll}
+                  >
+                    {recallingAll ? 'Recalling...' : 'Recall All Scavengers'}
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div 
-                className="max-h-[calc(100vh-400px)] overflow-y-auto"
+                className="overflow-y-auto"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => e.preventDefault()}
               >
@@ -318,26 +475,15 @@ export default function GaragePage() {
                       } ${draggedIndex === index ? 'opacity-50' : ''}`}
                     >
                       <div 
-                        draggable="true"
-                        onDragStart={(e) => {
-                          handleDragStart(index);
-                        }}
+                        draggable
+                        onDragStart={() => handleDragStart(index)}
                         onDragEnd={handleDragEnd}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
                         className="px-2 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex items-center"
                       >
                         <GripVertical className="h-4 w-4" />
                       </div>
                       <button
                         onClick={() => setSelectedBotIndex(bot.tokenIndex)}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
                         className="flex-1 text-left px-2 py-3"
                       >
                         <div className="space-y-2">
@@ -351,19 +497,58 @@ export default function GaragePage() {
                               <div className="font-semibold truncate text-sm text-foreground">
                                 #{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}
                               </div>
-                              <div className="text-xs text-muted-foreground/60 mb-1">{factionName}</div>
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                                <span>{factionName}</span>
+                                {bot.stats?.eloRating !== undefined && (
+                                  <>
+                                    <span>•</span>
+                                    <span>
+                                      {Number(bot.stats.eloRating) >= 1800 ? 'Silent' :
+                                       Number(bot.stats.eloRating) >= 1600 ? 'Elite' :
+                                       Number(bot.stats.eloRating) >= 1400 ? 'Raider' :
+                                       Number(bot.stats.eloRating) >= 1200 ? 'Junker' : 'Scrap'}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
                               
                               {bot.stats && (
-                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                  <div className="flex items-center gap-1">
-                                    <Battery className="h-3 w-3" />
-                                    <span className="font-mono">{Number(bot.stats.battery)}%</span>
+                                <>
+                                  {/* Stats Row */}
+                                  <div className="flex items-center gap-2 text-xs mb-1">
+                                    <div className="flex items-center gap-0.5">
+                                      <span className="text-yellow-500">⚡</span>
+                                      <span className="font-mono text-yellow-500">{Number(bot.currentStats?.speed || bot.stats.baseStats.speed)}</span>
+                                      <span className="text-muted-foreground/40">/{Number(bot.maxStats?.speed || 24)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-0.5">
+                                      <span className="text-orange-500">💪</span>
+                                      <span className="font-mono text-orange-500">{Number(bot.currentStats?.powerCore || bot.stats.baseStats.powerCore)}</span>
+                                      <span className="text-muted-foreground/40">/{Number(bot.maxStats?.powerCore || 24)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-0.5">
+                                      <span className="text-blue-500">🚀</span>
+                                      <span className="font-mono text-blue-500">{Number(bot.currentStats?.acceleration || bot.stats.baseStats.acceleration)}</span>
+                                      <span className="text-muted-foreground/40">/{Number(bot.maxStats?.acceleration || 20)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-0.5">
+                                      <span className="text-red-500">🎯</span>
+                                      <span className="font-mono text-red-500">{Number(bot.currentStats?.stability || bot.stats.baseStats.stability)}</span>
+                                      <span className="text-muted-foreground/40">/{Number(bot.maxStats?.stability || 23)}</span>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-1">
-                                    <Wrench className="h-3 w-3" />
-                                    <span className="font-mono">{Number(bot.stats.condition)}%</span>
+                                  {/* Battery and Condition Row */}
+                                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                    <div className="flex items-center gap-1">
+                                      <Battery className="h-3 w-3" />
+                                      <span className="font-mono">{Number(bot.stats.battery)}%</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <Wrench className="h-3 w-3" />
+                                      <span className="font-mono">{Number(bot.stats.condition)}%</span>
+                                    </div>
                                   </div>
-                                </div>
+                                </>
                               )}
                             </div>
                           </div>
@@ -406,7 +591,7 @@ export default function GaragePage() {
                                     {bot.activeUpgrade && (
                                       <Badge variant="secondary" className="text-xs flex items-center gap-1">
                                         <Clock className="h-3 w-3" />
-                                        {Object.keys(bot.activeUpgrade.upgradeType)[0]} {formatTimeRemaining(bot.activeUpgrade.endsAt)}
+                                        {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])} {formatTimeRemaining(bot.activeUpgrade.endsAt)}
                                       </Badge>
                                     )}
                                     {bot.activeMission && (
@@ -447,9 +632,18 @@ export default function GaragePage() {
           {/* Right Panel - Bot Details */}
           <div className="flex-1 min-w-0">
             {selectedBot ? (
-              <BotCard bot={selectedBot} onUpdate={() => refetchBots()} />
+              <BotCard 
+                bot={selectedBot} 
+                onUpdate={() => refetchBots()}
+                loading={botLoadingStates.get(selectedBot.tokenIndex.toString()) || false}
+                setLoading={(val) => setBotLoadingStates(new Map(botLoadingStates.set(selectedBot.tokenIndex.toString(), val)))}
+                recharging={botRechargingStates.get(selectedBot.tokenIndex.toString()) || false}
+                setRecharging={(val) => setBotRechargingStates(new Map(botRechargingStates.set(selectedBot.tokenIndex.toString(), val)))}
+                repairing={botRepairingStates.get(selectedBot.tokenIndex.toString()) || false}
+                setRepairing={(val) => setBotRepairingStates(new Map(botRepairingStates.set(selectedBot.tokenIndex.toString(), val)))}
+              />
             ) : (
-              <Card>
+              <Card className="border-2 border-primary/20 bg-card/80 backdrop-blur">
                 <CardContent className="py-12 text-center">
                   <p className="text-muted-foreground">
                     Select a bot from the list to view details

@@ -10,6 +10,7 @@ import {
   getBotProfile,
   getBotRaceHistory,
   debugTestSimulation,
+  queryRaces,
   type ScheduledEvent,
   type Race,
 } from '@pokedbots-racing/ic-js';
@@ -167,5 +168,44 @@ export const useDebugTestSimulation = (
       return debugTestSimulation(tokenIndexes, trackId, trackSeed);
     },
     enabled: enabled && tokenIndexes.length > 0,
+  });
+};
+
+/**
+ * Query races with advanced filtering and pagination
+ */
+export const useQueryRaces = (filters: {
+  status?: 'Upcoming' | 'InProgress' | 'Completed' | 'Cancelled';
+  raceClass?: 'Scrap' | 'Junker' | 'Raider' | 'Elite' | 'SilentKlan';
+  terrain?: 'ScrapHeaps' | 'WastelandSand' | 'MetalRoads';
+  minEntries?: number;
+  maxEntries?: number;
+  hasMinimumEntries?: boolean;
+  minPrizePool?: number;
+  maxPrizePool?: number;
+  startTimeFrom?: bigint;
+  startTimeTo?: bigint;
+  limit?: number;
+  afterRaceId?: number;
+}, enabled: boolean = true) => {
+  // Convert BigInt values to strings for the query key to avoid serialization errors
+  const serializableFilters = {
+    ...filters,
+    startTimeFrom: filters.startTimeFrom?.toString(),
+    startTimeTo: filters.startTimeTo?.toString(),
+  };
+  
+  return useQuery({
+    queryKey: ['queryRaces', serializableFilters],
+    queryFn: async () => {
+      console.log('Fetching races with filters:', filters);
+      const result = await queryRaces(filters);
+      console.log('Query races result:', result);
+      return result;
+    },
+    enabled,
+    refetchInterval: 30000, // Refetch every 30 seconds
+    retry: 2, // Reduce retries
+    staleTime: 10000, // Consider data stale after 10 seconds
   });
 };

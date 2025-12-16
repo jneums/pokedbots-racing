@@ -141,24 +141,28 @@ export default function MarketplacePage() {
           </Alert>
         )}
 
-        {/* Filter Section */}
-        <Card className="mb-6">
-          <CardHeader 
-            className="cursor-pointer hover:bg-accent/50 transition-colors"
-            onClick={() => setFiltersOpen(!filtersOpen)}
-          >
-            <div className="flex items-center justify-between">
-              <CardTitle>Filters</CardTitle>
-              <ChevronDown 
-                className={`h-5 w-5 transition-transform duration-200 ${
-                  filtersOpen ? 'transform rotate-180' : ''
-                }`}
-              />
-            </div>
-          </CardHeader>
-          {filtersOpen && (
-          <CardContent>
-            <div className="flex flex-col gap-4">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Sidebar - Filters (Sticky on desktop) */}
+          <aside className="w-full lg:w-64 shrink-0">
+            <div className="lg:sticky lg:top-20 space-y-4">
+              {/* Mobile: Collapsible filters */}
+              <Card className="lg:hidden">
+                <CardHeader 
+                  className="cursor-pointer hover:bg-accent/50 transition-colors"
+                  onClick={() => setFiltersOpen(!filtersOpen)}
+                >
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Filters</CardTitle>
+                    <ChevronDown 
+                      className={`h-5 w-5 transition-transform duration-200 ${
+                        filtersOpen ? 'transform rotate-180' : ''
+                      }`}
+                    />
+                  </div>
+                </CardHeader>
+                {filtersOpen && (
+                  <CardContent>
+                    <div className="flex flex-col gap-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Min Price (ICP)</label>
@@ -254,46 +258,166 @@ export default function MarketplacePage() {
                   </SelectContent>
                 </Select>
               </div>
-              {(minPrice || maxPrice || minRating || maxRating || faction || raceClass) && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setMinPrice('');
-                    setMaxPrice('');
-                    setMinRating('');
-                    setMaxRating('');
-                    setFaction('');
-                    setRaceClass('');
-                  }}
-                  className="w-full sm:w-auto"
-                >
-                  Clear Filters
-                </Button>
-              )}
-            </div>
-          </CardContent>
-          )}
-        </Card>
+                      {(minPrice || maxPrice || minRating || maxRating || faction || raceClass) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setMinPrice('');
+                            setMaxPrice('');
+                            setMinRating('');
+                            setMaxRating('');
+                            setFaction('');
+                            setRaceClass('');
+                          }}
+                          className="w-full"
+                        >
+                          Clear Filters
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
 
-        {/* Sort Buttons with horizontal scroll on mobile */}
-        <div className="mb-6 overflow-x-auto">
-          <div className="flex gap-2 flex-nowrap min-w-min">
-            <Button
-              variant={sortBy === 'price' ? 'default' : 'outline'}
-              onClick={() => setSortBy('price')}
-              className="whitespace-nowrap"
-            >
-              Sort by Price
-            </Button>
-            <Button
-              variant={sortBy === 'rating' ? 'default' : 'outline'}
-              onClick={() => setSortBy('rating')}
-              className="whitespace-nowrap"
-            >
-              Sort by Rating
-            </Button>
-          </div>
-        </div>
+              {/* Desktop: Always visible filters */}
+              <Card className="hidden lg:block">
+                <CardHeader>
+                  <CardTitle>Filters</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium">Min Price (ICP)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 0.5"
+                        value={minPrice}
+                        onChange={(e) => setMinPrice(e.target.value)}
+                        className="px-3 py-2 border rounded-md bg-background"
+                        step="0.1"
+                        min="0"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium">Max Price (ICP)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 10"
+                        value={maxPrice}
+                        onChange={(e) => setMaxPrice(e.target.value)}
+                        className="px-3 py-2 border rounded-md bg-background"
+                        step="0.1"
+                        min="0"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium">Min Rating</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 20"
+                        value={minRating}
+                        onChange={(e) => setMinRating(e.target.value)}
+                        className="px-3 py-2 border rounded-md bg-background"
+                        step="1"
+                        min="0"
+                        max="100"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium">Max Rating</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 100"
+                        value={maxRating}
+                        onChange={(e) => setMaxRating(e.target.value)}
+                        className="px-3 py-2 border rounded-md bg-background"
+                        step="1"
+                        min="0"
+                        max="100"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium">Faction</label>
+                      <Select value={faction || 'all'} onValueChange={(value) => setFaction(value === 'all' ? '' : value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="All Factions" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          <SelectItem value="all">All Factions</SelectItem>
+                          <SelectItem value="UltimateMaster">UltimateMaster</SelectItem>
+                          <SelectItem value="Wild">Wild</SelectItem>
+                          <SelectItem value="Golden">Golden</SelectItem>
+                          <SelectItem value="Ultimate">Ultimate</SelectItem>
+                          <SelectItem value="Blackhole">Blackhole</SelectItem>
+                          <SelectItem value="Dead">Dead</SelectItem>
+                          <SelectItem value="Master">Master</SelectItem>
+                          <SelectItem value="Bee">Bee</SelectItem>
+                          <SelectItem value="Food">Food</SelectItem>
+                          <SelectItem value="Box">Box</SelectItem>
+                          <SelectItem value="Murder">Murder</SelectItem>
+                          <SelectItem value="Game">Game</SelectItem>
+                          <SelectItem value="Animal">Animal</SelectItem>
+                          <SelectItem value="Industrial">Industrial</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium">Race Class</label>
+                      <Select value={raceClass || 'all'} onValueChange={(value) => setRaceClass(value === 'all' ? '' : value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="All Classes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Classes</SelectItem>
+                          <SelectItem value="SilentKlan">👑 Silent Klan (50+)</SelectItem>
+                          <SelectItem value="Elite">🥇 Elite (40-49)</SelectItem>
+                          <SelectItem value="Raider">🥈 Raider (30-39)</SelectItem>
+                          <SelectItem value="Junker">🥉 Junker (20-29)</SelectItem>
+                          <SelectItem value="Scrap">🗑️ Scrap (&lt;20)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {(minPrice || maxPrice || minRating || maxRating || faction || raceClass) && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setMinPrice('');
+                          setMaxPrice('');
+                          setMinRating('');
+                          setMaxRating('');
+                          setFaction('');
+                          setRaceClass('');
+                        }}
+                        className="w-full"
+                      >
+                        Clear Filters
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </aside>
+
+          {/* Main Content Area */}
+          <div className="flex-1 min-w-0">
+            {/* Sort Buttons */}
+            <div className="mb-6 flex gap-2">
+              <Button
+                variant={sortBy === 'price' ? 'default' : 'outline'}
+                onClick={() => setSortBy('price')}
+                className="whitespace-nowrap"
+              >
+                Sort by Price
+              </Button>
+              <Button
+                variant={sortBy === 'rating' ? 'default' : 'outline'}
+                onClick={() => setSortBy('rating')}
+                className="whitespace-nowrap"
+              >
+                Sort by Rating
+              </Button>
+            </div>
 
           {error && (
             <Card className="mb-6 border-red-500">
@@ -425,6 +549,8 @@ export default function MarketplacePage() {
               )}
             </>
           )}
+          </div>
+        </div>
 
         <PurchaseDialog
           botNumber={purchaseDialog.tokenIndex ?? 0}

@@ -40,20 +40,20 @@ export default function Navigation() {
           
           {/* Desktop Navigation */}
           <nav className="hidden sm:flex items-center gap-6">
-            <Link to="/marketplace" className={linkClass('/marketplace')}>
-              Marketplace
+            <Link to="/leaderboard" className={linkClass('/leaderboard')}>
+              Leaderboard
             </Link>
             <Link to="/garage" className={linkClass('/garage')}>
               Garage
-            </Link>
-            <Link to="/leaderboard" className={linkClass('/leaderboard')}>
-              Leaderboard
             </Link>
             <Link to="/schedule" className={linkClass('/schedule')}>
               Schedule
             </Link>
             <Link to="/simulator" className={linkClass('/simulator')}>
               Simulator
+            </Link>
+            <Link to="/marketplace" className={linkClass('/marketplace')}>
+              Marketplace
             </Link>
             <WalletButton />
           </nav>
@@ -90,11 +90,11 @@ export default function Navigation() {
                   </div>
                   <div className="h-px bg-border mb-2" />
                   <Link 
-                    to="/marketplace" 
-                    className={mobileLinkClass('/marketplace')}
+                    to="/leaderboard" 
+                    className={mobileLinkClass('/leaderboard')}
                     onClick={() => setIsOpen(false)}
                   >
-                    Marketplace
+                    Leaderboard
                   </Link>
                   <Link 
                     to="/garage" 
@@ -102,13 +102,6 @@ export default function Navigation() {
                     onClick={() => setIsOpen(false)}
                   >
                     Garage
-                  </Link>
-                  <Link 
-                    to="/leaderboard" 
-                    className={mobileLinkClass('/leaderboard')}
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Leaderboard
                   </Link>
                   <Link 
                     to="/schedule" 
@@ -123,6 +116,13 @@ export default function Navigation() {
                     onClick={() => setIsOpen(false)}
                   >
                     Simulator
+                  </Link>
+                  <Link 
+                    to="/marketplace" 
+                    className={mobileLinkClass('/marketplace')}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Marketplace
                   </Link>
                   {isAuthenticated && (
                     <button

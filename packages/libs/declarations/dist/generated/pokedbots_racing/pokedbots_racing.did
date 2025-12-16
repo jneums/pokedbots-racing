@@ -145,6 +145,7 @@ type ScavengingZone =
  };
 type ScavengingMission = 
  record {
+   durationMinutes: opt nat;
    lastAccumulation: int;
    missionId: nat;
    pendingParts:
@@ -305,6 +306,19 @@ type PokedBotRacingStats =
    factionReputation: nat;
    lastDecayed: int;
    lastDiagnostics: opt int;
+   lastMissionRewards:
+    opt
+     record {
+       completedAt: int;
+       gyroModules: nat;
+       hoursOut: nat;
+       powerCoreFragments: nat;
+       speedChips: nat;
+       thrusterKits: nat;
+       totalParts: nat;
+       universalParts: nat;
+       zone: ScavengingZone;
+     };
    lastRaced: opt int;
    lastRecharged: opt int;
    lastRepaired: opt int;
@@ -589,6 +603,33 @@ type McpServer =
    /// List all API keys owned by the caller.
    ///    * @returns A list of API key metadata (but not the raw keys).
    list_my_api_keys: () -> (vec ApiKeyMetadata) query;
+   query_races: (filters:
+    record {
+      afterRaceId: opt nat;
+      eligibleForCaller: opt record {
+                               caller: principal;
+                               eligibleOnly: bool;
+                             };
+      hasMinimumEntries: opt bool;
+      limit: nat;
+      maxEntries: opt nat;
+      maxPrizePool: opt nat;
+      minEntries: opt nat;
+      minPrizePool: opt nat;
+      participantNftId: opt text;
+      participantPrincipal: opt principal;
+      raceClass: opt RaceClass;
+      startTimeFrom: opt int;
+      startTimeTo: opt int;
+      status: opt RaceStatus;
+      terrain: opt Terrain;
+    }) ->
+    (record {
+       hasMore: bool;
+       nextRaceId: opt nat;
+       races: vec Race;
+       totalMatching: nat;
+     }) query;
    recalculate_bot_stats: () -> (text);
    /// Revoke (delete) an API key owned by the caller.
    ///    * @param key_id The ID of the key to revoke.
@@ -653,6 +694,8 @@ type McpServer =
            wins: nat;
          };
      });
+   /// Cancel an in-progress upgrade and receive a full refund
+   web_cancel_upgrade: (tokenIndex: nat) -> (Result_1);
    /// Complete a scavenging mission and collect rewards (web method)
    web_complete_scavenging: (tokenIndex: nat) -> (Result_1);
    /// Enter a race (with ICRC-2 payment for entry fee)
@@ -676,6 +719,28 @@ type McpServer =
         winRate: float64;
         wins: nat;
       }) query;
+   /// Get faction synergy bonuses for the caller's collection
+   web_get_collection_bonuses: () ->
+    (record {
+       costMultipliers:
+        record {
+          rechargeCooldown: float64;
+          repair: float64;
+          upgrade: float64;
+        };
+       drainMultipliers: record {scavenging: float64;};
+       statBonuses:
+        record {
+          acceleration: int;
+          powerCore: int;
+          speed: int;
+          stability: int;
+        };
+       yieldMultipliers: record {
+                           parts: float64;
+                           prizes: float64;
+                         };
+     }) query;
    /// Get user's parts inventory
    web_get_user_inventory: () -> (UserInventory) query;
    /// Initialize a bot for racing (web equivalent of garage_initialize_pokedbot)
@@ -693,6 +758,15 @@ type McpServer =
             powerCore: nat;
             speed: nat;
             stability: nat;
+          };
+        eligibleRaces:
+         vec
+          record {
+            entryFee: nat;
+            name: text;
+            raceId: nat;
+            startTime: int;
+            terrain: Terrain;
           };
         isInitialized: bool;
         maxStats:
@@ -737,12 +811,76 @@ type McpServer =
                        };
           };
       });
+   /// List all PokedBots registered in the garage by the caller (QUERY - no EXT canister call)
+   /// Returns only bots that have been initialized for racing
+   /// Frontend should query EXT canister separately to show unregistered bots
+   web_list_my_registered_bots: () ->
+    (vec
+      record {
+        activeUpgrade: opt UpgradeSession;
+        currentStats:
+         record {
+           acceleration: nat;
+           powerCore: nat;
+           speed: nat;
+           stability: nat;
+         };
+        eligibleRaces:
+         vec
+          record {
+            entryFee: nat;
+            name: text;
+            raceId: nat;
+            startTime: int;
+            terrain: Terrain;
+          };
+        maxStats:
+         record {
+           acceleration: nat;
+           powerCore: nat;
+           speed: nat;
+           stability: nat;
+         };
+        name: opt text;
+        stats: PokedBotRacingStats;
+        tokenIndex: nat;
+        upcomingRaces:
+         vec
+          record {
+            entryFee: nat;
+            name: text;
+            raceId: nat;
+            startTime: int;
+            terrain: Terrain;
+          };
+        upgradeCostsV2:
+         record {
+           acceleration: record {
+                           costE8s: nat;
+                           successRate: float64;
+                         };
+           pityCounter: nat;
+           powerCore: record {
+                        costE8s: nat;
+                        successRate: float64;
+                      };
+           speed: record {
+                    costE8s: nat;
+                    successRate: float64;
+                  };
+           stability: record {
+                        costE8s: nat;
+                        successRate: float64;
+                      };
+         };
+      }) query;
    /// Recharge a bot's battery (0.1 ICP + fee via ICRC-2)
    web_recharge_bot: (tokenIndex: nat) -> (Result_1);
    /// Repair a bot to restore condition (0.05 ICP + fee via ICRC-2)
    web_repair_bot: (tokenIndex: nat) -> (Result_1);
    /// Start a scavenging mission (web method)
-   web_start_scavenging: (tokenIndex: nat, zone: text) -> (Result_1);
+   web_start_scavenging: (tokenIndex: nat, zone: text, durationMinutes:
+    opt nat) -> (Result_1);
    /// Upgrade a bot stat (via ICRC-2 payment or parts)
    web_upgrade_bot: (tokenIndex: nat, upgradeType: UpgradeType,
     paymentMethod: variant {

@@ -270,4 +270,12 @@ module {
     // Return a quote based on some pseudo-random selection
     quotes[0]; // For now, return first one. Could add randomization later
   };
+
+  public func cancelUpgrade(botName : Text, upgradeType : Text, refundInfo : Text) : Text {
+    "🛑 **UPGRADE CANCELLED**\n\n" #
+    "**" # botName # "** has aborted the " # upgradeType # " upgrade session.\n\n" #
+    "⏱️ All progress lost - the wasteland doesn't forgive hesitation.\n" #
+    "💰 " # refundInfo # "\n\n" #
+    "Your bot is ready for other operations. Time wasted, lesson learned.";
+  };
 };

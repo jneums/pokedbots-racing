@@ -19,7 +19,7 @@ export const getLeaderboard = async (
   limit: number = 100,
   identity?: Identity
 ): Promise<LeaderboardEntry[]> => {
-  const racingActor = getRacingActor(identity);
+  const racingActor = await getRacingActor(identity);
   const result = await racingActor.get_leaderboard(lbType, BigInt(limit));
   return result;
 };
@@ -36,7 +36,7 @@ export const getMyRanking = async (
   tokenIndex: number,
   identity?: Identity
 ): Promise<LeaderboardEntry | null> => {
-  const racingActor = getRacingActor(identity);
+  const racingActor = await getRacingActor(identity);
   const result = await racingActor.get_my_ranking(lbType, BigInt(tokenIndex));
   return result.length > 0 ? (result[0] ?? null) : null;
 };
@@ -48,7 +48,7 @@ export const getMyRanking = async (
 export const getCurrentPeriods = async (
   identity?: Identity
 ): Promise<{ seasonId: bigint; monthId: bigint }> => {
-  const racingActor = getRacingActor(identity);
+  const racingActor = await getRacingActor(identity);
   return await racingActor.get_current_periods();
 };
 

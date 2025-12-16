@@ -3,6 +3,7 @@ import Result "mo:base/Result";
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
 import Int "mo:base/Int";
+import Float "mo:base/Float";
 import Time "mo:base/Time";
 
 import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
@@ -44,16 +45,37 @@ module {
       let walletAccountId = ExtIntegration.principalToAccountIdentifier(userPrincipal, null);
       let tokensResult = await ExtIntegration.getOwnedTokens(ctx.extCanister, walletAccountId);
 
+      // Get user inventory first (always show this)
+      let inventory = ctx.garageManager.getUserInventory(userPrincipal);
+
       let message = switch (tokensResult) {
         case (#err(msg)) {
-          "🤖 Empty Garage\n\nNo PokedBots found in your wallet.\n\nWallet ID: " # walletAccountId;
+          var result = "🤖 Empty Garage\n\n";
+          result #= "📦 Parts Inventory:\n";
+          result #= "   🏎️  Speed Chips: " # Nat.toText(inventory.speedChips) # "\n";
+          result #= "   ⚡ Power Cells: " # Nat.toText(inventory.powerCoreFragments) # "\n";
+          result #= "   🚀 Thruster Kits: " # Nat.toText(inventory.thrusterKits) # "\n";
+          result #= "   🎯 Gyro Units: " # Nat.toText(inventory.gyroModules) # "\n";
+          result #= "   ⭐ Universal Parts: " # Nat.toText(inventory.universalParts) # "\n\n";
+          result #= "✨ Collection Bonuses:\n";
+          result #= "   None (collect faction bots for bonuses)\n\n";
+          result #= "No PokedBots found in your wallet.\n\nWallet ID: " # walletAccountId;
+          result;
         };
         case (#ok(tokens)) {
           if (tokens.size() == 0) {
-            "🤖 Empty Garage\n\nNo PokedBots found in your wallet.\n\nWallet ID: " # walletAccountId;
+            var result = "🤖 Empty Garage\n\n";
+            result #= "📦 Parts Inventory:\n";
+            result #= "   🏎️  Speed Chips: " # Nat.toText(inventory.speedChips) # "\n";
+            result #= "   ⚡ Power Cells: " # Nat.toText(inventory.powerCoreFragments) # "\n";
+            result #= "   🚀 Thruster Kits: " # Nat.toText(inventory.thrusterKits) # "\n";
+            result #= "   🎯 Gyro Units: " # Nat.toText(inventory.gyroModules) # "\n";
+            result #= "   ⭐ Universal Parts: " # Nat.toText(inventory.universalParts) # "\n\n";
+            result #= "✨ Collection Bonuses:\n";
+            result #= "   None (collect faction bots for bonuses)\n\n";
+            result #= "No PokedBots found in your wallet.\n\nWallet ID: " # walletAccountId;
+            result;
           } else {
-            // Get user inventory
-            let inventory = ctx.garageManager.getUserInventory(userPrincipal);
             var msg = "🤖 Your Garage\n\n";
 
             // Add inventory summary
@@ -64,6 +86,77 @@ module {
             msg #= "   🎯 Gyro Units: " # Nat.toText(inventory.gyroModules) # " (from WastelandSand races)\n";
             msg #= "   ⭐ Universal Parts: " # Nat.toText(inventory.universalParts) # "\n\n";
 
+            // Calculate and display collection bonuses (faction synergies)
+            let synergies = ctx.garageManager.calculateFactionSynergies(userPrincipal);
+            msg #= "✨ Collection Bonuses (apply to ALL bots):\n";
+
+            // Stat bonuses
+            var hasStatBonuses = false;
+            var totalSpeed : Nat = 0;
+            var totalPowerCore : Nat = 0;
+            var totalAccel : Nat = 0;
+            var totalStability : Nat = 0;
+            for ((faction, bonusStats) in synergies.statBonuses.vals()) {
+              totalSpeed += bonusStats.speed;
+              totalPowerCore += bonusStats.powerCore;
+              totalAccel += bonusStats.acceleration;
+              totalStability += bonusStats.stability;
+            };
+            if (totalSpeed > 0) {
+              msg #= "   🏎️  +" # Nat.toText(totalSpeed) # " Speed\n";
+              hasStatBonuses := true;
+            };
+            if (totalPowerCore > 0) {
+              msg #= "   ⚡ +" # Nat.toText(totalPowerCore) # " Power Core\n";
+              hasStatBonuses := true;
+            };
+            if (totalAccel > 0) {
+              msg #= "   🚀 +" # Nat.toText(totalAccel) # " Acceleration\n";
+              hasStatBonuses := true;
+            };
+            if (totalStability > 0) {
+              msg #= "   🎯 +" # Nat.toText(totalStability) # " Stability\n";
+              hasStatBonuses := true;
+            };
+
+            // Cost/yield bonuses
+            let upgradeDiscount = Float.toInt((1.0 - synergies.costMultipliers.upgradeCost) * 100.0);
+            let repairDiscount = Float.toInt((1.0 - synergies.costMultipliers.repairCost) * 100.0);
+            let cooldownReduction = Float.toInt((1.0 - synergies.costMultipliers.rechargeCooldown) * 100.0);
+            let partsBoost = Float.toInt((synergies.yieldMultipliers.scavengingParts - 1.0) * 100.0);
+            let prizeBoost = Float.toInt((synergies.yieldMultipliers.racePrizes - 1.0) * 100.0);
+            let drainReduction = Float.toInt((1.0 - synergies.drainMultipliers.scavengingDrain) * 100.0);
+
+            if (upgradeDiscount > 0) {
+              msg #= "   💰 -" # Int.toText(upgradeDiscount) # "% Upgrade Costs\n";
+              hasStatBonuses := true;
+            };
+            if (repairDiscount > 0) {
+              msg #= "   🔧 -" # Int.toText(repairDiscount) # "% Repair Costs\n";
+              hasStatBonuses := true;
+            };
+            if (cooldownReduction > 0) {
+              msg #= "   ⏱️  -" # Int.toText(cooldownReduction) # "% Recharge Cooldown\n";
+              hasStatBonuses := true;
+            };
+            if (partsBoost > 0) {
+              msg #= "   📦 +" # Int.toText(partsBoost) # "% Scavenging Parts\n";
+              hasStatBonuses := true;
+            };
+            if (prizeBoost > 0) {
+              msg #= "   🏆 +" # Int.toText(prizeBoost) # "% Race Prizes\n";
+              hasStatBonuses := true;
+            };
+            if (drainReduction > 0) {
+              msg #= "   🛡️  -" # Int.toText(drainReduction) # "% Scavenging Drain\n";
+              hasStatBonuses := true;
+            };
+
+            if (not hasStatBonuses) {
+              msg #= "   None (collect more faction bots for bonuses)\n";
+            };
+            msg #= "\n";
+
             msg #= "Found " # Nat32.toText(Nat32.fromNat(tokens.size())) # " PokedBot(s)\n\n";
 
             for (tokenIndex in tokens.vals()) {
@@ -72,6 +165,10 @@ module {
 
               // Get racing stats if initialized
               let robotStats = ctx.getStats(Nat32.toNat(tokenIndex));
+
+              // Calculate synergies once for this user (for cooldown display)
+              let synergies = ctx.garageManager.calculateFactionSynergies(userPrincipal);
+              let adjustedRechargeCooldown = Float.toInt(Float.fromInt(RECHARGE_COOLDOWN) * synergies.costMultipliers.rechargeCooldown);
 
               msg #= "🏎️ PokedBot #" # Nat32.toText(tokenIndex);
 
@@ -158,7 +255,7 @@ module {
                     case (?mission) {
                       let hoursElapsed = (now - mission.startTime) / (3600 * 1_000_000_000);
                       let totalPending = mission.pendingParts.speedChips + mission.pendingParts.powerCoreFragments + mission.pendingParts.thrusterKits + mission.pendingParts.gyroModules + mission.pendingParts.universalParts;
-                      
+
                       let zoneName = switch (mission.zone) {
                         case (#ScrapHeaps) { "ScrapHeaps" };
                         case (#AbandonedSettlements) { "AbandonedSettlements" };
@@ -169,11 +266,11 @@ module {
                     case (null) {};
                   };
 
-                  // Show service cooldowns
+                  // Show service cooldowns (using Food faction synergy adjusted cooldown)
                   msg #= "   ";
                   switch (stats.lastRecharged) {
                     case (?lastTime) {
-                      if (now - lastTime >= RECHARGE_COOLDOWN) {
+                      if (now - lastTime >= adjustedRechargeCooldown) {
                         msg #= "✅ Recharge: Ready";
                       } else {
                         msg #= "⏳ Recharge: On cooldown";

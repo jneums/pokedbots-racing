@@ -1,21 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BotListItem, initializeBot, rechargeBot, repairBot, generatetokenIdentifier, listBotForSale, unlistBot, transferBot, startScavenging, completeScavenging } from '@pokedbots-racing/ic-js';
+import { BotListItem, initializeBot, rechargeBot, repairBot, generatetokenIdentifier, listBotForSale, unlistBot, transferBot, startScavenging, completeScavenging, enterRace } from '@pokedbots-racing/ic-js';
 import { useAuth } from '../hooks/useAuth';
-import { useUpgradeBot } from '../hooks/useGarage';
+import { useUpgradeBot, useCancelUpgrade } from '../hooks/useGarage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { Battery, Wrench } from 'lucide-react';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Checkbox } from './ui/checkbox';
 
 interface BotCardProps {
   bot: BotListItem;
   onUpdate: () => void;
+  loading: boolean;
+  setLoading: (val: boolean) => void;
+  recharging: boolean;
+  setRecharging: (val: boolean) => void;
+  repairing: boolean;
+  setRepairing: (val: boolean) => void;
 }
 
 // Format time relative to now (e.g., "in 2h", "in 5m", "in 3d")
@@ -36,7 +44,22 @@ function formatRelativeTime(timestampNanos: bigint): string {
   return 'starting soon';
 }
 
-export function BotCard({ bot, onUpdate }: BotCardProps) {
+// Convert upgrade type to display name
+function getUpgradeDisplayName(upgradeType: string): string {
+  const nameMap: Record<string, string> = {
+    'Velocity': 'Speed',
+    'velocity': 'Speed',
+    'PowerCore': 'Power Core',
+    'powerCore': 'Power Core',
+    'Thruster': 'Acceleration',
+    'thruster': 'Acceleration',
+    'Gyro': 'Stability',
+    'gyro': 'Stability',
+  };
+  return nameMap[upgradeType] || upgradeType;
+}
+
+export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRecharging, repairing, setRepairing }: BotCardProps) {
   const { user } = useAuth();
   const upgradeMutation = useUpgradeBot();
   const [showInitialize, setShowInitialize] = useState(false);
@@ -45,14 +68,12 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showScavenging, setShowScavenging] = useState(false);
   const [upgradeType, setUpgradeType] = useState<'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro'>('Velocity');
-  const [paymentMethod, setPaymentMethod] = useState<'icp' | 'parts'>('icp');
+  const [paymentMethod, setPaymentMethod] = useState<'icp' | 'parts'>('parts');
   const [scavengingZone, setScavengingZone] = useState<'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields'>('ScrapHeaps');
+  const [scavengingDuration, setScavengingDuration] = useState<number | undefined>(undefined);
   const [botName, setBotName] = useState('');
   const [listPrice, setListPrice] = useState('');
   const [transferTo, setTransferTo] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [recharging, setRecharging] = useState(false);
-  const [repairing, setRepairing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleInitialize = async () => {
@@ -140,7 +161,7 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await startScavenging(Number(bot.tokenIndex), scavengingZone, user.agent as any);
+      const result = await startScavenging(Number(bot.tokenIndex), scavengingZone, user.agent as any, scavengingDuration);
       setShowScavenging(false);
       onUpdate();
       toast.success(result);
@@ -168,6 +189,21 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
       toast.error(errorMsg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const cancelUpgradeMutation = useCancelUpgrade();
+
+  const handleCancelUpgrade = async () => {
+    setError(null);
+    try {
+      const result = await cancelUpgradeMutation.mutateAsync(Number(bot.tokenIndex));
+      onUpdate();
+      toast.success(result);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to cancel upgrade';
+      setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
@@ -234,7 +270,7 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
   const formatWorldBuff = () => {
     if (!stats?.worldBuff || stats.worldBuff.length === 0) return null;
     const buff = stats.worldBuff[0];
-    const expiresAt = Number(buff.expiresAt) * 1000; // Convert seconds to milliseconds
+    const expiresAt = Number(buff.expiresAt) / 1_000_000; // Convert nanoseconds to milliseconds
     const now = Date.now();
     const remaining = expiresAt - now;
     
@@ -392,7 +428,7 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
   if (needsRegistration) {
     return (
       <>
-        <Card className="border-dashed">
+        <Card className="border-dashed border-2 border-primary/20 bg-card/80 backdrop-blur">
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
               <Avatar className="h-12 w-12">
@@ -465,7 +501,7 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
   const stats = bot.stats!;
 
   return (
-    <Card>
+    <Card className="border-2 border-primary/20 bg-card/80 backdrop-blur">
       <CardHeader>
         <CardTitle className="flex items-center gap-3">
           <Avatar className="h-16 w-16">
@@ -510,45 +546,53 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
         )}
 
         {/* Overcharge Status - Always visible to encourage usage */}
-        <div className={`p-3 rounded-lg space-y-2 ${
-          Number(stats.overcharge) > 0 
-            ? 'bg-cyan-500/10 border border-cyan-500/30' 
-            : 'bg-muted/50 border border-muted'
-        }`}>
-          <div className="flex justify-between items-center">
-            <span className={`text-sm font-semibold ${
-              Number(stats.overcharge) > 0 
-                ? 'text-cyan-600 dark:text-cyan-400' 
-                : 'text-muted-foreground'
+        {(() => {
+          const overcharge = Number(stats.overcharge);
+          const maxOvercharge = 40;
+          const percentOfMax = Math.round((overcharge / maxOvercharge) * 100);
+          
+          return (
+            <div className={`p-3 rounded-lg space-y-2 ${
+              overcharge > 0 
+                ? 'bg-cyan-500/10 border border-cyan-500/30' 
+                : 'bg-muted/50 border border-muted'
             }`}>
-              ⚡ Overcharge
-            </span>
-            <span className={`text-sm font-bold ${
-              Number(stats.overcharge) > 0 
-                ? 'text-cyan-600 dark:text-cyan-400' 
-                : 'text-muted-foreground'
-            }`}>
-              {Number(stats.overcharge)}%
-            </span>
-          </div>
-          <div className="w-full bg-cyan-900/20 rounded-full h-2">
-            <div
-              className="h-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all"
-              style={{ width: `${Math.min(Number(stats.overcharge), 75)}%` }}
-            />
-          </div>
-          {Number(stats.overcharge) > 0 ? (
-            <div className="text-xs space-y-0.5">
-              <p className="text-muted-foreground">Next race boost:</p>
-              <div className="flex justify-between">
-                <span className="text-green-600">+{(Number(stats.overcharge) * 0.3).toFixed(1)}% Speed/Accel</span>
-                <span className="text-red-600">-{(Number(stats.overcharge) * 0.2).toFixed(1)}% Power/Stab</span>
+              <div className="flex justify-between items-center">
+                <span className={`text-sm font-semibold ${
+                  overcharge > 0 
+                    ? 'text-cyan-600 dark:text-cyan-400' 
+                    : 'text-muted-foreground'
+                }`}>
+                  ⚡ Overcharge
+                </span>
+                <span className={`text-sm font-bold ${
+                  overcharge > 0 
+                    ? 'text-cyan-600 dark:text-cyan-400' 
+                    : 'text-muted-foreground'
+                }`}>
+                  {overcharge > 0 ? `${percentOfMax}%` : '0%'}
+                </span>
               </div>
+              <div className="w-full bg-cyan-900/20 rounded-full h-2">
+                <div
+                  className="h-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all"
+                  style={{ width: `${percentOfMax}%` }}
+                />
+              </div>
+              {overcharge > 0 ? (
+                <div className="text-xs space-y-0.5">
+                  <p className="text-muted-foreground">Next race boost:</p>
+                  <div className="flex justify-between">
+                    <span className="text-green-600">+{(overcharge * 0.15).toFixed(1)}% Speed/Accel</span>
+                    <span className="text-red-600">-{(overcharge * 0.1).toFixed(1)}% Power/Stab</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Recharge at low battery for bonus stats!</p>
+              )}
             </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">Recharge at low battery for bonus stats!</p>
-          )}
-        </div>
+          );
+        })()}
 
         {/* Current/Max Stats (pre-calculated by backend) */}
         {(() => {
@@ -565,19 +609,19 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
                   View full stats on detail page →
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="flex justify-between items-center p-2 bg-card/50 border border-primary/20 rounded">
+                  <div className="flex justify-between items-center p-2 bg-card/80 border border-primary/20 rounded">
                     <span className="text-muted-foreground">⚡ Speed</span>
                     <span className="font-bold">{speedUp > 0 ? `${speedUp} upgrades` : 'Base'}</span>
                   </div>
-                  <div className="flex justify-between items-center p-2 bg-card/50 border border-primary/20 rounded">
+                  <div className="flex justify-between items-center p-2 bg-card/80 border border-primary/20 rounded">
                     <span className="text-muted-foreground">💪 Power</span>
                     <span className="font-bold">{powerUp > 0 ? `${powerUp} upgrades` : 'Base'}</span>
                   </div>
-                  <div className="flex justify-between items-center p-2 bg-card/50 border border-primary/20 rounded">
+                  <div className="flex justify-between items-center p-2 bg-card/80 border border-primary/20 rounded">
                     <span className="text-muted-foreground">🚀 Accel</span>
                     <span className="font-bold">{accelUp > 0 ? `${accelUp} upgrades` : 'Base'}</span>
                   </div>
-                  <div className="flex justify-between items-center p-2 bg-card/50 border border-primary/20 rounded">
+                  <div className="flex justify-between items-center p-2 bg-card/80 border border-primary/20 rounded">
                     <span className="text-muted-foreground">🎯 Stability</span>
                     <span className="font-bold">{stabUp > 0 ? `${stabUp} upgrades` : 'Base'}</span>
                   </div>
@@ -603,7 +647,7 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
           return (
             <div className="space-y-2">
               <div className="grid grid-cols-4 gap-3">
-                <div className="flex flex-col items-center p-3 bg-card/50 border border-primary/20 rounded-lg">
+                <div className="flex flex-col items-center p-3 bg-card/80 border border-primary/20 rounded-lg">
                   <span className="text-2xl mb-1">⚡</span>
                   <span className="text-xs text-muted-foreground">Speed</span>
                   <span className={`text-lg font-bold ${currentSpeed < maxSpeed ? 'text-yellow-500' : ''}`}>
@@ -611,7 +655,7 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
                   </span>
                   <span className="text-xs text-muted-foreground">/{maxSpeed}</span>
                 </div>
-                <div className="flex flex-col items-center p-3 bg-card/50 border border-primary/20 rounded-lg">
+                <div className="flex flex-col items-center p-3 bg-card/80 border border-primary/20 rounded-lg">
                   <span className="text-2xl mb-1">💪</span>
                   <span className="text-xs text-muted-foreground">Power</span>
                   <span className={`text-lg font-bold ${currentPower < maxPower ? 'text-yellow-500' : ''}`}>
@@ -619,7 +663,7 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
                   </span>
                   <span className="text-xs text-muted-foreground">/{maxPower}</span>
                 </div>
-                <div className="flex flex-col items-center p-3 bg-card/50 border border-primary/20 rounded-lg">
+                <div className="flex flex-col items-center p-3 bg-card/80 border border-primary/20 rounded-lg">
                   <span className="text-2xl mb-1">🚀</span>
                   <span className="text-xs text-muted-foreground">Accel</span>
                   <span className={`text-lg font-bold ${currentAccel < maxAccel ? 'text-yellow-500' : ''}`}>
@@ -627,7 +671,7 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
                   </span>
                   <span className="text-xs text-muted-foreground">/{maxAccel}</span>
                 </div>
-                <div className="flex flex-col items-center p-3 bg-card/50 border border-primary/20 rounded-lg">
+                <div className="flex flex-col items-center p-3 bg-card/80 border border-primary/20 rounded-lg">
                   <span className="text-2xl mb-1">🎯</span>
                   <span className="text-xs text-muted-foreground">Stability</span>
                   <span className={`text-lg font-bold ${currentStability < maxStability ? 'text-yellow-500' : ''}`}>
@@ -644,99 +688,162 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
         })()}
 
         {/* Battery & Condition */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Battery</span>
-            <span className={Number(stats.battery) < 30 ? 'text-destructive font-bold' : ''}>
-              {formatBigInt(stats.battery)}%
-            </span>
-          </div>
-          <div className="w-full bg-secondary rounded-full h-2">
-            <div
-              className={`h-2 rounded-full transition-all ${
-                Number(stats.battery) < 30 ? 'bg-destructive' : 'bg-blue-500'
-              }`}
-              style={{ width: `${Number(stats.battery)}%` }}
-            />
+        <div className={`p-3 rounded-lg border space-y-3 ${
+          Number(stats.battery) < 30 || Number(stats.condition) < 30
+            ? 'bg-destructive/10 border-destructive/30' 
+            : 'bg-card/80 border-muted'
+        }`}>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Battery className={`h-4 w-4 ${Number(stats.battery) < 30 ? 'text-destructive' : 'text-blue-500'}`} />
+                <span className="text-sm font-semibold text-muted-foreground">Battery</span>
+              </div>
+              <span className={`text-sm font-bold ${Number(stats.battery) < 30 ? 'text-destructive' : 'text-blue-500'}`}>
+                {formatBigInt(stats.battery)}%
+              </span>
+            </div>
+            <div className="w-full bg-secondary rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all ${
+                  Number(stats.battery) < 30 ? 'bg-destructive' : 'bg-blue-500'
+                }`}
+                style={{ width: `${Number(stats.battery)}%` }}
+              />
+            </div>
           </div>
 
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Condition</span>
-            <span className={Number(stats.condition) < 30 ? 'text-destructive font-bold' : ''}>
-              {formatBigInt(stats.condition)}%
-            </span>
-          </div>
-          <div className="w-full bg-secondary rounded-full h-2">
-            <div
-              className={`h-2 rounded-full transition-all ${
-                Number(stats.condition) < 30 ? 'bg-destructive' : 'bg-green-500'
-              }`}
-              style={{ width: `${Number(stats.condition)}%` }}
-            />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Wrench className={`h-4 w-4 ${Number(stats.condition) < 30 ? 'text-destructive' : 'text-green-500'}`} />
+                <span className="text-sm font-semibold text-muted-foreground">Condition</span>
+              </div>
+              <span className={`text-sm font-bold ${Number(stats.condition) < 30 ? 'text-destructive' : 'text-green-500'}`}>
+                {formatBigInt(stats.condition)}%
+              </span>
+            </div>
+            <div className="w-full bg-secondary rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all ${
+                  Number(stats.condition) < 30 ? 'bg-destructive' : 'bg-green-500'
+                }`}
+                style={{ width: `${Number(stats.condition)}%` }}
+              />
+            </div>
           </div>
         </div>
 
         {/* Maintenance Actions */}
         <div className="space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              onClick={handleRecharge}
-              disabled={recharging || Number(stats.battery) >= 90 || !!bot.activeMission}
+          {(() => {
+            // Format time remaining for cooldown display
+            const formatTimeRemaining = (timestampMs: number): string => {
+              const now = Date.now();
+              const diffMs = timestampMs - now;
+              
+              if (diffMs <= 0) return 'Ready';
+              
+              const diffMinutes = Math.floor(diffMs / (1000 * 60));
+              const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+              
+              if (diffHours > 0) return `${diffHours}h ${diffMinutes % 60}m`;
+              if (diffMinutes > 0) return `${diffMinutes}m`;
+              return '< 1m';
+            };
+
+            // Check cooldowns
+            const now = Date.now();
+            const rechargeReady = stats.lastRecharged 
+              ? Number(stats.lastRecharged) / 1_000_000 + (6 * 60 * 60 * 1000)
+              : 0;
+            const repairReady = stats.lastRepaired
+              ? Number(stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
+              : 0;
+            const rechargeCooldown = rechargeReady > now;
+            const repairCooldown = repairReady > now;
+
+            return (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={handleRecharge}
+                    disabled={recharging || Number(stats.battery) >= 100 || !!bot.activeMission || rechargeCooldown}
+                    size="sm"
+                    variant="outline"
+                    title={
+                      bot.activeMission 
+                        ? "Cannot recharge while scavenging" 
+                        : rechargeCooldown 
+                          ? "Recharge on cooldown" 
+                          : ""
+                    }
+                  >
+                  {recharging ? (
+                    <>
+                      <span className="animate-spin mr-1">⚡</span>
+                      Recharging...
+                    </>
+                  ) : (
+                    '🔋 Recharge'
+                  )}
+                  </Button>
+                  <Button
+                    onClick={handleRepair}
+              disabled={repairing || Number(stats.condition) >= 100 || !!bot.activeMission || repairCooldown}
               size="sm"
               variant="outline"
-              title={bot.activeMission ? "Cannot recharge while scavenging" : ""}
-            >
-              {recharging ? (
-                <>
-                  <span className="animate-spin mr-1">⚡</span>
-                  Recharging...
-                </>
-              ) : (
-                '🔋 Recharge'
-              )}
-            </Button>
-            <Button
-              onClick={handleRepair}
-              disabled={repairing || Number(stats.condition) >= 90 || !!bot.activeMission}
-              size="sm"
-              variant="outline"
-              title={bot.activeMission ? "Cannot repair while scavenging" : ""}
-            >
-              {repairing ? (
-                <>
-                  <span className="animate-spin mr-1">🔧</span>
-                  Repairing...
-                </>
-              ) : (
-                '🔧 Repair'
-              )}
-            </Button>
-          </div>
+              title={
+                bot.activeMission 
+                  ? "Cannot repair while scavenging" 
+                  : repairCooldown 
+                    ? "Repair on cooldown" 
+                    : ""
+              }
+                  >
+                  {repairing ? (
+                    <>
+                      <span className="animate-spin mr-1">🔧</span>
+                      Repairing...
+                    </>
+                  ) : (
+                    '🔧 Repair'
+                  )}
+                  </Button>
+                </div>
           
-          {/* Full Maintenance Button */}
-          {(Number(stats.battery) < 90 || Number(stats.condition) < 90) && !bot.activeMission && (
-            <Button
-              onClick={handleFullMaintenance}
-              disabled={loading || recharging || repairing}
-              size="sm"
-              variant="secondary"
-              className="w-full"
-            >
-              {loading ? (
-                <>
-                  <span className="animate-spin mr-2">⚙️</span>
-                  Full Maintenance...
-                </>
-              ) : (
-                '⚙️ Full Maintenance (0.15 ICP)'
-              )}
-            </Button>
-          )}
+                {/* Full Maintenance Button */}
+                {(Number(stats.battery) < 100 || Number(stats.condition) < 100) && !bot.activeMission && (
+                  <Button
+                    onClick={handleFullMaintenance}
+                    disabled={loading || recharging || repairing || rechargeCooldown || repairCooldown}
+                    size="sm"
+                    variant="secondary"
+                    className="w-full"
+                  >
+                  {loading ? (
+                    <>
+                      <span className="animate-spin mr-2">⚙️</span>
+                      Full Maintenance...
+                    </>
+                  ) : (
+                    '⚙️ Full Maintenance (0.15 ICP)'
+                  )}
+                  </Button>
+                )}
           
-          {/* Helper text when maintenance is disabled */}
-          {bot.activeMission && (
-            <p className="text-xs text-muted-foreground text-center">⚠️ Maintenance unavailable while scavenging</p>
-          )}
+                {/* Helper text when maintenance is disabled */}
+                {bot.activeMission && (
+                  <p className="text-xs text-muted-foreground text-center">⚠️ Maintenance unavailable while scavenging</p>
+                )}
+                {(rechargeCooldown || repairCooldown) && !bot.activeMission && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    ⏳ {rechargeCooldown && `Recharge (${formatTimeRemaining(rechargeReady)})`}{rechargeCooldown && repairCooldown && " & "}{repairCooldown && `Repair (${formatTimeRemaining(repairReady)})`} on cooldown
+                  </p>
+                )}
+              </>
+            );
+          })()}
         </div>
 
 {(() => {
@@ -755,7 +862,7 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
                 <div className="text-xs space-y-1">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Current:</span>
-                    <span className="font-medium">{upgradeTypeName}</span>
+                    <span className="font-medium">{getUpgradeDisplayName(upgradeTypeName)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Status:</span>
@@ -781,17 +888,37 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
                     )}
                   </div>
                 </div>
-                {isComplete && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setShowUpgrade(true)}
-                    disabled={loading}
-                  >
-                    ⚡ Start Next Upgrade
-                  </Button>
-                )}
+                <div className="grid grid-cols-2 gap-2">
+                  {isComplete && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="col-span-2"
+                      onClick={() => setShowUpgrade(true)}
+                      disabled={loading}
+                    >
+                      ⚡ Start Next Upgrade
+                    </Button>
+                  )}
+                  {!isComplete && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="col-span-2"
+                      onClick={handleCancelUpgrade}
+                      disabled={cancelUpgradeMutation.isPending || loading}
+                    >
+                      {cancelUpgradeMutation.isPending ? (
+                        <>
+                          <span className="animate-spin mr-2">⚙️</span>
+                          Cancelling...
+                        </>
+                      ) : (
+                        '🛑 Cancel Upgrade (Full Refund)'
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
             );
           } else {
@@ -854,12 +981,37 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
             
             return (
               <div className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg space-y-2">
-                <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">🔍 Scavenging Active</p>
+                <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">🔍 Scavenging in Progress</p>
                 <div className="text-xs space-y-1">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Zone:</span>
                     <span className="font-medium">{Object.keys(mission.zone)[0]}</span>
                   </div>
+                  {mission.durationMinutes && mission.durationMinutes.length > 0 && (() => {
+                    const duration = Number(mission.durationMinutes[0]);
+                    const endTime = Number(mission.startTime) / 1_000_000 + (duration * 60 * 1000);
+                    const remaining = Math.max(0, endTime - Date.now());
+                    const remainingMinutes = Math.floor(remaining / 60000);
+                    const remainingHours = Math.floor(remainingMinutes / 60);
+                    const remainingMins = remainingMinutes % 60;
+                    
+                    return (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Duration:</span>
+                          <span className="font-medium">
+                            {duration < 60 ? `${duration}m` : `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? (duration % 60) + 'm' : ''}`}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Time Remaining:</span>
+                          <span className="font-medium text-orange-600">
+                            {remaining <= 0 ? 'Complete!' : remainingHours > 0 ? `${remainingHours}h ${remainingMins}m` : `${remainingMins}m`}
+                          </span>
+                        </div>
+                      </>
+                    );
+                  })()}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Time Elapsed:</span>
                     <span className="font-medium">
@@ -918,42 +1070,112 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
           }
         })()}
 
-        {/* Upcoming Races */}
-        {(() => {
-          if (bot.upcomingRaces && bot.upcomingRaces.length > 0) {
-            // Has races - show race list
-            return (
-              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-2">
-                <p className="text-sm font-semibold text-primary">🏁 Upcoming Races ({bot.upcomingRaces.length})</p>
-                {bot.upcomingRaces.map((race) => (
-                  <Link
-                    key={race.raceId}
-                    to="/schedule"
-                    className="w-full text-xs text-muted-foreground flex justify-between items-center hover:text-primary transition-colors cursor-pointer"
-                  >
-                    <span className="truncate max-w-[150px]">{race.name}</span>
-                    <span className="text-xs font-medium">
-                      {formatRelativeTime(race.startTime)}
-                    </span>
-                  </Link>
-                ))}
-                <Button
-                  className="w-full"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => window.location.href = '/schedule'}
-                >
-                  Find More Races
-                </Button>
+        {/* Last Mission Rewards Summary */}
+        {bot.stats?.lastMissionRewards && bot.stats.lastMissionRewards.length > 0 && (() => {
+          const reward = bot.stats.lastMissionRewards[0];
+          const totalParts = Number(reward.totalParts);
+          const completedAt = new Date(Number(reward.completedAt) / 1_000_000);
+          const timeAgo = Math.floor((Date.now() - completedAt.getTime()) / (1000 * 60));
+          const zoneName = Object.keys(reward.zone)[0];
+          
+          return (
+            <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-green-600 dark:text-green-400">✅ Last Mission Complete</p>
+                <span className="text-xs text-muted-foreground">
+                  {timeAgo < 60 ? `${timeAgo}m ago` : timeAgo < 1440 ? `${Math.floor(timeAgo / 60)}h ago` : `${Math.floor(timeAgo / 1440)}d ago`}
+                </span>
               </div>
-            );
-          } else {
-            // No races - show empty state with CTA
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Zone:</span>
+                  <span className="font-medium">{zoneName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Duration:</span>
+                  <span className="font-medium">{Number(reward.hoursOut)}h</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total Collected:</span>
+                  <span className="font-bold text-green-600">{totalParts} parts</span>
+                </div>
+                {totalParts > 0 && (
+                  <div className="text-xs text-muted-foreground pt-1 space-y-0.5 border-t border-muted/50 mt-2">
+                    {Number(reward.speedChips) > 0 && <div>⚡ {Number(reward.speedChips)} Speed Chips</div>}
+                    {Number(reward.powerCoreFragments) > 0 && <div>💪 {Number(reward.powerCoreFragments)} Power Fragments</div>}
+                    {Number(reward.thrusterKits) > 0 && <div>🚀 {Number(reward.thrusterKits)} Thruster Kits</div>}
+                    {Number(reward.gyroModules) > 0 && <div>🎯 {Number(reward.gyroModules)} Gyro Modules</div>}
+                    {Number(reward.universalParts) > 0 && <div>✨ {Number(reward.universalParts)} Universal Parts</div>}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Racing Section */}
+        {(() => {
+          const [selectedRaces, setSelectedRaces] = useState<Set<number>>(new Set());
+          const [enteringRaces, setEnteringRaces] = useState(false);
+
+
+          const handleToggleRace = (raceId: number) => {
+            const newSelected = new Set(selectedRaces);
+            if (newSelected.has(raceId)) {
+              newSelected.delete(raceId);
+            } else {
+              newSelected.add(raceId);
+            }
+            setSelectedRaces(newSelected);
+          };
+
+          const handleToggleAll = () => {
+            if (bot.eligibleRaces && selectedRaces.size === bot.eligibleRaces.length) {
+              setSelectedRaces(new Set());
+            } else if (bot.eligibleRaces) {
+              setSelectedRaces(new Set(bot.eligibleRaces.map(r => r.raceId)));
+            }
+          };
+
+          const handleEnterSelected = async () => {
+            if (!user?.agent || selectedRaces.size === 0) return;
+            
+            setEnteringRaces(true);
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const raceId of selectedRaces) {
+              try {
+                await enterRace(raceId, Number(bot.tokenIndex), user.agent as any);
+                successCount++;
+              } catch (error: any) {
+                console.error(`Failed to enter race ${raceId}:`, error);
+                failCount++;
+              }
+            }
+
+            setEnteringRaces(false);
+            setSelectedRaces(new Set());
+
+            if (successCount > 0) {
+              toast.success(`Entered ${successCount} race${successCount > 1 ? 's' : ''}!`);
+              onUpdate();
+            }
+            if (failCount > 0) {
+              toast.error(`Failed to enter ${failCount} race${failCount > 1 ? 's' : ''}`);
+            }
+          };
+
+          const hasEnteredRaces = bot.upcomingRaces && bot.upcomingRaces.length > 0;
+          const hasEligibleRaces = bot.eligibleRaces && bot.eligibleRaces.length > 0;
+
+          if (!hasEnteredRaces && !hasEligibleRaces) {
+            // No races at all - show empty state
             return (
               <div className="p-3 bg-muted/30 border border-muted rounded-lg space-y-2">
                 <p className="text-sm font-semibold text-muted-foreground">🏁 Racing</p>
                 <p className="text-xs text-muted-foreground">
-                  No upcoming races. Find a race that matches your bot's ELO rating!
+                  No races available. Check the schedule for upcoming races!
                 </p>
                 <Button
                   className="w-full"
@@ -966,6 +1188,92 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
               </div>
             );
           }
+
+          return (
+            <div className="space-y-2">
+              {/* Entered Races (informational, read-only) */}
+              {hasEnteredRaces && (
+                <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg space-y-2">
+                  <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                    ✓ Entered Races ({bot.upcomingRaces!.length})
+                  </p>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {bot.upcomingRaces!.map((race) => (
+                      <div
+                        key={race.raceId}
+                        className="p-2 rounded bg-green-500/5"
+                      >
+                        <Link
+                          to={`/race/${race.raceId}`}
+                          className="text-xs text-foreground hover:text-primary transition-colors block truncate font-medium"
+                        >
+                          {race.name}
+                        </Link>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{formatRelativeTime(race.startTime)}</span>
+                          <span>•</span>
+                          <span>{Number(race.entryFee) / 100_000_000} ICP</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Eligible Races (with checkboxes for entry) */}
+              {hasEligibleRaces && (
+                <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-2">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-semibold text-primary">
+                      🏁 Available Races ({bot.eligibleRaces!.length})
+                    </p>
+                    <button
+                      onClick={handleToggleAll}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {selectedRaces.size === bot.eligibleRaces!.length ? 'None' : 'All'}
+                    </button>
+                  </div>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {bot.eligibleRaces!.map((race) => (
+                      <div
+                        key={race.raceId}
+                        className="flex items-center gap-2 p-2 rounded hover:bg-primary/5 transition-colors"
+                      >
+                        <Checkbox
+                          checked={selectedRaces.has(race.raceId)}
+                          onCheckedChange={() => handleToggleRace(race.raceId)}
+                          disabled={enteringRaces}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <Link
+                            to={`/race/${race.raceId}`}
+                            className="text-xs text-foreground hover:text-primary transition-colors block truncate"
+                          >
+                            {race.name}
+                          </Link>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{formatRelativeTime(race.startTime)}</span>
+                            <span>•</span>
+                            <span>{Number(race.entryFee) / 100_000_000} ICP</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    variant="default"
+                    onClick={handleEnterSelected}
+                    disabled={selectedRaces.size === 0 || enteringRaces}
+                  >
+                    {enteringRaces ? 'Entering...' : `Enter Selected (${selectedRaces.size})`}
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
         })()}
 
         {/* Marketplace Actions */}
@@ -1108,15 +1416,66 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
+              <Label>Mission Duration (Optional)</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={scavengingDuration === undefined ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setScavengingDuration(undefined)}
+                  className="flex-1"
+                >
+                  ♾️ Continuous
+                </Button>
+                <Button
+                  type="button"
+                  variant={scavengingDuration === 15 ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setScavengingDuration(15)}
+                  className="flex-1"
+                >
+                  15 min
+                </Button>
+                <Button
+                  type="button"
+                  variant={scavengingDuration === 60 ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setScavengingDuration(60)}
+                  className="flex-1"
+                >
+                  1 hr
+                </Button>
+                <Button
+                  type="button"
+                  variant={scavengingDuration === 300 ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setScavengingDuration(300)}
+                  className="flex-1"
+                >
+                  5 hrs
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {scavengingDuration === undefined 
+                  ? 'Bot will scavenge until you manually collect rewards'
+                  : `Bot will auto-collect after ${scavengingDuration < 60 ? scavengingDuration + ' min' : (scavengingDuration / 60) + ' hr' + (scavengingDuration > 60 ? 's' : '')}`
+                }
+              </p>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="scavenging-zone">Scavenging Zone</Label>
               <Select value={scavengingZone} onValueChange={(value: any) => setScavengingZone(value)}>
-                <SelectTrigger id="scavenging-zone">
-                  <SelectValue />
+                <SelectTrigger id="scavenging-zone" className="w-full">
+                  <SelectValue>
+                    {scavengingZone === 'ScrapHeaps' && '🏜️ Scrap Heaps'}
+                    {scavengingZone === 'AbandonedSettlements' && '🏭 Abandoned Settlements'}
+                    {scavengingZone === 'DeadMachineFields' && '⚠️ Dead Machine Fields'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ScrapHeaps">🏜️ Scrap Heaps (Safe) - 40% Universal, 1.0x costs</SelectItem>
-                  <SelectItem value="AbandonedSettlements">🏭 Abandoned Settlements (Moderate) - 25% Universal, 1.2x battery, 1.3x condition</SelectItem>
-                  <SelectItem value="DeadMachineFields">⚠️ Dead Machine Fields (High Risk) - 10% Universal, 1.5x battery, 1.8x condition, 2.0x parts</SelectItem>
+                  <SelectItem value="ScrapHeaps">🏜️ Scrap Heaps (Safe)</SelectItem>
+                  <SelectItem value="AbandonedSettlements">🏭 Abandoned Settlements (Moderate)</SelectItem>
+                  <SelectItem value="DeadMachineFields">⚠️ Dead Machine Fields (High Risk)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1131,19 +1490,19 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Parts per Hour:</span>
                   <span className={scavengingZone === 'DeadMachineFields' ? 'text-orange-600 font-semibold' : ''}>
-                    ~{scavengingZone === 'ScrapHeaps' ? '8-12' : scavengingZone === 'AbandonedSettlements' ? '11-17' : '16-24'}
+                    ~{scavengingZone === 'ScrapHeaps' ? '20' : scavengingZone === 'AbandonedSettlements' ? '32' : '50'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Battery per Hour:</span>
                   <span className={scavengingZone === 'DeadMachineFields' ? 'text-red-600 font-semibold' : ''}>
-                    ~{scavengingZone === 'ScrapHeaps' ? '2' : scavengingZone === 'AbandonedSettlements' ? '2.4' : '3'}
+                    ~{scavengingZone === 'ScrapHeaps' ? '20' : scavengingZone === 'AbandonedSettlements' ? '40' : '70'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Condition per Hour:</span>
                   <span className={scavengingZone === 'DeadMachineFields' ? 'text-red-600 font-semibold' : ''}>
-                    ~{scavengingZone === 'ScrapHeaps' ? '0.5' : scavengingZone === 'AbandonedSettlements' ? '0.65' : '0.9'}
+                    ~{scavengingZone === 'ScrapHeaps' ? '8' : scavengingZone === 'AbandonedSettlements' ? '16' : '28'}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -1154,7 +1513,7 @@ export function BotCard({ bot, onUpdate }: BotCardProps) {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground pt-2">
-                💡 <strong>Continuous Scavenging:</strong> Parts accumulate automatically every 15 min. Retrieve your bot anytime to collect! Death risk increases with low battery/condition.
+                💡 <strong>Continuous Scavenging:</strong> Parts accumulate every 15 min. Retrieve anytime to collect! <strong>Rates shown are base values</strong> - your bot's faction and stats provide bonuses that reduce battery/condition costs and increase parts yield.
               </p>
             </div>
             {error && (

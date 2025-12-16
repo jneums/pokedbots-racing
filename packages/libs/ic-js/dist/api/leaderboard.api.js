@@ -8,7 +8,7 @@ import { getRacingActor } from '../actors.js';
  * @returns An array of LeaderboardEntry objects, sorted by rank
  */
 export const getLeaderboard = async (lbType, limit = 100, identity) => {
-    const racingActor = getRacingActor(identity);
+    const racingActor = await getRacingActor(identity);
     const result = await racingActor.get_leaderboard(lbType, BigInt(limit));
     return result;
 };
@@ -20,7 +20,7 @@ export const getLeaderboard = async (lbType, limit = 100, identity) => {
  * @returns The LeaderboardEntry for the bot, or null if not found
  */
 export const getMyRanking = async (lbType, tokenIndex, identity) => {
-    const racingActor = getRacingActor(identity);
+    const racingActor = await getRacingActor(identity);
     const result = await racingActor.get_my_ranking(lbType, BigInt(tokenIndex));
     return result.length > 0 ? (result[0] ?? null) : null;
 };
@@ -29,7 +29,7 @@ export const getMyRanking = async (lbType, tokenIndex, identity) => {
  * @param identity Optional identity to use for the actor
  */
 export const getCurrentPeriods = async (identity) => {
-    const racingActor = getRacingActor(identity);
+    const racingActor = await getRacingActor(identity);
     return await racingActor.get_current_periods();
 };
 /**

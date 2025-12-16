@@ -447,23 +447,28 @@ function RaceCard({ raceId }: { raceId: bigint }) {
           </div>
         )}
 
-        {/* Prize Distribution - Only show winners with prizes */}
+        {/* Race Results - All finishers */}
         {race.results && race.results.length > 0 && race.results[0] && 'Completed' in race.status && (() => {
           const finalResults = race.results[0];
-          const winnersWithPrizes = finalResults.filter((result: any) => result.prizeAmount && result.prizeAmount > 0n);
-          return winnersWithPrizes.length > 0 && (
+          const allFinishers = finalResults.filter((result: any) => result.finalTime && result.finalTime < 100000);
+          return allFinishers.length > 0 && (
             <>            
               <div className="space-y-2">
-                <p className="text-sm font-semibold">💰 Prize Distribution:</p>
+                <p className="text-sm font-semibold">🏁 Race Results:</p>
                 <div className="space-y-2">
-                  {winnersWithPrizes.map((result: any, idx: number) => {
+                  {allFinishers.map((result: any, idx: number) => {
                   const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(result.nftId));
                   const imageUrl = generateExtThumbnailLink(tokenId);
                   const position = finalResults.findIndex((r: any) => r.nftId === result.nftId) + 1;
+                  const hasPrize = result.prizeAmount && result.prizeAmount > 0n;
                 
                 return (
                   <Link key={idx} to={`/bot/${result.nftId}`} className="block hover:bg-card/70 transition-colors rounded-lg">
-                    <div className="flex items-center gap-3 p-3 bg-green-500/5 border-2 border-green-500/20 rounded-lg">
+                    <div className={`flex items-center gap-3 p-3 border-2 rounded-lg ${
+                      hasPrize 
+                        ? 'bg-green-500/5 border-green-500/20' 
+                        : 'bg-card/50 border-border/40'
+                    }`}>
                       <div className="text-2xl font-bold w-8">
                         {position === 1 && '🥇'}
                         {position === 2 && '🥈'}
@@ -473,21 +478,23 @@ function RaceCard({ raceId }: { raceId: bigint }) {
                       <img
                         src={imageUrl}
                         alt={`Bot #${result.nftId}`}
-                        className="w-12 h-12 rounded border-2 border-green-500/40"
+                        className={`w-12 h-12 rounded border-2 ${
+                          hasPrize ? 'border-green-500/40' : 'border-border/40'
+                        }`}
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold"><BotName tokenIndex={Number(result.nftId)} /></p>
                         <p className="text-xs text-muted-foreground">
-                          {result.finalTime && result.finalTime < 100000 
-                            ? `${result.finalTime.toFixed(2)}s` 
-                            : 'DNF'}
+                          {result.finalTime.toFixed(2)}s
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm text-green-500 font-bold">
-                          +{formatICP(result.prizeAmount)}
-                        </p>
-                      </div>
+                      {hasPrize && (
+                        <div className="text-right">
+                          <p className="text-sm text-green-500 font-bold">
+                            +{formatICP(result.prizeAmount)}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </Link>
                 );

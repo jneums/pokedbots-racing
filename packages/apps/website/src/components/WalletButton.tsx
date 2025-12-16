@@ -17,17 +17,17 @@ const WALLET_OPTIONS: { id: WalletProvider; name: string; description: string }[
   {
     id: 'identity',
     name: 'Internet Identity',
-    description: 'IC native authentication (v2)',
+    description: 'IC native authentication',
   },
   {
     id: 'nfid',
     name: 'NFID',
-    description: 'Modern wallet with email support',
+    description: 'Modern wallet with email',
   },
   {
     id: 'plug',
     name: 'Plug Wallet',
-    description: 'Browser extension wallet',
+    description: 'Browser extension',
   },
 ];
 

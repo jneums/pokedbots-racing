@@ -344,6 +344,35 @@ export interface McpServer {
   'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
   'icrc120_upgrade_finished' : ActorMethod<[], UpgradeFinishedResult>,
   'list_my_api_keys' : ActorMethod<[], Array<ApiKeyMetadata>>,
+  'query_races' : ActorMethod<
+    [
+      {
+        'afterRaceId' : [] | [bigint],
+        'status' : [] | [RaceStatus],
+        'participantPrincipal' : [] | [Principal],
+        'eligibleForCaller' : [] | [
+          { 'caller' : Principal, 'eligibleOnly' : boolean }
+        ],
+        'minPrizePool' : [] | [bigint],
+        'terrain' : [] | [Terrain],
+        'minEntries' : [] | [bigint],
+        'limit' : bigint,
+        'maxPrizePool' : [] | [bigint],
+        'startTimeTo' : [] | [bigint],
+        'hasMinimumEntries' : [] | [boolean],
+        'maxEntries' : [] | [bigint],
+        'startTimeFrom' : [] | [bigint],
+        'raceClass' : [] | [RaceClass],
+        'participantNftId' : [] | [string],
+      },
+    ],
+    {
+      'hasMore' : boolean,
+      'nextRaceId' : [] | [bigint],
+      'races' : Array<Race>,
+      'totalMatching' : bigint,
+    }
+  >,
   'recalculate_bot_stats' : ActorMethod<[], string>,
   'revoke_my_api_key' : ActorMethod<[string], undefined>,
   'set_ext_canister' : ActorMethod<[Principal], Result_3>,
@@ -406,6 +435,7 @@ export interface McpServer {
       >,
     }
   >,
+  'web_cancel_upgrade' : ActorMethod<[bigint], Result_1>,
   'web_complete_scavenging' : ActorMethod<[bigint], Result_1>,
   'web_enter_race' : ActorMethod<[bigint, bigint], Result_1>,
   'web_get_bot_details' : ActorMethod<[bigint], Result_2>,
@@ -428,6 +458,24 @@ export interface McpServer {
       }
     >
   >,
+  'web_get_collection_bonuses' : ActorMethod<
+    [],
+    {
+      'yieldMultipliers' : { 'prizes' : number, 'parts' : number },
+      'statBonuses' : {
+        'stability' : bigint,
+        'speed' : bigint,
+        'acceleration' : bigint,
+        'powerCore' : bigint,
+      },
+      'drainMultipliers' : { 'scavenging' : number },
+      'costMultipliers' : {
+        'repair' : number,
+        'upgrade' : number,
+        'rechargeCooldown' : number,
+      },
+    }
+  >,
   'web_get_user_inventory' : ActorMethod<[], UserInventory>,
   'web_initialize_bot' : ActorMethod<[bigint, [] | [string]], Result_1>,
   'web_list_my_bots' : ActorMethod<
@@ -446,6 +494,15 @@ export interface McpServer {
         'tokenIndex' : bigint,
         'isInitialized' : boolean,
         'name' : [] | [string],
+        'eligibleRaces' : Array<
+          {
+            'startTime' : bigint,
+            'terrain' : Terrain,
+            'name' : string,
+            'raceId' : bigint,
+            'entryFee' : bigint,
+          }
+        >,
         'currentOwner' : string,
         'stats' : [] | [PokedBotRacingStats],
         'upcomingRaces' : Array<
@@ -477,9 +534,60 @@ export interface McpServer {
       }
     >
   >,
+  'web_list_my_registered_bots' : ActorMethod<
+    [],
+    Array<
+      {
+        'activeUpgrade' : [] | [UpgradeSession],
+        'maxStats' : {
+          'stability' : bigint,
+          'speed' : bigint,
+          'acceleration' : bigint,
+          'powerCore' : bigint,
+        },
+        'tokenIndex' : bigint,
+        'name' : [] | [string],
+        'eligibleRaces' : Array<
+          {
+            'startTime' : bigint,
+            'terrain' : Terrain,
+            'name' : string,
+            'raceId' : bigint,
+            'entryFee' : bigint,
+          }
+        >,
+        'stats' : PokedBotRacingStats,
+        'upcomingRaces' : Array<
+          {
+            'startTime' : bigint,
+            'terrain' : Terrain,
+            'name' : string,
+            'raceId' : bigint,
+            'entryFee' : bigint,
+          }
+        >,
+        'currentStats' : {
+          'stability' : bigint,
+          'speed' : bigint,
+          'acceleration' : bigint,
+          'powerCore' : bigint,
+        },
+        'upgradeCostsV2' : {
+          'stability' : { 'successRate' : number, 'costE8s' : bigint },
+          'speed' : { 'successRate' : number, 'costE8s' : bigint },
+          'acceleration' : { 'successRate' : number, 'costE8s' : bigint },
+          'powerCore' : { 'successRate' : number, 'costE8s' : bigint },
+          'pityCounter' : bigint,
+        },
+      }
+    >
+  >,
   'web_recharge_bot' : ActorMethod<[bigint], Result_1>,
   'web_repair_bot' : ActorMethod<[bigint], Result_1>,
-  'web_start_scavenging' : ActorMethod<[bigint, string], Result_1>,
+  'web_start_scavenging' : ActorMethod<
+    [bigint, string, [] | [bigint]],
+    Result_1
+  >,
   'web_upgrade_bot' : ActorMethod<
     [bigint, UpgradeType, { 'icp' : null } | { 'parts' : null }],
     Result_1
@@ -506,6 +614,19 @@ export interface PokedBotRacingStats {
   'worldBuff' : [] | [WorldBuff],
   'wins' : bigint,
   'eloRating' : bigint,
+  'lastMissionRewards' : [] | [
+    {
+      'powerCoreFragments' : bigint,
+      'completedAt' : bigint,
+      'universalParts' : bigint,
+      'gyroModules' : bigint,
+      'zone' : ScavengingZone,
+      'speedChips' : bigint,
+      'totalParts' : bigint,
+      'thrusterKits' : bigint,
+      'hoursOut' : bigint,
+    }
+  ],
   'factionReputation' : bigint,
   'stabilityUpgrades' : bigint,
   'scavengingMissions' : bigint,
@@ -633,6 +754,7 @@ export interface ScavengingMission {
     'thrusterKits' : bigint,
   },
   'lastAccumulation' : bigint,
+  'durationMinutes' : [] | [bigint],
   'missionId' : bigint,
 }
 export type ScavengingZone = { 'AbandonedSettlements' : null } |

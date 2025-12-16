@@ -1,9 +1,20 @@
-import { type Identity } from '@icp-sdk/core/agent';
+import { type Identity, Actor, HttpAgent } from '@icp-sdk/core/agent';
 import { getRacingActor, getNFTsActor, getLedgerActor } from '../actors.js';
 import { PokedBotsRacing, PokedBotsNFTs, Ledger } from '@pokedbots-racing/declarations';
 import { Principal } from '@icp-sdk/core/principal';
-import { getCanisterId } from '../config.js';
+import { getCanisterId, getHost } from '../config.js';
 import { sha224 } from 'js-sha256';
+
+// Helper to safely stringify errors that may contain BigInt
+function stringifyError(err: any): string {
+  try {
+    return JSON.stringify(err, (_, value) =>
+      typeof value === 'bigint' ? value.toString() : value
+    );
+  } catch {
+    return String(err);
+  }
+}
 
 export interface MarketplaceListing {
   tokenIndex: number;
@@ -262,7 +273,7 @@ export async function purchaseMarketplaceBot(
   );
 
   if ('err' in lockResult) {
-    throw new Error(`Failed to lock NFT: ${JSON.stringify(lockResult.err)}`);
+    throw new Error(`Failed to lock NFT: ${stringifyError(lockResult.err)}`);
   }
 
   const paymentAddress = lockResult.ok;
@@ -282,7 +293,7 @@ export async function purchaseMarketplaceBot(
   });
 
   if ('Err' in transferResult) {
-    throw new Error(`Failed to transfer ICP: ${JSON.stringify(transferResult.Err)}`);
+    throw new Error(`Failed to transfer ICP: ${stringifyError(transferResult.Err)}`);
   }
 
   // Step 3: Settle the purchase to complete ownership transfer
@@ -482,7 +493,7 @@ export async function transferBot(
   if ('ok' in result) {
     return `Bot #${tokenIndex} transferred successfully`;
   } else {
-    const errMsg = 'err' in result ? JSON.stringify(result.err) : 'Unknown error';
+    const errMsg = 'err' in result ? stringifyError(result.err) : 'Unknown error';
     throw new Error(`Failed to transfer bot: ${errMsg}`);
   }
 }

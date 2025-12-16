@@ -608,39 +608,23 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     // Check for string key variant
     if ('InProgress' in raceStatus) return true;
     
-    // Check if it's Completed (means not live)
-    if ('Completed' in raceStatus) return false;
-    
-    // Fallback: check if race has started but no results yet
-    if (raceStartTime && (!results || results.length === 0 || !results[0]?.finalTime)) {
+    // Check if race started within the last hour (grace period for recently completed races)
+    if (raceStartTime) {
       const now = Date.now() * 1_000_000;
       const hasStarted = Number(raceStartTime) <= now;
-      const notTooOld = (now - Number(raceStartTime)) < (2 * 60 * 60 * 1_000_000_000); // Less than 2 hours ago
-      return hasStarted && notTooOld;
+      const withinGracePeriod = (now - Number(raceStartTime)) < (60 * 60 * 1_000_000_000); // Less than 1 hour ago
+      
+      // Show live view if race started and is within 1 hour, even if completed
+      if (hasStarted && withinGracePeriod) {
+        return true;
+      }
     }
     
     return false;
   }, [raceStatus, raceStartTime, results]);
   
-  // Calculate initial time for live mode
-  const getInitialTime = () => {
-    if (!isLive || !raceStartTime) return 0;
-    const now = Date.now() * 1_000_000; // Current time in nanoseconds
-    const elapsedNs = now - Number(raceStartTime);
-    const elapsedSeconds = elapsedNs / 1_000_000_000;
-    return Math.max(0, elapsedSeconds);
-  };
-  
-  // Calculate initial time based on mode: live races start at current time, completed races start at beginning
-  const getInitialDisplayTime = () => {
-    if (isLive) {
-      return getInitialTime(); // Live races show current elapsed time
-    }
-    return 0; // Completed races start at beginning
-  };
-  
-  const [isPlaying, setIsPlaying] = useState(isLive); // Auto-play only for live races
-  const [currentTime, setCurrentTime] = useState(getInitialDisplayTime());
+  const [isPlaying, setIsPlaying] = useState(false); // Start paused - user can manually play
+  const [currentTime, setCurrentTime] = useState(0); // Always start at beginning
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [liveMode, setLiveMode] = useState(isLive);
   const animationRef = useRef<number | undefined>(undefined);
@@ -742,11 +726,8 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
       setIsPlaying(false);
     }
     
-    // If it's a new live race, auto-play and set current time
-    if (isLive && raceStartTime) {
-      setCurrentTime(getInitialTime());
-      setIsPlaying(true);
-    }
+    // Live races start at beginning, paused - user controls playback
+    // No automatic time adjustment or auto-play
   }, [isLive, maxTime, raceStartTime]);
   
   useEffect(() => {

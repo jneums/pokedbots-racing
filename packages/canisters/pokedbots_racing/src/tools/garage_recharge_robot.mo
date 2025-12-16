@@ -25,7 +25,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_recharge_robot";
     title = ?"Recharge Robot Battery";
-    description = ?"Recharge robot battery. Costs 0.1 ICP + 0.0001 fee. Restores 75 battery. Does NOT restore condition (use garage_repair_robot). 6hr cooldown. Requires ICRC-2 approval.\n\n**OVERCHARGE MECHANIC:**\n• Base overcharge: (100 - battery) × 0.75, max 75%\n• Efficiency affected by CONDITION + RNG: 0.5 + (condition/200) + random(-0.2, +0.2)\n  - 100% condition: 80-120% efficiency (reliable)\n  - 50% condition: 55-95% efficiency (risky)\n  - 0% condition: 30-70% efficiency (wildcard)\n• Examples at 100% condition:\n  - 10% battery → 54-81% overcharge (avg 67.5%)\n  - 50% battery → 30-45% overcharge (avg 37.5%)\n• Overcharge consumed in next race for one-time stat boost:\n  - Speed: +0.3% per 1% overcharge (max +22.5% at 75%)\n  - Acceleration: +0.3% per 1% overcharge (max +22.5% at 75%)\n  - Stability: -0.2% per 1% overcharge (max -15% at 75%)\n  - Power Core: -0.2% per 1% overcharge (max -15% at 75%)\n• Strategic: Low battery + high condition = reliable big boost. Low condition = gambling!";
+    description = ?"Recharge robot battery. Costs 0.1 ICP + 0.0001 fee. Restores 75 battery. Does NOT restore condition (use garage_repair_robot). 6hr cooldown. Requires ICRC-2 approval.\n\n**OVERCHARGE MECHANIC:**\n• Base overcharge: (100 - battery) × 0.5, max 40%\n• Efficiency affected by CONDITION + RNG: 0.5 + (condition/200) + random(-0.2, +0.2)\n  - 100% condition: 80-120% efficiency (reliable)\n  - 50% condition: 55-95% efficiency (risky)\n  - 0% condition: 30-70% efficiency (wildcard)\n• Examples at 100% condition:\n  - 10% battery → 36-54% overcharge (avg 45%, capped at 40%)\n  - 50% battery → 20-30% overcharge (avg 25%)\n• Overcharge consumed in next race for one-time stat boost:\n  - Speed: +0.15% per 1% overcharge (max +6% at 40%)\n  - Acceleration: +0.15% per 1% overcharge (max +6% at 40%)\n  - Stability: -0.1% per 1% overcharge (max -4% at 40%)\n  - Power Core: -0.1% per 1% overcharge (max -4% at 40%)\n• ⚠️ REPAIR RESETS OVERCHARGE: Repairing clears overcharge to prevent exploit cycles\n• Strategic: Low battery + high condition = reliable boost. Overcharge much weaker than before!";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -91,13 +91,16 @@ module {
         case (null) {};
       };
 
-      // Check cooldown
+      // Check cooldown with Food faction synergy (reduces cooldown by 15-45%)
+      let synergies = ctx.garageManager.calculateFactionSynergies(user);
+      let adjustedCooldown = Float.toInt(Float.fromInt(RECHARGE_COOLDOWN) * synergies.costMultipliers.rechargeCooldown);
+
       let now = Time.now();
       switch (racingStats.lastRecharged) {
         case (?lastTime) {
           let timeSince = now - lastTime;
-          if (timeSince < RECHARGE_COOLDOWN) {
-            let hoursLeft = (RECHARGE_COOLDOWN - timeSince) / (60 * 60 * 1_000_000_000);
+          if (timeSince < adjustedCooldown) {
+            let hoursLeft = (adjustedCooldown - timeSince) / (60 * 60 * 1_000_000_000);
             return ToolContext.makeError("Recharge cooldown active. Hours remaining: " # Nat.toText(Int.abs(hoursLeft)), cb);
           };
         };

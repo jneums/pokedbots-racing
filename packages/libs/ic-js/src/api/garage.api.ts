@@ -1,9 +1,9 @@
 // packages/libs/ic-js/src/api/garage.api.ts
 
-import { type Identity, Actor } from '@icp-sdk/core/agent';
+import { type Identity, Actor, HttpAgent } from '@icp-sdk/core/agent';
 import { getRacingActor, getNFTsActor } from '../actors.js';
 import { PokedBotsRacing, PokedBotsNFTs } from '@pokedbots-racing/declarations';
-import { getCanisterId } from '../config.js';
+import { getCanisterId, getHost } from '../config.js';
 import { approveICRC2 } from './ledger.api.js';
 
 // Re-export types - use inline types to avoid version conflicts
@@ -38,9 +38,7 @@ async function getActor(identityOrAgent: IdentityOrAgent): Promise<PokedBotsRaci
   
   // It's a standard Identity - use our standard actor creation
   return getRacingActor(identityOrAgent as Identity);
-}
-
-// Helper to get NFTs actor from Identity or Plug agent
+}// Helper to get NFTs actor from Identity or Plug agent
 async function getNFTsActorFromAgent(identityOrAgent: IdentityOrAgent): Promise<PokedBotsNFTs._SERVICE> {
   // Check if it's a Plug agent - use window.ic.plug.createActor
   if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
@@ -90,6 +88,7 @@ export interface BotListItem {
     zone: { ScrapHeaps: null } | { AbandonedSettlements: null } | { DeadMachineFields: null };
     startTime: bigint;
     lastAccumulation: bigint;
+    durationMinutes: [] | [bigint];
     pendingParts: {
       speedChips: bigint;
       powerCoreFragments: bigint;
@@ -99,6 +98,13 @@ export interface BotListItem {
     };
   };
   upcomingRaces?: Array<{
+    raceId: number;
+    name: string;
+    startTime: bigint;
+    entryFee: bigint;
+    terrain: any;
+  }>;
+  eligibleRaces?: Array<{
     raceId: number;
     name: string;
     startTime: bigint;
@@ -123,7 +129,72 @@ export interface BotDetailsResponse {
 }
 
 /**
- * List all PokedBots owned by the authenticated user.
+ * List all PokedBots registered in the garage (QUERY - fast, no inter-canister calls).
+ * Returns only bots that have been initialized for racing.
+ * @param identity Required identity for authentication
+ * @returns Array of registered bot information
+ */
+export const listMyRegisteredBots = async (identityOrAgent: IdentityOrAgent): Promise<BotListItem[]> => {
+  const racingActor = await getActor(identityOrAgent);
+  const nftsActor = await getNFTsActorFromAgent(identityOrAgent);
+  
+  const result = await racingActor.web_list_my_registered_bots();
+  
+  // Get all marketplace listings to check if any of our bots are listed
+  let listingsMap = new Map<number, { price: number }>();
+  try {
+    const allListings = await nftsActor.listings();
+    allListings.forEach(([tokenIndex32, listing, _metadata]) => {
+      const tokenIndex = Number(tokenIndex32);
+      const priceICP = Number(listing.price) / 100_000_000;
+      listingsMap.set(tokenIndex, { price: priceICP });
+    });
+  } catch (err) {
+    console.warn('Failed to fetch listings:', err);
+  }
+  
+  return result.map(bot => {
+    const tokenIndex = Number(bot.tokenIndex);
+    const listingInfo = listingsMap.get(tokenIndex);
+    
+    // Extract activeMission from stats
+    const activeMission = bot.stats.activeMission && bot.stats.activeMission.length > 0 
+      ? bot.stats.activeMission[0] 
+      : undefined;
+    
+    return {
+      tokenIndex: bot.tokenIndex,
+      isInitialized: true, // All registered bots are initialized
+      name: bot.name.length > 0 ? bot.name[0] : undefined,
+      currentOwner: bot.stats.ownerPrincipal.toText(),
+      stats: bot.stats,
+      currentStats: bot.currentStats,
+      maxStats: bot.maxStats,
+      upgradeCostsV2: bot.upgradeCostsV2,
+      isListed: !!listingInfo,
+      listPrice: listingInfo?.price,
+      activeUpgrade: bot.activeUpgrade.length > 0 ? bot.activeUpgrade[0] : undefined,
+      activeMission,
+      upcomingRaces: bot.upcomingRaces.map(race => ({
+        raceId: Number(race.raceId),
+        name: race.name,
+        startTime: race.startTime,
+        entryFee: race.entryFee,
+        terrain: race.terrain,
+      })).sort((a, b) => Number(a.startTime - b.startTime)),
+      eligibleRaces: bot.eligibleRaces.map(race => ({
+        raceId: Number(race.raceId),
+        name: race.name,
+        startTime: race.startTime,
+        entryFee: race.entryFee,
+        terrain: race.terrain,
+      })).sort((a, b) => Number(a.startTime - b.startTime)),
+    };
+  });
+};
+
+/**
+ * List all PokedBots owned by the authenticated user (UPDATE - slow, calls EXT canister).
  * Also checks EXT canister for listing status.
  * @param identity Required identity for authentication
  * @returns Array of bot information with optional stats (if initialized)
@@ -182,7 +253,14 @@ export const listMyBots = async (identityOrAgent: IdentityOrAgent): Promise<BotL
         startTime: race.startTime,
         entryFee: race.entryFee,
         terrain: race.terrain,
-      })),
+      })).sort((a, b) => Number(a.startTime - b.startTime)),
+      eligibleRaces: bot.eligibleRaces.map(race => ({
+        raceId: Number(race.raceId),
+        name: race.name,
+        startTime: race.startTime,
+        entryFee: race.entryFee,
+        terrain: race.terrain,
+      })).sort((a, b) => Number(a.startTime - b.startTime)),
     };
   });
 };
@@ -336,6 +414,28 @@ export const upgradeBot = async (
 };
 
 /**
+ * Cancel an in-progress upgrade and receive a full refund.
+ * ICP refunds will be sent to your wallet (minus transfer fee).
+ * Parts refunds will be added back to your inventory.
+ * @param tokenIndex The token index of the bot with the active upgrade
+ * @param identityOrAgent Required identity for authentication
+ * @returns Success message or error
+ */
+export const cancelUpgrade = async (
+  tokenIndex: number,
+  identityOrAgent: IdentityOrAgent
+): Promise<string> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_cancel_upgrade(BigInt(tokenIndex));
+  
+  if ('ok' in result) {
+    return result.ok;
+  } else {
+    throw new Error(result.err);
+  }
+};
+
+/**
  * Enter a race with ICRC-2 payment for entry fee.
  * This function automatically handles the ICRC-2 approval before entering.
  * @param raceId The ID of the race to enter
@@ -383,6 +483,45 @@ export const getUserInventory = async (
 };
 
 /**
+ * Get collection bonuses (faction synergies) for the authenticated user
+ * @param identity Required identity for authentication
+ * @returns Collection bonuses including stat boosts, cost reductions, and yield increases
+ */
+export const getCollectionBonuses = async (
+  identityOrAgent: IdentityOrAgent
+): Promise<{
+  statBonuses: { speed: number; powerCore: number; acceleration: number; stability: number };
+  costMultipliers: { repair: number; upgrade: number; rechargeCooldown: number };
+  yieldMultipliers: { parts: number; prizes: number };
+  drainMultipliers: { scavenging: number };
+}> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_get_collection_bonuses();
+  
+  // Convert bigints to numbers for easier JS usage
+  return {
+    statBonuses: {
+      speed: Number(result.statBonuses.speed),
+      powerCore: Number(result.statBonuses.powerCore),
+      acceleration: Number(result.statBonuses.acceleration),
+      stability: Number(result.statBonuses.stability)
+    },
+    costMultipliers: {
+      repair: Number(result.costMultipliers.repair),
+      upgrade: Number(result.costMultipliers.upgrade),
+      rechargeCooldown: Number(result.costMultipliers.rechargeCooldown)
+    },
+    yieldMultipliers: {
+      parts: Number(result.yieldMultipliers.parts),
+      prizes: Number(result.yieldMultipliers.prizes)
+    },
+    drainMultipliers: {
+      scavenging: Number(result.drainMultipliers.scavenging)
+    }
+  };
+};
+
+/**
  * Purchase a bot from the marketplace using ICRC-2 payment.
  * User must approve the canister as spender before calling this.
  * @param tokenIndex The token index of the bot to purchase
@@ -418,13 +557,15 @@ export const approveIcpSpending = async (
 export const startScavenging = async (
   tokenIndex: number,
   zone: 'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields',
-  identityOrAgent: IdentityOrAgent
+  identityOrAgent: IdentityOrAgent,
+  durationMinutes?: number,
 ): Promise<string> => {
   const actor = await getActor(identityOrAgent);
   
   const result = await actor.web_start_scavenging(
     BigInt(tokenIndex),
-    zone
+    zone,
+    durationMinutes !== undefined ? [BigInt(durationMinutes)] : []
   );
   
   if ('ok' in result) {

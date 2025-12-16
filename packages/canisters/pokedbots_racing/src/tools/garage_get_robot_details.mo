@@ -197,26 +197,31 @@ module {
         stability = baseStats.stability + racingStats.stabilityBonus;
       };
 
-      // Calculate next upgrade costs using V2 dynamic formula
+      // Calculate next upgrade costs using V2 dynamic formula with Game faction synergy
+      let synergies = ctx.garageManager.calculateFactionSynergies(user);
       let speedUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
         currentStats.speed - racingStats.speedBonus,
         currentStats.speed,
         overallRating,
+        synergies.costMultipliers.upgradeCost,
       );
       let powerCoreUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
         currentStats.powerCore - racingStats.powerCoreBonus,
         currentStats.powerCore,
         overallRating,
+        synergies.costMultipliers.upgradeCost,
       );
       let accelerationUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
         currentStats.acceleration - racingStats.accelerationBonus,
         currentStats.acceleration,
         overallRating,
+        synergies.costMultipliers.upgradeCost,
       );
       let stabilityUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
         currentStats.stability - racingStats.stabilityBonus,
         currentStats.stability,
         overallRating,
+        synergies.costMultipliers.upgradeCost,
       );
 
       // Calculate success rates and pity bonus
@@ -301,7 +306,7 @@ module {
                 let elapsed = now - mission.startTime;
                 let hoursElapsed = elapsed / (60 * 60 * 1_000_000_000);
                 let minutesSinceAccumulation = (now - mission.lastAccumulation) / (60 * 1_000_000_000);
-                
+
                 let totalPending = mission.pendingParts.speedChips + mission.pendingParts.powerCoreFragments + mission.pendingParts.thrusterKits + mission.pendingParts.gyroModules + mission.pendingParts.universalParts;
 
                 let missionTypeText = "Continuous Scavenging";

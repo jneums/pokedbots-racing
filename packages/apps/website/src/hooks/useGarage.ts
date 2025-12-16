@@ -1,13 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  listMyBots,
+  listMyRegisteredBots,
   initializeBot,
   getBotDetails,
   rechargeBot,
   repairBot,
   upgradeBot,
+  cancelUpgrade,
   enterRace,
   getUserInventory,
+  getCollectionBonuses,
   listMyApiKeys,
   createApiKey,
   revokeApiKey,
@@ -18,7 +20,8 @@ import {
 import { useAuth } from './useAuth';
 
 /**
- * Hook to fetch user's bots
+ * Hook to fetch user's registered bots (QUERY - fast, no Plug popups)
+ * Only returns bots that have been initialized for racing
  */
 export function useMyBots() {
   const { user } = useAuth();
@@ -29,11 +32,12 @@ export function useMyBots() {
       if (!user?.agent) {
         throw new Error('Not authenticated');
       }
-      return listMyBots(user.agent);
+      return listMyRegisteredBots(user.agent);
     },
     enabled: !!user?.agent,
     staleTime: 30 * 1000, // 30 seconds - cache shared across pages
     gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache when unmounted
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds to keep data fresh
   });
 }
 
@@ -121,6 +125,28 @@ export function useRepairBot() {
 }
 
 /**
+ * Hook to cancel an in-progress upgrade
+ */
+export function useCancelUpgrade() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (tokenIndex: number) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return cancelUpgrade(tokenIndex, user.agent as any);
+    },
+    onSuccess: (_, tokenIndex) => {
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+    },
+  });
+}
+
+/**
  * Hook to enter a race
  */
 export function useEnterRace() {
@@ -190,6 +216,26 @@ export function useUserInventory() {
     },
     enabled: !!user?.agent,
     staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
+ * Hook to fetch collection bonuses (faction synergies)
+ */
+export function useCollectionBonuses() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['collection-bonuses', user?.principal],
+    queryFn: async () => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return getCollectionBonuses(user.agent);
+    },
+    enabled: !!user?.agent,
+    staleTime: 30 * 1000, // 30 seconds - sync with bot list
     gcTime: 5 * 60 * 1000, // 5 minutes
   });
 }

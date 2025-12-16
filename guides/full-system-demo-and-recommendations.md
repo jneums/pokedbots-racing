@@ -549,7 +549,6 @@ Elite natural stats: Top bots have 35-64 natural stats before any upgrades
 ❌ **Don't upgrade if:**
 - Already have 4+ upgrades to one stat (costs 40-83 ICP for +0-1 gain)
 - You have <25 ICP total budget (buy better bot instead)
-- Bot condition <50 or battery <30 (upgrade will fail)
 - You're about to sell the bot (buyers factor in base stats more)
 - Stat already maxed at 70 (can't upgrade further)
 

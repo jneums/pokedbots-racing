@@ -135,8 +135,9 @@ module {
         };
       };
 
-      // Calculate cost using V2 formula
-      let costE8s = ctx.garageManager.calculateUpgradeCostV2(baseStat, currentStatValue, overallRating);
+      // Calculate cost using V2 formula with Game faction synergy
+      let synergies = ctx.garageManager.calculateFactionSynergies(user);
+      let costE8s = ctx.garageManager.calculateUpgradeCostV2(baseStat, currentStatValue, overallRating, synergies.costMultipliers.upgradeCost);
       let totalCost = costE8s + TRANSFER_FEE;
 
       // Determine part type (for parts payment option)

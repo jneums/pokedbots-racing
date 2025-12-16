@@ -2,6 +2,8 @@ import Result "mo:base/Result";
 import Principal "mo:base/Principal";
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
+import Int "mo:base/Int";
+import Float "mo:base/Float";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
 import Error "mo:base/Error";
@@ -22,7 +24,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_repair_robot";
     title = ?"Repair Robot Condition";
-    description = ?"Repair a robot to restore condition. Costs 0.05 ICP + 0.0001 ICP transfer fee. Restores 25 Condition. Cooldown: 3 hours.";
+    description = ?"Repair a robot to restore condition. Costs 0.05 ICP + 0.0001 ICP transfer fee. Restores 25 Condition. Cooldown: 3 hours. ⚠️ RESETS OVERCHARGE to 0% (prevents repair->recharge exploit).";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -107,7 +109,11 @@ module {
       let icpLedger = actor (Principal.toText(ledgerId)) : actor {
         icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
       };
-      let totalCost = REPAIR_COST + TRANSFER_FEE;
+
+      // Apply Industrial faction synergy discount to repair cost
+      let synergies = ctx.garageManager.calculateFactionSynergies(user);
+      let repairCostWithSynergy = Nat.max(1_000_000, Int.abs(Float.toInt(Float.fromInt(REPAIR_COST) * synergies.costMultipliers.repairCost)));
+      let totalCost = repairCostWithSynergy + TRANSFER_FEE;
 
       try {
         let transferResult = await icpLedger.icrc2_transfer_from({
@@ -130,17 +136,19 @@ module {
             let updatedStats = {
               racingStats with
               condition = Nat.min(100, racingStats.condition + 25);
+              overcharge = 0; // Reset overcharge to prevent repair->recharge exploit
               lastRepaired = ?now;
             };
 
             ctx.garageManager.updateStats(tokenIndex, updatedStats);
 
+            let costIcp = Float.fromInt(repairCostWithSynergy) / 100_000_000.0;
             let response = Json.obj([
               ("token_index", Json.int(tokenIndex)),
               ("action", Json.str("Repair Condition")),
               ("condition_restored", Json.int(conditionRestored)),
               ("new_condition", Json.int(updatedStats.condition)),
-              ("cost_icp", Json.str("0.05")),
+              ("cost_icp", Json.str(Float.toText(costIcp))),
               ("message", Json.str("🔧 Repairs complete. Condition at " # Nat.toText(updatedStats.condition) # "%")),
             ]);
 

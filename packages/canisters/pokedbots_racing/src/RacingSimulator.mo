@@ -556,18 +556,20 @@ module {
       var results : [RaceResult] = [];
 
       // Add finishers with prizes
+      // Prize distribution curve: ensures top 3 profit, 4th breaks even
+      // Linear progression from 1st (45%) to 4th (9%)
       for (i in Iter.range(0, sorted.size() - 1)) {
         let (participant, time) = sorted[i];
         let position = i + 1;
 
         let prize = if (position == 1) {
-          (netPrizePool * 475) / 1000; // 47.5%
+          (netPrizePool * 45) / 100; // 45%
         } else if (position == 2) {
-          (netPrizePool * 2375) / 10000; // 23.75%
+          (netPrizePool * 28) / 100; // 28%
         } else if (position == 3) {
-          (netPrizePool * 1425) / 10000; // 14.25%
+          (netPrizePool * 18) / 100; // 18%
         } else if (position == 4) {
-          (netPrizePool * 95) / 1000; // 9.5%
+          (netPrizePool * 9) / 100; // 9%
         } else {
           0;
         };
@@ -633,18 +635,20 @@ module {
       var results : [RaceResult] = [];
 
       // Add finishers with prizes
+      // Prize distribution curve: ensures top 3 profit, 4th breaks even
+      // Linear progression from 1st (45%) to 4th (9%)
       for (i in Iter.range(0, sorted.size() - 1)) {
         let (participant, time) = sorted[i];
         let position = i + 1;
 
         let prize = if (position == 1) {
-          (netPrizePool * 475) / 1000; // 47.5%
+          (netPrizePool * 45) / 100; // 45%
         } else if (position == 2) {
-          (netPrizePool * 2375) / 10000; // 23.75%
+          (netPrizePool * 28) / 100; // 28%
         } else if (position == 3) {
-          (netPrizePool * 1425) / 10000; // 14.25%
+          (netPrizePool * 18) / 100; // 18%
         } else if (position == 4) {
-          (netPrizePool * 95) / 1000; // 9.5%
+          (netPrizePool * 9) / 100; // 9%
         } else {
           0;
         };
@@ -728,11 +732,23 @@ module {
       nextRaceId += 1;
 
       let now = Time.now();
-      let sim = RaceSimulator();
-      let duration = sim.calculateRaceDuration(distance, terrain);
 
-      // Select track based on terrain and distance
+      // Select track based on terrain and distance hint
       let trackId = selectTrackForRace(terrain, distance, raceId);
+
+      // Get the actual track to use its real totalDistance
+      let actualDistance = switch (getTrack(trackId)) {
+        case (?track) {
+          // Convert meters to km (rounded)
+          (track.totalDistance + 500) / 1000; // +500 for rounding
+        };
+        case (null) {
+          distance; // Fallback to passed distance if track not found
+        };
+      };
+
+      let sim = RaceSimulator();
+      let duration = sim.calculateRaceDuration(actualDistance, terrain);
 
       // trackSeed will be generated at race finish using IC random beacon
       // This prevents pre-simulation of race outcomes
@@ -741,7 +757,7 @@ module {
       let race : Race = {
         raceId = raceId;
         name = generateRaceName(raceId, terrain, raceClass);
-        distance = distance;
+        distance = actualDistance; // Use track's actual distance
         terrain = terrain;
         trackId = trackId;
         trackSeed = trackSeed;
@@ -842,27 +858,42 @@ module {
     ) : ?Race {
       switch (getRace(raceId)) {
         case (?race) {
-          let entry : RaceEntry = {
-            nftId = nftId;
-            owner = owner;
-            entryFee = race.entryFee;
-            enteredAt = now;
-            stats = null; // Stats snapshot added at race start
+          // Check if this bot is already entered in this race
+          let alreadyEntered = Array.find<RaceEntry>(
+            race.entries,
+            func(e : RaceEntry) : Bool { e.nftId == nftId },
+          );
+
+          switch (alreadyEntered) {
+            case (?_) {
+              // Bot is already entered, return null to indicate failure
+              return null;
+            };
+            case (null) {
+              // Bot not entered yet, proceed with entry
+              let entry : RaceEntry = {
+                nftId = nftId;
+                owner = owner;
+                entryFee = race.entryFee;
+                enteredAt = now;
+                stats = null; // Stats snapshot added at race start
+              };
+
+              let newEntries = Array.append<RaceEntry>(race.entries, [entry]);
+              let newPrizePool = race.prizePool + race.entryFee;
+              let newTax = (newPrizePool * 5) / 100;
+
+              let updatedRace = {
+                race with
+                entries = newEntries;
+                prizePool = newPrizePool;
+                platformTax = newTax;
+              };
+
+              ignore Map.put(races, nhash, raceId, updatedRace);
+              ?updatedRace;
+            };
           };
-
-          let newEntries = Array.append<RaceEntry>(race.entries, [entry]);
-          let newPrizePool = race.prizePool + race.entryFee;
-          let newTax = (newPrizePool * 5) / 100;
-
-          let updatedRace = {
-            race with
-            entries = newEntries;
-            prizePool = newPrizePool;
-            platformTax = newTax;
-          };
-
-          ignore Map.put(races, nhash, raceId, updatedRace);
-          ?updatedRace;
         };
         case (null) { null };
       };

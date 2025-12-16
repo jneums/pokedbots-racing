@@ -118,10 +118,9 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
   };
   isPastEvent?: boolean;
 }) {
-  const totalPrizePool = Number(event.metadata.prizePoolBonus) + 
-                         (Number(event.metadata.entryFee) * Number(event.raceIds.length));
-
   const now = new Date();
+  const scheduledTime = new Date(Number(event.scheduledTime) / 1_000_000);
+  const hasStarted = now >= scheduledTime;
   const registrationClosesDate = new Date(Number(event.registrationCloses) / 1_000_000);
   const isRegistrationOpen = now < registrationClosesDate && 'RegistrationOpen' in event.status;
   
@@ -146,7 +145,7 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
     `${Math.min(...raceSummary.distances.map(Number))}${Math.max(...raceSummary.distances.map(Number)) !== Math.min(...raceSummary.distances.map(Number)) ? `-${Math.max(...raceSummary.distances.map(Number))}` : ''}km` : null;
 
   return (
-    <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur">
+    <Card className={`border-2 ${hasStarted && !isPastEvent ? 'border-orange-500/40 bg-orange-950/20' : 'border-primary/20 bg-card/50'} hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 backdrop-blur`}>
       <CardHeader>
         <div className="flex justify-between items-start">
           <div className="space-y-2 flex-1">
@@ -158,7 +157,13 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
                   <Badge variant="outline" className="bg-primary/20 text-primary font-mono text-sm">
                     {formatDate(event.scheduledTime)}
                   </Badge>
-                  {getStatusBadge(event.status, event.registrationCloses, isPastEvent)}
+                  {hasStarted && !isPastEvent && (
+                    <Badge className="bg-orange-500/90 hover:bg-orange-500 border-orange-400/50 animate-pulse">
+                      🏁 In Progress
+                    </Badge>
+                  )}
+                  {!hasStarted && getStatusBadge(event.status, event.registrationCloses, isPastEvent)}
+                  {isPastEvent && getStatusBadge(event.status, event.registrationCloses, isPastEvent)}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1 flex-wrap">
                   <span>{getEventTypeName(event.eventType)}</span>
@@ -218,16 +223,6 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
         {/* Event Details */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
-            <p className="text-xs text-muted-foreground mb-1">Prize Pool</p>
-            <p className="text-lg font-bold text-primary">{formatICP(BigInt(totalPrizePool))}</p>
-          </div>
-
-          <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
-            <p className="text-xs text-muted-foreground mb-1">Entry Fee</p>
-            <p className="text-lg font-bold text-primary">{formatICP(event.metadata.entryFee)}</p>
-          </div>
-
-          <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
             <p className="text-xs text-muted-foreground mb-1">Races</p>
             <p className="text-lg font-bold text-primary">{event.raceIds.length}</p>
           </div>
@@ -236,6 +231,20 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
             <p className="text-xs text-muted-foreground mb-1">Points</p>
             <p className="text-lg font-bold text-primary">{event.metadata.pointsMultiplier}x</p>
           </div>
+
+          {raceSummary && Number(raceSummary.totalParticipants) > 0 && (
+            <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">Participants</p>
+              <p className="text-lg font-bold text-primary">👥 {Number(raceSummary.totalParticipants)}</p>
+            </div>
+          )}
+
+          {distanceRange && (
+            <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">Distance</p>
+              <p className="text-lg font-bold text-primary font-mono">{distanceRange}</p>
+            </div>
+          )}
         </div>
 
         {/* Divisions */}

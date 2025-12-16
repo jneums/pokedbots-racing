@@ -210,13 +210,15 @@ module {
     // Get upcoming events (next N days)
     public func getUpcomingEvents(fromTime : Int, daysAhead : Nat) : [ScheduledEvent] {
       let NANOS_PER_DAY : Int = 86400_000_000_000;
+      let NANOS_PER_HOUR : Int = 3600_000_000_000;
       let endTime = fromTime + (daysAhead * NANOS_PER_DAY);
+      let gracePeriodStart = fromTime - NANOS_PER_HOUR; // Show events from up to 1 hour ago
 
       let allEvents = getAllEvents();
       let upcoming = Array.filter<ScheduledEvent>(
         allEvents,
         func(e) {
-          e.scheduledTime >= fromTime and e.scheduledTime <= endTime and e.status != #Completed and e.status != #Cancelled
+          e.scheduledTime >= gracePeriodStart and e.scheduledTime <= endTime and e.status != #Completed and e.status != #Cancelled
         },
       );
 

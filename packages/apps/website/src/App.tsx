@@ -1,12 +1,13 @@
 import { Routes, Route, useLocation, Link } from 'react-router-dom';
 import { useEffect } from 'react';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import Navigation from './app/navigation';
 import HomePage from './app/page';
 import MarketplacePage from './app/marketplace/page';
 import GaragePage from './app/garage/page';
 import SchedulePage from './app/schedule/page';
 import EventDetailsPage from './app/schedule/[eventId]/page';
+import RaceDetailsPage from './app/race/[raceId]/page';
 import LeaderboardPage from './app/leaderboard/page';
 import SimulatorPage from './app/simulator/page';
 import DocsListPage from './app/docs/page';
@@ -16,6 +17,7 @@ import GuidePage from './app/guides/[slug]/page';
 import BotDetailsPage from './app/bot/[tokenIndex]/page';
 import { WalletDrawerProvider } from './contexts/WalletDrawerContext';
 import { WalletDrawer } from './components/WalletDrawer';
+import { useAuth } from './hooks/useAuth';
 
 import { configure as configureIcJs } from '@pokedbots-racing/ic-js';
 
@@ -48,6 +50,83 @@ function ScrollToTop() {
   return null;
 }
 
+function SessionExpirationHandler() {
+  const { isAuthenticated, logout, user } = useAuth();
+
+  useEffect(() => {
+    let hasShownExpiration = false;
+
+    const showExpirationToast = () => {
+      if (hasShownExpiration) return;
+      hasShownExpiration = true;
+      
+      toast.error('Wallet Session Expired', {
+        description: 'Your Plug wallet session has expired. Please reconnect your wallet.',
+        duration: 10000,
+        action: {
+          label: 'Reconnect',
+          onClick: () => {
+            logout();
+            window.location.reload();
+          },
+        },
+      });
+
+      // Auto-logout after showing the message
+      setTimeout(() => {
+        logout();
+      }, 500);
+    };
+
+    const handleError = (event: ErrorEvent | PromiseRejectionEvent) => {
+      const error = 'reason' in event ? event.reason : event.error;
+      const errorMessage = error?.message || error?.toString() || '';
+
+      // Check for Plug wallet session expiration errors
+      if (
+        isAuthenticated &&
+        user?.provider === 'plug' &&
+        (errorMessage.includes('No keychain found') ||
+         errorMessage.includes('keychain') ||
+         errorMessage.includes('session'))
+      ) {
+        showExpirationToast();
+      }
+    };
+
+    // Intercept console.error to catch Plug's internal errors
+    const originalConsoleError = console.error;
+    console.error = (...args: any[]) => {
+      const errorMessage = args.join(' ');
+      
+      if (
+        isAuthenticated &&
+        user?.provider === 'plug' &&
+        (errorMessage.includes('No keychain found') ||
+         errorMessage.includes('tabMessenger') ||
+         errorMessage.includes('keychain'))
+      ) {
+        showExpirationToast();
+      }
+      
+      // Still call the original console.error
+      originalConsoleError.apply(console, args);
+    };
+
+    // Listen for both error events and unhandled promise rejections
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleError);
+
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleError);
+      console.error = originalConsoleError;
+    };
+  }, [isAuthenticated, user, logout]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <WalletDrawerProvider>
@@ -65,6 +144,7 @@ export default function App() {
             },
           }}
         />
+        <SessionExpirationHandler />
         <ScrollToTop />
         <Navigation />
         <WalletDrawer />
@@ -75,6 +155,7 @@ export default function App() {
           <Route path="/garage" element={<GaragePage />} />
           <Route path="/schedule" element={<SchedulePage />} />
           <Route path="/schedule/:eventId" element={<EventDetailsPage />} />
+          <Route path="/race/:raceId" element={<RaceDetailsPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/simulator" element={<SimulatorPage />} />
           <Route path="/bot/:tokenIndex" element={<BotDetailsPage />} />

@@ -1,4 +1,4 @@
-import { Identity } from '@icp-sdk/core/agent';
+import { type Identity } from '@icp-sdk/core/agent';
 import { PokedBotsRacing } from '@pokedbots-racing/declarations';
 export type ScheduledEvent = PokedBotsRacing.ScheduledEvent;
 export type EventStatus = PokedBotsRacing.EventStatus;
@@ -105,3 +105,28 @@ export declare const debugTestSimulation: (tokenIndexes: number[], trackId: numb
     tokenIndex: number;
     finalTime: number;
 }[] | null>;
+/**
+ * Query races with advanced filtering and pagination
+ * @param filters Object containing filter criteria
+ * @param identity Optional identity to use for the actor
+ * @returns Filtered races with pagination info
+ */
+export declare const queryRaces: (filters: {
+    status?: "Upcoming" | "InProgress" | "Completed" | "Cancelled";
+    raceClass?: "Scrap" | "Junker" | "Raider" | "Elite" | "SilentKlan";
+    terrain?: "ScrapHeaps" | "WastelandSand" | "MetalRoads";
+    minEntries?: number;
+    maxEntries?: number;
+    hasMinimumEntries?: boolean;
+    minPrizePool?: number;
+    maxPrizePool?: number;
+    startTimeFrom?: bigint;
+    startTimeTo?: bigint;
+    limit?: number;
+    afterRaceId?: number;
+}, identity?: Identity) => Promise<{
+    races: Race[];
+    hasMore: boolean;
+    nextRaceId: bigint | null;
+    totalMatching: bigint;
+}>;

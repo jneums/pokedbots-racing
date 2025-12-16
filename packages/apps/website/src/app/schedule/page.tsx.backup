@@ -1,0 +1,389 @@
+'use client';
+
+import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useGetUpcomingEventsWithRaces } from "@/hooks/useRacing";
+import { useGetEventWithRaces } from "@/hooks/useRacing";
+
+function formatICP(amount: bigint): string {
+  const icp = Number(amount) / 100_000_000;
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(icp) + ' ICP';
+}
+
+function formatDate(timestamp: bigint): string {
+  const date = new Date(Number(timestamp) / 1_000_000); // Convert nanoseconds to milliseconds
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatRelativeTime(timestamp: bigint): string {
+  const date = new Date(Number(timestamp) / 1_000_000);
+  const now = new Date();
+  const diffMs = date.getTime() - now.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+  
+  if (diffHours < 0) return 'Started';
+  
+  if (diffHours < 24) {
+    const hours = Math.floor(diffHours);
+    const minutes = Math.floor((diffHours - hours) * 60);
+    
+    if (hours === 0) {
+      return `in ${minutes} min${minutes !== 1 ? 's' : ''}`;
+    }
+    return `in ${hours}h ${minutes}m`;
+  }
+  
+  const days = Math.floor(diffHours / 24);
+  return `in ${days} day${days !== 1 ? 's' : ''}`;
+}
+
+function getEventTypeIcon(eventType: ScheduledEvent['eventType']): string {
+  if ('DailySprint' in eventType) return '⚡';
+  if ('WeeklyLeague' in eventType) return '🏆';
+  if ('MonthlyCup' in eventType) return '👑';
+  if ('SpecialEvent' in eventType) return '🌟';
+  return '🏁';
+}
+
+function RaceCard({ race, eventId }: { race: any; eventId: number }) {
+  const totalPrizePool = Number(event.metadata.prizePoolBonus) + 
+                         (Number(event.metadata.entryFee) * Number(event.raceIds.length));
+
+  const now = new Date();
+  const registrationClosesDate = new Date(Number(event.registrationCloses) / 1_000_000);
+  const isRegistrationOpen = now < registrationClosesDate && 'RegistrationOpen' in event.status;
+  
+  const isUpcoming = 'Announced' in event.status;
+
+  // Get terrain icons
+  const getTerrainIcon = (terrain: any): string => {
+    if ('ScrapHeaps' in terrain) return '🔩';
+    if ('WastelandSand' in terrain) return '🏜️';
+    if ('MetalRoads' in terrain) return '🛣️';
+    return '🏁';
+  };
+
+  const uniqueTerrains = raceSummary ? Array.from(new Set(raceSummary.terrains.map(t => {
+    if ('ScrapHeaps' in t) return 'ScrapHeaps';
+    if ('WastelandSand' in t) return 'WastelandSand';
+    if ('MetalRoads' in t) return 'MetalRoads';
+    return 'Unknown';
+  }))) : [];
+
+  const distanceRange = raceSummary && raceSummary.distances.length > 0 ? 
+    `${Math.min(...raceSummary.distances.map(Number))}${Math.max(...raceSummary.distances.map(Number)) !== Math.min(...raceSummary.distances.map(Number)) ? `-${Math.max(...raceSummary.distances.map(Number))}` : ''}km` : null;
+
+  return (
+    <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur">
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <div className="space-y-2 flex-1">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{getEventTypeIcon(event.eventType)}</span>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <CardTitle className="text-2xl">{event.metadata.name}</CardTitle>
+                  <Badge variant="outline" className="bg-primary/20 text-primary font-mono text-sm">
+                    {formatDate(event.scheduledTime)}
+                  </Badge>
+                  {getStatusBadge(event.status, event.registrationCloses, isPastEvent)}
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1 flex-wrap">
+                  <span>{getEventTypeName(event.eventType)}</span>
+                  <span>•</span>
+                  <span>{event.raceIds.length} race{event.raceIds.length !== 1 ? 's' : ''}</span>
+                  {distanceRange && (
+                    <>
+                      <span>•</span>
+                      <span className="font-mono">{distanceRange}</span>
+                    </>
+                  )}
+                  {uniqueTerrains.length > 0 && (
+                    <>
+                      <span>•</span>
+                      <span className="flex gap-1">
+                        {uniqueTerrains.map((t, idx) => (
+                          <span key={idx} title={t}>
+                            {getTerrainIcon({ [t]: null })}
+                          </span>
+                        ))}
+                      </span>
+                    </>
+                  )}
+                  {raceSummary && Number(raceSummary.totalParticipants) > 0 && (
+                    <>
+                      <span>•</span>
+                      <span>👥 {Number(raceSummary.totalParticipants)}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+            <CardDescription className="text-base">
+              {event.metadata.description}
+            </CardDescription>
+            <div className="flex items-center gap-4 text-sm">
+              {isRegistrationOpen && !isPastEvent && (
+                <span className="text-green-500 font-semibold">
+                  ⏰ Closes {formatRelativeTime(event.registrationCloses)}
+                </span>
+              )}
+              {isPastEvent && (
+                <span className="text-muted-foreground">
+                  ✓ Completed
+                </span>
+              )}
+              {isUpcoming && !isPastEvent && (
+                <span className="text-blue-500 font-semibold">
+                  Opens {formatRelativeTime(event.registrationOpens)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Event Details */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
+            <p className="text-xs text-muted-foreground mb-1">Prize Pool</p>
+            <p className="text-lg font-bold text-primary">{formatICP(BigInt(totalPrizePool))}</p>
+          </div>
+
+          <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
+            <p className="text-xs text-muted-foreground mb-1">Entry Fee</p>
+            <p className="text-lg font-bold text-primary">{formatICP(event.metadata.entryFee)}</p>
+          </div>
+
+          <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
+            <p className="text-xs text-muted-foreground mb-1">Races</p>
+            <p className="text-lg font-bold text-primary">{event.raceIds.length}</p>
+          </div>
+
+          <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
+            <p className="text-xs text-muted-foreground mb-1">Points</p>
+            <p className="text-lg font-bold text-primary">{event.metadata.pointsMultiplier}x</p>
+          </div>
+        </div>
+
+        {/* Divisions */}
+        {event.metadata.divisions.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Divisions:</p>
+            <div className="flex gap-2 flex-wrap">
+              {event.metadata.divisions.map((division, idx) => (
+                <Badge key={idx} variant="outline" className="bg-primary/10">
+                  {getDivisionName(division)}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Entry Limits */}
+        <div className="flex items-center justify-between text-sm">
+          <div className="text-muted-foreground">
+            Entry Limits: {event.metadata.minEntries.toString()} - {event.metadata.maxEntries.toString()} racers
+          </div>
+          {isUpcoming && (
+            <div className="text-blue-500 font-semibold">
+              Opens {formatRelativeTime(event.registrationOpens)}
+            </div>
+          )}
+        </div>
+
+        {/* View Details Button */}
+        <Link to={`/schedule/${event.eventId}`} className="block mt-4">
+          <Button className="w-full" variant="default">
+            View Race Details →
+          </Button>
+        </Link>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RaceCard({ race, eventId }: { race: any; eventId: number }) {
+  const getTerrainName = (terrain: any): string => {
+    if ('ScrapHeaps' in terrain) return 'Scrap Heaps';
+    if ('WastelandSand' in terrain) return 'Wasteland Sand';
+    if ('MetalRoads' in terrain) return 'Metal Roads';
+    return 'Unknown';
+  };
+
+  const getTerrainIcon = (terrain: any): string => {
+    if ('ScrapHeaps' in terrain) return '🔩';
+    if ('WastelandSand' in terrain) return '🏜️';
+    if ('MetalRoads' in terrain) return '🛣️';
+    return '🏁';
+  };
+
+  const getRaceClassName = (raceClass: any): string => {
+    if ('Scrap' in raceClass) return 'Scrap';
+    if ('Junker' in raceClass) return 'Junker';
+    if ('Raider' in raceClass) return 'Raider';
+    if ('Elite' in raceClass) return 'Elite';
+    if ('SilentKlan' in raceClass) return 'Silent Klan';
+    return 'Unknown';
+  };
+
+  const spotsRemaining = Number(race.maxEntries) - Number(race.currentEntries);
+  const isFull = spotsRemaining <= 0;
+
+  return (
+    <Card className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-lg bg-card/50 backdrop-blur">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 space-y-3">
+            {/* Race Name and Badges */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <h3 className="text-lg font-bold">{race.name}</h3>
+              <Badge variant="outline" className="bg-primary/20 text-primary">
+                {getRaceClassName(race.raceClass)}
+              </Badge>
+              {isFull ? (
+                <Badge className="bg-red-500/90 hover:bg-red-500">Full</Badge>
+              ) : spotsRemaining <= 3 ? (
+                <Badge className="bg-yellow-500/90 hover:bg-yellow-500">
+                  {spotsRemaining} spot{spotsRemaining !== 1 ? 's' : ''} left
+                </Badge>
+              ) : (
+                <Badge className="bg-green-500/90 hover:bg-green-500">Open</Badge>
+              )}
+            </div>
+
+            {/* Race Details */}
+            <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+              <span className="flex items-center gap-1">
+                {getTerrainIcon(race.terrain)}
+                {getTerrainName(race.terrain)}
+              </span>
+              <span>•</span>
+              <span className="font-mono">{Number(race.distance)}km</span>
+              <span>•</span>
+              <span>{formatICP(race.entryFee)} entry</span>
+              <span>•</span>
+              <span>👥 {Number(race.currentEntries)}/{Number(race.maxEntries)}</span>
+            </div>
+          </div>
+
+          {/* View Button */}
+          <Link to={`/race/${race.raceId}`}>
+            <Button size="sm" variant="default">
+              View →
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function SchedulePage() {
+  const { data: upcomingEventsData, isLoading: upcomingLoading } = useGetUpcomingEventsWithRaces(14); // Next 2 weeks
+
+  // Flatten all races from events with their event context
+  const allRaces = useMemo(() => {
+    if (!upcomingEventsData) return [];
+    
+    const races: Array<{ race: any; event: any; eventId: number }> = [];
+    
+    upcomingEventsData.forEach(({ event }) => {
+      // Fetch detailed races for each event (will be cached by React Query)
+      event.raceIds.forEach(raceId => {
+        races.push({
+          race: { raceId, name: `Loading...` }, // Placeholder
+          event,
+          eventId: Number(event.eventId),
+        });
+      });
+    });
+    
+    return races;
+  }, [upcomingEventsData]);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-16">
+        <div className="max-w-5xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-12">
+            <h1 className="text-5xl font-bold mb-4">🏁 Race Schedule</h1>
+            <p className="text-xl text-muted-foreground">
+              All upcoming wasteland races
+            </p>
+          </div>
+
+          {/* Race List */}
+          {upcomingLoading ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Loading races...</p>
+            </div>
+          ) : !upcomingEventsData || upcomingEventsData.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-lg text-muted-foreground">No upcoming races scheduled.</p>
+              <p className="text-sm text-muted-foreground mt-2">Check back later for new races!</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {upcomingEventsData.map(({ event }) => (
+                <div key={event.eventId.toString()} className="space-y-3">
+                  {/* Event Header */}
+                  <div className="flex items-center gap-3 px-2">
+                    <span className="text-2xl">{getEventTypeIcon(event.eventType)}</span>
+                    <div>
+                      <h2 className="text-xl font-bold">{event.metadata.name}</h2>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDate(event.scheduledTime)} • {event.raceIds.length} race{event.raceIds.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Races in this event */}
+                  <div className="space-y-2 pl-12">
+                    {event.raceIds.map((raceId: bigint) => (
+                      <RaceCardWithData key={raceId.toString()} raceId={Number(raceId)} eventId={Number(event.eventId)} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RaceCardWithData({ raceId, eventId }: { raceId: number; eventId: number }) {
+  const { data: eventData } = useGetEventWithRaces(eventId);
+  
+  const race = useMemo(() => {
+    if (!eventData) return null;
+    return eventData.races.find(r => Number(r.raceId) === raceId);
+  }, [eventData, raceId]);
+
+  if (!race) {
+    return (
+      <Card className="border-2 border-primary/20 bg-card/30 backdrop-blur animate-pulse">
+        <CardContent className="p-6">
+          <div className="h-16"></div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return <RaceCard race={race} eventId={eventId} />;
+}

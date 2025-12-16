@@ -1,9 +1,9 @@
 // packages/libs/ic-js/src/api/racing.api.ts
 
-import { Identity } from '@icp-sdk/core/agent';
+import { type Identity, Actor, HttpAgent } from '@icp-sdk/core/agent';
 import { getRacingActor } from '../actors.js';
 import { PokedBotsRacing } from '@pokedbots-racing/declarations';
-import { getCanisterId } from '../config.js';
+import { getCanisterId, getHost } from '../config.js';
 
 export type ScheduledEvent = PokedBotsRacing.ScheduledEvent;
 export type EventStatus = PokedBotsRacing.EventStatus;
@@ -238,4 +238,63 @@ export const debugTestSimulation = async (
     tokenIndex: Number(r.tokenIndex),
     finalTime: Number(r.finalTime),
   }));
+};
+
+/**
+ * Query races with advanced filtering and pagination
+ * @param filters Object containing filter criteria
+ * @param identity Optional identity to use for the actor
+ * @returns Filtered races with pagination info
+ */
+export const queryRaces = async (
+  filters: {
+    status?: 'Upcoming' | 'InProgress' | 'Completed' | 'Cancelled';
+    raceClass?: 'Scrap' | 'Junker' | 'Raider' | 'Elite' | 'SilentKlan';
+    terrain?: 'ScrapHeaps' | 'WastelandSand' | 'MetalRoads';
+    minEntries?: number;
+    maxEntries?: number;
+    hasMinimumEntries?: boolean;
+    minPrizePool?: number;
+    maxPrizePool?: number;
+    startTimeFrom?: bigint;
+    startTimeTo?: bigint;
+    limit?: number;
+    afterRaceId?: number;
+  },
+  identity?: Identity
+): Promise<{
+  races: Race[];
+  hasMore: boolean;
+  nextRaceId: bigint | null;
+  totalMatching: bigint;
+}> => {
+  const racingActor = await getActor(identity);
+  
+  // Convert filter values to backend format
+  const backendFilters: any = {
+    status: filters.status ? [{ [filters.status]: null }] : [],
+    raceClass: filters.raceClass ? [{ [filters.raceClass]: null }] : [],
+    terrain: filters.terrain ? [{ [filters.terrain]: null }] : [],
+    minEntries: filters.minEntries !== undefined ? [BigInt(filters.minEntries)] : [],
+    maxEntries: filters.maxEntries !== undefined ? [BigInt(filters.maxEntries)] : [],
+    hasMinimumEntries: filters.hasMinimumEntries !== undefined ? [filters.hasMinimumEntries] : [],
+    minPrizePool: filters.minPrizePool !== undefined ? [BigInt(filters.minPrizePool)] : [],
+    maxPrizePool: filters.maxPrizePool !== undefined ? [BigInt(filters.maxPrizePool)] : [],
+    participantPrincipal: [],
+    participantNftId: [],
+    eligibleForCaller: [],
+    startTimeFrom: filters.startTimeFrom !== undefined ? [filters.startTimeFrom] : [],
+    startTimeTo: filters.startTimeTo !== undefined ? [filters.startTimeTo] : [],
+    limit: BigInt(filters.limit || 20),
+    afterRaceId: filters.afterRaceId !== undefined ? [BigInt(filters.afterRaceId)] : [],
+  };
+  
+  const result = await racingActor.query_races(backendFilters);
+  
+  return {
+    races: result.races,
+    hasMore: result.hasMore,
+    nextRaceId: (result.nextRaceId.length > 0 ? result.nextRaceId[0] : null) ?? null,
+    totalMatching: result.totalMatching,
+  };
 };

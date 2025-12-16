@@ -12,6 +12,17 @@ const ICP_LEDGER_CANISTER_ID = 'ryjl3-tyaaa-aaaaa-aaaba-cai';
 type ICPLedger = Ledger._SERVICE;
 type IdentityOrAgent = Identity | any;
 
+// Helper to safely stringify errors that may contain BigInt
+function stringifyError(err: any): string {
+  try {
+    return JSON.stringify(err, (_, value) =>
+      typeof value === 'bigint' ? value.toString() : value
+    );
+  } catch {
+    return String(err);
+  }
+}
+
 // Cache for Plug ledger actor to avoid recreating on every call
 let cachedPlugLedgerActor: ICPLedger | null = null;
 
@@ -126,7 +137,7 @@ export async function transferICP(
     });
 
     if ('Err' in result) {
-      throw new Error(`Transfer failed: ${JSON.stringify(result.Err)}`);
+      throw new Error(`Transfer failed: ${stringifyError(result.Err)}`);
     }
 
     return result.Ok;
@@ -147,7 +158,7 @@ export async function transferICP(
     });
 
     if ('Err' in result) {
-      throw new Error(`Transfer failed: ${JSON.stringify(result.Err)}`);
+      throw new Error(`Transfer failed: ${stringifyError(result.Err)}`);
     }
 
     return result.Ok;
@@ -190,7 +201,7 @@ export async function approveICRC2(
 
   if ('Err' in result) {
     console.error('[approveICRC2] Approval failed with error:', result.Err);
-    throw new Error(`Approval failed: ${JSON.stringify(result.Err)}`);
+    throw new Error(`Approval failed: ${stringifyError(result.Err)}`);
   }
 
   console.log('[approveICRC2] Approval successful, block:', result.Ok.toString());
