@@ -13,9 +13,11 @@ import {
   listMyApiKeys,
   createApiKey,
   revokeApiKey,
+  getUserWalletNFTs,
   type UpgradeType,
   type PaymentMethod,
   type ApiKeyMetadata,
+  type UnregisteredNFT,
 } from '@pokedbots-racing/ic-js';
 import { useAuth } from './useAuth';
 
@@ -297,5 +299,27 @@ export function useRevokeApiKey() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-api-keys'] });
     },
+  });
+}
+
+/**
+ * Hook to fetch user's wallet NFTs (both registered and unregistered)
+ * This shows all NFTs the user owns, including those not yet registered for racing
+ */
+export function useUserWalletNFTs() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['user-wallet-nfts', user?.principal],
+    queryFn: async () => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return getUserWalletNFTs(user.agent);
+    },
+    enabled: !!user?.agent,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 60 * 1000, // Auto-refetch every minute (less frequent than registered bots)
   });
 }

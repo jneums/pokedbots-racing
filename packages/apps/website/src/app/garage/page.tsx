@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { useMyBots, useUserInventory, useCollectionBonuses } from '../../hooks/useGarage';
+import { useMyBots, useUserInventory, useCollectionBonuses, useUserWalletNFTs } from '../../hooks/useGarage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { WalletConnect } from '../../components/WalletConnect';
 import { BotCard } from '../../components/BotCard';
-import { Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical } from 'lucide-react';
+import { Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical, Plus } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { BotListItem } from '@pokedbots-racing/ic-js';
 import { Progress } from '../../components/ui/progress';
@@ -66,6 +66,7 @@ export default function GaragePage() {
   const { data: bots = [], isLoading, isFetching, error: botsError } = useMyBots();
   const { data: inventory, isLoading: inventoryLoading, refetch: refetchInventory } = useUserInventory();
   const { data: bonuses, isLoading: bonusesLoading } = useCollectionBonuses();
+  const { data: walletNFTs = [], isLoading: walletNFTsLoading, error: walletNFTsError } = useUserWalletNFTs();
   
   // Use isFetching for loading state (shows on both initial load and manual refetch)
   const loading = isFetching;
@@ -106,13 +107,53 @@ export default function GaragePage() {
     });
   };
 
-  // Sort bots: favorites first, then by custom order, then by token index
+  // Sort bots: favorites first, then by custom order, then registered, then unregistered
   const sortedBots = useMemo(() => {
+    console.log('[GaragePage] Starting sortedBots calculation');
+    console.log('[GaragePage] Registered bots:', bots.length, bots.map(b => Number(b.tokenIndex)));
+    console.log('[GaragePage] Wallet NFTs:', walletNFTs.length, walletNFTs);
+    
+    // Start with registered bots
     const botsArray = [...bots];
     
-    // Sort by custom order if exists
+    // Add unregistered bots to the end (filter out already registered ones)
+    const registeredTokenIndices = new Set(bots.map(b => Number(b.tokenIndex)));
+    console.log('[GaragePage] Registered token indices Set:', Array.from(registeredTokenIndices));
+    
+    const unregisteredBots = walletNFTs
+      .filter(nft => {
+        const isNotRegistered = !nft.isRegistered;
+        const notInRegisteredSet = !registeredTokenIndices.has(nft.tokenIndex);
+        console.log(`[GaragePage] Checking NFT ${nft.tokenIndex}: isRegistered=${nft.isRegistered}, inSet=${registeredTokenIndices.has(nft.tokenIndex)}, includeInUnregistered=${isNotRegistered && notInRegisteredSet}`);
+        return isNotRegistered && notInRegisteredSet;
+      })
+      .map(nft => {
+        console.log('[GaragePage] Mapping unregistered NFT:', nft.tokenIndex);
+        return {
+          tokenIndex: BigInt(nft.tokenIndex),
+          isInitialized: false,
+          name: undefined,
+          currentOwner: '',
+          stats: undefined,
+          currentStats: undefined,
+          maxStats: undefined,
+          upgradeCostsV2: undefined,
+          isListed: false,
+          activeUpgrade: undefined,
+          activeMission: undefined,
+          upcomingRaces: [],
+          eligibleRaces: [],
+        };
+      });
+    
+    console.log('[GaragePage] Unregistered bots after filtering:', unregisteredBots.length, unregisteredBots.map(b => Number(b.tokenIndex)));
+    
+    const allBots = [...botsArray, ...unregisteredBots];
+    console.log('[GaragePage] All bots combined:', allBots.length, allBots.map(b => ({ tokenIndex: Number(b.tokenIndex), isInitialized: b.isInitialized })));
+    
+    // Sort by custom order if exists (only for registered bots)
     if (customOrder.length > 0) {
-      botsArray.sort((a, b) => {
+      allBots.sort((a, b) => {
         const aIndex = customOrder.indexOf(a.tokenIndex.toString());
         const bIndex = customOrder.indexOf(b.tokenIndex.toString());
         
@@ -128,15 +169,15 @@ export default function GaragePage() {
       });
     }
     
-    // Favorites always on top
-    return botsArray.sort((a, b) => {
+    // Favorites always on top (only registered bots can be favorited)
+    return allBots.sort((a, b) => {
       const aFav = favorites.has(a.tokenIndex.toString());
       const bFav = favorites.has(b.tokenIndex.toString());
       if (aFav && !bFav) return -1;
       if (!aFav && bFav) return 1;
       return 0;
     });
-  }, [bots, favorites, customOrder]);
+  }, [bots, walletNFTs, favorites, customOrder]);
 
   // Handle drag and drop
   const handleDragStart = (index: number) => {
@@ -420,7 +461,7 @@ export default function GaragePage() {
             </Card>
           </div>
         </div>
-      ) : bots.length === 0 ? (
+      ) : bots.length === 0 && walletNFTs.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground text-lg mb-4">
@@ -457,12 +498,59 @@ export default function GaragePage() {
                 onDrop={(e) => e.preventDefault()}
               >
                 {sortedBots.map((bot, index) => {
+                  const isUnregistered = !bot.isInitialized;
                   const faction = bot.stats?.faction;
                   const factionName = faction ? Object.keys(faction)[0] : 'Unknown';
                   const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.tokenIndex));
                   const imageUrl = `https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=${tokenId}&type=thumbnail`;
                   const isFavorite = favorites.has(bot.tokenIndex.toString());
                   
+                  // Render unregistered bots differently
+                  if (isUnregistered) {
+                    const isSelected = selectedBotIndex === bot.tokenIndex;
+                    return (
+                      <button
+                        key={bot.tokenIndex.toString()}
+                        onClick={() => setSelectedBotIndex(bot.tokenIndex)}
+                        className={`w-full text-left border-b border-dashed border-muted-foreground/20 hover:bg-muted/30 transition-colors ${
+                          isSelected ? 'bg-muted/50 border-l-4 border-l-amber-500' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-4 p-4">
+                          <div className="relative">
+                            <Avatar className="h-16 w-16 border-2 border-dashed border-amber-500/30">
+                              <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
+                              <AvatarFallback className="bg-amber-500/10 text-amber-600">
+                                #{bot.tokenIndex.toString().slice(-2)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="absolute -top-1 -right-1 bg-amber-500/20 border border-amber-500/50 rounded-full p-1">
+                              <Plus className="h-3 w-3 text-amber-500" />
+                            </div>
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-semibold text-base">
+                                PokedBot #{bot.tokenIndex.toString()}
+                              </p>
+                              <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 bg-amber-500/10">
+                                Unregistered
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Click to register for racing
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Cost: 0.1 ICP (one-time fee)
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  }
+                  
+                  // Render registered bots normally
                   return (
                     <div
                       key={bot.tokenIndex.toString()}

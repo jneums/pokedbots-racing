@@ -133,7 +133,7 @@ export async function browseMarketplace(
   }
 
   // Merge EXT listings with precomputed stats
-  let enrichedListings: MarketplaceListing[] = extListings.map(([tokenIndex32, listing, _metadata]) => {
+  let enrichedListings: MarketplaceListing[] = extListings.map(([tokenIndex32, listing, _metadata]: any) => {
     const tokenIndex = Number(tokenIndex32);
     const priceICP = Number(listing.price) / 100_000_000;
     const stats = statsMap.get(tokenIndex);

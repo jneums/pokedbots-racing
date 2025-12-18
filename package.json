@@ -45,6 +45,12 @@
       "@dfinity/candid": "3.4.3",
       "@dfinity/principal": "3.4.3",
       "@dfinity/identity": "3.4.3"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@dfinity/pic",
+      "core-js",
+      "esbuild",
+      "fsevents"
+    ]
   }
 }

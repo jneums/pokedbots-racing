@@ -3,8 +3,10 @@
 import { type Identity, Actor, HttpAgent } from '@icp-sdk/core/agent';
 import { getRacingActor, getNFTsActor } from '../actors.js';
 import { PokedBotsRacing, PokedBotsNFTs } from '@pokedbots-racing/declarations';
+import { Principal } from '@icp-sdk/core/principal';
 import { getCanisterId, getHost } from '../config.js';
 import { approveICRC2 } from './ledger.api.js';
+import { sha224 } from 'js-sha256';
 
 // Re-export types - use inline types to avoid version conflicts
 export type UpgradeType = { velocity: null } | { powerCore: null } | { thruster: null } | { gyro: null };
@@ -144,7 +146,7 @@ export const listMyRegisteredBots = async (identityOrAgent: IdentityOrAgent): Pr
   let listingsMap = new Map<number, { price: number }>();
   try {
     const allListings = await nftsActor.listings();
-    allListings.forEach(([tokenIndex32, listing, _metadata]) => {
+    allListings.forEach(([tokenIndex32, listing, _metadata]: any) => {
       const tokenIndex = Number(tokenIndex32);
       const priceICP = Number(listing.price) / 100_000_000;
       listingsMap.set(tokenIndex, { price: priceICP });
@@ -209,7 +211,7 @@ export const listMyBots = async (identityOrAgent: IdentityOrAgent): Promise<BotL
   let listingsMap = new Map<number, { price: number }>();
   try {
     const allListings = await nftsActor.listings();
-    allListings.forEach(([tokenIndex32, listing, _metadata]) => {
+    allListings.forEach(([tokenIndex32, listing, _metadata]: any) => {
       const tokenIndex = Number(tokenIndex32);
       const priceICP = Number(listing.price) / 100_000_000;
       listingsMap.set(tokenIndex, { price: priceICP });
@@ -651,4 +653,136 @@ export const revokeApiKey = async (
 ): Promise<void> => {
   const actor = await getActor(identityOrAgent);
   await actor.revoke_my_api_key(keyId);
+};
+
+/**
+ * Convert principal to account identifier (EXT format)
+ */
+function principalToAccountIdentifier(principal: any, subaccount?: Uint8Array): string {
+  // Create padding: [0x0A, 'a', 'c', 'c', 'o', 'u', 'n', 't', '-', 'i', 'd']
+  const padding = new Uint8Array([0x0A, 0x61, 0x63, 0x63, 0x6F, 0x75, 0x6E, 0x74, 0x2D, 0x69, 0x64]);
+  
+  // Handle different principal types
+  let principalBytes: Uint8Array;
+  if (typeof principal.toUint8Array === 'function') {
+    principalBytes = principal.toUint8Array();
+  } else if (principal instanceof Uint8Array) {
+    principalBytes = principal;
+  } else {
+    throw new Error('Invalid principal type');
+  }
+  
+  const array = new Uint8Array([
+    ...padding,
+    ...principalBytes,
+    ...(subaccount || new Uint8Array(32)),
+  ]);
+  const hash = sha224(array);
+  const hashBytes = hexToUint8Array(hash);
+  const checksum = to32bits(crc32(hashBytes));
+  const bytes = new Uint8Array([...checksum, ...hashBytes]);
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function hexToUint8Array(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return bytes;
+}
+
+function to32bits(num: number): Uint8Array {
+  const b = new ArrayBuffer(4);
+  new DataView(b).setUint32(0, num);
+  return new Uint8Array(b);
+}
+
+function crc32(buf: Uint8Array): number {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    }
+    table[i] = c;
+  }
+  let crc = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) {
+    crc = table[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+// Interface for unregistered NFT info
+export interface UnregisteredNFT {
+  tokenIndex: number;
+  isRegistered: boolean;
+  metadata?: any;
+}
+
+/**
+ * Get all NFTs owned by the user from their wallet (both registered and unregistered).
+ * @param identityOrAgent Required identity for authentication
+ * @returns Array of token indices owned by the user
+ */
+export const getUserWalletNFTs = async (identityOrAgent: IdentityOrAgent): Promise<UnregisteredNFT[]> => {
+  const nftsActor = await getNFTsActorFromAgent(identityOrAgent);
+  
+  // Get user's principal
+  let userPrincipal: any;
+  if (isPlugAgent(identityOrAgent)) {
+    userPrincipal = await identityOrAgent.getPrincipal();
+  } else {
+    userPrincipal = identityOrAgent.getPrincipal();
+  }
+  
+  // Convert principal to account identifier for EXT standard
+  const accountId = principalToAccountIdentifier(userPrincipal);
+  
+  // Get user's tokens from the NFT canister
+  console.log('[getUserWalletNFTs] Fetching tokens for account ID:', accountId);
+  const result = await nftsActor.tokens(accountId);
+  console.log('[getUserWalletNFTs] Raw result from tokens():', result);
+  
+  if ('err' in result) {
+    console.error('[getUserWalletNFTs] Error fetching tokens:', result.err);
+    throw new Error(`Failed to fetch user tokens: ${JSON.stringify(result.err)}`);
+  }
+  
+  console.log('[getUserWalletNFTs] result.ok type:', typeof result.ok, 'isArray:', Array.isArray(result.ok), 'isUint32Array:', result.ok instanceof Uint32Array);
+  console.log('[getUserWalletNFTs] result.ok contents:', result.ok);
+  
+  // Handle token indices - result.ok is a Uint32Array or array of numbers
+  const tokenIndices = Array.from(result.ok).map((tokenIndex: any) => {
+    console.log('[getUserWalletNFTs] Processing tokenIndex:', tokenIndex, 'type:', typeof tokenIndex);
+    if (tokenIndex === null || tokenIndex === undefined) {
+      console.error('Received null/undefined tokenIndex:', tokenIndex);
+      return null;
+    }
+    // Convert BigInt or number to number
+    const value = typeof tokenIndex === 'bigint' ? Number(tokenIndex) : Number(tokenIndex);
+    return isNaN(value) ? null : value;
+  }).filter((idx: number | null): idx is number => idx !== null);
+  
+  console.log('[getUserWalletNFTs] Processed token indices:', tokenIndices);
+  
+  // Get registered bots to check which ones are already registered
+  const racingActor = await getActor(identityOrAgent);
+  const registeredBotsResult = await racingActor.web_list_my_registered_bots();
+  console.log('[getUserWalletNFTs] Registered bots:', registeredBotsResult.map((bot: any) => Number(bot.tokenIndex)));
+  const registeredTokenIndices = new Set(registeredBotsResult.map((bot: any) => Number(bot.tokenIndex)));
+  
+  // Return all tokens with their registration status
+  const walletNFTs = tokenIndices.map((tokenIndex: number) => ({
+    tokenIndex,
+    isRegistered: registeredTokenIndices.has(tokenIndex),
+  }));
+  
+  console.log('[getUserWalletNFTs] Final wallet NFTs:', walletNFTs);
+  console.log('[getUserWalletNFTs] Unregistered NFTs:', walletNFTs.filter(nft => !nft.isRegistered));
+  
+  return walletNFTs;
 };

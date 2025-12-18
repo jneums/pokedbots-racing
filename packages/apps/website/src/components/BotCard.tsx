@@ -60,8 +60,11 @@ function getUpgradeDisplayName(upgradeType: string): string {
 }
 
 export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRecharging, repairing, setRepairing }: BotCardProps) {
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   const { user } = useAuth();
   const upgradeMutation = useUpgradeBot();
+  const cancelUpgradeMutation = useCancelUpgrade();
+  
   const [showInitialize, setShowInitialize] = useState(false);
   const [showListForSale, setShowListForSale] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
@@ -75,6 +78,10 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
   const [listPrice, setListPrice] = useState('');
   const [transferTo, setTransferTo] = useState('');
   const [error, setError] = useState<string | null>(null);
+  
+  // Racing section state - must be at top level
+  const [selectedRaces, setSelectedRaces] = useState<Set<number>>(new Set());
+  const [enteringRaces, setEnteringRaces] = useState(false);
 
   const handleInitialize = async () => {
     if (!user?.agent) return;
@@ -191,8 +198,6 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
       setLoading(false);
     }
   };
-
-  const cancelUpgradeMutation = useCancelUpgrade();
 
   const handleCancelUpgrade = async () => {
     setError(null);
@@ -1115,10 +1120,6 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
 
         {/* Racing Section */}
         {(() => {
-          const [selectedRaces, setSelectedRaces] = useState<Set<number>>(new Set());
-          const [enteringRaces, setEnteringRaces] = useState(false);
-
-
           const handleToggleRace = (raceId: number) => {
             const newSelected = new Set(selectedRaces);
             if (newSelected.has(raceId)) {
