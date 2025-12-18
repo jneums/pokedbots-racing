@@ -13,12 +13,13 @@ import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
 import Json "mo:json";
 import ToolContext "ToolContext";
 import RacingSimulator "../RacingSimulator";
+import TimeUtils "../TimeUtils";
 
 module {
   public func config() : McpTypes.Tool = {
     name = "racing_get_bot_races";
     title = ?"Get Bot's Race Entries";
-    description = ?"Show races that a specific bot is entered in. Returns 5 races per page. Filter by status category and use cursor-based pagination.\n\n**TIMESTAMP FORMAT:** All timestamps (start_time, entry_deadline, created_at) are in nanoseconds since Unix epoch (UTC). Convert to readable dates: divide by 1_000_000 for milliseconds, then convert to user's timezone.";
+    description = ?"Show races that a specific bot is entered in. Returns 5 races per page. Filter by status category and use cursor-based pagination.\n\n**TIMESTAMP FORMAT:** All timestamps (start_time_utc, entry_deadline_utc, created_at_utc) are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z'). Times are already in UTC timezone.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

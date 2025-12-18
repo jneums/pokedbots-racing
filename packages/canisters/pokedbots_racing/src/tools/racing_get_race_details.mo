@@ -13,12 +13,13 @@ import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
 import Json "mo:json";
 import ToolContext "ToolContext";
 import RacingSimulator "../RacingSimulator";
+import TimeUtils "../TimeUtils";
 
 module {
   public func config() : McpTypes.Tool = {
     name = "racing_get_race_details";
     title = ?"Get Race Details";
-    description = ?"Get detailed information about a specific race including all entries, participants, current status, and results (if completed).\n\n**TIMESTAMP FORMAT:** All timestamps (start_time, entry_deadline, created_at, entered_at, timestamp) are in nanoseconds since Unix epoch (UTC). Convert to readable dates: divide by 1_000_000 for milliseconds, then convert to user's timezone. Current date: December 7, 2025.";
+    description = ?"Get detailed information about a specific race including all entries, participants, current status, and results (if completed).\n\n**TIMESTAMP FORMAT:** All timestamps (start_time_utc, entry_deadline_utc, created_at_utc, entered_at_utc) are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z'). Times are already in UTC timezone. Current date: December 17, 2025.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -50,7 +51,7 @@ module {
                   ("nft_id", Json.str(entry.nftId)),
                   ("owner", Json.str(Principal.toText(entry.owner))),
                   ("entry_fee_icp", Json.str(Text.concat(Nat.toText(entry.entryFee / 100_000_000), "." # Nat.toText((entry.entryFee % 100_000_000) / 1_000_000)))),
-                  ("entered_at", Json.int(entry.enteredAt)),
+                  ("entered_at_utc", Json.str(TimeUtils.nanosToUtcString(entry.enteredAt))),
                 ]);
                 entriesArray := Array.append(entriesArray, [entryJson]);
               };
@@ -66,7 +67,7 @@ module {
                   ("sponsor", Json.str(Principal.toText(sponsor.sponsor))),
                   ("amount_icp", Json.str(Text.concat(Nat.toText(sponsor.amount / 100_000_000), "." # Nat.toText((sponsor.amount % 100_000_000) / 1_000_000)))),
                   ("message", msgValue),
-                  ("timestamp", Json.int(sponsor.timestamp)),
+                  ("sponsored_at_utc", Json.str(TimeUtils.nanosToUtcString(sponsor.timestamp))),
                 ]);
                 sponsorsArray := Array.append(sponsorsArray, [sponsorJson]);
               };
@@ -149,12 +150,12 @@ module {
                 ("max_entries", Json.int(race.maxEntries)),
                 ("current_entries", Json.int(race.entries.size())),
                 ("spots_left", Json.int(race.maxEntries - race.entries.size())),
-                ("start_time", Json.int(race.startTime)),
-                ("entry_deadline", Json.int(race.entryDeadline)),
+                ("start_time_utc", Json.str(TimeUtils.nanosToUtcString(race.startTime))),
+                ("entry_deadline_utc", Json.str(TimeUtils.nanosToUtcString(race.entryDeadline))),
                 ("starts_in_hours", Json.int(hoursUntilStart)),
                 ("starts_in_minutes", Json.int(minutesUntilStart)),
                 ("entry_deadline_minutes", Json.int(minutesUntilDeadline)),
-                ("created_at", Json.int(race.createdAt)),
+                ("created_at_utc", Json.str(TimeUtils.nanosToUtcString(race.createdAt))),
                 ("entries", Json.arr(entriesArray)),
                 ("sponsors", Json.arr(sponsorsArray)),
                 ("results", Json.arr(resultsArray)),

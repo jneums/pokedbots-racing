@@ -12,12 +12,13 @@ import Json "mo:json";
 import ToolContext "ToolContext";
 import RacingSimulator "../RacingSimulator";
 import PokedBotsGarage "../PokedBotsGarage";
+import TimeUtils "../TimeUtils";
 
 module {
   public func config() : McpTypes.Tool = {
     name = "racing_list_races";
     title = ?"List Available Races";
-    description = ?"View upcoming wasteland races. Returns 5 races per page. Filter by class, terrain, status, distance, or bot eligibility. Use after_race_id for pagination.";
+    description = ?"View upcoming wasteland races. Returns 5 races per page. Filter by class, terrain, status, distance, or bot eligibility. Use after_race_id for pagination.\n\n**TIMESTAMP FORMAT:** All timestamps (start_time_utc, entry_deadline_utc) are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z').";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -352,6 +353,8 @@ module {
           ("max_entries", Json.int(race.maxEntries)),
           ("spots_left", Json.int(spotsLeft)),
           ("status", Json.str(statusText)),
+          ("start_time_utc", Json.str(TimeUtils.nanosToUtcString(race.startTime))),
+          ("entry_deadline_utc", Json.str(TimeUtils.nanosToUtcString(race.entryDeadline))),
           ("starts_in_hours", Json.int(hoursUntilStart)),
           ("starts_in_minutes", Json.int(minutesUntilStart)),
           ("entry_deadline_minutes", Json.int(minutesUntilDeadline)),

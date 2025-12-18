@@ -14,12 +14,13 @@ import ToolContext "ToolContext";
 import PokedBotsGarage "../PokedBotsGarage";
 import WastelandFlavor "WastelandFlavor";
 import ExtIntegration "../ExtIntegration";
+import TimeUtils "../TimeUtils";
 
 module {
   public func config() : McpTypes.Tool = {
     name = "garage_get_robot_details";
     title = ?"Get Robot Details";
-    description = ?"Get comprehensive details for a specific PokedBot including stats, condition, career, and upgrade status. The bot must be initialized for racing first.\n\n**TIMESTAMPS:** All timestamps (ends_at, last_recharged, last_repaired) are in nanoseconds since Unix epoch (UTC). Divide by 1_000_000 for milliseconds. Cooldowns: recharge 6hr, repair 3hr.\n\n**OWNERSHIP:** If you own the bot, shows full details (condition, battery, upgrade costs). If not, shows public profile only (stats, career, ELO).\n\nFor detailed mechanics (battery penalties, overcharge, terrain bonuses), use help_get_compendium tool.";
+    description = ?"Get comprehensive details for a specific PokedBot including stats, condition, career, and upgrade status. The bot must be initialized for racing first.\n\n**TIMESTAMPS:** All timestamps (world_buff_expires_at_utc, last_recharged_utc, last_repaired_utc, start_time_utc, last_accumulation_utc) are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z'). Cooldowns: recharge 6hr, repair 3hr.\n\n**OWNERSHIP:** If you own the bot, shows full details (condition, battery, upgrade costs). If not, shows public profile only (stats, career, ELO).\n\nFor detailed mechanics (battery penalties, overcharge, terrain bonuses), use help_get_compendium tool.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -263,8 +264,8 @@ module {
               ("condition", Json.int(racingStats.condition)),
               ("status", Json.str(status)),
               ("status_message", Json.str(statusFlavor)),
-              ("last_recharged", switch (racingStats.lastRecharged) { case (?t) { Json.int(t) }; case (null) { Json.nullable() } }),
-              ("last_repaired", switch (racingStats.lastRepaired) { case (?t) { Json.int(t) }; case (null) { Json.nullable() } }),
+              ("last_recharged_utc", switch (racingStats.lastRecharged) { case (?t) { Json.str(TimeUtils.nanosToUtcString(t)) }; case (null) { Json.nullable() } }),
+              ("last_repaired_utc", switch (racingStats.lastRepaired) { case (?t) { Json.str(TimeUtils.nanosToUtcString(t)) }; case (null) { Json.nullable() } }),
               (
                 "world_buff",
                 switch (racingStats.worldBuff) {
@@ -278,6 +279,7 @@ module {
                     Json.obj([
                       ("active", Json.bool(true)),
                       ("stats", Json.str(statsText)),
+                      ("expires_at_utc", Json.str(TimeUtils.nanosToUtcString(buff.expiresAt))),
                       ("expires_in_hours", Json.int(Int.abs(hoursRemaining))),
                       ("message", Json.str("World buff active:" # statsText # " (expires in " # Nat.toText(Int.abs(hoursRemaining)) # "h)")),
                     ]);
@@ -324,8 +326,8 @@ module {
                   ("hours_elapsed", Json.int(Int.abs(hoursElapsed))),
                   ("minutes_since_last_accumulation", Json.int(Int.abs(minutesSinceAccumulation))),
                   ("pending_parts", Json.int(totalPending)),
-                  ("start_time", Json.int(mission.startTime)),
-                  ("last_accumulation", Json.int(mission.lastAccumulation)),
+                  ("start_time_utc", Json.str(TimeUtils.nanosToUtcString(mission.startTime))),
+                  ("last_accumulation_utc", Json.str(TimeUtils.nanosToUtcString(mission.lastAccumulation))),
                 ]);
               };
             },
