@@ -27,3 +27,4 @@ export interface Token extends TokenInfo {
 export declare const Tokens: {
     readonly USDC: Token;
 };
+//# sourceMappingURL=tokens.d.ts.map

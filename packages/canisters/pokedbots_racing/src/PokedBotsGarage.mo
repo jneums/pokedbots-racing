@@ -2008,11 +2008,11 @@ module {
       baseBatteryDrain : Float;
       baseConditionLoss : Float;
     } {
-      // Base rates: 5-5-2 (parts, battery, condition) per 15 minutes
+      // Base rates: 2.5-5-2 (parts, battery, condition) per 15 minutes
       // Probabilistic rounding preserves exact fractional values over time
       // Zone multipliers and faction bonuses are fully preserved
       {
-        basePartsPer15Min = 5.0; // 20 parts/hour
+        basePartsPer15Min = 2.5; // 10 parts/hour (reduced by 50%)
         baseBatteryDrain = 5.0; // 20 battery/hour base
         baseConditionLoss = 2.0; // 8 condition/hour base
       };

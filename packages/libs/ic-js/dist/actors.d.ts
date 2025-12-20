@@ -18,3 +18,4 @@ export declare const getNFTsActor: (identity?: Identity) => Promise<PokedBotsNFT
  * @returns An actor instance for the ICP Ledger canister
  */
 export declare const getLedgerActor: (identity?: Identity) => Promise<Ledger._SERVICE>;
+//# sourceMappingURL=actors.d.ts.map

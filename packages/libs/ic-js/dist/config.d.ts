@@ -23,3 +23,4 @@ export declare const getCanisterId: (name: string) => string;
  */
 export declare const getHost: () => string;
 export {};
+//# sourceMappingURL=config.d.ts.map

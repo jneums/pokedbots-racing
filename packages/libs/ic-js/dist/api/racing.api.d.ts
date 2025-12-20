@@ -130,3 +130,4 @@ export declare const queryRaces: (filters: {
     nextRaceId: bigint | null;
     totalMatching: bigint;
 }>;
+//# sourceMappingURL=racing.api.d.ts.map

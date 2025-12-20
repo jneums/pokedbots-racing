@@ -11,3 +11,4 @@ export declare const decodeTokenId: (tid: string) => {
 export declare const generateExtAssetLink: (tokenId: string) => string;
 export declare const generateExtThumbnailLink: (tokenId: string) => string;
 export declare const getSubAccountArray: (s: number | number[]) => any[];
+//# sourceMappingURL=ext.d.ts.map

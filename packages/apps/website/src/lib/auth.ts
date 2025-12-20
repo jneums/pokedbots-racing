@@ -1,12 +1,10 @@
 /**
  * Authentication service using @dfinity/auth-client v2
- * Supports: Internet Identity v2, NFID, Plug Wallet
+ * Supports: Internet Identity v2, NFID, Plug Wallet, OISY Wallet
  */
 
 import { AuthClient } from '@dfinity/auth-client';
 import type { Identity } from '@dfinity/agent';
-import { HttpAgent } from '@dfinity/agent';
-import { clearPlugLedgerCache } from '@pokedbots-racing/ic-js';
 
 // Plug wallet global interface
 declare global {
@@ -281,7 +279,7 @@ export class AuthService {
   private clearStorage(): void {
     localStorage.removeItem(STORAGE_KEY);
     // Clear cached Plug ledger actor
-    clearPlugLedgerCache();
+    // clearPlugLedgerCache();
   }
 
   /**

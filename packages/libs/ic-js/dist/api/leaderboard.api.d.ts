@@ -51,3 +51,4 @@ export declare const getAllTimeLeaderboard: (limit?: number, identity?: Identity
  * @param identity Optional identity to use for the actor
  */
 export declare const getFactionLeaderboard: (faction: PokedBotsRacing.FactionType, limit?: number, identity?: Identity) => Promise<LeaderboardEntry[]>;
+//# sourceMappingURL=leaderboard.api.d.ts.map

@@ -36,7 +36,8 @@
   "license": "MIT",
   "dependencies": {
     "@icp-sdk/canisters": "^2.0.1",
-    "pem-file": "^1.0.1"
+    "pem-file": "^1.0.1",
+    "zod": "^4.2.1"
   },
   "pnpm": {
     "overrides": {

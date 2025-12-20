@@ -1,17 +1,17 @@
 {
-  "pokedbots_racing_dev": {
-    "ic": "3od6b-qiaaa-aaaai-q37ma-cai"
-  },
-  "pokedbots_racing": {
-    "ic": "p6nop-vyaaa-aaaai-q4djq-cai"
+  "icp_ledger": {
+    "ic": "ryjl3-tyaaa-aaaab-qaa6a-cai"
   },
   "pokedbots_nfts": {
     "ic": "bzsui-sqaaa-aaaah-qce2a-cai"
   },
+  "pokedbots_racing": {
+    "ic": "p6nop-vyaaa-aaaai-q4djq-cai"
+  },
+  "pokedbots_racing_dev": {
+    "ic": "3od6b-qiaaa-aaaai-q37ma-cai"
+  },
   "website": {
     "ic": "32qki-jaaaa-aaaai-q4a7a-cai"
-  },
-  "icp_ledger": {
-    "ic": "ryjl3-tyaaa-aaaab-qaa6a-cai"
   }
 }

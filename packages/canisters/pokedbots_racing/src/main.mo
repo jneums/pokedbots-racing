@@ -14,6 +14,9 @@ import Iter "mo:base/Iter";
 import Float "mo:base/Float";
 import Error "mo:base/Error";
 import Buffer "mo:base/Buffer";
+import HashMap "mo:base/HashMap";
+import Hash "mo:base/Hash";
+import Order "mo:base/Order";
 
 import HttpTypes "mo:http-types";
 import Map "mo:map/Map";
@@ -786,35 +789,35 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             };
           };
 
-          // Apply class-based entry fee multiplier - Linear progression
+          // Apply class-based entry fee multiplier - More linear progression
           let classFeeMultiplier : Float = switch (division) {
             case (#Scrap) { 0.5 }; // 0.5x base
             case (#Junker) { 1.0 }; // 1x base (reference)
-            case (#Raider) { 2.0 }; // 2x (double)
-            case (#Elite) { 4.0 }; // 4x (double again)
-            case (#SilentKlan) { 8.0 }; // 8x (double again)
+            case (#Raider) { 1.5 }; // 1.5x base (+50%)
+            case (#Elite) { 2.0 }; // 2x base (+100%)
+            case (#SilentKlan) { 3.0 }; // 3x base (+200%)
           };
 
           let adjustedEntryFee = Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
 
           // Platform bonus to guarantee top 3 profitability, 4th breaks even
           // Calculated for 8-player races with new distribution (45%, 28%, 18%, 9%)
-          // Formula: bonus = entry_fee × 12 (creates 20× entry pool)
+          // Formula: bonus = entry_fee × 4 (creates 12× entry pool) - 67% cost reduction from 12× multiplier
           let platformBonus : Nat = switch (event.eventType, division) {
-            // Daily Sprint bonuses - Entry fees: Scrap 0.025, Junker 0.05, Raider 0.1, Elite 0.2
-            case (#DailySprint, #Scrap) { 30_000_000 }; // 0.3 ICP (pool: 0.5, 1st: 0.225, 4th: 0.045)
-            case (#DailySprint, #Junker) { 60_000_000 }; // 0.6 ICP (pool: 1.0, 1st: 0.45, 4th: 0.09)
-            case (#DailySprint, #Raider) { 120_000_000 }; // 1.2 ICP (pool: 2.0, 1st: 0.9, 4th: 0.18)
-            case (#DailySprint, #Elite) { 240_000_000 }; // 2.4 ICP (pool: 4.0, 1st: 1.8, 4th: 0.36)
-            // Weekly League bonuses - Entry fees: Scrap 0.1, Junker 0.2, Raider 0.4, Elite 0.8, SilentKlan 1.6
-            case (#WeeklyLeague, #Scrap) { 120_000_000 }; // 1.2 ICP (pool: 2.0, 1st: 0.9, 4th: 0.18)
-            case (#WeeklyLeague, #Junker) { 240_000_000 }; // 2.4 ICP (pool: 4.0, 1st: 1.8, 4th: 0.36)
-            case (#WeeklyLeague, #Raider) { 480_000_000 }; // 4.8 ICP (pool: 8.0, 1st: 3.6, 4th: 0.72)
-            case (#WeeklyLeague, #Elite) { 960_000_000 }; // 9.6 ICP (pool: 16.0, 1st: 7.2, 4th: 1.44)
-            case (#WeeklyLeague, #SilentKlan) { 1_920_000_000 }; // 19.2 ICP (pool: 32.0, 1st: 14.4, 4th: 2.88)
-            // Monthly Cup bonuses - Entry fees: Elite 0.4, SilentKlan 4.0
-            case (#MonthlyCup, #Elite) { 480_000_000 }; // 4.8 ICP (pool: 8.0, 1st: 3.6, 4th: 0.72)
-            case (#MonthlyCup, #SilentKlan) { 4_800_000_000 }; // 48.0 ICP (pool: 80.0, 1st: 36.0, 4th: 7.2)
+            // Daily Sprint bonuses - Entry fees: Scrap 0.025, Junker 0.05, Raider 0.075, Elite 0.1
+            case (#DailySprint, #Scrap) { 10_000_000 }; // 0.1 ICP (pool: 0.3, 1st: 0.135, 4th: 0.027)
+            case (#DailySprint, #Junker) { 20_000_000 }; // 0.2 ICP (pool: 0.6, 1st: 0.27, 4th: 0.054)
+            case (#DailySprint, #Raider) { 30_000_000 }; // 0.3 ICP (pool: 0.9, 1st: 0.405, 4th: 0.081)
+            case (#DailySprint, #Elite) { 40_000_000 }; // 0.4 ICP (pool: 1.2, 1st: 0.54, 4th: 0.108)
+            // Weekly League bonuses - Entry fees: Scrap 0.1, Junker 0.2, Raider 0.3, Elite 0.4, SilentKlan 0.6
+            case (#WeeklyLeague, #Scrap) { 40_000_000 }; // 0.4 ICP (pool: 1.2, 1st: 0.54, 4th: 0.108)
+            case (#WeeklyLeague, #Junker) { 80_000_000 }; // 0.8 ICP (pool: 2.4, 1st: 1.08, 4th: 0.216)
+            case (#WeeklyLeague, #Raider) { 120_000_000 }; // 1.2 ICP (pool: 3.6, 1st: 1.62, 4th: 0.324)
+            case (#WeeklyLeague, #Elite) { 160_000_000 }; // 1.6 ICP (pool: 4.8, 1st: 2.16, 4th: 0.432)
+            case (#WeeklyLeague, #SilentKlan) { 240_000_000 }; // 2.4 ICP (pool: 7.2, 1st: 3.24, 4th: 0.648)
+            // Monthly Cup bonuses - Entry fees: Elite 1.0, SilentKlan 1.5
+            case (#MonthlyCup, #Elite) { 400_000_000 }; // 4.0 ICP (pool: 12.0, 1st: 5.4, 4th: 1.08)
+            case (#MonthlyCup, #SilentKlan) { 600_000_000 }; // 6.0 ICP (pool: 18.0, 1st: 8.1, 4th: 1.62)
             // Fallback
             case _ { event.metadata.prizePoolBonus };
           };
@@ -887,14 +890,35 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
 
     // Schedule next race creation check in 1 hour
+    // First check if we already have a race_create scheduled for around this time to avoid duplicates
     let nextCreationTime = now + (60 * 60 * 1_000_000_000);
-    let nextActionId = tt().setActionSync<system>(
-      Int.abs(nextCreationTime),
-      {
-        actionType = "race_create";
-        params = to_candid (());
-      },
-    );
+    let existingRaceCreateActions = tt().getActionsByFilter(#ByType("race_create"));
+
+    // Check if any existing race_create action is scheduled within 30 seconds of our target time
+    var alreadyScheduled = false;
+    for ((actionId, _action) in existingRaceCreateActions.vals()) {
+      let timeDiff = if (actionId.time > Int.abs(nextCreationTime)) {
+        actionId.time - Int.abs(nextCreationTime);
+      } else {
+        Int.abs(nextCreationTime) - actionId.time;
+      };
+
+      if (timeDiff < 30_000_000_000) {
+        // Within 30 seconds
+        alreadyScheduled := true;
+      };
+    };
+
+    var nextActionId : TT.ActionId = { id = 0; time = 0 };
+    if (not alreadyScheduled) {
+      nextActionId := tt().setActionSync<system>(
+        Int.abs(nextCreationTime),
+        {
+          actionType = "race_create";
+          params = to_candid (());
+        },
+      );
+    };
 
     nextActionId;
   };
@@ -3290,6 +3314,99 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
   };
 
+  // Admin function to clean up duplicate hourly_recharge timers
+  public shared ({ caller }) func cleanup_duplicate_recharge_timers() : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can cleanup timers";
+    };
+
+    let rechargeActions = tt().getActionsByFilter(#ByType("hourly_recharge"));
+    let count = rechargeActions.size();
+
+    if (count <= 1) {
+      return "No cleanup needed. Found " # Nat.toText(count) # " recharge timer(s).";
+    };
+
+    // Find the earliest scheduled action (the one we want to keep)
+    var earliestActionId : ?TT.ActionId = null;
+    var earliestTime : Nat = 9999999999999999999;
+
+    for ((actionId, _action) in rechargeActions.vals()) {
+      if (actionId.time < earliestTime) {
+        earliestTime := actionId.time;
+        earliestActionId := ?actionId;
+      };
+    };
+
+    // Cancel all actions except the earliest one
+    var cancelledCount : Nat = 0;
+    for ((actionId, _action) in rechargeActions.vals()) {
+      switch (earliestActionId) {
+        case (?earliest) {
+          if (actionId.id != earliest.id) {
+            ignore tt().cancelActionsByIds<system>([actionId.id]);
+            cancelledCount += 1;
+          };
+        };
+        case (null) {};
+      };
+    };
+
+    "Cleaned up " # Nat.toText(cancelledCount) # " duplicate recharge timers. Kept the earliest one scheduled at " # Nat.toText(earliestTime) # ".";
+  };
+
+  // Admin function to clean up duplicate race_create timers
+  public shared ({ caller }) func cleanup_duplicate_race_create_timers() : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can cleanup timers";
+    };
+
+    let raceCreateActions = tt().getActionsByFilter(#ByType("race_create"));
+    let count = raceCreateActions.size();
+
+    if (count == 0) {
+      return "No race_create timers found.";
+    };
+
+    // Group actions by timestamp - we want to keep only the first action for each unique timestamp
+    // Build a map of timestamp -> list of action IDs
+    var timestampMap = HashMap.HashMap<Nat, [TT.ActionId]>(0, Nat.equal, Hash.hash);
+
+    for ((actionId, _action) in raceCreateActions.vals()) {
+      let timestamp = actionId.time;
+      let existing = switch (timestampMap.get(timestamp)) {
+        case (?ids) { ids };
+        case (null) { [] };
+      };
+      timestampMap.put(timestamp, Array.append(existing, [actionId]));
+    };
+
+    // For each timestamp, keep the action with the lowest ID (first created), cancel the rest
+    var cancelledCount : Nat = 0;
+    var uniqueTimestamps : Nat = 0;
+
+    for ((timestamp, actionIds) in timestampMap.entries()) {
+      uniqueTimestamps += 1;
+      if (actionIds.size() > 1) {
+        // Sort by ID and keep the first one
+        let sorted = Array.sort(
+          actionIds,
+          func(a : TT.ActionId, b : TT.ActionId) : Order.Order {
+            Nat.compare(a.id, b.id);
+          },
+        );
+
+        // Cancel all except the first
+        for (i in Iter.range(1, sorted.size() - 1)) {
+          ignore tt().cancelActionsByIds<system>([sorted[i].id]);
+          cancelledCount += 1;
+        };
+      };
+    };
+
+    "Cleaned up " # Nat.toText(cancelledCount) # " duplicate race_create timers across " # Nat.toText(uniqueTimestamps) # " unique timestamps. Kept " # Nat.toText(uniqueTimestamps) # " timers.";
+  };
+
   // Admin function to manually trigger race finish for stuck races
   public shared ({ caller }) func trigger_race_finish(raceId : Nat) : async Text {
     if (caller != owner) {
@@ -3529,7 +3646,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         },
       );
 
-      Debug.print("Recharge timer already exists, skipping initialization");
+      Debug.print("Created initial recharge timer scheduled for " # Nat.toText(firstRechargeTime));
+    } else {
+      Debug.print("Recharge timer already exists (" # Nat.toText(existingActions.size()) # " found), skipping initialization");
     };
   };
 

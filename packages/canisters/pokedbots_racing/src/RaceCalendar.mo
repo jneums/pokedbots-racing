@@ -379,7 +379,7 @@ module {
     public func createWeeklyLeagueEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Weekly League Championship";
-        description = "Major competitive event - Entry scales by class (Junker 0.2, Raider 0.4, Elite 1.0, SilentKlan 2.0 ICP). All classes receive platform bonus to guarantee top 3 profitability.";
+        description = "Major competitive event - Entry scales by class (Scrap 0.1, Junker 0.2, Raider 0.3, Elite 0.4, SilentKlan 0.6 ICP). All classes receive platform bonus to guarantee top 3 profitability.";
         entryFee = 20_000_000; // 0.2 ICP base (Junker)
         maxEntries = 50; // Multiple heats if needed
         minEntries = 6;
@@ -402,7 +402,7 @@ module {
     public func createDailySprintEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Daily Sprint Challenge";
-        description = "Quick race for XP and rewards - Entry scales by class (Scrap 0.025, Junker 0.05, Raider 0.1, Elite 0.25 ICP). All classes receive platform bonus.";
+        description = "Quick race for XP and rewards - Entry scales by class (Scrap 0.025, Junker 0.05, Raider 0.075, Elite 0.1 ICP). All classes receive platform bonus.";
         entryFee = 5_000_000; // 0.05 ICP base (Junker)
         maxEntries = 12;
         minEntries = 2;
@@ -425,7 +425,7 @@ module {
     public func createMonthlyCupEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Monthly Championship Cup";
-        description = "Elite tournament - Entry scales by class (Elite 0.5, SilentKlan 5.0 ICP). No platform bonus - prize pools self-sustaining.";
+        description = "Elite tournament - Entry scales by class (Elite 1.0, SilentKlan 1.5 ICP). Platform bonus ensures competitive prize pools.";
         entryFee = 50_000_000; // 0.5 ICP base (Elite)
         maxEntries = 64; // Top 64 qualify
         minEntries = 16; // At least 16 for bracket

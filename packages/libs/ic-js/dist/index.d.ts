@@ -3,3 +3,4 @@ export * from './icrc16.js';
 export * from './config.js';
 export * from './tokens.js';
 export * from './ext.js';
+//# sourceMappingURL=index.d.ts.map

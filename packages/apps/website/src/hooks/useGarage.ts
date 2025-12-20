@@ -55,10 +55,10 @@ export function useBotDetails(tokenIndex: number | null) {
       if (!user?.agent || tokenIndex === null) {
         throw new Error('Not authenticated or invalid token');
       }
-      return getBotDetails(user.agent as any, tokenIndex);
+      return getBotDetails(tokenIndex, user.agent);
     },
     enabled: !!user?.agent && tokenIndex !== null,
-    staleTime: 10 * 1000, // 10 seconds
+    staleTime: 10 * 1000, // 10 seconds,
   });
 }
 
@@ -95,7 +95,7 @@ export function useRechargeBot() {
       if (!user?.agent) {
         throw new Error('Not authenticated');
       }
-      return rechargeBot(user.agent as any, tokenIndex);
+      return rechargeBot(tokenIndex, user.agent);
     },
     onSuccess: (_, tokenIndex) => {
       // Invalidate specific bot details
@@ -117,7 +117,7 @@ export function useRepairBot() {
       if (!user?.agent) {
         throw new Error('Not authenticated');
       }
-      return repairBot(user.agent as any, tokenIndex);
+      return repairBot(tokenIndex, user.agent);
     },
     onSuccess: (_, tokenIndex) => {
       queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });

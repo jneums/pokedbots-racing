@@ -1491,7 +1491,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Parts per Hour:</span>
                   <span className={scavengingZone === 'DeadMachineFields' ? 'text-orange-600 font-semibold' : ''}>
-                    ~{scavengingZone === 'ScrapHeaps' ? '20' : scavengingZone === 'AbandonedSettlements' ? '32' : '50'}
+                    ~{scavengingZone === 'ScrapHeaps' ? '10' : scavengingZone === 'AbandonedSettlements' ? '16' : '25'}
                   </span>
                 </div>
                 <div className="flex justify-between">

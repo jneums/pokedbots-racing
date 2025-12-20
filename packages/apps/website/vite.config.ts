@@ -81,6 +81,9 @@ export default defineConfig(({ mode }) => {
       sourcemap: false,
       rollupOptions: {
         output: {
+          entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+          chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+          assetFileNames: `assets/[name]-[hash].[ext]`,
           manualChunks: {
             'react-vendor': ['react', 'react-dom', 'react-router-dom'],
             'ui-vendor': ['@radix-ui/react-slot', '@radix-ui/react-tabs'],
