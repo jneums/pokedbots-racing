@@ -1269,18 +1269,28 @@ module {
       switch (background) {
         case (?(_, value)) {
           let bg = Text.toLowercase(value);
+
+          // MetalRoads: Purple shades, darker blues, teals (industrial/tech aesthetic)
           if (
-            Text.contains(bg, #text "brown") or Text.contains(bg, #text "red") or
-            Text.contains(bg, #text "yellow") or Text.contains(bg, #text "bones")
-          ) {
-            #WastelandSand;
-          } else if (
-            Text.contains(bg, #text "blue") or Text.contains(bg, #text "purple") or
-            Text.contains(bg, #text "grey") or Text.contains(bg, #text "gray") or
-            Text.contains(bg, #text "teal")
+            Text.contains(bg, #text "purple") or
+            Text.contains(bg, #text "teal") or
+            Text.contains(bg, #text "dark blue") or
+            Text.contains(bg, #text "grey blue")
           ) {
             #MetalRoads;
-          } else {
+          }
+          // WastelandSand: Warm colors, light/mid blues, reds (desert/sand aesthetic)
+          else if (
+            Text.contains(bg, #text "red") or
+            Text.contains(bg, #text "yellow") or
+            Text.contains(bg, #text "bones") or
+            Text.contains(bg, #text "light blue") or
+            (Text.contains(bg, #text "blue") and not Text.contains(bg, #text "dark") and not Text.contains(bg, #text "grey"))
+          ) {
+            #WastelandSand;
+          }
+          // ScrapHeaps: Greys, browns, blacks, darks, greens (junkyard aesthetic)
+          else {
             #ScrapHeaps;
           };
         };
@@ -2479,17 +2489,17 @@ module {
                 factionBoostedDistribution,
               );
 
-              // World buff chance: 4% per hour = 1% per 15-min interval
-              // Total chance scales with time: hours_elapsed * 4% (capped at 90%)
-              // Acceleration stat increases buff chance (at 100 accel: 1.6% instead of 1.0%)
+              // World buff chance: 15% per hour = 3.75% per 15-min interval
+              // Total chance scales with time: hours_elapsed * 15% (capped at 90%)
+              // Acceleration stat increases buff chance (at 100 accel: 6.0% instead of 3.75%)
               // hoursElapsed already calculated above for duration bonus
-              let totalBuffChance = Float.min(90.0, Float.fromInt(hoursElapsed) * 4.0);
+              let totalBuffChance = Float.min(90.0, Float.fromInt(hoursElapsed) * 15.0);
               let buffRoll = Float.fromInt((Int.abs(now / 1_000_000) * tokenIndex) % 1000) / 10.0; // 0-100
 
               var newWorldBuff = botStats.worldBuff; // Keep existing buff by default
               var buffMessage = "";
 
-              let baseBuffChance = 1.0 * accelBuffBonus; // 1.0% base, up to 1.6% with max accel
+              let baseBuffChance = 3.75 * accelBuffBonus; // 3.75% base, up to 6.0% with max accel
               if (buffRoll < baseBuffChance) {
                 // Acceleration-modified buff chance
                 // Buff strength scales with hours elapsed
@@ -2501,9 +2511,30 @@ module {
                   [("speed", 4 : Nat), ("acceleration", 3 : Nat), ("powerCore", 2 : Nat)];
                 };
 
-                // Blackhole faction converts to racing stats
+                // Blackhole faction adds +3 speed/accel bonus on top of regular buff
                 let finalBuffStats = if (botStats.faction == #Blackhole) {
-                  [("speed", 3 : Nat), ("acceleration", 3 : Nat)];
+                  // Add +3 to each stat in buffStats, or add new speed/accel entries
+                  let buff = Buffer.Buffer<(Text, Nat)>(buffStats.size() + 2);
+                  var hasSpeed = false;
+                  var hasAccel = false;
+
+                  for ((stat, value) in buffStats.vals()) {
+                    if (stat == "speed") {
+                      buff.add(("speed", value + 3));
+                      hasSpeed := true;
+                    } else if (stat == "acceleration") {
+                      buff.add(("acceleration", value + 3));
+                      hasAccel := true;
+                    } else {
+                      buff.add((stat, value));
+                    };
+                  };
+
+                  // Add speed/accel if not present in original buff
+                  if (not hasSpeed) { buff.add(("speed", 3)) };
+                  if (not hasAccel) { buff.add(("acceleration", 3)) };
+
+                  Buffer.toArray(buff);
                 } else {
                   buffStats;
                 };
@@ -2670,269 +2701,6 @@ module {
         };
       };
     };
-
-    /// LEGACY V1: Complete a scavenging mission and award parts (REPLACED BY V2 - completeScavengingMissionV2)
-    /* public func completeScavengingMission(
-      tokenIndex : Nat,
-      now : Int,
-      rng : Nat, // For randomness
-    ) : Result.Result<{ partsFound : Nat; speedChips : Nat; powerCoreFragments : Nat; thrusterKits : Nat; gyroModules : Nat; universalParts : Nat; batteryConsumed : Nat; conditionLost : Nat; worldBuffApplied : Bool; worldBuff : ?WorldBuff; events : [Text] }, Text> {
-      switch (getStats(tokenIndex)) {
-        case (null) { #err("Bot not found") };
-        case (?botStats) {
-          // Check if bot has an active mission
-          switch (botStats.activeMission) {
-            case (null) { return #err("Bot is not on a scavenging mission") };
-            case (?mission) {
-              // Check if mission is complete
-              if (now < mission.endTime) {
-                let remainingNanos = mission.endTime - now;
-                let remainingMinutes = remainingNanos / (60 * 1_000_000_000);
-                return #err("Mission not complete yet. " # Nat.toText(Int.abs(remainingMinutes)) # " minutes remaining");
-              };
-
-              // Calculate rewards and costs
-              let baseParts = getBaseParts(mission.missionType);
-              let baseBattery = getBaseBatteryCost(mission.missionType);
-              let zoneMultipliers = getZoneMultipliers(mission.zone);
-              let factionBonus = getFactionScavengingBonus(botStats.faction, mission.zone);
-
-              // Get current stats for scavenging bonuses
-              let currentStats = getCurrentStats(botStats);
-
-              // STAT BONUSES FOR SCAVENGING:
-              // 1. Power Core reduces battery cost (energy efficiency)
-              let powerCoreBonus = if (currentStats.powerCore >= 80) {
-                0.80; // -20% battery cost
-              } else if (currentStats.powerCore >= 50) {
-                0.90; // -10% battery cost
-              } else {
-                1.0; // Normal cost
-              };
-
-              // 2. Condition affects variance (better maintained = more consistent)
-              let conditionVariance = if (botStats.condition >= 80) {
-                (90, 110); // Tight variance: 90-110% (±10%)
-              } else if (botStats.condition >= 50) {
-                (80, 120); // Normal variance: 80-120% (±20%)
-              } else {
-                (70, 130); // Wide variance: 70-130% (±30%, risky)
-              };
-
-              // 3. Stability reduces condition loss in dangerous zones
-              let stabilityBonus = if (mission.zone == #DeadMachineFields and currentStats.stability >= 70) {
-                0.75; // -25% condition loss in dangerous zones
-              } else {
-                1.0; // Normal condition loss
-              };
-
-              // RNG for parts yield (adjusted variance based on condition)
-              let rngSeed = rng + tokenIndex + Int.abs(now);
-              let varianceRange = conditionVariance.1 - conditionVariance.0;
-              let rngVariance = Float.fromInt((rngSeed % varianceRange) + conditionVariance.0) / 100.0;
-
-              // Calculate parts found
-              let basePartsAvg = (baseParts.min + baseParts.max) / 2;
-              let partsBeforeRNG = Float.fromInt(basePartsAvg) * zoneMultipliers.parts * factionBonus.partsMultiplier;
-              var partsFound = Int.abs(Float.toInt(partsBeforeRNG * rngVariance));
-
-              // Check for faction-specific RNG bonuses
-              var events : [Text] = [];
-              var worldBuffApplied = false;
-              var worldBuff : ?WorldBuff = null;
-
-              // Golden faction: 15% chance to double parts
-              if (botStats.faction == #Golden) {
-                let doubleProc = (rngSeed % 100) < 15;
-                if (doubleProc) {
-                  partsFound := partsFound * 2;
-                  events := Array.append(events, ["Lucky streak! Parts yield doubled (Golden faction)"]);
-                };
-              };
-
-              // Box faction: 5% chance to triple parts
-              if (botStats.faction == #Box) {
-                let tripleProc = (rngSeed % 100) < 5;
-                if (tripleProc) {
-                  partsFound := partsFound * 3;
-                  events := Array.append(events, ["Jackpot! Found a treasure cache (Box faction)"]);
-                };
-              };
-
-              // World buffs are only earned during accumulation (not on completion)
-              // to prevent spam abuse (enter/exit short missions repeatedly)
-
-              // Master faction: Every 10th mission doubles parts
-              if (botStats.faction == #Master) {
-                let nextMissionCount = botStats.scavengingMissions + 1;
-                if (nextMissionCount % 10 == 0) {
-                  partsFound := partsFound * 2;
-                  events := Array.append(events, ["Mastery bonus! Parts doubled (10th mission)"]);
-                };
-              };
-
-              // Game faction: Every 5th mission +10 parts
-              if (botStats.faction == #Game) {
-                let nextMissionCount = botStats.scavengingMissions + 1;
-                if (nextMissionCount % 5 == 0) {
-                  partsFound += 10;
-                  events := Array.append(events, ["Achievement unlocked! +10 bonus parts (5th mission)"]);
-                };
-              };
-
-              // Calculate battery consumed (with Power Core efficiency bonus)
-              let batteryFloat = Float.fromInt(baseBattery) * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus;
-              let batteryRequested = Int.abs(Float.toInt(batteryFloat));
-
-              // Calculate condition lost (with Stability bonus in dangerous zones)
-              let baseConditionLoss = switch (mission.missionType) {
-                case (#ShortExpedition) { 15 };
-                case (#DeepSalvage) { 25 };
-                case (#WastelandExpedition) { 40 };
-              };
-              let conditionFloat = Float.fromInt(baseConditionLoss) * zoneMultipliers.condition * factionBonus.conditionMultiplier * stabilityBonus;
-              let conditionRequested = Int.abs(Float.toInt(conditionFloat));
-
-              // Update bot stats (use saturating subtraction and track actual consumed)
-              var actualBatteryConsumed = batteryRequested;
-              let newBattery : Nat = if (botStats.battery > batteryRequested) {
-                botStats.battery - batteryRequested;
-              } else {
-                actualBatteryConsumed := botStats.battery; // Only consumed what was available
-                0;
-              };
-
-              var actualConditionLost = conditionRequested;
-              let newCondition : Nat = if (botStats.condition > conditionRequested) {
-                botStats.condition - conditionRequested;
-              } else {
-                actualConditionLost := botStats.condition; // Only lost what was available
-                0;
-              };
-
-              // Scale rewards if battery/condition ran out (failure penalty)
-              var partsScaling = 1.0;
-              if (actualBatteryConsumed < batteryRequested) {
-                // Ran out of battery - scale parts based on how much battery was available
-                partsScaling := Float.fromInt(actualBatteryConsumed) / Float.fromInt(batteryRequested);
-                events := Array.append(events, ["⚠️ Battery depleted mid-mission! Parts yield reduced to " # Nat.toText(Int.abs(Float.toInt(partsScaling * 100.0))) # "%"]);
-              };
-
-              // Apply scaling to parts
-              partsFound := Int.abs(Float.toInt(Float.fromInt(partsFound) * partsScaling));
-
-              let newBestHaul = if (partsFound > botStats.bestHaul) {
-                partsFound;
-              } else { botStats.bestHaul };
-
-              // Preserve existing world buff if new one wasn't earned
-              let finalWorldBuff = switch (worldBuff) {
-                case (?newBuff) { ?newBuff }; // New buff earned, use it
-                case (null) { botStats.worldBuff }; // No new buff, keep existing
-              };
-
-              let updatedStats = {
-                botStats with
-                battery = newBattery;
-                condition = newCondition;
-                scavengingMissions = botStats.scavengingMissions + 1;
-                totalPartsScavenged = botStats.totalPartsScavenged + partsFound;
-                scavengingReputation = botStats.scavengingReputation + 1; // +1 per mission
-                bestHaul = newBestHaul;
-                activeMission = null; // Clear mission
-                worldBuff = finalWorldBuff; // Keep existing buff if new one not earned
-              };
-              updateStats(tokenIndex, updatedStats);
-
-              // Award parts to player's inventory
-              let owner = botStats.ownerPrincipal;
-
-              // Distribute parts dynamically based on mission type and zone
-              // Calculate distribution percentages
-              let partDistribution : [(PartType, Float)] = switch (mission.zone) {
-                case (#ScrapHeaps) {
-                  // Balanced parts, good for universal
-                  [(#UniversalPart, 0.4), (#SpeedChip, 0.15), (#PowerCoreFragment, 0.15), (#ThrusterKit, 0.15), (#GyroModule, 0.15)];
-                };
-                case (#AbandonedSettlements) {
-                  // More specialized parts, less universal
-                  [(#UniversalPart, 0.25), (#SpeedChip, 0.20), (#PowerCoreFragment, 0.20), (#ThrusterKit, 0.20), (#GyroModule, 0.15)];
-                };
-                case (#DeadMachineFields) {
-                  // Mostly specialized parts, rare universal
-                  [(#UniversalPart, 0.10), (#SpeedChip, 0.25), (#PowerCoreFragment, 0.25), (#ThrusterKit, 0.20), (#GyroModule, 0.20)];
-                };
-              };
-
-              // Calculate parts per type
-              var speedChipsFound = 0;
-              var powerCoreFragmentsFound = 0;
-              var thrusterKitsFound = 0;
-              var gyroModulesFound = 0;
-              var universalPartsFound = 0;
-
-              for ((partType, percentage) in partDistribution.vals()) {
-                let amount = Int.abs(Float.toInt(Float.fromInt(partsFound) * percentage));
-                switch (partType) {
-                  case (#SpeedChip) { speedChipsFound := amount };
-                  case (#PowerCoreFragment) {
-                    powerCoreFragmentsFound := amount;
-                  };
-                  case (#ThrusterKit) { thrusterKitsFound := amount };
-                  case (#GyroModule) { gyroModulesFound := amount };
-                  case (#UniversalPart) { universalPartsFound := amount };
-                };
-              };
-
-              // Ensure at least 1 of something if total > 0
-              if (partsFound > 0 and speedChipsFound + powerCoreFragmentsFound + thrusterKitsFound + gyroModulesFound + universalPartsFound == 0) {
-                universalPartsFound := partsFound; // Fallback to all universal
-              };
-
-              switch (Map.get(userInventories, phash, owner)) {
-                case (null) {
-                  // Create new inventory
-                  let newInventory : UserInventory = {
-                    owner = owner;
-                    speedChips = speedChipsFound;
-                    powerCoreFragments = powerCoreFragmentsFound;
-                    thrusterKits = thrusterKitsFound;
-                    gyroModules = gyroModulesFound;
-                    universalParts = universalPartsFound;
-                  };
-                  ignore Map.put(userInventories, phash, owner, newInventory);
-                };
-                case (?inv) {
-                  let updatedInv = {
-                    owner = inv.owner;
-                    speedChips = inv.speedChips + speedChipsFound;
-                    powerCoreFragments = inv.powerCoreFragments + powerCoreFragmentsFound;
-                    thrusterKits = inv.thrusterKits + thrusterKitsFound;
-                    gyroModules = inv.gyroModules + gyroModulesFound;
-                    universalParts = inv.universalParts + universalPartsFound;
-                  };
-                  ignore Map.put(userInventories, phash, owner, updatedInv);
-                };
-              };
-
-              #ok({
-                partsFound = partsFound;
-                speedChips = speedChipsFound;
-                powerCoreFragments = powerCoreFragmentsFound;
-                thrusterKits = thrusterKitsFound;
-                gyroModules = gyroModulesFound;
-                universalParts = universalPartsFound;
-                batteryConsumed = actualBatteryConsumed;
-                conditionLost = actualConditionLost;
-                worldBuffApplied = worldBuffApplied;
-                worldBuff = worldBuff;
-                events = events;
-              });
-            };
-          };
-        };
-      };
-    }; */
 
     /// NEW: Complete continuous scavenging mission (collect rewards anytime)
     public func completeScavengingMissionV2(

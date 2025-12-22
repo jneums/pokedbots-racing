@@ -275,8 +275,21 @@ function RaceCard({ raceId }: { raceId: bigint }) {
           <div className="text-center p-3 bg-card/50 border border-primary/20 rounded-lg">
             <p className="text-xs text-muted-foreground mb-1">Entries</p>
             <p className="text-base font-bold text-primary">{entryCount}/{Number(race.maxEntries)}</p>
+            <p className="text-xs text-muted-foreground mt-1">Min: {Number(race.minEntries)}</p>
           </div>
         </div>
+
+        {/* Cancellation Risk Warning */}
+        {isUpcoming && entryCount < Number(race.minEntries) && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+            <p className="text-sm text-yellow-600 font-semibold">
+              ⚠️ Race at risk of cancellation
+            </p>
+            <p className="text-xs text-yellow-600/80 mt-1">
+              Needs {Number(race.minEntries) - entryCount} more {Number(race.minEntries) - entryCount === 1 ? 'entry' : 'entries'} to proceed (minimum {Number(race.minEntries)} required)
+            </p>
+          </div>
+        )}
 
         {/* Enter Race Button */}
         {userEnteredBots.length > 0 && (

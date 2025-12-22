@@ -87,6 +87,7 @@ export default defineConfig(({ mode }) => {
           manualChunks: {
             'react-vendor': ['react', 'react-dom', 'react-router-dom'],
             'ui-vendor': ['@radix-ui/react-slot', '@radix-ui/react-tabs'],
+            'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
           },
         },
       },

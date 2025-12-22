@@ -89,6 +89,16 @@ module {
         case (?r) { r };
       };
 
+      let now = Time.now();
+
+      // Check if registration is open for this race's event
+      switch (ctx.checkRegistrationWindow(raceId, now)) {
+        case (#err(msg)) {
+          return ToolContext.makeError(msg, cb);
+        };
+        case (#ok()) {};
+      };
+
       // Get bot stats and verify registered owner
       var botStats = switch (ctx.garageManager.getStats(tokenIndex)) {
         case (null) {
@@ -102,8 +112,6 @@ module {
           stats;
         };
       };
-
-      let now = Time.now();
 
       // Allow race entry even if bot is scavenging - they'll be pulled when race starts
       // No need to check or pull from scavenging here

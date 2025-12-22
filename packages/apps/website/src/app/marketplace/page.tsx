@@ -3,11 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Alert, AlertDescription } from '../../components/ui/alert';
+import { Input } from '../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { PurchaseDialog } from '../../components/PurchaseDialog';
 import { useAuth } from '../../hooks/useAuth';
 import { useInfiniteMarketplace, usePurchaseBot } from '../../hooks/useMarketplace';
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus } from '../../lib/utils';
 import { AlertCircle, ChevronDown } from 'lucide-react';
 
 interface PurchaseDialogState {
@@ -27,6 +29,7 @@ export default function MarketplacePage() {
   const [maxRating, setMaxRating] = useState<string>('');
   const [faction, setFaction] = useState<string>('');
   const [raceClass, setRaceClass] = useState<string>('');
+  const [tokenIndexSearch, setTokenIndexSearch] = useState<string>('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { mutate: purchaseBot } = usePurchaseBot();
   const [showLoginAlert, setShowLoginAlert] = useState(false);
@@ -87,6 +90,7 @@ export default function MarketplacePage() {
     maxRating: maxRating ? parseInt(maxRating) : undefined,
     faction: faction || undefined,
     raceClass: raceClass || undefined,
+    tokenIndex: tokenIndexSearch || undefined,
     limit: 20 
   });
 
@@ -163,6 +167,18 @@ export default function MarketplacePage() {
                 {filtersOpen && (
                   <CardContent>
                     <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Token Index</label>
+                <Input
+                  type="number"
+                  placeholder="Search by token index..."
+                  value={tokenIndexSearch}
+                  onChange={(e) => setTokenIndexSearch(e.target.value)}
+                  className="w-full"
+                  min="0"
+                  max="9999"
+                />
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Min Price (ICP)</label>
@@ -258,10 +274,11 @@ export default function MarketplacePage() {
                   </SelectContent>
                 </Select>
               </div>
-                      {(minPrice || maxPrice || minRating || maxRating || faction || raceClass) && (
+                      {(tokenIndexSearch || minPrice || maxPrice || minRating || maxRating || faction || raceClass) && (
                         <Button
                           variant="outline"
                           onClick={() => {
+                            setTokenIndexSearch('');
                             setMinPrice('');
                             setMaxPrice('');
                             setMinRating('');
@@ -286,6 +303,18 @@ export default function MarketplacePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium">Token Index</label>
+                      <Input
+                        type="number"
+                        placeholder="Search by token index..."
+                        value={tokenIndexSearch}
+                        onChange={(e) => setTokenIndexSearch(e.target.value)}
+                        className="w-full"
+                        min="0"
+                        max="9999"
+                      />
+                    </div>
                     <div className="flex flex-col gap-2">
                       <label className="text-sm font-medium">Min Price (ICP)</label>
                       <input
@@ -377,10 +406,11 @@ export default function MarketplacePage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    {(minPrice || maxPrice || minRating || maxRating || faction || raceClass) && (
+                    {(tokenIndexSearch || minPrice || maxPrice || minRating || maxRating || faction || raceClass) && (
                       <Button
                         variant="outline"
                         onClick={() => {
+                          setTokenIndexSearch('');
                           setMinPrice('');
                           setMaxPrice('');
                           setMinRating('');
@@ -510,10 +540,26 @@ export default function MarketplacePage() {
                             </div>
                           )}
                         </div>
+                        {listing.faction && (
+                          <div className="flex items-center gap-1 text-xs flex-wrap pt-2">
+                            <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400 px-2 py-0">
+                              {getTerrainIcon(getTerrainPreference(listing.backgroundColor, listing.faction))} {getTerrainName(getTerrainPreference(listing.backgroundColor, listing.faction))} 
+                              {(() => {
+                                const terrain = getTerrainPreference(listing.backgroundColor, listing.faction);
+                                const bonus = getFactionTerrainBonus(listing.faction, terrain);
+                                return bonus ? ` (${bonus})` : ' (+5%)';
+                              })()}
+                            </Badge>
+                            <Badge variant="outline" className="border-blue-500/50 text-blue-600 dark:text-blue-400 px-2 py-0">
+                              {getFactionBonus(listing.faction)}
+                            </Badge>
+                          </div>
+                        )}
                       </div>
                       <Button 
                         className="w-full mt-4" 
                         variant="default"
+                        disabled={!user}
                         onClick={() => handlePurchaseClick(
                           listing.tokenIndex, 
                           listing.price,
@@ -521,7 +567,7 @@ export default function MarketplacePage() {
                           listing.overallRating
                         )}
                       >
-                        Purchase
+                        {user ? 'Purchase' : 'Connect Wallet'}
                       </Button>
                     </CardContent>
                   </Card>

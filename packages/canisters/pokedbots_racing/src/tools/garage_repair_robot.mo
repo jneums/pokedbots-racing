@@ -24,7 +24,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_repair_robot";
     title = ?"Repair Robot Condition";
-    description = ?"Repair a robot to restore condition. Costs 0.05 ICP + 0.0001 ICP transfer fee. Restores 25 Condition. Cooldown: 3 hours. ⚠️ RESETS OVERCHARGE to 0% (prevents repair->recharge exploit).";
+    description = ?"Repair a robot to restore condition. Costs 0.05 ICP + 0.0001 ICP transfer fee. Restores 25 Condition. Cooldown: 3 hours.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -136,7 +136,6 @@ module {
             let updatedStats = {
               racingStats with
               condition = Nat.min(100, racingStats.condition + 25);
-              overcharge = 0; // Reset overcharge to prevent repair->recharge exploit
               lastRepaired = ?now;
             };
 

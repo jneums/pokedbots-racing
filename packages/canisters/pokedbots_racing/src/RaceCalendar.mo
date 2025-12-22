@@ -379,10 +379,10 @@ module {
     public func createWeeklyLeagueEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Weekly League Championship";
-        description = "Major competitive event - Entry scales by class (Scrap 0.1, Junker 0.2, Raider 0.3, Elite 0.4, SilentKlan 0.6 ICP). All classes receive platform bonus to guarantee top 3 profitability.";
-        entryFee = 20_000_000; // 0.2 ICP base (Junker)
+        description = "Major competitive event - Entry scales by class (Scrap 0.2, Junker 0.4, Raider 0.6, Elite 0.8, SilentKlan 1.2 ICP). All classes receive platform bonus to guarantee top 3 profitability.";
+        entryFee = 40_000_000; // 0.4 ICP base (Junker)
         maxEntries = 50; // Multiple heats if needed
-        minEntries = 6;
+        minEntries = 4;
         prizePoolBonus = 200_000_000; // Platform adds 2 ICP
         pointsMultiplier = 2.0; // Double points
         divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan]; // All divisions
@@ -402,13 +402,13 @@ module {
     public func createDailySprintEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Daily Sprint Challenge";
-        description = "Quick race for XP and rewards - Entry scales by class (Scrap 0.025, Junker 0.05, Raider 0.075, Elite 0.1 ICP). All classes receive platform bonus.";
-        entryFee = 5_000_000; // 0.05 ICP base (Junker)
+        description = "Quick race for XP and rewards - Entry scales by class (Scrap 0.05, Junker 0.1, Raider 0.15, Elite 0.2, SilentKlan 0.3 ICP). All classes receive platform bonus.";
+        entryFee = 10_000_000; // 0.1 ICP base (Junker)
         maxEntries = 12;
         minEntries = 2;
         prizePoolBonus = 50_000_000; // Platform adds 0.5 ICP (Junker base)
         pointsMultiplier = 1.0; // Standard points
-        divisions = [#Scrap, #Junker, #Raider, #Elite]; // Include all daily tiers
+        divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan]; // All tiers
       };
 
       scheduleEvent(
@@ -421,12 +421,35 @@ module {
       );
     };
 
+    // Create Weekly Scrap event (beginner-friendly)
+    public func createWeeklyScrapEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
+      let metadata : EventMetadata = {
+        name = "Weekly Scrap Showdown";
+        description = "Beginner race for Scrap bots - Entry 0.1 ICP with platform bonus to ensure profits for top finishers.";
+        entryFee = 10_000_000; // 0.1 ICP (Scrap tier)
+        maxEntries = 12;
+        minEntries = 4;
+        prizePoolBonus = 40_000_000; // Platform adds 0.4 ICP
+        pointsMultiplier = 1.5; // 1.5x points
+        divisions = [#Scrap]; // Scrap only
+      };
+
+      scheduleEvent(
+        #WeeklyLeague,
+        scheduledTime,
+        scheduledTime - (48 * 3600 * 1_000_000_000), // Opens 48h before
+        scheduledTime - (30 * 60 * 1_000_000_000), // Closes 30 min before
+        metadata,
+        now,
+      );
+    };
+
     // Create Monthly Cup event
     public func createMonthlyCupEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Monthly Championship Cup";
-        description = "Elite tournament - Entry scales by class (Elite 1.0, SilentKlan 1.5 ICP). Platform bonus ensures competitive prize pools.";
-        entryFee = 50_000_000; // 0.5 ICP base (Elite)
+        description = "Elite tournament - Entry scales by class (Elite 2.0, SilentKlan 3.0 ICP). Platform bonus ensures competitive prize pools.";
+        entryFee = 100_000_000; // 1.0 ICP base (Elite)
         maxEntries = 64; // Top 64 qualify
         minEntries = 16; // At least 16 for bracket
         prizePoolBonus = 500_000_000; // Platform adds 5 ICP

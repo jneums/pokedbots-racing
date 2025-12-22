@@ -7,11 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetRaceById, useGetBotProfile } from "@/hooks/useRacing";
 import { useMyBots, useEnterRace } from "@/hooks/useGarage";
 import { useAuth } from "@/hooks/useAuth";
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
 import { RaceVisualizer } from '@/components/RaceVisualizer';
+import { RacePlayback } from '@/components/Track3D';
+import { getTrackTemplate } from '@/components/Track3D/trackData';
 import { toast } from 'sonner';
 
 function formatICP(amount: bigint): string {
@@ -67,6 +70,98 @@ function BotName({ tokenIndex }: { tokenIndex: number }) {
   }
   
   return <>Bot #{tokenIndex}</>;
+}
+
+function RacePlayback3DWrapper({ race }: { race: any }) {
+  // Fetch all bot profiles
+  const botProfiles = race.entries.map((entry: any) => {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const { data } = useGetBotProfile(Number(entry.nftId));
+    return data;
+  });
+
+  const allLoaded = botProfiles.every((p: any) => p !== undefined);
+
+  const trackId = Number((race as any).trackId) || 1;
+  const track = getTrackTemplate(trackId);
+  
+  if (!track) {
+    return (
+      <div className="text-center p-8 text-muted-foreground">
+        Track data not available
+      </div>
+    );
+  }
+
+  if (!allLoaded) {
+    return (
+      <div className="w-full h-96 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading 3D visualization...</p>
+      </div>
+    );
+  }
+  
+  // Check if race is completed with results
+  if ('Completed' in race.status && race.results && race.results.length > 0 && race.results[0]) {
+    const finalResults = race.results[0];
+    
+    // Prepare race results for playback
+    const raceResults = finalResults.map((result: any) => {
+      const statsData = result.stats && result.stats.length > 0 && result.stats[0] ? result.stats[0] : result.stats;
+      
+      const finalStats = statsData ? {
+        speed: Number(statsData.speed),
+        stability: Number(statsData.stability),
+        powerCore: Number(statsData.powerCore),
+        acceleration: Number(statsData.acceleration),
+      } : undefined;
+      
+      return {
+        nftId: Number(result.nftId),
+        finalTime: Number(result.finalTime),
+        segmentTimes: result.segmentTimes ? result.segmentTimes.map((t: any) => Number(t)) : [],
+        position: result.position || 0,
+        stats: finalStats,
+        faction: result.faction,
+        preferredTerrain: result.preferredTerrain,
+      };
+    });
+    
+    // Create bot colors and labels
+    const botColors: Record<number, string> = {};
+    const botLabels: Record<number, string> = {};
+    
+    race.entries.forEach((entry: any) => {
+      const nftId = Number(entry.nftId);
+      botColors[nftId] = `hsl(${(nftId * 137.5) % 360}, 70%, 50%)`;
+      // Use bot profile name if available
+      const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === nftId);
+      botLabels[nftId] = (profile?.name?.[0] && profile.name[0].length > 0) 
+        ? profile.name[0] 
+        : `Bot #${nftId}`;
+    });
+    
+    return (
+      <RacePlayback
+        track={track}
+        results={raceResults}
+        botColors={botColors}
+        botLabels={botLabels}
+      />
+    );
+  }
+  
+  // Race not completed yet, show message
+  return (
+    <div className="text-center p-8 space-y-4">
+      <p className="text-muted-foreground">
+        3D race playback will be available once the race is completed
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Track: {track.name}
+      </p>
+    </div>
+  );
 }
 
 function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrain, botOrder, raceStartTime, raceStatus }: {
@@ -425,21 +520,32 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
                race.entries.length > 1 && 
                race.entries[0]?.stats && (
                 <div className="mb-4">
-                  <RaceVisualizerWithStats
-                    results={race.results && race.results.length > 0 && race.results[0] ? race.results[0] : race.entries.map((entry: any, idx: number) => ({
-                      nftId: entry.nftId,
-                      finalTime: null,
-                      position: idx + 1,
-                      stats: entry.stats,
-                    }))}
-                    trackSeed={BigInt((race as any).trackSeed)}
-                    trackId={Number((race as any).trackId) || 1}
-                    distance={Number(race.distance)}
-                    terrain={race.terrain}
-                    botOrder={race.entries.map((entry: any) => entry.nftId)}
-                    raceStartTime={race.startTime}
-                    raceStatus={race.status}
-                  />
+                  <Tabs defaultValue="2d" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 mb-4">
+                      <TabsTrigger value="2d">2D Race View</TabsTrigger>
+                      <TabsTrigger value="3d">3D Track View</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="2d">
+                      <RaceVisualizerWithStats
+                        results={race.results && race.results.length > 0 && race.results[0] ? race.results[0] : race.entries.map((entry: any, idx: number) => ({
+                          nftId: entry.nftId,
+                          finalTime: null,
+                          position: idx + 1,
+                          stats: entry.stats,
+                        }))}
+                        trackSeed={BigInt((race as any).trackSeed)}
+                        trackId={Number((race as any).trackId) || 1}
+                        distance={Number(race.distance)}
+                        terrain={race.terrain}
+                        botOrder={race.entries.map((entry: any) => entry.nftId)}
+                        raceStartTime={race.startTime}
+                        raceStatus={race.status}
+                      />
+                    </TabsContent>
+                    <TabsContent value="3d">
+                      <RacePlayback3DWrapper race={race} />
+                    </TabsContent>
+                  </Tabs>
                 </div>
               )}
 

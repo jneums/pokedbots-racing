@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useGetBotProfile, useGetBotRaceHistory } from '@/hooks/useRacing';
+import { useBackgrounds } from '@/hooks/useBackgrounds';
 import { generatetokenIdentifier, generateExtThumbnailLink, generateExtAssetLink } from '@pokedbots-racing/ic-js';
+import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus } from '@/lib/utils';
 
 function formatICP(amount: bigint): string {
   const icp = Number(amount) / 100_000_000;
@@ -54,6 +56,7 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
   const navigate = useNavigate();
   const { data: profile, isLoading } = useGetBotProfile(Number(tokenIndex));
   const { data: raceHistory, isLoading: historyLoading } = useGetBotRaceHistory(Number(tokenIndex), 10);
+  const { data: backgroundData } = useBackgrounds();
 
   if (isLoading || !profile) {
     return (
@@ -78,6 +81,11 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
   const winRate = racesEntered > 0
     ? ((wins / racesEntered) * 100).toFixed(1)
     : '0';
+
+  // Get actual background color for terrain preference
+  const backgroundColor = backgroundData?.backgrounds[tokenIndex];
+  const terrainPreference = getTerrainPreference(backgroundColor, faction);
+  const factionTerrainBonus = getFactionTerrainBonus(faction, terrainPreference);
 
   const ownerPrincipal = profile.owner?.toString();
   const formatPrincipal = (principal: string): string => {
@@ -116,7 +124,7 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
                 {profile.name && profile.name.length > 0 && profile.name[0] ? `PokedBot #${tokenIndex} - ${profile.name[0]}` : `PokedBot #${tokenIndex}`}
               </h1>
               
-              <div className="flex gap-2 mb-4">
+              <div className="flex gap-2 mb-4 flex-wrap">
                 <Badge className={`bg-gradient-to-r ${getFactionColor(faction)} text-white`}>
                   {faction}
                 </Badge>
@@ -124,6 +132,12 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
                 <Badge variant="secondary">Rating: {profile.stats.overallRating}/100</Badge>
                 <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
                   ⚡ ELO: {profile.eloRating}
+                </Badge>
+                <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400">
+                  {getTerrainIcon(terrainPreference)} {getTerrainName(terrainPreference)} {factionTerrainBonus ? `(${factionTerrainBonus})` : '(+5%)'}
+                </Badge>
+                <Badge variant="outline" className="border-blue-500/50 text-blue-600 dark:text-blue-400">
+                  {getFactionBonus(faction)}
                 </Badge>
               </div>
 

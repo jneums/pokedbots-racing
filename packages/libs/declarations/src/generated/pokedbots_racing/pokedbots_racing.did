@@ -360,6 +360,8 @@ type McpServer =
                                                      nat;
                                                      text;
                                                    });
+   cleanup_duplicate_race_create_timers: () -> (text);
+   cleanup_duplicate_recharge_timers: () -> (text);
    clear_reconstitution_traces: () -> ();
    /// * Creates a new API key. This API key is linked to the caller's principal.
    ///    * @param name A human-readable name for the key.
@@ -762,6 +764,7 @@ type McpServer =
         eligibleRaces:
          vec
           record {
+            entryDeadline: int;
             entryFee: nat;
             name: text;
             raceId: nat;
@@ -783,6 +786,7 @@ type McpServer =
         upcomingRaces:
          vec
           record {
+            entryDeadline: int;
             entryFee: nat;
             name: text;
             raceId: nat;
@@ -828,6 +832,7 @@ type McpServer =
         eligibleRaces:
          vec
           record {
+            entryDeadline: int;
             entryFee: nat;
             name: text;
             raceId: nat;
@@ -847,6 +852,7 @@ type McpServer =
         upcomingRaces:
          vec
           record {
+            entryDeadline: int;
             entryFee: nat;
             name: text;
             raceId: nat;

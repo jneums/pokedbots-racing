@@ -21,21 +21,45 @@ module {
     let SECONDS_PER_DAY : Int = 86400;
 
     let seconds = timestamp / NANOS_PER_SECOND;
-    let days = seconds / SECONDS_PER_DAY;
+    var days = seconds / SECONDS_PER_DAY;
 
     // January 1, 1970 was a Thursday
-    // Calculate approximate year and month
-    let yearsSince1970 = Int.abs(days / 365);
-    let year = 1970 + yearsSince1970;
+    // Days in each month (non-leap year)
+    let monthDays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-    // Calculate day of year (approximate)
-    let dayOfYear = Int.abs(days % 365);
+    var year = 1970;
+    var month = 1;
 
-    // Approximate month (30.44 days per month average)
-    let month = Int.abs((dayOfYear * 12) / 365) + 1;
-    let monthClamped = if (month > 12) { 12 } else { month };
+    // Iterate through years to find the correct year
+    label yearLoop loop {
+      let isLeapYear = (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0);
+      let daysInYear = if (isLeapYear) { 366 } else { 365 };
 
-    (year * 100) + monthClamped; // YYYYMM format
+      if (days < daysInYear) {
+        break yearLoop;
+      };
+
+      days := days - daysInYear;
+      year := year + 1;
+    };
+
+    // Find the correct month within the year
+    let isLeapYear = (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0);
+    label monthLoop for (i in Iter.range(0, 11)) {
+      var daysInMonth = monthDays[i];
+      if (i == 1 and isLeapYear) {
+        daysInMonth := 29; // February in leap year
+      };
+
+      if (days < daysInMonth) {
+        month := i + 1;
+        break monthLoop;
+      };
+
+      days := days - daysInMonth;
+    };
+
+    (year * 100) + month; // YYYYMM format
   };
 
   // Calculate season ID from timestamp
@@ -243,9 +267,13 @@ module {
       let isWin = position == 1;
       let isPodium = position <= 3;
 
+      // Calculate the correct period IDs from the race time
+      let raceMonthId = getMonthIdFromTime(raceTime);
+      let raceSeasonId = getSeasonIdFromTime(raceTime);
+
       // Update monthly leaderboard
       updateLeaderboardEntry(
-        #Monthly(currentMonthId),
+        #Monthly(raceMonthId),
         tokenIndex,
         owner,
         points,
@@ -259,7 +287,7 @@ module {
 
       // Update season leaderboard
       updateLeaderboardEntry(
-        #Season(currentSeasonId),
+        #Season(raceSeasonId),
         tokenIndex,
         owner,
         points,

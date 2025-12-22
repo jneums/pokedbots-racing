@@ -249,6 +249,60 @@ Players pay ICP for bot upgrades with dynamic RNG-based pricing.
 
 ---
 
+## Worst-Case Scenario: New Player Analysis
+
+### Scenario: $15 Investment, Elite Races Only, No Wins
+
+**Assumptions:**
+- Player starts with $15 USD
+- ICP price: **$3 USD/ICP** → **5.0 ICP starting balance**
+- Target: Elite Daily Sprint races (4 per day)
+- Elite entry fee: **0.10 ICP per race** (current system)
+- Outcome: No wins (worst case)
+- Maintenance: Included in analysis
+
+**Daily Cost Breakdown:**
+- 4 Elite races × 0.10 ICP = **0.4 ICP/day** in entry fees
+- Maintenance costs:
+  - 1 Recharge per day (0.1 ICP) = **0.1 ICP/day**
+  - Occasional repairs (0.05 ICP avg) = **~0.02 ICP/day average**
+- **Total daily cost: 0.52 ICP/day**
+
+**How Long Can They Race?**
+- Starting balance: 5.0 ICP
+- Daily cost: 0.52 ICP
+- **Duration: 9.6 days of racing**
+- **Total races entered: ~38-39 Elite races**
+
+**Financial Summary:**
+- Initial investment: $15 (5.0 ICP)
+- Total races: 38-39 Elite races
+- Cost per race: ~$0.30 USD (0.10 ICP)
+- Maintenance: ~$1.80 (0.6 ICP for recharge/repairs over 10 days)
+- ROI: $0 (no wins assumed)
+- **Net loss: -$15 (-100%)**
+
+**Key Insights:**
+1. **Reasonable for learning:** 38-39 races provides substantial opportunity to learn and improve
+2. **Cost per race:** At $0.30/race, this is affordable entertainment value
+3. **Reality check:** Winning even 1-2 races significantly extends racing duration:
+   - 1 win @ 5th place or better recovers 0.3-1.5 ICP
+   - 2-3 wins could extend racing by 5-10 additional races
+4. **Elite class reality:** With 38 races, players have real opportunity to:
+   - Learn race mechanics and strategy
+   - Win some races and recover costs
+   - Build competitive experience
+
+**Expected Outcome (More Realistic):**
+- 38 races entered
+- Expected wins: 3-8 races (8-20% win rate for average player)
+- Prize money: ~1.5-4.0 ICP recovered
+- **Effective cost: $10.50-15.00 for 38 races**
+- **Cost per race: ~$0.28-0.39 USD**
+- **Net loss: -$10.50 to -$15 (70-100%)**
+
+---
+
 ## Conclusion
 
 **The platform economics are viable with:**

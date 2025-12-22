@@ -365,24 +365,8 @@ module {
       let positionValue = (mixedSeed / 13) % 1000;
       let positionBonus = 0.90 + (Float.fromInt(positionValue) / 5000.0); // 0.90 to 1.10
 
-      // Stat interaction bonus (synergy between complementary stats)
-      let statSynergy = if (
-        (speed > 80 and acceleration > 80) or // Speed demons
-        (powerCore > 80 and stability > 80) or // Endurance tanks
-        (speed > 75 and powerCore > 75 and acceleration > 75 and stability > 75) // Well-rounded
-      ) {
-        0.95; // 5% bonus for synergistic builds
-      } else if (
-        (speed < 40 and powerCore < 40) or // Double weakness
-        (acceleration < 40 and stability < 40),
-      ) {
-        1.08; // 8% penalty for double weaknesses
-      } else {
-        1.0;
-      };
-
       // Final time with all modifiers
-      let finalTime = baseTime * terrainMod * distanceMod * raceChaos * botRandom * positionBonus * statSynergy;
+      let finalTime = baseTime * terrainMod * distanceMod * raceChaos * botRandom * positionBonus;
       Float.max(1.0, finalTime);
     };
 
@@ -550,8 +534,12 @@ module {
         func(a, b) { Float.compare(a.1, b.1) },
       );
 
-      // Calculate prizes
-      let totalPool = race.prizePool + race.platformBonus;
+      // Calculate prizes (include platform bonus + entry fees + sponsorships - tax)
+      var totalSponsorships : Nat = 0;
+      for (sponsor in race.sponsors.vals()) {
+        totalSponsorships += sponsor.amount;
+      };
+      let totalPool = race.prizePool + race.platformBonus + totalSponsorships;
       let netPrizePool = Nat.sub(totalPool, race.platformTax);
       var results : [RaceResult] = [];
 
@@ -629,8 +617,12 @@ module {
         func(a, b) { Float.compare(a.1, b.1) },
       );
 
-      // Calculate prizes (include platform bonus + entry fees - tax)
-      let totalPool = race.prizePool + race.platformBonus;
+      // Calculate prizes (include platform bonus + entry fees + sponsorships - tax)
+      var totalSponsorships : Nat = 0;
+      for (sponsor in race.sponsors.vals()) {
+        totalSponsorships += sponsor.amount;
+      };
+      let totalPool = race.prizePool + race.platformBonus + totalSponsorships;
       let netPrizePool = Nat.sub(totalPool, race.platformTax);
       var results : [RaceResult] = [];
 

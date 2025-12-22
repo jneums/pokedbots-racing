@@ -8,12 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 import { Battery, Wrench } from 'lucide-react';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
+import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus } from '../lib/utils';
 
 interface BotCardProps {
   bot: BotListItem;
@@ -24,6 +26,18 @@ interface BotCardProps {
   setRecharging: (val: boolean) => void;
   repairing: boolean;
   setRepairing: (val: boolean) => void;
+  enteringRaces: boolean;
+  setEnteringRaces: (val: boolean) => void;
+  rechargeCooldownMultiplier?: number;
+  backgroundColor?: string;
+  inventory?: {
+    owner: string;
+    speedChips: bigint;
+    powerCoreFragments: bigint;
+    thrusterKits: bigint;
+    gyroModules: bigint;
+    universalParts: bigint;
+  };
 }
 
 // Format time relative to now (e.g., "in 2h", "in 5m", "in 3d")
@@ -59,7 +73,7 @@ function getUpgradeDisplayName(upgradeType: string): string {
   return nameMap[upgradeType] || upgradeType;
 }
 
-export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRecharging, repairing, setRepairing }: BotCardProps) {
+export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRecharging, repairing, setRepairing, enteringRaces, setEnteringRaces, rechargeCooldownMultiplier = 1.0, backgroundColor, inventory }: BotCardProps) {
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   const { user } = useAuth();
   const upgradeMutation = useUpgradeBot();
@@ -70,6 +84,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
   const [showTransfer, setShowTransfer] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showScavenging, setShowScavenging] = useState(false);
+  const [showCancelUpgradeConfirm, setShowCancelUpgradeConfirm] = useState(false);
   const [upgradeType, setUpgradeType] = useState<'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro'>('Velocity');
   const [paymentMethod, setPaymentMethod] = useState<'icp' | 'parts'>('parts');
   const [scavengingZone, setScavengingZone] = useState<'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields'>('ScrapHeaps');
@@ -81,7 +96,6 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
   
   // Racing section state - must be at top level
   const [selectedRaces, setSelectedRaces] = useState<Set<number>>(new Set());
-  const [enteringRaces, setEnteringRaces] = useState(false);
 
   const handleInitialize = async () => {
     if (!user?.agent) return;
@@ -530,8 +544,23 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
             </Badge>
           </div>
         </CardTitle>
-        <CardDescription>
-          ELO: {formatBigInt(stats.eloRating)} | Rating: {bot.currentStats ? Math.floor((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4) : '?'}/{bot.maxStats ? Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4) : '100'} | Rep: {formatBigInt(stats.factionReputation)}
+        <CardDescription className="space-y-1">
+          <div>
+            ELO: {formatBigInt(stats.eloRating)} | Rating: {bot.currentStats ? Math.floor((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4) : '?'}/{bot.maxStats ? Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4) : '100'} | Rep: {formatBigInt(stats.factionReputation)}
+          </div>
+          <div className="flex items-center gap-1 text-xs flex-wrap">
+            <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400 px-2 py-0">
+              {getTerrainIcon(getTerrainPreference(backgroundColor, getFactionName(stats.faction)))} {getTerrainName(getTerrainPreference(backgroundColor, getFactionName(stats.faction)))} 
+              {(() => {
+                const terrain = getTerrainPreference(backgroundColor, getFactionName(stats.faction));
+                const bonus = getFactionTerrainBonus(getFactionName(stats.faction), terrain);
+                return bonus ? ` (${bonus})` : ' (+5%)';
+              })()}
+            </Badge>
+            <Badge variant="outline" className="border-blue-500/50 text-blue-600 dark:text-blue-400 px-2 py-0">
+              ⚡ {getFactionBonus(getFactionName(stats.faction))}
+            </Badge>
+          </div>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -588,12 +617,12 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 <div className="text-xs space-y-0.5">
                   <p className="text-muted-foreground">Next race boost:</p>
                   <div className="flex justify-between">
-                    <span className="text-green-600">+{(overcharge * 0.15).toFixed(1)}% Speed/Accel</span>
-                    <span className="text-red-600">-{(overcharge * 0.1).toFixed(1)}% Power/Stab</span>
+                    <span className="text-green-600">+{(overcharge * 0.3).toFixed(1)}% Speed/Accel</span>
+                    <span className="text-red-600">-{(overcharge * 0.2).toFixed(1)}% Power/Stab</span>
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">Recharge at low battery for bonus stats!</p>
+                <p className="text-xs text-muted-foreground">Recharge at low battery (&lt;30%) for overcharge bonus! Boosts speed/accel but reduces stability/power.</p>
               )}
             </div>
           );
@@ -759,8 +788,9 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
 
             // Check cooldowns
             const now = Date.now();
+            const rechargeCooldownMs = 6 * 60 * 60 * 1000 * rechargeCooldownMultiplier; // 6 hours * multiplier
             const rechargeReady = stats.lastRecharged 
-              ? Number(stats.lastRecharged) / 1_000_000 + (6 * 60 * 60 * 1000)
+              ? Number(stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
               : 0;
             const repairReady = stats.lastRepaired
               ? Number(stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
@@ -910,7 +940,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                       variant="outline"
                       size="sm"
                       className="col-span-2"
-                      onClick={handleCancelUpgrade}
+                      onClick={() => setShowCancelUpgradeConfirm(true)}
                       disabled={cancelUpgradeMutation.isPending || loading}
                     >
                       {cancelUpgradeMutation.isPending ? (
@@ -1211,7 +1241,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                           {race.name}
                         </Link>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{formatRelativeTime(race.startTime)}</span>
+                          <span>Cutoff: {formatRelativeTime(race.entryDeadline)}</span>
                           <span>•</span>
                           <span>{Number(race.entryFee) / 100_000_000} ICP</span>
                         </div>
@@ -1254,7 +1284,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                             {race.name}
                           </Link>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{formatRelativeTime(race.startTime)}</span>
+                            <span>Cutoff: {formatRelativeTime(race.entryDeadline)}</span>
                             <span>•</span>
                             <span>{Number(race.entryFee) / 100_000_000} ICP</span>
                           </div>
@@ -1439,21 +1469,21 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 </Button>
                 <Button
                   type="button"
+                  variant={scavengingDuration === 30 ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setScavengingDuration(30)}
+                  className="flex-1"
+                >
+                  30 min
+                </Button>
+                <Button
+                  type="button"
                   variant={scavengingDuration === 60 ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setScavengingDuration(60)}
                   className="flex-1"
                 >
                   1 hr
-                </Button>
-                <Button
-                  type="button"
-                  variant={scavengingDuration === 300 ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setScavengingDuration(300)}
-                  className="flex-1"
-                >
-                  5 hrs
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -1550,6 +1580,54 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Max Stats at 100% Condition */}
+            {bot.maxStats && (
+              <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Max Stats (100% Condition)</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">⚡ Speed:</span>
+                    <span className="font-medium">{formatBigInt(bot.maxStats.speed)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">🔋 Power:</span>
+                    <span className="font-medium">{formatBigInt(bot.maxStats.powerCore)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">🚀 Accel:</span>
+                    <span className="font-medium">{formatBigInt(bot.maxStats.acceleration)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">🎯 Stability:</span>
+                    <span className="font-medium">{formatBigInt(bot.maxStats.stability)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Current Parts Inventory */}
+            {inventory && (
+              <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Your Parts Inventory</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">⚡ Velocity:</span>
+                    <span className="font-medium">{formatBigInt(inventory.speedChips)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">🔋 Power Core:</span>
+                    <span className="font-medium">{formatBigInt(inventory.powerCoreFragments)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">🚀 Thruster:</span>
+                    <span className="font-medium">{formatBigInt(inventory.thrusterKits)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">🎯 Gyro:</span>
+                    <span className="font-medium">{formatBigInt(inventory.gyroModules)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="upgrade-type">Stat to Upgrade</Label>
               <Select value={upgradeType} onValueChange={(value: any) => setUpgradeType(value)}>
@@ -1641,6 +1719,33 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel Upgrade Confirmation Dialog */}
+      <AlertDialog open={showCancelUpgradeConfirm} onOpenChange={setShowCancelUpgradeConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Upgrade?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel this upgrade? You will receive a full refund of your payment.
+              {bot.activeUpgrade && (
+                <div className="mt-2 p-2 bg-muted rounded-md text-sm">
+                  <p className="font-medium">Current upgrade:</p>
+                  <p>{getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])}</p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, keep upgrade</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelUpgrade}
+              disabled={cancelUpgradeMutation.isPending}
+            >
+              {cancelUpgradeMutation.isPending ? 'Cancelling...' : 'Yes, cancel upgrade'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

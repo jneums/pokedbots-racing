@@ -200,26 +200,40 @@ module {
 
       // Calculate next upgrade costs using V2 dynamic formula with Game faction synergy
       let synergies = ctx.garageManager.calculateFactionSynergies(user);
+      // Calculate base stats safely to avoid underflow
+      let speedBaseForCost = if (currentStats.speed >= racingStats.speedBonus) {
+        currentStats.speed - racingStats.speedBonus;
+      } else { 0 };
+      let powerCoreBaseForCost = if (currentStats.powerCore >= racingStats.powerCoreBonus) {
+        currentStats.powerCore - racingStats.powerCoreBonus;
+      } else { 0 };
+      let accelerationBaseForCost = if (currentStats.acceleration >= racingStats.accelerationBonus) {
+        currentStats.acceleration - racingStats.accelerationBonus;
+      } else { 0 };
+      let stabilityBaseForCost = if (currentStats.stability >= racingStats.stabilityBonus) {
+        currentStats.stability - racingStats.stabilityBonus;
+      } else { 0 };
+
       let speedUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
-        currentStats.speed - racingStats.speedBonus,
+        speedBaseForCost,
         currentStats.speed,
         overallRating,
         synergies.costMultipliers.upgradeCost,
       );
       let powerCoreUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
-        currentStats.powerCore - racingStats.powerCoreBonus,
+        powerCoreBaseForCost,
         currentStats.powerCore,
         overallRating,
         synergies.costMultipliers.upgradeCost,
       );
       let accelerationUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
-        currentStats.acceleration - racingStats.accelerationBonus,
+        accelerationBaseForCost,
         currentStats.acceleration,
         overallRating,
         synergies.costMultipliers.upgradeCost,
       );
       let stabilityUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
-        currentStats.stability - racingStats.stabilityBonus,
+        stabilityBaseForCost,
         currentStats.stability,
         overallRating,
         synergies.costMultipliers.upgradeCost,
@@ -227,10 +241,24 @@ module {
 
       // Calculate success rates and pity bonus
       let pityCounter = ctx.garageManager.getPityCounter(tokenIndex);
-      let speedAttempt = currentStats.speed - (currentStats.speed - racingStats.speedBonus);
-      let powerCoreAttempt = currentStats.powerCore - (currentStats.powerCore - racingStats.powerCoreBonus);
-      let accelerationAttempt = currentStats.acceleration - (currentStats.acceleration - racingStats.accelerationBonus);
-      let stabilityAttempt = currentStats.stability - (currentStats.stability - racingStats.stabilityBonus);
+      // Calculate base stats (current stats minus bonuses, but ensure no underflow)
+      let speedBase = if (currentStats.speed >= racingStats.speedBonus) {
+        currentStats.speed - racingStats.speedBonus;
+      } else { 0 };
+      let powerCoreBase = if (currentStats.powerCore >= racingStats.powerCoreBonus) {
+        currentStats.powerCore - racingStats.powerCoreBonus;
+      } else { 0 };
+      let accelerationBase = if (currentStats.acceleration >= racingStats.accelerationBonus) {
+        currentStats.acceleration - racingStats.accelerationBonus;
+      } else { 0 };
+      let stabilityBase = if (currentStats.stability >= racingStats.stabilityBonus) {
+        currentStats.stability - racingStats.stabilityBonus;
+      } else { 0 };
+
+      let speedAttempt = speedBase;
+      let powerCoreAttempt = powerCoreBase;
+      let accelerationAttempt = accelerationBase;
+      let stabilityAttempt = stabilityBase;
 
       let speedSuccessRate = ctx.garageManager.calculateSuccessRate(speedAttempt, pityCounter);
       let powerCoreSuccessRate = ctx.garageManager.calculateSuccessRate(powerCoreAttempt, pityCounter);

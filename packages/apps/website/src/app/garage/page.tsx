@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyBots, useUserInventory, useCollectionBonuses, useUserWalletNFTs } from '../../hooks/useGarage';
+import { useBackgrounds } from '../../hooks/useBackgrounds';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -61,12 +62,14 @@ export default function GaragePage() {
   const [botLoadingStates, setBotLoadingStates] = useState<Map<string, boolean>>(new Map());
   const [botRechargingStates, setBotRechargingStates] = useState<Map<string, boolean>>(new Map());
   const [botRepairingStates, setBotRepairingStates] = useState<Map<string, boolean>>(new Map());
+  const [botEnteringRacesStates, setBotEnteringRacesStates] = useState<Map<string, boolean>>(new Map());
   
   // Use React Query hooks - isFetching is true during both initial load and refetch
   const { data: bots = [], isLoading, isFetching, error: botsError } = useMyBots();
   const { data: inventory, isLoading: inventoryLoading, refetch: refetchInventory } = useUserInventory();
   const { data: bonuses, isLoading: bonusesLoading } = useCollectionBonuses();
   const { data: walletNFTs = [], isLoading: walletNFTsLoading, error: walletNFTsError } = useUserWalletNFTs();
+  const { data: backgroundData } = useBackgrounds();
   
   // Use isFetching for loading state (shows on both initial load and manual refetch)
   const loading = isFetching;
@@ -729,6 +732,11 @@ export default function GaragePage() {
                 setRecharging={(val) => setBotRechargingStates(new Map(botRechargingStates.set(selectedBot.tokenIndex.toString(), val)))}
                 repairing={botRepairingStates.get(selectedBot.tokenIndex.toString()) || false}
                 setRepairing={(val) => setBotRepairingStates(new Map(botRepairingStates.set(selectedBot.tokenIndex.toString(), val)))}
+                enteringRaces={botEnteringRacesStates.get(selectedBot.tokenIndex.toString()) || false}
+                setEnteringRaces={(val) => setBotEnteringRacesStates(new Map(botEnteringRacesStates.set(selectedBot.tokenIndex.toString(), val)))}
+                rechargeCooldownMultiplier={bonuses?.costMultipliers.rechargeCooldown}
+                backgroundColor={backgroundData?.backgrounds[selectedBot.tokenIndex.toString()]}
+                inventory={inventory}
               />
             ) : (
               <Card className="border-2 border-primary/20 bg-card/80 backdrop-blur">

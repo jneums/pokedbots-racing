@@ -426,6 +426,8 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Text))],
         [],
       ),
+    'cleanup_duplicate_race_create_timers' : IDL.Func([], [IDL.Text], []),
+    'cleanup_duplicate_recharge_timers' : IDL.Func([], [IDL.Text], []),
     'clear_reconstitution_traces' : IDL.Func([], [], []),
     'create_my_api_key' : IDL.Func(
         [IDL.Text, IDL.Vec(IDL.Text)],
@@ -929,6 +931,7 @@ export const idlFactory = ({ IDL }) => {
                   'terrain' : Terrain,
                   'name' : IDL.Text,
                   'raceId' : IDL.Nat,
+                  'entryDeadline' : IDL.Int,
                   'entryFee' : IDL.Nat,
                 })
               ),
@@ -940,6 +943,7 @@ export const idlFactory = ({ IDL }) => {
                   'terrain' : Terrain,
                   'name' : IDL.Text,
                   'raceId' : IDL.Nat,
+                  'entryDeadline' : IDL.Int,
                   'entryFee' : IDL.Nat,
                 })
               ),
@@ -997,6 +1001,7 @@ export const idlFactory = ({ IDL }) => {
                   'terrain' : Terrain,
                   'name' : IDL.Text,
                   'raceId' : IDL.Nat,
+                  'entryDeadline' : IDL.Int,
                   'entryFee' : IDL.Nat,
                 })
               ),
@@ -1007,6 +1012,7 @@ export const idlFactory = ({ IDL }) => {
                   'terrain' : Terrain,
                   'name' : IDL.Text,
                   'raceId' : IDL.Nat,
+                  'entryDeadline' : IDL.Int,
                   'entryFee' : IDL.Nat,
                 })
               ),

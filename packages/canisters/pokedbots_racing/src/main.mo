@@ -802,22 +802,23 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
           // Platform bonus to guarantee top 3 profitability, 4th breaks even
           // Calculated for 8-player races with new distribution (45%, 28%, 18%, 9%)
-          // Formula: bonus = entry_fee × 4 (creates 12× entry pool) - 67% cost reduction from 12× multiplier
+          // Formula: bonus = entry_fee × 4 (creates 12× entry pool) - increased 20% from previous values
           let platformBonus : Nat = switch (event.eventType, division) {
-            // Daily Sprint bonuses - Entry fees: Scrap 0.025, Junker 0.05, Raider 0.075, Elite 0.1
-            case (#DailySprint, #Scrap) { 10_000_000 }; // 0.1 ICP (pool: 0.3, 1st: 0.135, 4th: 0.027)
-            case (#DailySprint, #Junker) { 20_000_000 }; // 0.2 ICP (pool: 0.6, 1st: 0.27, 4th: 0.054)
-            case (#DailySprint, #Raider) { 30_000_000 }; // 0.3 ICP (pool: 0.9, 1st: 0.405, 4th: 0.081)
-            case (#DailySprint, #Elite) { 40_000_000 }; // 0.4 ICP (pool: 1.2, 1st: 0.54, 4th: 0.108)
+            // Daily Sprint bonuses - Entry fees: Scrap 0.025, Junker 0.05, Raider 0.075, Elite 0.1, SilentKlan 0.15
+            case (#DailySprint, #Scrap) { 12_000_000 }; // 0.12 ICP (was 0.1, +20%)
+            case (#DailySprint, #Junker) { 24_000_000 }; // 0.24 ICP (was 0.2, +20%)
+            case (#DailySprint, #Raider) { 36_000_000 }; // 0.36 ICP (was 0.3, +20%)
+            case (#DailySprint, #Elite) { 48_000_000 }; // 0.48 ICP (was 0.4, +20%)
+            case (#DailySprint, #SilentKlan) { 48_000_000 }; // 0.48 ICP (new tier, matching Elite)
             // Weekly League bonuses - Entry fees: Scrap 0.1, Junker 0.2, Raider 0.3, Elite 0.4, SilentKlan 0.6
-            case (#WeeklyLeague, #Scrap) { 40_000_000 }; // 0.4 ICP (pool: 1.2, 1st: 0.54, 4th: 0.108)
-            case (#WeeklyLeague, #Junker) { 80_000_000 }; // 0.8 ICP (pool: 2.4, 1st: 1.08, 4th: 0.216)
-            case (#WeeklyLeague, #Raider) { 120_000_000 }; // 1.2 ICP (pool: 3.6, 1st: 1.62, 4th: 0.324)
-            case (#WeeklyLeague, #Elite) { 160_000_000 }; // 1.6 ICP (pool: 4.8, 1st: 2.16, 4th: 0.432)
-            case (#WeeklyLeague, #SilentKlan) { 240_000_000 }; // 2.4 ICP (pool: 7.2, 1st: 3.24, 4th: 0.648)
+            case (#WeeklyLeague, #Scrap) { 48_000_000 }; // 0.48 ICP (was 0.4, +20%)
+            case (#WeeklyLeague, #Junker) { 96_000_000 }; // 0.96 ICP (was 0.8, +20%)
+            case (#WeeklyLeague, #Raider) { 144_000_000 }; // 1.44 ICP (was 1.2, +20%)
+            case (#WeeklyLeague, #Elite) { 192_000_000 }; // 1.92 ICP (was 1.6, +20%)
+            case (#WeeklyLeague, #SilentKlan) { 288_000_000 }; // 2.88 ICP (was 2.4, +20%)
             // Monthly Cup bonuses - Entry fees: Elite 1.0, SilentKlan 1.5
-            case (#MonthlyCup, #Elite) { 400_000_000 }; // 4.0 ICP (pool: 12.0, 1st: 5.4, 4th: 1.08)
-            case (#MonthlyCup, #SilentKlan) { 600_000_000 }; // 6.0 ICP (pool: 18.0, 1st: 8.1, 4th: 1.62)
+            case (#MonthlyCup, #Elite) { 480_000_000 }; // 4.8 ICP (was 4.0, +20%)
+            case (#MonthlyCup, #SilentKlan) { 720_000_000 }; // 7.2 ICP (was 6.0, +20%)
             // Fallback
             case _ { event.metadata.prizePoolBonus };
           };
@@ -938,13 +939,23 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       },
     );
 
-    // Schedule next 2 Weekly Leagues if less than 2 scheduled
-    if (weeklyLeagues.size() < 2) {
+    // Separate all-class leagues from Scrap-only leagues
+    let allClassLeagues = Array.filter<RaceCalendar.ScheduledEvent>(
+      weeklyLeagues,
+      func(e) { e.metadata.divisions.size() > 1 },
+    );
+    let scrapLeagues = Array.filter<RaceCalendar.ScheduledEvent>(
+      weeklyLeagues,
+      func(e) { e.metadata.divisions.size() == 1 },
+    );
+
+    // Schedule next 2 all-class Weekly Leagues if less than 2 scheduled
+    if (allClassLeagues.size() < 2) {
       // Start from the last existing weekly league, or now if none exist
-      var scheduleTime = if (weeklyLeagues.size() > 0) {
+      var scheduleTime = if (allClassLeagues.size() > 0) {
         // Sort by scheduledTime to find the latest
         let sorted = Array.sort<RaceCalendar.ScheduledEvent>(
-          weeklyLeagues,
+          allClassLeagues,
           func(a, b) { Int.compare(a.scheduledTime, b.scheduledTime) },
         );
         sorted[sorted.size() - 1].scheduledTime + 1_000_000_000; // Start after the last one
@@ -952,7 +963,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         now;
       };
 
-      for (i in Iter.range(0, 1 - weeklyLeagues.size())) {
+      for (i in Iter.range(0, 1 - allClassLeagues.size())) {
         let nextSunday = RaceCalendar.getNextWeeklyOccurrence(0, 20, 0, scheduleTime);
 
         // Check if event already exists at this time (within 30-minute window)
@@ -977,6 +988,49 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         };
 
         scheduleTime := nextSunday + 1_000_000_000; // Move past this event
+      };
+    };
+
+    // Schedule next 2 Scrap Weekly Leagues if less than 2 scheduled
+    if (scrapLeagues.size() < 2) {
+      // Start from the last existing scrap league, or now if none exist
+      var scheduleTime = if (scrapLeagues.size() > 0) {
+        // Sort by scheduledTime to find the latest
+        let sorted = Array.sort<RaceCalendar.ScheduledEvent>(
+          scrapLeagues,
+          func(a, b) { Int.compare(a.scheduledTime, b.scheduledTime) },
+        );
+        sorted[sorted.size() - 1].scheduledTime + 1_000_000_000; // Start after the last one
+      } else {
+        now;
+      };
+
+      for (i in Iter.range(0, 1 - scrapLeagues.size())) {
+        let nextWednesday = RaceCalendar.getNextWeeklyOccurrence(3, 20, 0, scheduleTime); // Wednesday 8pm UTC
+
+        // Check if event already exists at this time (within 30-minute window)
+        let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
+          upcomingEvents,
+          func(e) {
+            switch (e.eventType) {
+              case (#WeeklyLeague) {
+                let timeDiff = Int.abs(e.scheduledTime - nextWednesday);
+                let isScrapOnly = e.metadata.divisions.size() == 1;
+                isScrapOnly and (timeDiff < (30 * 60 * 1_000_000_000)); // Within 30 minutes
+              };
+              case (_) { false };
+            };
+          },
+        );
+
+        if (existingAtTime.size() == 0) {
+          ignore eventCalendar.createWeeklyScrapEvent(nextWednesday, now);
+          Debug.print("Auto-scheduled Weekly Scrap Showdown for timestamp: " # debug_show (nextWednesday));
+        } else {
+          Debug.print("SKIP: Weekly Scrap Showdown already exists at timestamp: " # debug_show (nextWednesday));
+        };
+
+        scheduleTime := nextWednesday + 1_000_000_000; // Move past this event
       };
     };
 
@@ -1606,6 +1660,25 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       Option.isSome(activeRace);
     };
     addSponsor = raceManager.addSponsor;
+    checkRegistrationWindow = func(raceId : Nat, now : Int) : Result.Result<(), Text> {
+      // Check if registration is open for this race's event
+      switch (eventCalendar.getEventByRaceId(raceId)) {
+        case (?event) {
+          if (now < event.registrationOpens) {
+            let hoursUntilOpen = (event.registrationOpens - now) / (60 * 60 * 1_000_000_000);
+            return #err("Registration has not opened yet. Opens in " # Nat.toText(Int.abs(hoursUntilOpen)) # " hours.");
+          };
+          if (now > event.registrationCloses) {
+            return #err("Registration has closed for this event.");
+          };
+          #ok();
+        };
+        case (null) {
+          // Race not part of an event - allow entry
+          #ok();
+        };
+      };
+    };
   };
 
   // Import tool configurations from separate modules
@@ -3127,6 +3200,35 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   // ===== DEBUG/ADMIN FUNCTIONS =====
 
+  // Update minimum racer requirement for a specific race
+  public shared ({ caller }) func admin_update_race_min_entries(raceId : Nat, minEntries : Nat) : async Text {
+    if (caller != owner) {
+      Debug.trap("Only owner can update race requirements");
+    };
+
+    switch (raceManager.getRace(raceId)) {
+      case (?race) {
+        switch (race.status) {
+          case (#Upcoming) {
+            // Update the race directly in the map
+            let updatedRace = {
+              race with
+              minEntries = minEntries;
+            };
+            Map.set(raceManager.getRacesMap(), Map.nhash, raceId, updatedRace);
+            "Successfully updated race " # Nat.toText(raceId) # " minEntries to " # Nat.toText(minEntries);
+          };
+          case (_) {
+            "Error: Can only update minEntries for Upcoming races";
+          };
+        };
+      };
+      case (null) {
+        "Error: Race not found";
+      };
+    };
+  };
+
   // Manually cancel specific races by ID (with refunds)
   public shared ({ caller }) func cancel_races_by_ids(raceIds : [Nat]) : async [(Nat, Text)] {
     if (caller != owner) {
@@ -4157,6 +4259,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       raceId : Nat;
       name : Text;
       startTime : Int;
+      entryDeadline : Int;
       entryFee : Nat;
       terrain : RacingSimulator.Terrain;
     }];
@@ -4164,6 +4267,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       raceId : Nat;
       name : Text;
       startTime : Int;
+      entryDeadline : Int;
       entryFee : Nat;
       terrain : RacingSimulator.Terrain;
     }];
@@ -4183,7 +4287,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           },
         );
 
-        let results = Array.mapFilter<Nat32, { tokenIndex : Nat; name : ?Text; stats : ?PokedBotsGarage.PokedBotRacingStats; currentStats : ?{ speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; maxStats : ?{ speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; upgradeCostsV2 : ?{ speed : { costE8s : Nat; successRate : Float }; powerCore : { costE8s : Nat; successRate : Float }; acceleration : { costE8s : Nat; successRate : Float }; stability : { costE8s : Nat; successRate : Float }; pityCounter : Nat }; isInitialized : Bool; currentOwner : Text; activeUpgrade : ?PokedBotsGarage.UpgradeSession; upcomingRaces : [{ raceId : Nat; name : Text; startTime : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }]; eligibleRaces : [{ raceId : Nat; name : Text; startTime : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }] }>(
+        let results = Array.mapFilter<Nat32, { tokenIndex : Nat; name : ?Text; stats : ?PokedBotsGarage.PokedBotRacingStats; currentStats : ?{ speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; maxStats : ?{ speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; upgradeCostsV2 : ?{ speed : { costE8s : Nat; successRate : Float }; powerCore : { costE8s : Nat; successRate : Float }; acceleration : { costE8s : Nat; successRate : Float }; stability : { costE8s : Nat; successRate : Float }; pityCounter : Nat }; isInitialized : Bool; currentOwner : Text; activeUpgrade : ?PokedBotsGarage.UpgradeSession; upcomingRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }]; eligibleRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }] }>(
           tokens,
           func(tokenIndex32) {
             let tokenIndex = Nat32.toNat(tokenIndex32);
@@ -4260,6 +4364,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               raceId : Nat;
               name : Text;
               startTime : Int;
+              entryDeadline : Int;
               entryFee : Nat;
               terrain : RacingSimulator.Terrain;
             }] = [];
@@ -4267,6 +4372,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               raceId : Nat;
               name : Text;
               startTime : Int;
+              entryDeadline : Int;
               entryFee : Nat;
               terrain : RacingSimulator.Terrain;
             }] = [];
@@ -4281,6 +4387,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                 raceId = race.raceId;
                 name = race.name;
                 startTime = race.startTime;
+                entryDeadline = race.entryDeadline;
                 entryFee = race.entryFee;
                 terrain = race.terrain;
               };
@@ -4350,6 +4457,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       raceId : Nat;
       name : Text;
       startTime : Int;
+      entryDeadline : Int;
       entryFee : Nat;
       terrain : RacingSimulator.Terrain;
     }];
@@ -4357,6 +4465,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       raceId : Nat;
       name : Text;
       startTime : Int;
+      entryDeadline : Int;
       entryFee : Nat;
       terrain : RacingSimulator.Terrain;
     }];
@@ -4373,7 +4482,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     );
 
     // Iterate through all registered bots and filter by owner
-    let registeredBots = Buffer.Buffer<{ tokenIndex : Nat; name : ?Text; stats : PokedBotsGarage.PokedBotRacingStats; currentStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; maxStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; upgradeCostsV2 : { speed : { costE8s : Nat; successRate : Float }; powerCore : { costE8s : Nat; successRate : Float }; acceleration : { costE8s : Nat; successRate : Float }; stability : { costE8s : Nat; successRate : Float }; pityCounter : Nat }; activeUpgrade : ?PokedBotsGarage.UpgradeSession; upcomingRaces : [{ raceId : Nat; name : Text; startTime : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }]; eligibleRaces : [{ raceId : Nat; name : Text; startTime : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }] }>(10);
+    let registeredBots = Buffer.Buffer<{ tokenIndex : Nat; name : ?Text; stats : PokedBotsGarage.PokedBotRacingStats; currentStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; maxStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; upgradeCostsV2 : { speed : { costE8s : Nat; successRate : Float }; powerCore : { costE8s : Nat; successRate : Float }; acceleration : { costE8s : Nat; successRate : Float }; stability : { costE8s : Nat; successRate : Float }; pityCounter : Nat }; activeUpgrade : ?PokedBotsGarage.UpgradeSession; upcomingRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }]; eligibleRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }] }>(10);
 
     for ((tokenIndex, botStats) in Map.entries(stable_racing_stats)) {
       // Only include bots owned by the caller (compare principals)
@@ -4413,6 +4522,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           raceId : Nat;
           name : Text;
           startTime : Int;
+          entryDeadline : Int;
           entryFee : Nat;
           terrain : RacingSimulator.Terrain;
         }] = [];
@@ -4420,6 +4530,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           raceId : Nat;
           name : Text;
           startTime : Int;
+          entryDeadline : Int;
           entryFee : Nat;
           terrain : RacingSimulator.Terrain;
         }] = [];
@@ -4434,6 +4545,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             raceId = race.raceId;
             name = race.name;
             startTime = race.startTime;
+            entryDeadline = race.entryDeadline;
             entryFee = race.entryFee;
             terrain = race.terrain;
           };
@@ -5335,6 +5447,24 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     let race = switch (Map.get(stable_races, Map.nhash, raceId)) {
       case (?r) { r };
       case (null) { return #err("Race not found") };
+    };
+
+    // Check if registration is open for this race's event
+    let now = Time.now();
+    switch (eventCalendar.getEventByRaceId(raceId)) {
+      case (?event) {
+        // Check if registration window is open
+        if (now < event.registrationOpens) {
+          let hoursUntilOpen = (event.registrationOpens - now) / (60 * 60 * 1_000_000_000);
+          return #err("Registration has not opened yet. Opens in " # Nat.toText(Int.abs(hoursUntilOpen)) # " hours.");
+        };
+        if (now > event.registrationCloses) {
+          return #err("Registration has closed for this event.");
+        };
+      };
+      case (null) {
+        // Race not part of an event - allow entry (shouldn't happen normally)
+      };
     };
 
     // Check if bot is already entered in this race BEFORE taking payment

@@ -103,6 +103,7 @@ export interface BotListItem {
     raceId: number;
     name: string;
     startTime: bigint;
+    entryDeadline: bigint;
     entryFee: bigint;
     terrain: any;
   }>;
@@ -110,6 +111,7 @@ export interface BotListItem {
     raceId: number;
     name: string;
     startTime: bigint;
+    entryDeadline: bigint;
     entryFee: bigint;
     terrain: any;
   }>;
@@ -181,6 +183,7 @@ export const listMyRegisteredBots = async (identityOrAgent: IdentityOrAgent): Pr
         raceId: Number(race.raceId),
         name: race.name,
         startTime: race.startTime,
+        entryDeadline: race.entryDeadline,
         entryFee: race.entryFee,
         terrain: race.terrain,
       })).sort((a, b) => Number(a.startTime - b.startTime)),
@@ -188,6 +191,7 @@ export const listMyRegisteredBots = async (identityOrAgent: IdentityOrAgent): Pr
         raceId: Number(race.raceId),
         name: race.name,
         startTime: race.startTime,
+        entryDeadline: race.entryDeadline,
         entryFee: race.entryFee,
         terrain: race.terrain,
       })).sort((a, b) => Number(a.startTime - b.startTime)),
@@ -253,6 +257,7 @@ export const listMyBots = async (identityOrAgent: IdentityOrAgent): Promise<BotL
         raceId: Number(race.raceId),
         name: race.name,
         startTime: race.startTime,
+        entryDeadline: race.entryDeadline,
         entryFee: race.entryFee,
         terrain: race.terrain,
       })).sort((a, b) => Number(a.startTime - b.startTime)),
@@ -260,6 +265,7 @@ export const listMyBots = async (identityOrAgent: IdentityOrAgent): Promise<BotL
         raceId: Number(race.raceId),
         name: race.name,
         startTime: race.startTime,
+        entryDeadline: race.entryDeadline,
         entryFee: race.entryFee,
         terrain: race.terrain,
       })).sort((a, b) => Number(a.startTime - b.startTime)),

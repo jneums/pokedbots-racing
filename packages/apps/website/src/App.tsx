@@ -15,6 +15,7 @@ import DocPage from './app/docs/[slug]/page';
 import GuidesListPage from './app/guides/page';
 import GuidePage from './app/guides/[slug]/page';
 import BotDetailsPage from './app/bot/[tokenIndex]/page';
+import Track3DTestPage from './app/track3d-test/page';
 import { WalletDrawerProvider } from './contexts/WalletDrawerContext';
 import { WalletDrawer } from './components/WalletDrawer';
 import { useAuth } from './hooks/useAuth';
@@ -63,13 +64,6 @@ function SessionExpirationHandler() {
       toast.error('Wallet Session Expired', {
         description: 'Your Plug wallet session has expired. Please reconnect your wallet.',
         duration: 10000,
-        action: {
-          label: 'Reconnect',
-          onClick: () => {
-            logout();
-            window.location.reload();
-          },
-        },
       });
 
       // Auto-logout after showing the message
@@ -163,6 +157,7 @@ export default function App() {
           <Route path="/docs/:slug" element={<DocPage />} />
           <Route path="/guides" element={<GuidesListPage />} />
           <Route path="/guides/:slug" element={<GuidePage />} />
+          <Route path="/track3d-test" element={<Track3DTestPage />} />
         </Routes>
       </main>
       <footer className="border-t-2 border-primary/20 py-12 bg-card/30">

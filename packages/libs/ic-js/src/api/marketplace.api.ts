@@ -30,6 +30,7 @@ export interface MarketplaceListing {
   winRate: number;
   imageUrl: string;
   isInitialized: boolean;
+  backgroundColor?: string;
 }
 
 export interface BrowseMarketplaceParams {
@@ -43,6 +44,7 @@ export interface BrowseMarketplaceParams {
   sortBy?: "price" | "rating";
   sortDesc?: boolean;
   limit?: number;
+  tokenIndex?: string; // Search by token index (partial match)
 }
 
 export interface BrowseMarketplaceResult {
@@ -102,6 +104,10 @@ async function getLedgerActorFromIdentity(identityOrAgent: IdentityOrAgent): Pro
 type BotStats = { tokenId: number; speed: number; powerCore: number; acceleration: number; stability: number; faction: string };
 let cachedStats: BotStats[] | null = null;
 
+// Cache for backgrounds
+type BackgroundData = { backgrounds: Record<string, string> };
+let cachedBackgrounds: BackgroundData | null = null;
+
 async function loadPrecomputedStats(): Promise<BotStats[]> {
   if (cachedStats) return cachedStats;
   
@@ -109,6 +115,14 @@ async function loadPrecomputedStats(): Promise<BotStats[]> {
   const data = await response.json() as { stats: BotStats[] };
   cachedStats = data.stats;
   return cachedStats;
+}
+
+async function loadBackgrounds(): Promise<BackgroundData> {
+  if (cachedBackgrounds) return cachedBackgrounds;
+  
+  const response = await fetch('/backgrounds.json');
+  cachedBackgrounds = await response.json() as BackgroundData;
+  return cachedBackgrounds;
 }
 
 /**
@@ -121,9 +135,10 @@ export async function browseMarketplace(
   const nftActor = await getNFTsActorFromIdentity(identityOrAgent);
   const nftCanisterId = getCanisterId('POKEDBOTS_NFTS');
 
-  // Load precomputed stats
+  // Load precomputed stats and backgrounds
   const allStats = await loadPrecomputedStats();
   const statsMap = new Map(allStats.map(s => [s.tokenId, s]));
+  const backgroundData = await loadBackgrounds();
 
   // Get all listings from EXT canister (fast query call)
   const extListings = await nftActor.listings();
@@ -132,11 +147,12 @@ export async function browseMarketplace(
     return { listings: [], hasMore: false };
   }
 
-  // Merge EXT listings with precomputed stats
+  // Merge EXT listings with precomputed stats and backgrounds
   let enrichedListings: MarketplaceListing[] = extListings.map(([tokenIndex32, listing, _metadata]: any) => {
     const tokenIndex = Number(tokenIndex32);
     const priceICP = Number(listing.price) / 100_000_000;
     const stats = statsMap.get(tokenIndex);
+    const backgroundColor = backgroundData.backgrounds[tokenIndex.toString()];
     
     // Calculate overall rating from base stats
     const baseSpeed = stats?.speed || 0;
@@ -162,6 +178,7 @@ export async function browseMarketplace(
       winRate: 0, // Not available from precomputed stats
       imageUrl,
       isInitialized: false, // Not available from precomputed stats
+      backgroundColor,
     };
   });
 
@@ -198,6 +215,13 @@ export async function browseMarketplace(
         default: return true;
       }
     });
+  }
+
+  if (params.tokenIndex !== undefined && params.tokenIndex.trim() !== '') {
+    const searchStr = params.tokenIndex.trim();
+    enrichedListings = enrichedListings.filter(l => 
+      l.tokenIndex.toString().startsWith(searchStr)
+    );
   }
 
   // Apply sorting

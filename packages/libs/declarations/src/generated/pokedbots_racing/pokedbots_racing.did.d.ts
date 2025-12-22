@@ -119,6 +119,8 @@ export interface McpServer {
   'cancel_actions_by_filter' : ActorMethod<[ActionFilter], CancellationResult>,
   'cancel_actions_by_ids' : ActorMethod<[Array<bigint>], CancellationResult>,
   'cancel_races_by_ids' : ActorMethod<[Array<bigint>], Array<[bigint, string]>>,
+  'cleanup_duplicate_race_create_timers' : ActorMethod<[], string>,
+  'cleanup_duplicate_recharge_timers' : ActorMethod<[], string>,
   'clear_reconstitution_traces' : ActorMethod<[], undefined>,
   'create_my_api_key' : ActorMethod<[string, Array<string>], string>,
   'debug_get_all_tracks' : ActorMethod<
@@ -500,6 +502,7 @@ export interface McpServer {
             'terrain' : Terrain,
             'name' : string,
             'raceId' : bigint,
+            'entryDeadline' : bigint,
             'entryFee' : bigint,
           }
         >,
@@ -511,6 +514,7 @@ export interface McpServer {
             'terrain' : Terrain,
             'name' : string,
             'raceId' : bigint,
+            'entryDeadline' : bigint,
             'entryFee' : bigint,
           }
         >,
@@ -553,6 +557,7 @@ export interface McpServer {
             'terrain' : Terrain,
             'name' : string,
             'raceId' : bigint,
+            'entryDeadline' : bigint,
             'entryFee' : bigint,
           }
         >,
@@ -563,6 +568,7 @@ export interface McpServer {
             'terrain' : Terrain,
             'name' : string,
             'raceId' : bigint,
+            'entryDeadline' : bigint,
             'entryFee' : bigint,
           }
         >,

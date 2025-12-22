@@ -48,6 +48,8 @@ module ToolContext {
     isInActiveRace : (Nat) -> Bool;
     /// Add a sponsor to a race
     addSponsor : (raceId : Nat, sponsor : Principal, amount : Nat, message : ?Text) -> ?RacingSimulator.Race;
+    /// Check if registration is open for a race's event
+    checkRegistrationWindow : (raceId : Nat, now : Int) -> Result.Result<(), Text>;
   };
 
   /// Helper function to create an error response and invoke callback

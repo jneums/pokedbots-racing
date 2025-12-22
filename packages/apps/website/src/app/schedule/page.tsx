@@ -122,9 +122,12 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
   const scheduledTime = new Date(Number(event.scheduledTime) / 1_000_000);
   const hasStarted = now >= scheduledTime;
   const registrationClosesDate = new Date(Number(event.registrationCloses) / 1_000_000);
-  const isRegistrationOpen = now < registrationClosesDate && 'RegistrationOpen' in event.status;
+  const registrationOpensDate = new Date(Number(event.registrationOpens) / 1_000_000);
+  // Check actual timestamp to determine if registration is open, not just status
+  const isRegistrationOpen = now >= registrationOpensDate && now < registrationClosesDate;
   
-  const isUpcoming = 'Announced' in event.status;
+  // Registration hasn't opened yet (based on actual timestamp)
+  const isUpcoming = now < registrationOpensDate;
 
   // Get terrain icons
   const getTerrainIcon = (terrain: any): string => {
