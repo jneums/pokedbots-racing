@@ -1709,7 +1709,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     serverInfo = {
       name = "pokedbots-wasteland-racing";
       title = "PokedBots Wasteland Racing";
-      version = "0.3.1";
+      version = "0.4.0";
     };
     resources = resources;
     resourceReader = func(uri) {
