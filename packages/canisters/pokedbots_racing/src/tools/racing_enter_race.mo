@@ -25,7 +25,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_enter_race";
     title = ?"Enter Race";
-    description = ?"Enter your PokedBot in a wasteland race. Pays entry fee via ICRC-2. Bot must meet race class requirements based on ELO rating. Bots can race while upgrading or scavenging.\n\n**ENTRY FEES:**\n• Entry fees are paid via ICRC-2 approval when you register\n• If a race is cancelled due to insufficient entries, your entry fee will be automatically refunded\n• Refunds are processed shortly after the race is cancelled\n\n**SCAVENGING BOTS:** You can register for races while your bot is on a scavenging mission. When the race starts, your bot will be pulled from the mission with penalties:\n• Partial parts awarded based on progress (with 50% early withdrawal penalty)\n• Condition damage scales with mission type and progress (minimum 50% of full penalty)\n• Penalties applied at race start time, not at registration\n• WARNING: Starting long missions just to pull out early is NOT profitable due to harsh penalties\n\n**RACE COSTS (Applied after completion):**\n• Battery Drain: Base 10-20 (distance) × terrain (1.0-1.2×) × Power Core efficiency × condition penalty\n• Condition Wear: Base 3-7 (distance) × position (0.8-1.4×, winners wear less) × terrain (1.0-1.5×)\n\n**WARNING:** Low battery/condition severely reduces stats and can cause DNF (no prize). Check bot condition before entering.";
+    description = ?"Enter your PokedBot in a wasteland race. Pays entry fee via ICRC-2. Bot must meet race class requirements based on overall rating (bracket system). ELO represents skill within bracket. Bots can race while upgrading or scavenging.\n\n**ENTRY FEES:**\n• Entry fees are paid via ICRC-2 approval when you register\n• If a race is cancelled due to insufficient entries, your entry fee will be automatically refunded\n• Refunds are processed shortly after the race is cancelled\n\n**SCAVENGING BOTS:** You can register for races while your bot is on a scavenging mission. When the race starts, your bot will be pulled from the mission with penalties:\n• Partial parts awarded based on progress (with 50% early withdrawal penalty)\n• Condition damage scales with mission type and progress (minimum 50% of full penalty)\n• Penalties applied at race start time, not at registration\n• WARNING: Starting long missions just to pull out early is NOT profitable due to harsh penalties\n\n**RACE COSTS (Applied after completion):**\n• Battery Drain: Base 10-20 (distance) × terrain (1.0-1.2×) × Power Core efficiency × condition penalty\n• Condition Wear: Base 3-7 (distance) × position (0.8-1.4×, winners wear less) × terrain (1.0-1.5×)\n\n**WARNING:** Low battery/condition severely reduces stats and can cause DNF (no prize). Check bot condition before entering.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -143,44 +143,34 @@ module {
         return ToolContext.makeError("Race is full", cb);
       };
 
-      // Check if already entered
-      for (entry in race.entries.vals()) {
-        if (entry.nftId == nftId) {
-          return ToolContext.makeError("Bot already entered in this race", cb);
+      // Check if bot is already entered in any race within this event
+      switch (ctx.checkBotInEvent(raceId, nftId)) {
+        case (#err(msg)) {
+          return ToolContext.makeError(msg, cb);
         };
+        case (#ok()) {};
       };
 
-      // Check class requirements (ELO-based)
+      // Check class requirements (rating-based)
+      let rating = ctx.garageManager.calculateRatingAt100(botStats);
       let meetsClass = switch (race.raceClass) {
-        case (#Scrap) { botStats.eloRating < 1200 };
+        case (#Scrap) { rating < 20 };
         case (#Junker) {
-          botStats.eloRating >= 1200 and botStats.eloRating < 1400
+          rating >= 20 and rating < 30
         };
         case (#Raider) {
-          botStats.eloRating >= 1400 and botStats.eloRating < 1600
+          rating >= 30 and rating < 40
         };
         case (#Elite) {
-          botStats.eloRating >= 1600 and botStats.eloRating < 1800
+          rating >= 40 and rating < 50
         };
         case (#SilentKlan) {
-          botStats.eloRating >= 1800;
+          rating >= 50;
         };
       };
 
       if (not meetsClass) {
         return ToolContext.makeError("Bot does not meet race class requirements", cb);
-      };
-
-      // Check if bot is already entered in this race BEFORE taking payment
-      let alreadyEntered = Array.find<RacingSimulator.RaceEntry>(
-        race.entries,
-        func(e : RacingSimulator.RaceEntry) : Bool { e.nftId == nftId },
-      );
-      switch (alreadyEntered) {
-        case (?_) {
-          return ToolContext.makeError("This bot is already entered in this race", cb);
-        };
-        case (null) {};
       };
 
       // Process payment using ICRC-2 transfer_from

@@ -140,7 +140,6 @@ type ScheduledEvent =
 type ScavengingZone = 
  variant {
    AbandonedSettlements;
-   ChargingStation;
    DeadMachineFields;
    RepairBay;
    ScrapHeaps;
@@ -150,8 +149,6 @@ type ScavengingMission =
    durationMinutes: opt nat;
    lastAccumulation: int;
    missionId: nat;
-   pendingBatteryRestored: nat;
-   pendingConditionRestored: nat;
    pendingParts:
     record {
       gyroModules: nat;
@@ -164,26 +161,17 @@ type ScavengingMission =
    tokenIndex: nat;
    zone: ScavengingZone;
  };
-type Result_6 = 
+type Result_4 = 
  variant {
    err: TreasuryError;
    ok;
  };
-type Result_5 = 
+type Result_3 = 
  variant {
    err: text;
    ok;
  };
-type Result_4 = 
- variant {
-   err: text;
-   ok: record {
-         betId: nat;
-         currentOdds: float64;
-         potentialPayout: nat;
-       };
- };
-type Result_3 = 
+type Result_2 = 
  variant {
    err: text;
    ok:
@@ -221,19 +209,6 @@ type Result_3 =
        };
     };
  };
-type Result_2 = 
- variant {
-   err: text;
-   ok:
-    record {
-      accelerationPartsRefunded: nat;
-      powerCorePartsRefunded: nat;
-      respecCost: nat;
-      speedPartsRefunded: nat;
-      stabilityPartsRefunded: nat;
-      totalRefunded: nat;
-    };
- };
 type Result_1 = 
  variant {
    err: text;
@@ -267,11 +242,6 @@ type RaceStatus =
    Completed;
    InProgress;
    Upcoming;
- };
-type RaceResults = 
- record {
-   fetchedAt: int;
-   rankings: vec nat;
  };
 type RaceResult = 
  record {
@@ -322,14 +292,6 @@ type Race =
    trackId: nat;
    trackSeed: nat;
  };
-type PoolStatus = 
- variant {
-   Cancelled;
-   Closed;
-   Open;
-   Pending;
-   Settled;
- };
 type PokedBotRacingStats = 
  record {
    accelerationBonus: nat;
@@ -371,7 +333,6 @@ type PokedBotRacingStats =
    preferredDistance: Distance;
    preferredTerrain: Terrain;
    racesEntered: nat;
-   respecCount: nat;
    scavengingMissions: nat;
    scavengingReputation: nat;
    shows: nat;
@@ -394,11 +355,6 @@ type NFTMetadata =
      };
 type McpServer = 
  service {
-   admin_clear_active_mission: (tokenIndex: nat) -> (text);
-   /// Admin function to manually create betting pool for an existing race
-   /// Useful for testing and recovery when races are created in advance
-   admin_create_betting_pool: (raceId: nat) -> (Result_1);
-   admin_get_active_mission: (tokenIndex: nat) -> (text) query;
    /// Admin method to remove a bot from a race (for fixing bugs/errors)
    admin_remove_race_entry: (raceId: nat, tokenIndex: nat) -> (Result_1);
    admin_update_race_min_entries: (raceId: nat, minEntries: nat) -> (text);
@@ -686,11 +642,11 @@ type McpServer =
    ///    * @returns True if the key was found and revoked, false otherwise.
    revoke_my_api_key: (key_id: text) -> ();
    /// Set the EXT NFT canister ID. Only the current owner can call this.
-   set_ext_canister: (canister_id: principal) -> (Result_5);
+   set_ext_canister: (canister_id: principal) -> (Result_3);
    /// Set the ICP ledger canister ID. Only the current owner can call this.
-   set_icp_ledger: (ledger_id: principal) -> (Result_5);
+   set_icp_ledger: (ledger_id: principal) -> (Result_3);
    /// Set a new owner for the canister. Only the current owner can call this.
-   set_owner: (new_owner: principal) -> (Result_6);
+   set_owner: (new_owner: principal) -> (Result_4);
    transformJwksResponse:
     (record {
        context: blob;
@@ -716,41 +672,10 @@ type McpServer =
    upload_nft_stats_batch: (batch: vec record {
                                          nat;
                                          NFTStats;
-                                       }) -> (Result_5);
+                                       }) -> (Result_3);
    /// Upload trait schema (owner only, done once)
-   upload_trait_schema: (schemaData: TraitSchema) -> (Result_5);
+   upload_trait_schema: (schemaData: TraitSchema) -> (Result_3);
    validate_timer_state: () -> (vec text) query;
-   /// Get user's betting history for UI
-   web_betting_get_my_bets: (limit: nat) ->
-    (record {
-       bets: vec Bet;
-       summary:
-        record {
-          netProfit: int;
-          totalBets: nat;
-          totalWagered: nat;
-          totalWon: nat;
-          winRate: float64;
-        };
-     }) query;
-   /// Get betting pool info for UI
-   web_betting_get_pool_info: (raceId: nat) -> (opt BettingPool) query;
-   /// List betting pools for UI
-   web_betting_list_pools: (statusFilter: opt PoolStatus, limit: nat) ->
-    (record {
-       pools:
-        vec
-         record {
-           bettingClosesAt: int;
-           bettingOpensAt: int;
-           raceId: nat;
-           status: PoolStatus;
-           totalBets: nat;
-           totalPooled: nat;
-         };}) query;
-   /// Place a bet for UI
-   web_betting_place_bet: (raceId: nat, tokenIndex: nat, betType: BetType,
-    amountE8s: nat) -> (Result_4);
    /// Browse marketplace listings with filtering and pagination
    web_browse_marketplace: (after: opt nat, minRating: opt nat, maxPrice:
     opt float64, faction: opt text, sortBy: opt text, sortDesc: opt bool,
@@ -782,7 +707,7 @@ type McpServer =
    /// Enter a race (with ICRC-2 payment for entry fee)
    web_enter_race: (raceId: nat, tokenIndex: nat) -> (Result_1);
    /// Get detailed stats for a specific bot
-   web_get_bot_details: (tokenIndex: nat) -> (Result_3);
+   web_get_bot_details: (tokenIndex: nat) -> (Result_2);
    /// Get bot details for multiple token indices (query call for performance)
    web_get_bot_details_batch: (tokenIndices: vec nat) ->
     (vec
@@ -963,9 +888,6 @@ type McpServer =
    web_recharge_bot: (tokenIndex: nat) -> (Result_1);
    /// Repair a bot to restore condition (0.05 ICP + fee via ICRC-2)
    web_repair_bot: (tokenIndex: nat) -> (Result_1);
-   /// Respec a bot - reset all upgrades and refund parts (with penalty)
-   /// Cost escalates: 1 ICP, 2 ICP, 3 ICP... based on respecCount
-   web_respec_bot: (tokenIndex: nat) -> (Result_2);
    /// Start a scavenging mission (web method)
    web_start_scavenging: (tokenIndex: nat, zone: text, durationMinutes:
     opt nat) -> (Result_1);
@@ -1038,15 +960,6 @@ type Header =
    text;
  };
 type HashedApiKey = text;
-type FailedPayout = 
- record {
-   amount: nat;
-   attempts: nat;
-   betId: nat;
-   error: text;
-   lastAttempt: int;
-   userId: principal;
- };
 type FactionType = 
  variant {
    Animal;
@@ -1110,66 +1023,6 @@ type CancellationResult =
                  text;
                };
    notFound: vec nat;
- };
-type BettingPool = 
- record {
-   betIds: vec nat;
-   bettingClosesAt: int;
-   bettingOpensAt: int;
-   distance: nat;
-   entrants: vec nat;
-   failedPayouts: vec FailedPayout;
-   payoutsCompleted: bool;
-   placeBetsByBot: vec record {
-                         nat;
-                         nat;
-                       };
-   placePool: nat;
-   raceClass: text;
-   raceId: nat;
-   rakeDistributed: bool;
-   results: opt RaceResults;
-   showBetsByBot: vec record {
-                        nat;
-                        nat;
-                      };
-   showPool: nat;
-   status: PoolStatus;
-   subaccount: blob;
-   terrain: text;
-   totalPooled: nat;
-   winBetsByBot: vec record {
-                       nat;
-                       nat;
-                     };
-   winPool: nat;
- };
-type BetType = 
- variant {
-   Place;
-   Show;
-   Win;
- };
-type BetStatus = 
- variant {
-   Active;
-   Lost;
-   Pending;
-   Refunded;
-   Won;
- };
-type Bet = 
- record {
-   amount: nat;
-   betId: nat;
-   betType: BetType;
-   paid: bool;
-   potentialPayout: opt nat;
-   raceId: nat;
-   status: BetStatus;
-   timestamp: int;
-   tokenIndex: nat;
-   userId: principal;
  };
 type ApiKeyMetadata = 
  record {

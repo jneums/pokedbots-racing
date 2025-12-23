@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BotListItem, initializeBot, rechargeBot, repairBot, generatetokenIdentifier, listBotForSale, unlistBot, transferBot, startScavenging, completeScavenging, enterRace } from '@pokedbots-racing/ic-js';
+import { BotListItem, initializeBot, rechargeBot, repairBot, respecBot, generatetokenIdentifier, listBotForSale, unlistBot, transferBot, startScavenging, completeScavenging, enterRace } from '@pokedbots-racing/ic-js';
 import { useAuth } from '../hooks/useAuth';
 import { useUpgradeBot, useCancelUpgrade } from '../hooks/useGarage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -79,15 +79,30 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
   const upgradeMutation = useUpgradeBot();
   const cancelUpgradeMutation = useCancelUpgrade();
   
+  // Debug logging for activeMission
+  useEffect(() => {
+    console.log('🤖 BotCard Debug - Bot #' + bot.tokenIndex);
+    console.log('  - activeMission:', bot.activeMission);
+    console.log('  - stats:', bot.stats);
+    if (bot.activeMission) {
+      console.log('  - zone:', bot.activeMission.zone);
+      console.log('  - zone keys:', Object.keys(bot.activeMission.zone));
+    }
+    if (bot.stats?.activeMission) {
+      console.log('  - stats.activeMission:', bot.stats.activeMission);
+    }
+  }, [bot]);
+  
   const [showInitialize, setShowInitialize] = useState(false);
   const [showListForSale, setShowListForSale] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showScavenging, setShowScavenging] = useState(false);
+  const [showRespec, setShowRespec] = useState(false);
   const [showCancelUpgradeConfirm, setShowCancelUpgradeConfirm] = useState(false);
   const [upgradeType, setUpgradeType] = useState<'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro'>('Velocity');
   const [paymentMethod, setPaymentMethod] = useState<'icp' | 'parts'>('parts');
-  const [scavengingZone, setScavengingZone] = useState<'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields'>('ScrapHeaps');
+  const [scavengingZone, setScavengingZone] = useState<'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields' | 'RepairBay' | 'ChargingStation'>('ScrapHeaps');
   const [scavengingDuration, setScavengingDuration] = useState<number | undefined>(undefined);
   const [botName, setBotName] = useState('');
   const [listPrice, setListPrice] = useState('');
@@ -96,6 +111,12 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
   
   // Racing section state - must be at top level
   const [selectedRaces, setSelectedRaces] = useState<Set<number>>(new Set());
+
+  // Clear selected races when bot changes to prevent selecting races for one bot
+  // then switching to another bot and accidentally entering wrong races
+  useEffect(() => {
+    setSelectedRaces(new Set());
+  }, [bot.tokenIndex]);
 
   const handleInitialize = async () => {
     if (!user?.agent) return;
@@ -182,12 +203,17 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
     setLoading(true);
     setError(null);
     try {
+      console.log('🚀 Starting scavenging for bot #' + bot.tokenIndex + ' in ' + scavengingZone);
       const result = await startScavenging(Number(bot.tokenIndex), scavengingZone, user.agent as any, scavengingDuration);
+      console.log('✅ Scavenging started successfully:', result);
       setShowScavenging(false);
-      onUpdate();
+      console.log('🔄 Calling onUpdate to refresh bot data...');
+      await onUpdate();
+      console.log('✅ Bot data refreshed');
       toast.success(result);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to start scavenging';
+      console.error('❌ Scavenging failed:', errorMsg);
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -223,6 +249,25 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
       const errorMsg = err instanceof Error ? err.message : 'Failed to cancel upgrade';
       setError(errorMsg);
       toast.error(errorMsg);
+    }
+  };
+
+  const handleRespec = async () => {
+    if (!user?.agent) return;
+    
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await respecBot(Number(bot.tokenIndex), user.agent as any);
+      setShowRespec(false);
+      onUpdate();
+      toast.success(result);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to strip bot';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1000,7 +1045,12 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
 
         {/* Scavenging Section - V2 Continuous */}
         {(() => {
+          console.log('🔍 Scavenging Section Render - Bot #' + bot.tokenIndex);
+          console.log('  - bot.activeMission exists?', !!bot.activeMission);
+          console.log('  - bot.activeMission value:', bot.activeMission);
+          
           if (bot.activeMission) {
+            console.log('  ✅ Showing active mission panel');
             // Active mission state
             const mission = bot.activeMission;
             const startTimeMs = Number(mission.startTime) / 1_000_000;
@@ -1053,20 +1103,41 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                       {elapsedHours > 0 ? `${elapsedHours}h ${elapsedMinutes}m` : `${elapsedMinutes}m`}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Pending Parts:</span>
-                    <span className={`font-bold ${totalPending > 0 ? 'text-orange-600' : ''}` }>
-                      {totalPending}
-                    </span>
-                  </div>
-                  {totalPending > 0 && (
-                    <div className="text-xs text-muted-foreground pt-1 space-y-0.5">
-                      {Number(mission.pendingParts.speedChips) > 0 && <div>⚡ {Number(mission.pendingParts.speedChips)} Speed Chips</div>}
-                      {Number(mission.pendingParts.powerCoreFragments) > 0 && <div>💪 {Number(mission.pendingParts.powerCoreFragments)} Power Fragments</div>}
-                      {Number(mission.pendingParts.thrusterKits) > 0 && <div>🚀 {Number(mission.pendingParts.thrusterKits)} Thruster Kits</div>}
-                      {Number(mission.pendingParts.gyroModules) > 0 && <div>🎯 {Number(mission.pendingParts.gyroModules)} Gyro Modules</div>}
-                      {Number(mission.pendingParts.universalParts) > 0 && <div>✨ {Number(mission.pendingParts.universalParts)} Universal</div>}
+                  {Object.keys(mission.zone)[0] === 'RepairBay' ? (
+                    // RepairBay shows condition restored instead of parts
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Condition Restored:</span>
+                      <span className={`font-bold ${Number(mission.pendingConditionRestored) > 0 ? 'text-green-600' : ''}` }>
+                        +{Number(mission.pendingConditionRestored)}
+                      </span>
                     </div>
+                  ) : Object.keys(mission.zone)[0] === 'ChargingStation' ? (
+                    // ChargingStation shows battery restored instead of parts
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Battery Restored:</span>
+                      <span className={`font-bold ${Number(mission.pendingBatteryRestored) > 0 ? 'text-cyan-600' : ''}` }>
+                        +{Number(mission.pendingBatteryRestored)}
+                      </span>
+                    </div>
+                  ) : (
+                    // Other zones show parts
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Pending Parts:</span>
+                        <span className={`font-bold ${totalPending > 0 ? 'text-orange-600' : ''}` }>
+                          {totalPending}
+                        </span>
+                      </div>
+                      {totalPending > 0 && (
+                        <div className="text-xs text-muted-foreground pt-1 space-y-0.5">
+                          {Number(mission.pendingParts.speedChips) > 0 && <div>⚡ {Number(mission.pendingParts.speedChips)} Speed Chips</div>}
+                          {Number(mission.pendingParts.powerCoreFragments) > 0 && <div>💪 {Number(mission.pendingParts.powerCoreFragments)} Power Fragments</div>}
+                          {Number(mission.pendingParts.thrusterKits) > 0 && <div>🚀 {Number(mission.pendingParts.thrusterKits)} Thruster Kits</div>}
+                          {Number(mission.pendingParts.gyroModules) > 0 && <div>🎯 {Number(mission.pendingParts.gyroModules)} Gyro Modules</div>}
+                          {Number(mission.pendingParts.universalParts) > 0 && <div>✨ {Number(mission.pendingParts.universalParts)} Universal</div>}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
                 <Button
@@ -1076,14 +1147,19 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                   className="w-full"
                   variant="outline"
                 >
-                  {loading ? 'Retrieving...' : '🏠 Retrieve Bot & Collect Parts'}
+                  {loading ? 'Retrieving...' : Object.keys(mission.zone)[0] === 'RepairBay' ? '🏠 Retrieve Bot' : Object.keys(mission.zone)[0] === 'ChargingStation' ? '🔌 Retrieve Bot' : '🏠 Retrieve Bot & Collect Parts'}
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
-                  💡 Parts accumulate every 15 minutes. Retrieve anytime!
+                  {Object.keys(mission.zone)[0] === 'RepairBay' 
+                    ? '💡 Condition restores every 15 minutes. Retrieve anytime!'
+                    : Object.keys(mission.zone)[0] === 'ChargingStation'
+                      ? '💡 Battery restores every 15 minutes. Retrieve anytime!'
+                      : '💡 Parts accumulate every 15 minutes. Retrieve anytime!'}
                 </p>
               </div>
             );
           } else {
+            console.log('  ❌ Showing idle state panel');
             // Idle state - show send button
             return (
               <div className="p-3 bg-muted/30 border border-muted rounded-lg space-y-2">
@@ -1337,6 +1413,31 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
             Transfer
           </Button>
         </div>
+
+        {/* Strip Bot Button - Advanced/Dangerous Action */}
+        {bot.stats && (() => {
+          const stats = bot.stats as any;
+          const hasUpgrades = (
+            Number(stats.speedUpgrades || 0) > 0 ||
+            Number(stats.powerCoreUpgrades || 0) > 0 ||
+            Number(stats.accelerationUpgrades || 0) > 0 ||
+            Number(stats.stabilityUpgrades || 0) > 0
+          );
+          const respecCount = Number(stats.respecCount || 0);
+          const respecCost = respecCount + 1;
+
+          return hasUpgrades && !bot.activeMission && !bot.activeUpgrade && (
+            <Button
+              onClick={() => setShowRespec(true)}
+              disabled={loading}
+              size="sm"
+              variant="destructive"
+              className="w-full"
+            >
+              🔧 Strip Bot ({respecCost} ICP)
+            </Button>
+          );
+        })()}
         
         {bot.isListed && bot.listPrice && (
           <p className="text-xs text-muted-foreground text-center">
@@ -1501,12 +1602,16 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                     {scavengingZone === 'ScrapHeaps' && '🏜️ Scrap Heaps'}
                     {scavengingZone === 'AbandonedSettlements' && '🏭 Abandoned Settlements'}
                     {scavengingZone === 'DeadMachineFields' && '⚠️ Dead Machine Fields'}
+                    {scavengingZone === 'RepairBay' && '🔧 Repair Bay'}
+                    {scavengingZone === 'ChargingStation' && '🔌 Charging Station'}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ScrapHeaps">🏜️ Scrap Heaps (Safe)</SelectItem>
                   <SelectItem value="AbandonedSettlements">🏭 Abandoned Settlements (Moderate)</SelectItem>
                   <SelectItem value="DeadMachineFields">⚠️ Dead Machine Fields (High Risk)</SelectItem>
+                  <SelectItem value="RepairBay">🔧 Repair Bay (Maintenance)</SelectItem>
+                  <SelectItem value="ChargingStation">🔌 Charging Station (Free Charging)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1518,33 +1623,75 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                   <span className="text-muted-foreground">Accumulation Rate:</span>
                   <span className="font-medium">Every 15 minutes</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Parts per Hour:</span>
-                  <span className={scavengingZone === 'DeadMachineFields' ? 'text-orange-600 font-semibold' : ''}>
-                    ~{scavengingZone === 'ScrapHeaps' ? '10' : scavengingZone === 'AbandonedSettlements' ? '16' : '25'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Battery per Hour:</span>
-                  <span className={scavengingZone === 'DeadMachineFields' ? 'text-red-600 font-semibold' : ''}>
-                    ~{scavengingZone === 'ScrapHeaps' ? '20' : scavengingZone === 'AbandonedSettlements' ? '40' : '70'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Condition per Hour:</span>
-                  <span className={scavengingZone === 'DeadMachineFields' ? 'text-red-600 font-semibold' : ''}>
-                    ~{scavengingZone === 'ScrapHeaps' ? '8' : scavengingZone === 'AbandonedSettlements' ? '16' : '28'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Universal Parts:</span>
-                  <span className="font-medium text-primary">
-                    {scavengingZone === 'ScrapHeaps' ? '40%' : scavengingZone === 'AbandonedSettlements' ? '25%' : '10%'}
-                  </span>
-                </div>
+                {scavengingZone !== 'RepairBay' && scavengingZone !== 'ChargingStation' ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Parts per Hour:</span>
+                      <span className={scavengingZone === 'DeadMachineFields' ? 'text-orange-600 font-semibold' : ''}>
+                        ~{scavengingZone === 'ScrapHeaps' ? '10' : scavengingZone === 'AbandonedSettlements' ? '16' : '25'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Battery per Hour:</span>
+                      <span className={scavengingZone === 'DeadMachineFields' ? 'text-red-600 font-semibold' : ''}>
+                        ~{scavengingZone === 'ScrapHeaps' ? '20' : scavengingZone === 'AbandonedSettlements' ? '40' : '70'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Condition per Hour:</span>
+                      <span className={scavengingZone === 'DeadMachineFields' ? 'text-red-600 font-semibold' : ''}>
+                        ~{scavengingZone === 'ScrapHeaps' ? '8' : scavengingZone === 'AbandonedSettlements' ? '16' : '28'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Universal Parts:</span>
+                      <span className="font-medium text-primary">
+                        {scavengingZone === 'ScrapHeaps' ? '40%' : scavengingZone === 'AbandonedSettlements' ? '25%' : '10%'}
+                      </span>
+                    </div>
+                  </>
+                ) : scavengingZone === 'RepairBay' ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Parts per Hour:</span>
+                      <span className="font-medium text-muted-foreground">0 (No parts)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Battery per Hour:</span>
+                      <span>~20</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Condition per Hour:</span>
+                      <span className="font-semibold text-green-600">+12-18 (Restored!)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Cooldown:</span>
+                      <span className="font-medium text-primary">Bypasses repair cooldown</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Parts per Hour:</span>
+                      <span className="font-medium text-muted-foreground">0 (No parts)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Battery per Hour:</span>
+                      <span className="font-semibold text-cyan-600">+4 (Restored!)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Condition per Hour:</span>
+                      <span className="font-medium text-muted-foreground">0 (No change)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Cost:</span>
+                      <span className="font-medium text-primary">FREE (vs 0.1 ICP instant)</span>
+                    </div>
+                  </>
+                )}
               </div>
               <p className="text-xs text-muted-foreground pt-2">
-                💡 <strong>Continuous Scavenging:</strong> Parts accumulate every 15 min. Retrieve anytime to collect! <strong>Rates shown are base values</strong> - your bot's faction and stats provide bonuses that reduce battery/condition costs and increase parts yield.
+                💡 <strong>Continuous Scavenging:</strong> {scavengingZone === 'RepairBay' ? 'Condition restores every 15 min. Retrieve when ready!' : scavengingZone === 'ChargingStation' ? 'Battery restores every 15 min (4/hr). Retrieve anytime!' : 'Parts accumulate every 15 min. Retrieve anytime to collect!'} <strong>Rates shown are base values</strong> - your bot's faction and stats provide bonuses.
               </p>
             </div>
             {error && (
@@ -1572,7 +1719,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
 
       {/* Upgrade Dialog */}
       <Dialog open={showUpgrade} onOpenChange={setShowUpgrade}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Upgrade {bot.name || `Bot #${bot.tokenIndex}`}</DialogTitle>
             <DialogDescription>
@@ -1742,6 +1889,66 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
               disabled={cancelUpgradeMutation.isPending}
             >
               {cancelUpgradeMutation.isPending ? 'Cancelling...' : 'Yes, cancel upgrade'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Strip Bot Confirmation Dialog */}
+      <AlertDialog open={showRespec} onOpenChange={setShowRespec}>
+        <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>⚠️ Strip Bot?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="space-y-3">
+                <p>This will <strong>reset all upgrade bonuses to 0</strong> and refund 60% of invested parts (40% penalty).</p>
+                
+                {bot.stats && (() => {
+                  const stats = bot.stats as any;
+                  const respecCount = Number(stats.respecCount || 0);
+                  const respecCost = respecCount + 1;
+                  const speedUp = Number(stats.speedUpgrades || 0);
+                  const powerUp = Number(stats.powerCoreUpgrades || 0);
+                  const accelUp = Number(stats.accelerationUpgrades || 0);
+                  const stabUp = Number(stats.stabilityUpgrades || 0);
+                  
+                  return (
+                    <>
+                      <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg space-y-1 text-sm">
+                        <p className="font-semibold text-destructive">Cost: {respecCost} ICP</p>
+                        <p className="text-muted-foreground">Current Upgrades:</p>
+                        <div className="grid grid-cols-2 gap-1 text-xs">
+                          <span>⚡ Speed: +{speedUp}</span>
+                          <span>💪 Power: +{powerUp}</span>
+                          <span>🚀 Accel: +{accelUp}</span>
+                          <span>🎯 Stability: +{stabUp}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="p-3 bg-muted rounded-lg space-y-1 text-xs">
+                        <p className="font-semibold">After Stripping:</p>
+                        <p className="text-green-600">✓ Pity counter preserved ({Number(bot.upgradeCostsV2?.pityCounter || 0)})</p>
+                        <p className="text-green-600">✓ Refund 60% of parts invested</p>
+                        <p className="text-destructive">✗ All stat bonuses reset to 0</p>
+                        <p className="text-destructive">✗ Bot will drop to lower race class</p>
+                        <p className="text-muted-foreground">⚠️ Cost increases: next strip = {respecCost + 1} ICP</p>
+                      </div>
+                    </>
+                  );
+                })()}
+                
+                <p className="text-sm font-semibold">This action cannot be undone!</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRespec}
+              disabled={loading}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {loading ? 'Stripping...' : 'Strip Bot'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

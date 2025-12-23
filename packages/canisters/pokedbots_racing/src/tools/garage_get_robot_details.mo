@@ -20,7 +20,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_get_robot_details";
     title = ?"Get Robot Details";
-    description = ?"Get comprehensive details for a specific PokedBot including stats, condition, career, and upgrade status. The bot must be initialized for racing first.\n\n**TIMESTAMPS:** All timestamps (world_buff_expires_at_utc, last_recharged_utc, last_repaired_utc, start_time_utc, last_accumulation_utc) are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z'). Cooldowns: recharge 6hr, repair 3hr.\n\n**OWNERSHIP:** If you own the bot, shows full details (condition, battery, upgrade costs). If not, shows public profile only (stats, career, ELO).\n\nFor detailed mechanics (battery penalties, overcharge, terrain bonuses), use help_get_compendium tool.";
+    description = ?"Get comprehensive details for a specific PokedBot including stats, condition, career, and upgrade status. The bot must be initialized for racing first.\n\n**TIMESTAMPS:** All timestamps (world_buff_expires_at_utc, last_recharged_utc, last_repaired_utc, start_time_utc, last_accumulation_utc) are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z'). Cooldowns: recharge 6hr, repair 3hr.\n\n**OWNERSHIP:** If you own the bot, shows full details (condition, battery, upgrade costs). If not, shows public profile only (stats, career, rating, ELO).\n\nFor detailed mechanics (battery penalties, overcharge, terrain bonuses), use help_get_compendium tool.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -86,17 +86,17 @@ module {
       let status = ctx.garageManager.getBotStatus(racingStats);
       let canRace = ctx.garageManager.canRace(Nat.toText(tokenIndex));
 
-      // Determine race class bracket (ELO-based)
-      let raceClass = if (racingStats.eloRating >= 1800) {
-        "SilentKlan (1800+ ELO)";
-      } else if (racingStats.eloRating >= 1600) {
-        "Elite (1600-1799 ELO)";
-      } else if (racingStats.eloRating >= 1400) {
-        "Raider (1400-1599 ELO)";
-      } else if (racingStats.eloRating >= 1200) {
-        "Junker (1200-1399 ELO)";
+      // Determine race class bracket (rating-based)
+      let raceClass = if (overallRating >= 50) {
+        "SilentKlan (50+ rating)";
+      } else if (overallRating >= 40) {
+        "Elite (40-49 rating)";
+      } else if (overallRating >= 30) {
+        "Raider (30-39 rating)";
+      } else if (overallRating >= 20) {
+        "Junker (20-29 rating)";
       } else {
-        "Scrap (<1200 ELO)";
+        "Scrap (0-19 rating)";
       };
 
       // Get wasteland flavor text

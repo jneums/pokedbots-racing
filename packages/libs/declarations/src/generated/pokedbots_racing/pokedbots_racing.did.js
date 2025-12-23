@@ -1,4 +1,5 @@
 export const idlFactory = ({ IDL }) => {
+  const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
   const Time__1 = IDL.Nat;
   const ActionFilter = IDL.Variant({
     'All' : IDL.Null,
@@ -246,7 +247,7 @@ export const idlFactory = ({ IDL }) => {
     'info' : ApiKeyInfo,
     'hashed_key' : HashedApiKey,
   });
-  const Result_3 = IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text });
+  const Result_5 = IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text });
   const Timestamp = IDL.Nat64;
   const TransferError = IDL.Variant({
     'GenericError' : IDL.Record({
@@ -266,14 +267,87 @@ export const idlFactory = ({ IDL }) => {
     'NotOwner' : IDL.Null,
     'TransferFailed' : TransferError,
   });
-  const Result_4 = IDL.Variant({ 'ok' : IDL.Null, 'err' : TreasuryError });
+  const Result_6 = IDL.Variant({ 'ok' : IDL.Null, 'err' : TreasuryError });
   const HttpHeader = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
   const HttpRequestResult = IDL.Record({
     'status' : IDL.Nat,
     'body' : IDL.Vec(IDL.Nat8),
     'headers' : IDL.Vec(HttpHeader),
   });
-  const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
+  const BetStatus = IDL.Variant({
+    'Won' : IDL.Null,
+    'Refunded' : IDL.Null,
+    'Lost' : IDL.Null,
+    'Active' : IDL.Null,
+    'Pending' : IDL.Null,
+  });
+  const BetType = IDL.Variant({
+    'Win' : IDL.Null,
+    'Show' : IDL.Null,
+    'Place' : IDL.Null,
+  });
+  const Bet = IDL.Record({
+    'status' : BetStatus,
+    'tokenIndex' : IDL.Nat,
+    'userId' : IDL.Principal,
+    'paid' : IDL.Bool,
+    'betType' : BetType,
+    'potentialPayout' : IDL.Opt(IDL.Nat),
+    'timestamp' : IDL.Int,
+    'raceId' : IDL.Nat,
+    'betId' : IDL.Nat,
+    'amount' : IDL.Nat,
+  });
+  const PoolStatus = IDL.Variant({
+    'Open' : IDL.Null,
+    'Closed' : IDL.Null,
+    'Cancelled' : IDL.Null,
+    'Settled' : IDL.Null,
+    'Pending' : IDL.Null,
+  });
+  const RaceResults = IDL.Record({
+    'rankings' : IDL.Vec(IDL.Nat),
+    'fetchedAt' : IDL.Int,
+  });
+  const FailedPayout = IDL.Record({
+    'userId' : IDL.Principal,
+    'attempts' : IDL.Nat,
+    'error' : IDL.Text,
+    'betId' : IDL.Nat,
+    'amount' : IDL.Nat,
+    'lastAttempt' : IDL.Int,
+  });
+  const BettingPool = IDL.Record({
+    'status' : PoolStatus,
+    'placePool' : IDL.Nat,
+    'winBetsByBot' : IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat)),
+    'terrain' : IDL.Text,
+    'rakeDistributed' : IDL.Bool,
+    'placeBetsByBot' : IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat)),
+    'subaccount' : IDL.Vec(IDL.Nat8),
+    'showBetsByBot' : IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat)),
+    'results' : IDL.Opt(RaceResults),
+    'distance' : IDL.Nat,
+    'payoutsCompleted' : IDL.Bool,
+    'betIds' : IDL.Vec(IDL.Nat),
+    'raceId' : IDL.Nat,
+    'showPool' : IDL.Nat,
+    'entrants' : IDL.Vec(IDL.Nat),
+    'totalPooled' : IDL.Nat,
+    'bettingOpensAt' : IDL.Int,
+    'winPool' : IDL.Nat,
+    'raceClass' : IDL.Text,
+    'bettingClosesAt' : IDL.Int,
+    'failedPayouts' : IDL.Vec(FailedPayout),
+  });
+  const Result_4 = IDL.Variant({
+    'ok' : IDL.Record({
+      'currentOdds' : IDL.Float64,
+      'potentialPayout' : IDL.Nat,
+      'betId' : IDL.Nat,
+    }),
+    'err' : IDL.Text,
+  });
   const UpgradeType = IDL.Variant({
     'Gyro' : IDL.Null,
     'PowerCore' : IDL.Null,
@@ -301,11 +375,14 @@ export const idlFactory = ({ IDL }) => {
     'stats' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat)),
   });
   const ScavengingZone = IDL.Variant({
+    'ChargingStation' : IDL.Null,
     'AbandonedSettlements' : IDL.Null,
     'ScrapHeaps' : IDL.Null,
+    'RepairBay' : IDL.Null,
     'DeadMachineFields' : IDL.Null,
   });
   const ScavengingMission = IDL.Record({
+    'pendingConditionRestored' : IDL.Nat,
     'startTime' : IDL.Int,
     'tokenIndex' : IDL.Nat,
     'zone' : ScavengingZone,
@@ -319,6 +396,7 @@ export const idlFactory = ({ IDL }) => {
     'lastAccumulation' : IDL.Int,
     'durationMinutes' : IDL.Opt(IDL.Nat),
     'missionId' : IDL.Nat,
+    'pendingBatteryRestored' : IDL.Nat,
   });
   const PokedBotRacingStats = IDL.Record({
     'accelerationBonus' : IDL.Nat,
@@ -367,6 +445,7 @@ export const idlFactory = ({ IDL }) => {
     'powerCoreBonus' : IDL.Nat,
     'faction' : FactionType,
     'battery' : IDL.Nat,
+    'respecCount' : IDL.Nat,
     'speedBonus' : IDL.Nat,
     'totalScrapEarned' : IDL.Nat,
     'activeMission' : IDL.Opt(ScavengingMission),
@@ -374,7 +453,7 @@ export const idlFactory = ({ IDL }) => {
     'upgradeEndsAt' : IDL.Opt(IDL.Int),
     'condition' : IDL.Nat,
   });
-  const Result_2 = IDL.Variant({
+  const Result_3 = IDL.Variant({
     'ok' : IDL.Record({
       'activeUpgrade' : IDL.Opt(UpgradeSession),
       'stats' : PokedBotRacingStats,
@@ -404,6 +483,17 @@ export const idlFactory = ({ IDL }) => {
     'speedChips' : IDL.Nat,
     'thrusterKits' : IDL.Nat,
   });
+  const Result_2 = IDL.Variant({
+    'ok' : IDL.Record({
+      'stabilityPartsRefunded' : IDL.Nat,
+      'speedPartsRefunded' : IDL.Nat,
+      'powerCorePartsRefunded' : IDL.Nat,
+      'respecCost' : IDL.Nat,
+      'totalRefunded' : IDL.Nat,
+      'accelerationPartsRefunded' : IDL.Nat,
+    }),
+    'err' : IDL.Text,
+  });
   const Subaccount = IDL.Vec(IDL.Nat8);
   const Destination = IDL.Record({
     'owner' : IDL.Principal,
@@ -411,6 +501,15 @@ export const idlFactory = ({ IDL }) => {
   });
   const Result = IDL.Variant({ 'ok' : IDL.Nat, 'err' : TreasuryError });
   const McpServer = IDL.Service({
+    'admin_clear_active_mission' : IDL.Func([IDL.Nat], [IDL.Text], []),
+    'admin_create_betting_pool' : IDL.Func([IDL.Nat], [Result_1], []),
+    'admin_get_active_mission' : IDL.Func([IDL.Nat], [IDL.Text], ['query']),
+    'admin_remove_race_entry' : IDL.Func([IDL.Nat, IDL.Nat], [Result_1], []),
+    'admin_update_race_min_entries' : IDL.Func(
+        [IDL.Nat, IDL.Nat],
+        [IDL.Text],
+        [],
+      ),
     'cancel_actions_by_filter' : IDL.Func(
         [ActionFilter],
         [CancellationResult],
@@ -778,9 +877,9 @@ export const idlFactory = ({ IDL }) => {
       ),
     'recalculate_bot_stats' : IDL.Func([], [IDL.Text], []),
     'revoke_my_api_key' : IDL.Func([IDL.Text], [], []),
-    'set_ext_canister' : IDL.Func([IDL.Principal], [Result_3], []),
-    'set_icp_ledger' : IDL.Func([IDL.Principal], [Result_3], []),
-    'set_owner' : IDL.Func([IDL.Principal], [Result_4], []),
+    'set_ext_canister' : IDL.Func([IDL.Principal], [Result_5], []),
+    'set_icp_ledger' : IDL.Func([IDL.Principal], [Result_5], []),
+    'set_owner' : IDL.Func([IDL.Principal], [Result_6], []),
     'transformJwksResponse' : IDL.Func(
         [
           IDL.Record({
@@ -813,11 +912,55 @@ export const idlFactory = ({ IDL }) => {
       ),
     'upload_nft_stats_batch' : IDL.Func(
         [IDL.Vec(IDL.Tuple(IDL.Nat, NFTStats))],
-        [Result_3],
+        [Result_5],
         [],
       ),
-    'upload_trait_schema' : IDL.Func([TraitSchema], [Result_3], []),
+    'upload_trait_schema' : IDL.Func([TraitSchema], [Result_5], []),
     'validate_timer_state' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+    'web_betting_get_my_bets' : IDL.Func(
+        [IDL.Nat],
+        [
+          IDL.Record({
+            'bets' : IDL.Vec(Bet),
+            'summary' : IDL.Record({
+              'totalWagered' : IDL.Nat,
+              'totalBets' : IDL.Nat,
+              'totalWon' : IDL.Nat,
+              'winRate' : IDL.Float64,
+              'netProfit' : IDL.Int,
+            }),
+          }),
+        ],
+        ['query'],
+      ),
+    'web_betting_get_pool_info' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Opt(BettingPool)],
+        ['query'],
+      ),
+    'web_betting_list_pools' : IDL.Func(
+        [IDL.Opt(PoolStatus), IDL.Nat],
+        [
+          IDL.Record({
+            'pools' : IDL.Vec(
+              IDL.Record({
+                'status' : PoolStatus,
+                'totalBets' : IDL.Nat,
+                'raceId' : IDL.Nat,
+                'totalPooled' : IDL.Nat,
+                'bettingOpensAt' : IDL.Int,
+                'bettingClosesAt' : IDL.Int,
+              })
+            ),
+          }),
+        ],
+        ['query'],
+      ),
+    'web_betting_place_bet' : IDL.Func(
+        [IDL.Nat, IDL.Nat, BetType, IDL.Nat],
+        [Result_4],
+        [],
+      ),
     'web_browse_marketplace' : IDL.Func(
         [
           IDL.Opt(IDL.Nat),
@@ -855,7 +998,7 @@ export const idlFactory = ({ IDL }) => {
     'web_cancel_upgrade' : IDL.Func([IDL.Nat], [Result_1], []),
     'web_complete_scavenging' : IDL.Func([IDL.Nat], [Result_1], []),
     'web_enter_race' : IDL.Func([IDL.Nat, IDL.Nat], [Result_1], []),
-    'web_get_bot_details' : IDL.Func([IDL.Nat], [Result_2], []),
+    'web_get_bot_details' : IDL.Func([IDL.Nat], [Result_3], []),
     'web_get_bot_details_batch' : IDL.Func(
         [IDL.Vec(IDL.Nat)],
         [
@@ -1048,6 +1191,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'web_recharge_bot' : IDL.Func([IDL.Nat], [Result_1], []),
     'web_repair_bot' : IDL.Func([IDL.Nat], [Result_1], []),
+    'web_respec_bot' : IDL.Func([IDL.Nat], [Result_2], []),
     'web_start_scavenging' : IDL.Func(
         [IDL.Nat, IDL.Text, IDL.Opt(IDL.Nat)],
         [Result_1],

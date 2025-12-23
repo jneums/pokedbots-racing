@@ -284,9 +284,10 @@ let stability = applyFactionBonus(((seed / 1000000) % 100) * 0.7 + 30, faction, 
 - +5% Power Core
 - +5% Stability
 - 25% chance for 2x upgrades
-- Dependable performance
+- **Collection Bonus: 20%/40%/60% repair cost reduction** (2/4/6 bots)
+- Cheap maintenance, dependable performance
 
-**Lore:** Heavy machinery foundation. The reliable workhorse of the wasteland.
+**Lore:** Heavy machinery foundation. The reliable workhorse of the wasteland. Built to last with minimal upkeep.
 
 ---
 

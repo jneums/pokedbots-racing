@@ -16,6 +16,7 @@ import { RaceVisualizer } from '@/components/RaceVisualizer';
 import { RacePlayback } from '@/components/Track3D';
 import { getTrackTemplate } from '@/components/Track3D/trackData';
 import { toast } from 'sonner';
+import { BettingInterface } from '@/components/BettingInterface';
 
 function formatICP(amount: bigint): string {
   const icp = Number(amount) / 100_000_000;
@@ -290,15 +291,16 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
   const raceClass = getClassName(race);
 
   const isBotEligible = (bot: any): boolean => {
-    if (!bot.stats || !bot.stats.eloRating) return false;
-    const elo = Number(bot.stats.eloRating);
+    if (!bot.maxStats) return false;
+    // Calculate overall rating (average of max stats)
+    const rating = Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4);
     
     switch (raceClass) {
-      case 'Scrap': return elo < 1200;
-      case 'Junker': return elo >= 1200 && elo < 1400;
-      case 'Raider': return elo >= 1400 && elo < 1600;
-      case 'Elite': return elo >= 1600 && elo < 1800;
-      case 'SilentKlan': return elo >= 1800;
+      case 'Scrap': return rating < 20;
+      case 'Junker': return rating >= 20 && rating < 30;
+      case 'Raider': return rating >= 30 && rating < 40;
+      case 'Elite': return rating >= 40 && rating < 50;
+      case 'SilentKlan': return rating >= 50;
       default: return false;
     }
   };
@@ -428,7 +430,15 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
                   <p className="text-sm text-red-500">Entry deadline has passed</p>
                 </div>
               )}
+            </CardContent>
+          </Card>
 
+          {/* Betting Interface */}
+          <BettingInterface raceId={Number(raceId)} />
+
+          {/* Race Entries Section */}
+          <Card className="border-primary/20">
+            <CardContent className="pt-6">
               {'Upcoming' in race.status && (
                 <div className="space-y-3">
                   <p className="text-sm font-semibold">Racers ({entryCount}/{Number(race.maxEntries)}):</p>
@@ -661,7 +671,7 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
             {eligibleBots.length === 0 && ineligibleBots.length > 0 && (
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
                 <p className="text-sm text-yellow-600">
-                  None of your bots meet the ELO requirement for this {raceClass} class race.
+                  None of your bots meet the rating requirement for this {raceClass} class race.
                 </p>
               </div>
             )}

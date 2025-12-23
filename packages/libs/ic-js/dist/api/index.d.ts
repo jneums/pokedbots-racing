@@ -3,4 +3,5 @@ export * from './leaderboard.api.js';
 export * from './racing.api.js';
 export * from './ledger.api.js';
 export * from './marketplace.api.js';
+export * from './betting.api.js';
 //# sourceMappingURL=index.d.ts.map

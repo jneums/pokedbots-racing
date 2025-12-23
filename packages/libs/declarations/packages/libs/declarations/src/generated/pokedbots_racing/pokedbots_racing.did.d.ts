@@ -25,49 +25,6 @@ export interface ApiKeyMetadata {
   'info' : ApiKeyInfo,
   'hashed_key' : HashedApiKey,
 }
-export interface Bet {
-  'status' : BetStatus,
-  'tokenIndex' : bigint,
-  'userId' : Principal,
-  'paid' : boolean,
-  'betType' : BetType,
-  'potentialPayout' : [] | [bigint],
-  'timestamp' : bigint,
-  'raceId' : bigint,
-  'betId' : bigint,
-  'amount' : bigint,
-}
-export type BetStatus = { 'Won' : null } |
-  { 'Refunded' : null } |
-  { 'Lost' : null } |
-  { 'Active' : null } |
-  { 'Pending' : null };
-export type BetType = { 'Win' : null } |
-  { 'Show' : null } |
-  { 'Place' : null };
-export interface BettingPool {
-  'status' : PoolStatus,
-  'placePool' : bigint,
-  'winBetsByBot' : Array<[bigint, bigint]>,
-  'terrain' : string,
-  'rakeDistributed' : boolean,
-  'placeBetsByBot' : Array<[bigint, bigint]>,
-  'subaccount' : Uint8Array | number[],
-  'showBetsByBot' : Array<[bigint, bigint]>,
-  'results' : [] | [RaceResults],
-  'distance' : bigint,
-  'payoutsCompleted' : boolean,
-  'betIds' : Array<bigint>,
-  'raceId' : bigint,
-  'showPool' : bigint,
-  'entrants' : Array<bigint>,
-  'totalPooled' : bigint,
-  'bettingOpensAt' : bigint,
-  'winPool' : bigint,
-  'raceClass' : string,
-  'bettingClosesAt' : bigint,
-  'failedPayouts' : Array<FailedPayout>,
-}
 export interface CancellationResult {
   'cancelled' : Array<ActionId>,
   'errors' : Array<[bigint, string]>,
@@ -114,14 +71,6 @@ export type FactionType = { 'Bee' : null } |
   { 'UltimateMaster' : null } |
   { 'Industrial' : null } |
   { 'Master' : null };
-export interface FailedPayout {
-  'userId' : Principal,
-  'attempts' : bigint,
-  'error' : string,
-  'betId' : bigint,
-  'amount' : bigint,
-  'lastAttempt' : bigint,
-}
 export type HashedApiKey = string;
 export type Header = [string, string];
 export interface HttpHeader { 'value' : string, 'name' : string }
@@ -167,9 +116,6 @@ export type LeaderboardType = { 'AllTime' : null } |
   { 'Monthly' : bigint } |
   { 'Season' : bigint };
 export interface McpServer {
-  'admin_clear_active_mission' : ActorMethod<[bigint], string>,
-  'admin_create_betting_pool' : ActorMethod<[bigint], Result_1>,
-  'admin_get_active_mission' : ActorMethod<[bigint], string>,
   'admin_remove_race_entry' : ActorMethod<[bigint, bigint], Result_1>,
   'admin_update_race_min_entries' : ActorMethod<[bigint, bigint], string>,
   'cancel_actions_by_filter' : ActorMethod<[ActionFilter], CancellationResult>,
@@ -433,9 +379,9 @@ export interface McpServer {
   >,
   'recalculate_bot_stats' : ActorMethod<[], string>,
   'revoke_my_api_key' : ActorMethod<[string], undefined>,
-  'set_ext_canister' : ActorMethod<[Principal], Result_5>,
-  'set_icp_ledger' : ActorMethod<[Principal], Result_5>,
-  'set_owner' : ActorMethod<[Principal], Result_6>,
+  'set_ext_canister' : ActorMethod<[Principal], Result_3>,
+  'set_icp_ledger' : ActorMethod<[Principal], Result_3>,
+  'set_owner' : ActorMethod<[Principal], Result_4>,
   'transformJwksResponse' : ActorMethod<
     [{ 'context' : Uint8Array | number[], 'response' : HttpRequestResult }],
     HttpRequestResult
@@ -459,42 +405,9 @@ export interface McpServer {
     ],
     undefined
   >,
-  'upload_nft_stats_batch' : ActorMethod<[Array<[bigint, NFTStats]>], Result_5>,
-  'upload_trait_schema' : ActorMethod<[TraitSchema], Result_5>,
+  'upload_nft_stats_batch' : ActorMethod<[Array<[bigint, NFTStats]>], Result_3>,
+  'upload_trait_schema' : ActorMethod<[TraitSchema], Result_3>,
   'validate_timer_state' : ActorMethod<[], Array<string>>,
-  'web_betting_get_my_bets' : ActorMethod<
-    [bigint],
-    {
-      'bets' : Array<Bet>,
-      'summary' : {
-        'totalWagered' : bigint,
-        'totalBets' : bigint,
-        'totalWon' : bigint,
-        'winRate' : number,
-        'netProfit' : bigint,
-      },
-    }
-  >,
-  'web_betting_get_pool_info' : ActorMethod<[bigint], [] | [BettingPool]>,
-  'web_betting_list_pools' : ActorMethod<
-    [[] | [PoolStatus], bigint],
-    {
-      'pools' : Array<
-        {
-          'status' : PoolStatus,
-          'totalBets' : bigint,
-          'raceId' : bigint,
-          'totalPooled' : bigint,
-          'bettingOpensAt' : bigint,
-          'bettingClosesAt' : bigint,
-        }
-      >,
-    }
-  >,
-  'web_betting_place_bet' : ActorMethod<
-    [bigint, bigint, BetType, bigint],
-    Result_4
-  >,
   'web_browse_marketplace' : ActorMethod<
     [
       [] | [bigint],
@@ -529,7 +442,7 @@ export interface McpServer {
   'web_cancel_upgrade' : ActorMethod<[bigint], Result_1>,
   'web_complete_scavenging' : ActorMethod<[bigint], Result_1>,
   'web_enter_race' : ActorMethod<[bigint, bigint], Result_1>,
-  'web_get_bot_details' : ActorMethod<[bigint], Result_3>,
+  'web_get_bot_details' : ActorMethod<[bigint], Result_2>,
   'web_get_bot_details_batch' : ActorMethod<
     [Array<bigint>],
     Array<
@@ -679,7 +592,6 @@ export interface McpServer {
   >,
   'web_recharge_bot' : ActorMethod<[bigint], Result_1>,
   'web_repair_bot' : ActorMethod<[bigint], Result_1>,
-  'web_respec_bot' : ActorMethod<[bigint], Result_2>,
   'web_start_scavenging' : ActorMethod<
     [bigint, string, [] | [bigint]],
     Result_1
@@ -739,7 +651,6 @@ export interface PokedBotRacingStats {
   'powerCoreBonus' : bigint,
   'faction' : FactionType,
   'battery' : bigint,
-  'respecCount' : bigint,
   'speedBonus' : bigint,
   'totalScrapEarned' : bigint,
   'activeMission' : [] | [ScavengingMission],
@@ -747,11 +658,6 @@ export interface PokedBotRacingStats {
   'upgradeEndsAt' : [] | [bigint],
   'condition' : bigint,
 }
-export type PoolStatus = { 'Open' : null } |
-  { 'Closed' : null } |
-  { 'Cancelled' : null } |
-  { 'Settled' : null } |
-  { 'Pending' : null };
 export interface Race {
   'startTime' : bigint,
   'status' : RaceStatus,
@@ -795,10 +701,6 @@ export interface RaceResult {
   'nftId' : string,
   'position' : bigint,
 }
-export interface RaceResults {
-  'rankings' : Array<bigint>,
-  'fetchedAt' : bigint,
-}
 export type RaceStatus = { 'Cancelled' : null } |
   { 'InProgress' : null } |
   { 'Completed' : null } |
@@ -824,17 +726,6 @@ export type Result_1 = { 'ok' : string } |
   { 'err' : string };
 export type Result_2 = {
     'ok' : {
-      'stabilityPartsRefunded' : bigint,
-      'speedPartsRefunded' : bigint,
-      'powerCorePartsRefunded' : bigint,
-      'respecCost' : bigint,
-      'totalRefunded' : bigint,
-      'accelerationPartsRefunded' : bigint,
-    }
-  } |
-  { 'err' : string };
-export type Result_3 = {
-    'ok' : {
       'activeUpgrade' : [] | [UpgradeSession],
       'stats' : PokedBotRacingStats,
       'baseStats' : {
@@ -855,20 +746,11 @@ export type Result_3 = {
     }
   } |
   { 'err' : string };
-export type Result_4 = {
-    'ok' : {
-      'currentOdds' : number,
-      'potentialPayout' : bigint,
-      'betId' : bigint,
-    }
-  } |
+export type Result_3 = { 'ok' : null } |
   { 'err' : string };
-export type Result_5 = { 'ok' : null } |
-  { 'err' : string };
-export type Result_6 = { 'ok' : null } |
+export type Result_4 = { 'ok' : null } |
   { 'err' : TreasuryError };
 export interface ScavengingMission {
-  'pendingConditionRestored' : bigint,
   'startTime' : bigint,
   'tokenIndex' : bigint,
   'zone' : ScavengingZone,
@@ -882,10 +764,8 @@ export interface ScavengingMission {
   'lastAccumulation' : bigint,
   'durationMinutes' : [] | [bigint],
   'missionId' : bigint,
-  'pendingBatteryRestored' : bigint,
 }
-export type ScavengingZone = { 'ChargingStation' : null } |
-  { 'AbandonedSettlements' : null } |
+export type ScavengingZone = { 'AbandonedSettlements' : null } |
   { 'ScrapHeaps' : null } |
   { 'RepairBay' : null } |
   { 'DeadMachineFields' : null };

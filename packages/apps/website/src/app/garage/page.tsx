@@ -594,10 +594,23 @@ export default function GaragePage() {
                                   <>
                                     <span>•</span>
                                     <span>
-                                      {Number(bot.stats.eloRating) >= 1800 ? 'Silent' :
-                                       Number(bot.stats.eloRating) >= 1600 ? 'Elite' :
-                                       Number(bot.stats.eloRating) >= 1400 ? 'Raider' :
-                                       Number(bot.stats.eloRating) >= 1200 ? 'Junker' : 'Scrap'}
+                                      {(() => {
+                                        // Calculate overall rating (average of max stats)
+                                        const rating = bot.maxStats 
+                                          ? Math.floor((
+                                              Number(bot.maxStats.speed) + 
+                                              Number(bot.maxStats.powerCore) + 
+                                              Number(bot.maxStats.acceleration) + 
+                                              Number(bot.maxStats.stability)
+                                            ) / 4)
+                                          : 0;
+                                        
+                                        // Determine class based on rating (not ELO)
+                                        return rating >= 50 ? 'SilentKlan' :
+                                               rating >= 40 ? 'Elite' :
+                                               rating >= 30 ? 'Raider' :
+                                               rating >= 20 ? 'Junker' : 'Scrap';
+                                      })()}
                                     </span>
                                   </>
                                 )}

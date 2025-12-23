@@ -304,19 +304,19 @@ module {
                     msg #= "   🏁 Record: No races yet\n";
                   };
 
-                  // Show race class bracket (ELO-based)
-                  let raceClassText = if (stats.eloRating >= 1800) {
-                    "💀 SilentKlan (1800+ ELO)";
-                  } else if (stats.eloRating >= 1600) {
-                    "🥇 Elite (1600-1799 ELO)";
-                  } else if (stats.eloRating >= 1400) {
-                    "🥈 Raider (1400-1599 ELO)";
-                  } else if (stats.eloRating >= 1200) {
-                    "🥉 Junker (1200-1399 ELO)";
+                  // Show race class bracket (rating-based)
+                  let raceClassText = if (totalRatingAt100 >= 50) {
+                    "💀 SilentKlan (50+ rating)";
+                  } else if (totalRatingAt100 >= 40) {
+                    "🥇 Elite (40-49 rating)";
+                  } else if (totalRatingAt100 >= 30) {
+                    "🥈 Raider (30-39 rating)";
+                  } else if (totalRatingAt100 >= 20) {
+                    "🥉 Junker (20-29 rating)";
                   } else {
-                    "🗑️ Scrap (<1200 ELO)";
+                    "🗑️ Scrap (0-19 rating)";
                   };
-                  msg #= "   🏆 Class: " # raceClassText # " | ELO: " # Nat.toText(stats.eloRating) # "\n";
+                  msg #= "   🏆 Class: " # raceClassText # " | ELO: " # Nat.toText(stats.eloRating) # " (skill)\n";
 
                   // Show terrain preferences based on faction bonuses
                   msg #= "   🎯 Prefers: " # (

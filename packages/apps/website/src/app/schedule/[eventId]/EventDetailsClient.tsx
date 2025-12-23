@@ -10,6 +10,7 @@ import { useMyBots, useEnterRace } from "@/hooks/useGarage";
 import { useAuth } from "@/hooks/useAuth";
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
 import { RaceVisualizer } from '@/components/RaceVisualizer';
+import { BettingInterface } from '@/components/BettingInterface';
 import { toast } from 'sonner';
 
 function formatICP(amount: bigint): string {
@@ -207,17 +208,18 @@ function RaceCard({ raceId }: { raceId: bigint }) {
 
   const raceClass = getClassName(race);
 
-  // Check if a bot is eligible for this race class based on ELO
+  // Check if a bot is eligible for this race class based on rating
   const isBotEligible = (bot: any): boolean => {
-    if (!bot.stats || !bot.stats.eloRating) return false;
-    const elo = Number(bot.stats.eloRating);
+    if (!bot.maxStats) return false;
+    // Calculate overall rating (average of max stats)
+    const rating = Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4);
     
     switch (raceClass) {
-      case 'Scrap': return elo < 1200;
-      case 'Junker': return elo >= 1200 && elo < 1400;
-      case 'Raider': return elo >= 1400 && elo < 1600;
-      case 'Elite': return elo >= 1600 && elo < 1800;
-      case 'SilentKlan': return elo >= 1800;
+      case 'Scrap': return rating < 20;
+      case 'Junker': return rating >= 20 && rating < 30;
+      case 'Raider': return rating >= 30 && rating < 40;
+      case 'Elite': return rating >= 40 && rating < 50;
+      case 'SilentKlan': return rating >= 50;
       default: return false;
     }
   };
@@ -327,10 +329,11 @@ function RaceCard({ raceId }: { raceId: bigint }) {
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
             <p className="text-sm text-yellow-600">
               You have bots but none are eligible for this {raceClass} class race.
-              {raceClass === 'Junker' && ' (Need ELO < 1400)'}
-              {raceClass === 'Raider' && ' (Need ELO 1400-1599)'}
-              {raceClass === 'Elite' && ' (Need ELO 1600-1799)'}
-              {raceClass === 'SilentKlan' && ' (Need ELO ≥ 1800)'}
+              {raceClass === 'Scrap' && ' (Need rating 0-19)'}
+              {raceClass === 'Junker' && ' (Need rating 20-29)'}
+              {raceClass === 'Raider' && ' (Need rating 30-39)'}
+              {raceClass === 'Elite' && ' (Need rating 40-49)'}
+              {raceClass === 'SilentKlan' && ' (Need rating ≥ 50)'}
             </p>
           </div>
         )}
@@ -517,6 +520,11 @@ function RaceCard({ raceId }: { raceId: bigint }) {
             </>
           );
         })()}
+
+        {/* Betting Interface */}
+        <div className="mt-4">
+          <BettingInterface raceId={Number(raceId)} />
+        </div>
       </CardContent>
 
       {/* Enter Race Dialog */}
@@ -528,8 +536,9 @@ function RaceCard({ raceId }: { raceId: bigint }) {
               Select a bot to enter in {race.name}. Entry fee: {formatICP(race.entryFee)}
               <br />
               <span className="text-xs">
-                {raceClass === 'Junker' && 'ELO Requirement: < 1400'}
-                {raceClass === 'Raider' && 'ELO Requirement: 1400-1599'}
+                {raceClass === 'Scrap' && 'Rating Requirement: 0-19'}
+                {raceClass === 'Junker' && 'Rating Requirement: 20-29'}
+                {raceClass === 'Raider' && 'Rating Requirement: 30-39'}
                 {raceClass === 'Elite' && 'ELO Requirement: 1600-1799'}
                 {raceClass === 'SilentKlan' && 'ELO Requirement: ≥ 1800'}
               </span>
@@ -567,7 +576,7 @@ function RaceCard({ raceId }: { raceId: bigint }) {
                         {bot.name && <span className="text-muted-foreground">- {bot.name}</span>}
                         {bot.stats && (
                           <span className="text-xs text-red-500">
-                            (ELO: {Number(bot.stats.eloRating)} - Not eligible)
+                            (Rating: {bot.maxStats ? Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4) : '?'} - Not eligible)
                           </span>
                         )}
                       </div>

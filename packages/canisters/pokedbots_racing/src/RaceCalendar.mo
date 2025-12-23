@@ -380,7 +380,7 @@ module {
       let metadata : EventMetadata = {
         name = "Weekly League Championship";
         description = "Major competitive event - Entry scales by class (Scrap 0.2, Junker 0.4, Raider 0.6, Elite 0.8, SilentKlan 1.2 ICP). All classes receive platform bonus to guarantee top 3 profitability.";
-        entryFee = 40_000_000; // 0.4 ICP base (Junker)
+        entryFee = 80_000_000; // 0.8 ICP base (Junker)
         maxEntries = 50; // Multiple heats if needed
         minEntries = 4;
         prizePoolBonus = 200_000_000; // Platform adds 2 ICP
@@ -392,7 +392,7 @@ module {
         #WeeklyLeague,
         scheduledTime,
         scheduledTime - (48 * 3600 * 1_000_000_000), // Opens Friday (48h before)
-        scheduledTime - (30 * 60 * 1_000_000_000), // Closes 30 min before
+        scheduledTime - (60 * 60 * 1_000_000_000), // Closes 1 hour before
         metadata,
         now,
       );
@@ -403,7 +403,7 @@ module {
       let metadata : EventMetadata = {
         name = "Daily Sprint Challenge";
         description = "Quick race for XP and rewards - Entry scales by class (Scrap 0.05, Junker 0.1, Raider 0.15, Elite 0.2, SilentKlan 0.3 ICP). All classes receive platform bonus.";
-        entryFee = 10_000_000; // 0.1 ICP base (Junker)
+        entryFee = 20_000_000; // 0.2 ICP base (Junker)
         maxEntries = 12;
         minEntries = 2;
         prizePoolBonus = 50_000_000; // Platform adds 0.5 ICP (Junker base)
@@ -415,30 +415,7 @@ module {
         #DailySprint,
         scheduledTime,
         now, // Opens immediately
-        scheduledTime - (15 * 60 * 1_000_000_000), // Closes 15 min before
-        metadata,
-        now,
-      );
-    };
-
-    // Create Weekly Scrap event (beginner-friendly)
-    public func createWeeklyScrapEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
-      let metadata : EventMetadata = {
-        name = "Weekly Scrap Showdown";
-        description = "Beginner race for Scrap bots - Entry 0.1 ICP with platform bonus to ensure profits for top finishers.";
-        entryFee = 10_000_000; // 0.1 ICP (Scrap tier)
-        maxEntries = 12;
-        minEntries = 4;
-        prizePoolBonus = 40_000_000; // Platform adds 0.4 ICP
-        pointsMultiplier = 1.5; // 1.5x points
-        divisions = [#Scrap]; // Scrap only
-      };
-
-      scheduleEvent(
-        #WeeklyLeague,
-        scheduledTime,
-        scheduledTime - (48 * 3600 * 1_000_000_000), // Opens 48h before
-        scheduledTime - (30 * 60 * 1_000_000_000), // Closes 30 min before
+        scheduledTime - (60 * 60 * 1_000_000_000), // Closes 1 hour before
         metadata,
         now,
       );
@@ -449,7 +426,7 @@ module {
       let metadata : EventMetadata = {
         name = "Monthly Championship Cup";
         description = "Elite tournament - Entry scales by class (Elite 2.0, SilentKlan 3.0 ICP). Platform bonus ensures competitive prize pools.";
-        entryFee = 100_000_000; // 1.0 ICP base (Elite)
+        entryFee = 200_000_000; // 2.0 ICP base (Elite)
         maxEntries = 64; // Top 64 qualify
         minEntries = 16; // At least 16 for bracket
         prizePoolBonus = 500_000_000; // Platform adds 5 ICP

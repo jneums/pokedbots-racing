@@ -72,6 +72,9 @@ module {
     accelerationUpgrades : Nat;
     stabilityUpgrades : Nat;
 
+    // Respec system
+    respecCount : Nat; // Number of times bot has been respecced (affects cost)
+
     // Dynamic stats
     battery : Nat;
     condition : Nat;
@@ -159,6 +162,8 @@ module {
     #ScrapHeaps; // 1.0x multipliers (safe)
     #AbandonedSettlements; // 1.2x battery, 1.3x condition, 1.4x parts
     #DeadMachineFields; // 1.5x battery, 1.8x condition, 2.0x parts
+    #RepairBay; // 1.0x battery drain, restores condition instead of gathering parts
+    #ChargingStation; // No battery drain, restores +1 battery per tick (free charging)
   };
 
   // Continuous scavenging mission - toggle on/off, accumulate rewards every 15 minutes
@@ -177,6 +182,8 @@ module {
       gyroModules : Nat;
       universalParts : Nat;
     };
+    pendingConditionRestored : Nat; // For RepairBay missions - condition points restored so far
+    pendingBatteryRestored : Nat; // For ChargingStation missions - battery points restored so far
   };
 
   public type WorldBuff = {
@@ -812,6 +819,7 @@ module {
         powerCoreUpgrades = 0;
         accelerationUpgrades = 0;
         stabilityUpgrades = 0;
+        respecCount = 0;
         battery = 100;
         condition = 100;
         experience = 0;
@@ -1093,6 +1101,17 @@ module {
       (current.speed + current.powerCore + current.acceleration + current.stability) / 4;
     };
 
+    /// Calculate rating at 100% condition (for race class eligibility)
+    /// This ensures bots don't drop out of their class due to temporary condition
+    public func calculateRatingAt100(botStats : PokedBotRacingStats) : Nat {
+      let base = getBaseStats(botStats.tokenIndex);
+      let speed = base.speed + botStats.speedBonus;
+      let powerCore = base.powerCore + botStats.powerCoreBonus;
+      let acceleration = base.acceleration + botStats.accelerationBonus;
+      let stability = base.stability + botStats.stabilityBonus;
+      (speed + powerCore + acceleration + stability) / 4;
+    };
+
     /// Get bot status
     public func getBotStatus(botStats : PokedBotRacingStats) : Text {
       if (botStats.condition < 25) { "Critical Malfunction" } else if (botStats.condition < 50) {
@@ -1351,6 +1370,11 @@ module {
       addParts(user, partType, amount);
     };
 
+    /// Set user inventory directly (for transfers and other operations)
+    public func setUserInventory(user : Principal, inventory : UserInventory) {
+      ignore Map.put(userInventories, phash, user, inventory);
+    };
+
     /// Remove parts from user inventory (returns false if insufficient)
     /// Universal Parts can substitute for any specific part type
     public func removeParts(user : Principal, partType : PartType, amount : Nat) : Bool {
@@ -1562,6 +1586,137 @@ module {
     private func rollDoublePoints(doubleChance : Float, seed : Nat32) : Bool {
       let roll = Nat32.toNat((seed / 100) % 100); // Use different part of seed
       Float.fromInt(roll) < doubleChance;
+    };
+
+    // ===== RESPEC SYSTEM =====
+
+    /// Calculate respec cost in e8s based on respec count
+    /// Cost = (respecCount + 1) * 1 ICP
+    public func calculateRespecCost(respecCount : Nat) : Nat {
+      (respecCount + 1) * 100_000_000; // 1 ICP, 2 ICP, 3 ICP...
+    };
+
+    /// Calculate parts refund for a single stat with 40% penalty (60% returned)
+    /// Returns the total parts to refund based on all upgrades made to that stat
+    private func calculateStatPartsRefund(
+      baseStatValue : Nat,
+      currentBonus : Nat,
+      overallRating : Nat,
+      costMultiplier : Float,
+    ) : Nat {
+      var totalRefund : Nat = 0;
+      var upgradedValue = baseStatValue;
+
+      // Calculate the cost of each upgrade point
+      for (i in Iter.range(1, currentBonus)) {
+        let upgradeCost = calculateUpgradeCostV2(baseStatValue, upgradedValue, overallRating, costMultiplier);
+        // Convert ICP cost to parts (100 parts = 1 ICP = 100_000_000 e8s)
+        let costInParts = (upgradeCost * 100) / 100_000_000;
+        // Apply 40% penalty (return 60%)
+        let refundAmount = (costInParts * 60) / 100;
+        totalRefund += refundAmount;
+        upgradedValue += 1;
+      };
+
+      totalRefund;
+    };
+
+    /// Respec a bot - reset all upgrades and refund parts (minus penalty)
+    /// Returns the parts refunded by type
+    public func respecBot(tokenIndex : Nat, owner : Principal) : Result.Result<{ speedPartsRefunded : Nat; powerCorePartsRefunded : Nat; accelerationPartsRefunded : Nat; stabilityPartsRefunded : Nat; totalRefunded : Nat }, Text> {
+      switch (Map.get(stats, nhash, tokenIndex)) {
+        case (null) { #err("Bot not initialized") };
+        case (?botStats) {
+          if (botStats.ownerPrincipal != owner) {
+            return #err("Not the owner");
+          };
+
+          // Can't respec while upgrading
+          if (Option.isSome(Map.get(activeUpgrades, nhash, tokenIndex))) {
+            return #err("Cannot respec while upgrade is in progress");
+          };
+
+          // Can't respec if no upgrades
+          if (
+            botStats.speedBonus == 0 and botStats.powerCoreBonus == 0 and
+            botStats.accelerationBonus == 0 and botStats.stabilityBonus == 0
+          ) {
+            return #err("No upgrades to respec");
+          };
+
+          let baseStats = getBaseStats(tokenIndex);
+          let synergies = calculateFactionSynergies(owner);
+          let overallRating = (
+            baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability
+          ) / 4;
+
+          // Calculate refunds for each stat
+          let speedRefund = calculateStatPartsRefund(
+            baseStats.speed,
+            botStats.speedBonus,
+            overallRating,
+            synergies.costMultipliers.upgradeCost,
+          );
+          let powerCoreRefund = calculateStatPartsRefund(
+            baseStats.powerCore,
+            botStats.powerCoreBonus,
+            overallRating,
+            synergies.costMultipliers.upgradeCost,
+          );
+          let accelerationRefund = calculateStatPartsRefund(
+            baseStats.acceleration,
+            botStats.accelerationBonus,
+            overallRating,
+            synergies.costMultipliers.upgradeCost,
+          );
+          let stabilityRefund = calculateStatPartsRefund(
+            baseStats.stability,
+            botStats.stabilityBonus,
+            overallRating,
+            synergies.costMultipliers.upgradeCost,
+          );
+
+          // Refund parts to user inventory
+          if (speedRefund > 0) {
+            addParts(owner, #SpeedChip, speedRefund);
+          };
+          if (powerCoreRefund > 0) {
+            addParts(owner, #PowerCoreFragment, powerCoreRefund);
+          };
+          if (accelerationRefund > 0) {
+            addParts(owner, #ThrusterKit, accelerationRefund);
+          };
+          if (stabilityRefund > 0) {
+            addParts(owner, #GyroModule, stabilityRefund);
+          };
+
+          // Reset bot stats (keep pity counter)
+          let updatedStats : PokedBotRacingStats = {
+            botStats with
+            speedBonus = 0;
+            powerCoreBonus = 0;
+            accelerationBonus = 0;
+            stabilityBonus = 0;
+            speedUpgrades = 0;
+            powerCoreUpgrades = 0;
+            accelerationUpgrades = 0;
+            stabilityUpgrades = 0;
+            respecCount = botStats.respecCount + 1;
+          };
+
+          ignore Map.put(stats, nhash, tokenIndex, updatedStats);
+
+          let totalRefunded = speedRefund + powerCoreRefund + accelerationRefund + stabilityRefund;
+
+          #ok({
+            speedPartsRefunded = speedRefund;
+            powerCorePartsRefunded = powerCoreRefund;
+            accelerationPartsRefunded = accelerationRefund;
+            stabilityPartsRefunded = stabilityRefund;
+            totalRefunded = totalRefunded;
+          });
+        };
+      };
     };
 
     // ===== CONTINUOUS SCAVENGING SYSTEM =====
@@ -1806,7 +1961,7 @@ module {
           if (count >= 6) {
             {
               upgradeCost = 1.0;
-              repairCost = 0.75;
+              repairCost = 0.40; // 60% discount - reliable workhorse maintenance
               rechargeCooldown = 1.0;
               scavengingParts = 1.0;
               racePrizes = 1.0;
@@ -1815,7 +1970,7 @@ module {
           } else if (count >= 4) {
             {
               upgradeCost = 1.0;
-              repairCost = 0.85;
+              repairCost = 0.60; // 40% discount
               rechargeCooldown = 1.0;
               scavengingParts = 1.0;
               racePrizes = 1.0;
@@ -1824,7 +1979,7 @@ module {
           } else if (count >= 2) {
             {
               upgradeCost = 1.0;
-              repairCost = 0.92;
+              repairCost = 0.80; // 20% discount
               rechargeCooldown = 1.0;
               scavengingParts = 1.0;
               racePrizes = 1.0;
@@ -2080,6 +2235,14 @@ module {
             (#GyroModule, 0.20),
           ];
         };
+        case (#RepairBay) {
+          // No parts awarded in RepairBay (condition restoration only)
+          [];
+        };
+        case (#ChargingStation) {
+          // No parts awarded in ChargingStation (battery restoration only)
+          [];
+        };
       };
     };
 
@@ -2225,6 +2388,16 @@ module {
         // Dangerous: 2.5x parts but 3.5x costs - terrible efficiency (70% as efficient as safe), only for elite Industrial/UltimateMaster bots
         case (#DeadMachineFields) {
           { battery = 3.5; condition = 3.5; parts = 2.5 };
+        };
+        // Repair Bay: Same battery drain as safe zone, but restores condition instead of gathering parts
+        // Negative condition value = restoration instead of loss
+        case (#RepairBay) {
+          { battery = 1.0; condition = -3.0; parts = 0.0 };
+        };
+        // Charging Station: No battery drain, restores battery instead
+        // Negative battery value = restoration instead of loss
+        case (#ChargingStation) {
+          { battery = -1.0; condition = 1.0; parts = 0.0 };
         };
       };
     };
@@ -2415,7 +2588,7 @@ module {
               let speedBonus = 1.0 + (Float.fromInt(currentStats.speed) / 100.0 * 0.10);
 
               // Acceleration increases world buff chance - scales smoothly
-              // At 0: 3.75%, at 50: 4.875% (+30%), at 100: 6.0% (+60%)
+              // At 0: 2.0%, at 50: 2.6% (+30%), at 100: 3.2% (+60%)
               let accelBuffBonus = 1.0 + (Float.fromInt(currentStats.acceleration) / 100.0 * 0.60);
 
               // Duration bonus: rewards longer commitments with efficiency curve
@@ -2453,22 +2626,50 @@ module {
 
               Debug.print("BATTERY ROUNDING bot " # debug_show (tokenIndex) # " floor=" # debug_show (batteryFloor) # " fraction=" # debug_show (batteryFraction) # " rng=" # debug_show (batteryRng) # " rounded=" # debug_show (batteryDrainRounded));
 
+              // Negative batteryDrain means restoration (Charging Station)
+              let newBattery = if (batteryDrainWithVariance < 0.0) {
+                // Restoration: add battery (capped at 100)
+                Nat.min(100, botStats.battery + batteryDrainRounded);
+              } else {
+                // Drain: subtract battery (floored at 0)
+                if (botStats.battery > batteryDrainRounded) {
+                  botStats.battery - batteryDrainRounded;
+                } else { 0 };
+              };
+
+              // Track how much battery was actually restored (for ChargingStation display)
+              let batteryRestored = if (batteryDrainWithVariance < 0.0 and newBattery > botStats.battery) {
+                newBattery - botStats.battery;
+              } else {
+                0;
+              };
+
               let conditionFloor = Int.abs(Float.toInt(conditionLossWithVariance));
-              let conditionFraction = conditionLossWithVariance - Float.fromInt(conditionFloor);
+              let conditionFraction = Float.abs(conditionLossWithVariance) - Float.fromInt(conditionFloor);
               let conditionRng = Float.fromInt(hashNat(tokenIndex + Int.abs(now) + 3) % 100) / 100.0;
-              let conditionLossRounded = if (conditionRng < conditionFraction) {
+              let conditionChangeRounded = if (conditionRng < conditionFraction) {
                 conditionFloor + 1;
               } else {
                 conditionFloor;
               };
 
-              let newBattery = if (botStats.battery > batteryDrainRounded) {
-                botStats.battery - batteryDrainRounded;
-              } else { 0 };
+              // Negative conditionLoss means restoration (Repair Bay)
+              let newCondition = if (conditionLossWithVariance < 0.0) {
+                // Restoration: add condition (capped at 100)
+                Nat.min(100, botStats.condition + conditionChangeRounded);
+              } else {
+                // Loss: subtract condition (floored at 0)
+                if (botStats.condition > conditionChangeRounded) {
+                  botStats.condition - conditionChangeRounded;
+                } else { 0 };
+              };
 
-              let newCondition = if (botStats.condition > conditionLossRounded) {
-                botStats.condition - conditionLossRounded;
-              } else { 0 };
+              // Track how much condition was actually restored (for RepairBay display)
+              let conditionRestored = if (conditionLossWithVariance < 0.0 and newCondition > botStats.condition) {
+                newCondition - botStats.condition;
+              } else {
+                0;
+              };
 
               // Probabilistic rounding for parts too
               let partsFloor = Int.abs(Float.toInt(partsThis15Min));
@@ -2489,17 +2690,17 @@ module {
                 factionBoostedDistribution,
               );
 
-              // World buff chance: 15% per hour = 3.75% per 15-min interval
-              // Total chance scales with time: hours_elapsed * 15% (capped at 90%)
-              // Acceleration stat increases buff chance (at 100 accel: 6.0% instead of 3.75%)
+              // World buff chance: 8% per hour = 2% per 15-min interval
+              // Total chance scales with time: hours_elapsed * 8% (capped at 90%)
+              // Acceleration stat increases buff chance (at 100 accel: 3.2% instead of 2%)
               // hoursElapsed already calculated above for duration bonus
-              let totalBuffChance = Float.min(90.0, Float.fromInt(hoursElapsed) * 15.0);
+              let totalBuffChance = Float.min(90.0, Float.fromInt(hoursElapsed) * 8.0);
               let buffRoll = Float.fromInt((Int.abs(now / 1_000_000) * tokenIndex) % 1000) / 10.0; // 0-100
 
               var newWorldBuff = botStats.worldBuff; // Keep existing buff by default
               var buffMessage = "";
 
-              let baseBuffChance = 3.75 * accelBuffBonus; // 3.75% base, up to 6.0% with max accel
+              let baseBuffChance = 2.0 * accelBuffBonus; // 2% base, up to 3.2% with max accel
               if (buffRoll < baseBuffChance) {
                 // Acceleration-modified buff chance
                 // Buff strength scales with hours elapsed
@@ -2548,11 +2749,13 @@ module {
                 buffMessage := " 🌟 WORLD BUFF DISCOVERED!";
               };
 
-              // Update mission with new pending parts
+              // Update mission with new pending parts, condition restored, and battery restored
               let updatedMission = {
                 mission with
                 lastAccumulation = now;
                 pendingParts = newPendingParts;
+                pendingConditionRestored = mission.pendingConditionRestored + conditionRestored;
+                pendingBatteryRestored = mission.pendingBatteryRestored + batteryRestored;
               };
 
               let updatedStats = {
@@ -2618,6 +2821,8 @@ module {
               gyroModules = 0;
               universalParts = 0;
             };
+            pendingConditionRestored = 0;
+            pendingBatteryRestored = 0;
           };
 
           // Update bot stats with active mission

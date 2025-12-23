@@ -77,7 +77,12 @@ const TRACK_NAMES = [
   "Highway of the Dead",
   "Wasteland Gauntlet",
   "Junkyard Sprint",
-  "Metal Mesa Run"
+  "Metal Mesa Loop",
+  "Dune Runner",
+  "Rust Belt Rally",
+  "Debris Field Dash",
+  "Velocity Viaduct",
+  "Sandstorm Circuit"
 ];
 
 // Track definitions matching backend RacingSimulator.mo
@@ -178,6 +183,85 @@ const TRACK_TEMPLATES: Record<number, { segments: TrackSegment[]; laps: number }
       { length: 350, terrain: 'WastelandSand', angle: 0, difficulty: 1.12 },  // Sand flat
       { length: 300, terrain: 'WastelandSand', angle: 0, difficulty: 1.1 },   // Technical sand
       { length: 250, terrain: 'WastelandSand', angle: -15, difficulty: 1.05 } // Final descent (angles sum to 0)
+    ],
+    laps: 2
+  },
+  6: { // Dune Runner - Brutal marathon through endless dunes
+    segments: [
+      { length: 1200, terrain: 'WastelandSand', angle: 5, difficulty: 1.18 },
+      { length: 1100, terrain: 'WastelandSand', angle: 8, difficulty: 1.22 },
+      { length: 1000, terrain: 'WastelandSand', angle: 12, difficulty: 1.28 },
+      { length: 1300, terrain: 'WastelandSand', angle: 15, difficulty: 1.32 },
+      { length: 1200, terrain: 'WastelandSand', angle: 10, difficulty: 1.25 },
+      { length: 1100, terrain: 'WastelandSand', angle: 0, difficulty: 1.2 },
+      { length: 1000, terrain: 'WastelandSand', angle: -8, difficulty: 1.15 },
+      { length: 900, terrain: 'WastelandSand', angle: -12, difficulty: 1.1 },
+      { length: 1200, terrain: 'WastelandSand', angle: 0, difficulty: 1.22 },
+      { length: 1100, terrain: 'WastelandSand', angle: 6, difficulty: 1.25 },
+      { length: 1000, terrain: 'WastelandSand', angle: 10, difficulty: 1.28 },
+      { length: 900, terrain: 'WastelandSand', angle: 8, difficulty: 1.2 },
+      { length: 1300, terrain: 'WastelandSand', angle: 0, difficulty: 1.18 },
+      { length: 1200, terrain: 'WastelandSand', angle: -5, difficulty: 1.12 },
+      { length: 1000, terrain: 'WastelandSand', angle: -10, difficulty: 1.08 }
+    ],
+    laps: 1
+  },
+  7: { // Rust Belt Rally - High-speed highway blast
+    segments: [
+      { length: 900, terrain: 'MetalRoads', angle: 0, difficulty: 0.82 },
+      { length: 850, terrain: 'MetalRoads', angle: -2, difficulty: 0.78 },
+      { length: 800, terrain: 'MetalRoads', angle: 0, difficulty: 0.8 },
+      { length: 750, terrain: 'MetalRoads', angle: 0, difficulty: 0.85 },
+      { length: 700, terrain: 'MetalRoads', angle: -4, difficulty: 0.76 },
+      { length: 650, terrain: 'MetalRoads', angle: 0, difficulty: 0.88 },
+      { length: 600, terrain: 'MetalRoads', angle: 0, difficulty: 0.9 },
+      { length: 550, terrain: 'MetalRoads', angle: 0, difficulty: 0.85 },
+      { length: 900, terrain: 'MetalRoads', angle: 0, difficulty: 0.82 },
+      { length: 850, terrain: 'MetalRoads', angle: 0, difficulty: 0.8 },
+      { length: 800, terrain: 'MetalRoads', angle: -3, difficulty: 0.78 },
+      { length: 850, terrain: 'MetalRoads', angle: 0, difficulty: 0.83 }
+    ],
+    laps: 1
+  },
+  8: { // Debris Field Dash - Treacherous obstacle course
+    segments: [
+      { length: 300, terrain: 'ScrapHeaps', angle: 8, difficulty: 1.22 },
+      { length: 350, terrain: 'ScrapHeaps', angle: 12, difficulty: 1.28 },
+      { length: 280, terrain: 'ScrapHeaps', angle: 18, difficulty: 1.35 },
+      { length: 320, terrain: 'ScrapHeaps', angle: -10, difficulty: 1.18 },
+      { length: 400, terrain: 'ScrapHeaps', angle: 0, difficulty: 1.25 },
+      { length: 350, terrain: 'ScrapHeaps', angle: 15, difficulty: 1.3 },
+      { length: 300, terrain: 'ScrapHeaps', angle: 20, difficulty: 1.38 },
+      { length: 280, terrain: 'ScrapHeaps', angle: -15, difficulty: 1.2 },
+      { length: 320, terrain: 'ScrapHeaps', angle: -8, difficulty: 1.15 },
+      { length: 350, terrain: 'ScrapHeaps', angle: 0, difficulty: 1.28 },
+      { length: 300, terrain: 'ScrapHeaps', angle: 10, difficulty: 1.25 }
+    ],
+    laps: 2
+  },
+  9: { // Velocity Viaduct - Lightning-fast elevated highway
+    segments: [
+      { length: 300, terrain: 'MetalRoads', angle: 0, difficulty: 0.8 },
+      { length: 250, terrain: 'MetalRoads', angle: 0, difficulty: 0.78 },
+      { length: 280, terrain: 'MetalRoads', angle: -5, difficulty: 0.75 },
+      { length: 220, terrain: 'MetalRoads', angle: -8, difficulty: 0.72 },
+      { length: 200, terrain: 'MetalRoads', angle: 0, difficulty: 0.85 },
+      { length: 250, terrain: 'MetalRoads', angle: 0, difficulty: 0.82 }
+    ],
+    laps: 3
+  },
+  10: { // Sandstorm Circuit - Circular desert track
+    segments: [
+      { length: 600, terrain: 'WastelandSand', angle: 0, difficulty: 1.15 },
+      { length: 550, terrain: 'WastelandSand', angle: 5, difficulty: 1.2 },
+      { length: 500, terrain: 'WastelandSand', angle: 10, difficulty: 1.25 },
+      { length: 450, terrain: 'WastelandSand', angle: 12, difficulty: 1.28 },
+      { length: 500, terrain: 'WastelandSand', angle: 8, difficulty: 1.22 },
+      { length: 550, terrain: 'WastelandSand', angle: 0, difficulty: 1.18 },
+      { length: 600, terrain: 'WastelandSand', angle: -6, difficulty: 1.12 },
+      { length: 550, terrain: 'WastelandSand', angle: -10, difficulty: 1.08 },
+      { length: 500, terrain: 'WastelandSand', angle: -8, difficulty: 1.1 },
+      { length: 600, terrain: 'WastelandSand', angle: 0, difficulty: 1.15 }
     ],
     laps: 2
   }

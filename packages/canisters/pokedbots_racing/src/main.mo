@@ -50,6 +50,7 @@ import GarageRechargeRobot "tools/garage_recharge_robot";
 import GarageRepairRobot "tools/garage_repair_robot";
 import GarageUpgradeRobot "tools/garage_upgrade_robot";
 import GarageCancelUpgrade "tools/garage_cancel_upgrade";
+import GarageTransferParts "tools/garage_transfer_parts";
 import GarageStartScavenging "tools/garage_start_scavenging";
 import GarageCompleteScavenging "tools/garage_complete_scavenging";
 import RacingListRaces "tools/racing_list_races";
@@ -58,6 +59,10 @@ import RacingSponsorRace "tools/racing_sponsor_race";
 import RacingGetRaceDetails "tools/racing_get_race_details";
 import RacingGetBotRaces "tools/racing_get_bot_races";
 import HelpGetCompendium "tools/help_get_compendium";
+import BettingPlaceBet "tools/betting_place_bet";
+import BettingListPools "tools/betting_list_pools";
+import BettingGetPoolInfo "tools/betting_get_pool_info";
+import BettingGetMyBets "tools/betting_get_my_bets";
 
 // Import Stats module for NFT metadata
 import Stats "Stats";
@@ -71,6 +76,8 @@ import Leaderboard "Leaderboard";
 import ExtIntegration "ExtIntegration";
 import IcpLedger "IcpLedger";
 import UsernameValidator "UsernameValidator";
+import BettingManager "BettingManager";
+import BettingTypes "BettingTypes";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
 
@@ -90,6 +97,7 @@ import Star "mo:star/star";
 //         powerCoreUpgrades : Nat;
 //         accelerationUpgrades : Nat;
 //         stabilityUpgrades : Nat;
+//         respecCount : Nat;
 //         battery : Nat;
 //         condition : Nat;
 //         experience : Nat;
@@ -118,7 +126,12 @@ import Star "mo:star/star";
 //         activeMission : ?{
 //           missionId : Nat;
 //           tokenIndex : Nat;
-//           zone : PokedBotsGarage.ScavengingZone;
+//           zone : {
+//             #ScrapHeaps;
+//             #AbandonedSettlements;
+//             #DeadMachineFields;
+//             #RepairBay;
+//           };
 //           startTime : Int;
 //           lastAccumulation : Int;
 //           durationMinutes : ?Nat;
@@ -129,18 +142,52 @@ import Star "mo:star/star";
 //             gyroModules : Nat;
 //             universalParts : Nat;
 //           };
+//           pendingConditionRestored : Nat;
 //         };
 //         worldBuff : ?PokedBotsGarage.WorldBuff;
-//         // V3: Missing lastMissionRewards field
+//         lastMissionRewards : ?{
+//           totalParts : Nat;
+//           speedChips : Nat;
+//           powerCoreFragments : Nat;
+//           thrusterKits : Nat;
+//           gyroModules : Nat;
+//           universalParts : Nat;
+//           hoursOut : Nat;
+//           completedAt : Int;
+//           zone : {
+//             #ScrapHeaps;
+//             #AbandonedSettlements;
+//             #DeadMachineFields;
+//             #RepairBay;
+//           };
+//         };
 //       }>;
 //     }
 //   ) : {
 //     var stable_racing_stats : Map.Map<Nat, PokedBotsGarage.PokedBotRacingStats>;
 //   } {
-//     // Migrate racing stats - add lastMissionRewards field with null default
+//     // Migrate racing stats - add pendingBatteryRestored field to activeMission
 //     let new_racing_stats = Map.new<Nat, PokedBotsGarage.PokedBotRacingStats>();
 
 //     for ((tokenIndex, oldStats) in Map.entries(old_state.stable_racing_stats)) {
+//       // Migrate activeMission if it exists
+//       let newActiveMission : ?PokedBotsGarage.ScavengingMission = switch (oldStats.activeMission) {
+//         case (null) { null };
+//         case (?oldMission) {
+//           ?{
+//             missionId = oldMission.missionId;
+//             tokenIndex = oldMission.tokenIndex;
+//             zone = oldMission.zone;
+//             startTime = oldMission.startTime;
+//             lastAccumulation = oldMission.lastAccumulation;
+//             durationMinutes = oldMission.durationMinutes;
+//             pendingParts = oldMission.pendingParts;
+//             pendingConditionRestored = oldMission.pendingConditionRestored;
+//             pendingBatteryRestored = 0;
+//           };
+//         };
+//       };
+
 //       let newStats : PokedBotsGarage.PokedBotRacingStats = {
 //         tokenIndex = oldStats.tokenIndex;
 //         ownerPrincipal = oldStats.ownerPrincipal;
@@ -154,6 +201,7 @@ import Star "mo:star/star";
 //         powerCoreUpgrades = oldStats.powerCoreUpgrades;
 //         accelerationUpgrades = oldStats.accelerationUpgrades;
 //         stabilityUpgrades = oldStats.stabilityUpgrades;
+//         respecCount = oldStats.respecCount;
 //         battery = oldStats.battery;
 //         condition = oldStats.condition;
 //         experience = oldStats.experience;
@@ -179,9 +227,9 @@ import Star "mo:star/star";
 //         totalPartsScavenged = oldStats.totalPartsScavenged;
 //         scavengingReputation = oldStats.scavengingReputation;
 //         bestHaul = oldStats.bestHaul;
-//         activeMission = oldStats.activeMission;
+//         activeMission = newActiveMission;
 //         worldBuff = oldStats.worldBuff;
-//         lastMissionRewards = null; // V4: New field with null default
+//         lastMissionRewards = oldStats.lastMissionRewards;
 //       };
 //       ignore Map.put(new_racing_stats, Map.nhash, tokenIndex, newStats);
 //     };
@@ -238,6 +286,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   // Stable state for prize payment tracking (prevents duplicate payments)
   // Key: "raceId:owner:amount" - ensures each prize is only paid once
   let stable_paid_prizes = Map.new<Text, Int>(); // Maps prize key to timestamp when paid
+
+  // Stable state for betting system
+  let stable_betting_pools = Map.new<Nat, BettingTypes.BettingPool>(); // raceId -> BettingPool
+  let stable_betting_bets = Map.new<Nat, BettingTypes.Bet>(); // betId -> Bet
+  let stable_betting_user_bets = Map.new<Principal, [Nat]>(); // userId -> [betIds]
+  let stable_betting_user_stats = Map.new<Principal, BettingTypes.UserBettingStats>(); // userId -> stats
+  var stable_betting_next_bet_id : Nat = 1;
+  var stable_platform_treasury : Principal = Principal.fromText("aaaaa-aa"); // Will be set on initialization
 
   // Constants
   let TRANSFER_FEE : Nat = 10_000; // 0.0001 ICP
@@ -349,6 +405,17 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     stable_faction_boards,
   );
 
+  // Betting manager (integrated into racing canister)
+  transient let bettingManager = BettingManager.BettingManager(
+    stable_betting_pools,
+    stable_betting_bets,
+    stable_betting_user_bets,
+    stable_betting_user_stats,
+    stable_betting_next_bet_id,
+    stable_platform_treasury,
+    Option.get(icpLedgerCanisterId, Principal.fromText("ryjl3-tyaaa-aaaaa-aaaba-cai")) // Default to local ledger, will be set properly
+  );
+
   // Marketplace listings cache removed to save memory
   // Fetch listings on-demand instead of caching
   let CACHE_TTL_SECONDS : Int = 300; // 5 minutes (unused, kept for compatibility)
@@ -432,19 +499,31 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     await extCanister.listings();
   };
 
-  /// Get race class based on ELO rating
-  func getRaceClassFromElo(eloRating : Nat) : RacingSimulator.RaceClass {
-    if (eloRating >= 1800) {
-      #SilentKlan; // Top tier: 1800+
-    } else if (eloRating >= 1600) {
-      #Elite; // High tier: 1600-1799
-    } else if (eloRating >= 1400) {
-      #Raider; // Mid tier: 1400-1599
-    } else if (eloRating >= 1200) {
-      #Junker; // Low tier: 1200-1399
+  /// Get race class based on overall rating (average of max stats)
+  func getRaceClassFromRating(overallRating : Nat) : RacingSimulator.RaceClass {
+    // Based on overall rating (average of max stats: 0-100)
+    if (overallRating >= 50) {
+      #SilentKlan; // Top tier: 50+ (highly upgraded)
+    } else if (overallRating >= 40) {
+      #Elite; // High tier: 40-49
+    } else if (overallRating >= 30) {
+      #Raider; // Mid tier: 30-39
+    } else if (overallRating >= 20) {
+      #Junker; // Low tier: 20-29
     } else {
-      #Scrap; // Bottom tier: <1200
+      #Scrap; // Bottom tier: 0-19
     };
+  };
+
+  /// Calculate overall rating from max stats (for race class determination)
+  /// This should be used for determining race eligibility, not current degraded stats
+  func calculateMaxRating(botStats : PokedBotsGarage.PokedBotRacingStats) : Nat {
+    let baseStats = garageManager.getBaseStats(botStats.tokenIndex);
+    let maxSpeed = baseStats.speed + botStats.speedBonus;
+    let maxPowerCore = baseStats.powerCore + botStats.powerCoreBonus;
+    let maxAcceleration = baseStats.acceleration + botStats.accelerationBonus;
+    let maxStability = baseStats.stability + botStats.stabilityBonus;
+    (maxSpeed + maxPowerCore + maxAcceleration + maxStability) / 4;
   };
 
   // Handle completed upgrades with V2 RNG mechanics
@@ -802,23 +881,23 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
           // Platform bonus to guarantee top 3 profitability, 4th breaks even
           // Calculated for 8-player races with new distribution (45%, 28%, 18%, 9%)
-          // Formula: bonus = entry_fee × 4 (creates 12× entry pool) - increased 20% from previous values
+          // Increased 35% to maximize player rewards while staying within 100 ICP/month budget
           let platformBonus : Nat = switch (event.eventType, division) {
             // Daily Sprint bonuses - Entry fees: Scrap 0.025, Junker 0.05, Raider 0.075, Elite 0.1, SilentKlan 0.15
-            case (#DailySprint, #Scrap) { 12_000_000 }; // 0.12 ICP (was 0.1, +20%)
-            case (#DailySprint, #Junker) { 24_000_000 }; // 0.24 ICP (was 0.2, +20%)
-            case (#DailySprint, #Raider) { 36_000_000 }; // 0.36 ICP (was 0.3, +20%)
-            case (#DailySprint, #Elite) { 48_000_000 }; // 0.48 ICP (was 0.4, +20%)
-            case (#DailySprint, #SilentKlan) { 48_000_000 }; // 0.48 ICP (new tier, matching Elite)
+            case (#DailySprint, #Scrap) { 16_000_000 }; // 0.16 ICP (+35% from 0.12)
+            case (#DailySprint, #Junker) { 32_000_000 }; // 0.32 ICP (+35% from 0.24)
+            case (#DailySprint, #Raider) { 48_000_000 }; // 0.48 ICP (+35% from 0.36)
+            case (#DailySprint, #Elite) { 65_000_000 }; // 0.65 ICP (+35% from 0.48)
+            case (#DailySprint, #SilentKlan) { 65_000_000 }; // 0.65 ICP (+35% from 0.48)
             // Weekly League bonuses - Entry fees: Scrap 0.1, Junker 0.2, Raider 0.3, Elite 0.4, SilentKlan 0.6
-            case (#WeeklyLeague, #Scrap) { 48_000_000 }; // 0.48 ICP (was 0.4, +20%)
-            case (#WeeklyLeague, #Junker) { 96_000_000 }; // 0.96 ICP (was 0.8, +20%)
-            case (#WeeklyLeague, #Raider) { 144_000_000 }; // 1.44 ICP (was 1.2, +20%)
-            case (#WeeklyLeague, #Elite) { 192_000_000 }; // 1.92 ICP (was 1.6, +20%)
-            case (#WeeklyLeague, #SilentKlan) { 288_000_000 }; // 2.88 ICP (was 2.4, +20%)
+            case (#WeeklyLeague, #Scrap) { 65_000_000 }; // 0.65 ICP (+35% from 0.48)
+            case (#WeeklyLeague, #Junker) { 130_000_000 }; // 1.30 ICP (+35% from 0.96)
+            case (#WeeklyLeague, #Raider) { 195_000_000 }; // 1.95 ICP (+35% from 1.44)
+            case (#WeeklyLeague, #Elite) { 260_000_000 }; // 2.60 ICP (+35% from 1.92)
+            case (#WeeklyLeague, #SilentKlan) { 390_000_000 }; // 3.90 ICP (+35% from 2.88)
             // Monthly Cup bonuses - Entry fees: Elite 1.0, SilentKlan 1.5
-            case (#MonthlyCup, #Elite) { 480_000_000 }; // 4.8 ICP (was 4.0, +20%)
-            case (#MonthlyCup, #SilentKlan) { 720_000_000 }; // 7.2 ICP (was 6.0, +20%)
+            case (#MonthlyCup, #Elite) { 650_000_000 }; // 6.5 ICP (+35% from 4.8)
+            case (#MonthlyCup, #SilentKlan) { 970_000_000 }; // 9.7 ICP (+35% from 7.2)
             // Fallback
             case _ { event.metadata.prizePoolBonus };
           };
@@ -838,6 +917,15 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           createdRaceIds := Array.append(createdRaceIds, [race.raceId]);
 
           Debug.print("Created race " # Nat.toText(race.raceId) # " for " # event.metadata.name # ": " # race.name);
+
+          // Schedule betting pool creation when registration closes
+          ignore tt().setActionSync<system>(
+            Int.abs(event.registrationCloses),
+            {
+              actionType = "betting_pool_create";
+              params = to_candid (race.raceId);
+            },
+          );
 
           // Schedule race start
           ignore tt().setActionSync<system>(
@@ -939,23 +1027,13 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       },
     );
 
-    // Separate all-class leagues from Scrap-only leagues
-    let allClassLeagues = Array.filter<RaceCalendar.ScheduledEvent>(
-      weeklyLeagues,
-      func(e) { e.metadata.divisions.size() > 1 },
-    );
-    let scrapLeagues = Array.filter<RaceCalendar.ScheduledEvent>(
-      weeklyLeagues,
-      func(e) { e.metadata.divisions.size() == 1 },
-    );
-
-    // Schedule next 2 all-class Weekly Leagues if less than 2 scheduled
-    if (allClassLeagues.size() < 2) {
+    // Schedule next 2 Weekly Leagues if less than 2 scheduled
+    if (weeklyLeagues.size() < 2) {
       // Start from the last existing weekly league, or now if none exist
-      var scheduleTime = if (allClassLeagues.size() > 0) {
+      var scheduleTime = if (weeklyLeagues.size() > 0) {
         // Sort by scheduledTime to find the latest
         let sorted = Array.sort<RaceCalendar.ScheduledEvent>(
-          allClassLeagues,
+          weeklyLeagues,
           func(a, b) { Int.compare(a.scheduledTime, b.scheduledTime) },
         );
         sorted[sorted.size() - 1].scheduledTime + 1_000_000_000; // Start after the last one
@@ -963,7 +1041,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         now;
       };
 
-      for (i in Iter.range(0, 1 - allClassLeagues.size())) {
+      for (i in Iter.range(0, 1 - weeklyLeagues.size())) {
         let nextSunday = RaceCalendar.getNextWeeklyOccurrence(0, 20, 0, scheduleTime);
 
         // Check if event already exists at this time (within 30-minute window)
@@ -988,49 +1066,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         };
 
         scheduleTime := nextSunday + 1_000_000_000; // Move past this event
-      };
-    };
-
-    // Schedule next 2 Scrap Weekly Leagues if less than 2 scheduled
-    if (scrapLeagues.size() < 2) {
-      // Start from the last existing scrap league, or now if none exist
-      var scheduleTime = if (scrapLeagues.size() > 0) {
-        // Sort by scheduledTime to find the latest
-        let sorted = Array.sort<RaceCalendar.ScheduledEvent>(
-          scrapLeagues,
-          func(a, b) { Int.compare(a.scheduledTime, b.scheduledTime) },
-        );
-        sorted[sorted.size() - 1].scheduledTime + 1_000_000_000; // Start after the last one
-      } else {
-        now;
-      };
-
-      for (i in Iter.range(0, 1 - scrapLeagues.size())) {
-        let nextWednesday = RaceCalendar.getNextWeeklyOccurrence(3, 20, 0, scheduleTime); // Wednesday 8pm UTC
-
-        // Check if event already exists at this time (within 30-minute window)
-        let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-          upcomingEvents,
-          func(e) {
-            switch (e.eventType) {
-              case (#WeeklyLeague) {
-                let timeDiff = Int.abs(e.scheduledTime - nextWednesday);
-                let isScrapOnly = e.metadata.divisions.size() == 1;
-                isScrapOnly and (timeDiff < (30 * 60 * 1_000_000_000)); // Within 30 minutes
-              };
-              case (_) { false };
-            };
-          },
-        );
-
-        if (existingAtTime.size() == 0) {
-          ignore eventCalendar.createWeeklyScrapEvent(nextWednesday, now);
-          Debug.print("Auto-scheduled Weekly Scrap Showdown for timestamp: " # debug_show (nextWednesday));
-        } else {
-          Debug.print("SKIP: Weekly Scrap Showdown already exists at timestamp: " # debug_show (nextWednesday));
-        };
-
-        scheduleTime := nextWednesday + 1_000_000_000; // Move past this event
       };
     };
 
@@ -1112,7 +1147,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             return #awaited(actionId); // Already paid, mark as complete to prevent retries
           };
           case (null) {
-            // Not paid yet, proceed with payment
+            // Not paid yet, mark as in-progress IMMEDIATELY to prevent race conditions
+            ignore Map.put(stable_paid_prizes, Map.thash, prizeKey, Time.now());
           };
         };
 
@@ -1142,8 +1178,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           switch (transferResult) {
             case (#Ok(blockIndex)) {
               Debug.print("Prize sent successfully, block: " # debug_show (blockIndex));
-              // Record that this prize has been paid
-              ignore Map.put(stable_paid_prizes, Map.thash, prizeKey, Time.now());
               return #awaited(actionId); // Success - action completed
             };
             case (#Err(err)) {
@@ -1163,6 +1197,82 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
   };
 
+  // Handle bet settlement asynchronously
+  func handleBetSettlement<system>(actionId : TT.ActionId, action : TT.Action) : async* Star.Star<TT.ActionId, TT.Error> {
+    Debug.print("Bet settlement handler triggered");
+
+    type BetSettlementInfo = {
+      raceId : Nat;
+      rankings : [Nat];
+    };
+    let settlementInfoOpt : ?BetSettlementInfo = from_candid (action.params);
+
+    switch (settlementInfoOpt) {
+      case (?info) {
+        Debug.print("Settling bets for race " # debug_show (info.raceId));
+
+        try {
+          ignore await bettingManager.settleBets(info.raceId, info.rankings);
+          Debug.print("Successfully settled bets for race " # debug_show (info.raceId));
+          return #awaited(actionId);
+        } catch (e) {
+          Debug.print("Bet settlement failed: " # Error.message(e));
+          return #trappable(actionId);
+        };
+      };
+      case (null) {
+        Debug.print("Could not decode bet settlement info");
+        return #trappable(actionId);
+      };
+    };
+  };
+
+  // Handle betting pool creation (when registration closes)
+  func handleBettingPoolCreate<system>(actionId : TT.ActionId, action : TT.Action) : TT.ActionId {
+    Debug.print("Betting pool creation handler triggered");
+
+    let raceIdOpt : ?Nat = from_candid (action.params);
+
+    switch (raceIdOpt) {
+      case (?raceId) {
+        Debug.print("Creating betting pool for race " # debug_show (raceId));
+
+        switch (raceManager.getRace(raceId)) {
+          case (?race) {
+            // Only create pool if race is still upcoming and has entries
+            if (race.status == #Upcoming and race.entries.size() > 0) {
+              // Check if pool already exists (from manual creation)
+              switch (bettingManager.getPool(raceId)) {
+                case (?existingPool) {
+                  // Pool exists, open it if it's pending
+                  if (existingPool.status == #Pending) {
+                    ignore bettingManager.openPool(raceId);
+                    Debug.print("Opened existing betting pool for race " # debug_show (raceId));
+                  };
+                };
+                case (null) {
+                  // Create new pool (will be #Open since we're at registration close time)
+                  ignore bettingManager.createPool(race);
+                  Debug.print("Created betting pool for race " # debug_show (raceId) # " with " # debug_show (race.entries.size()) # " entrants");
+                };
+              };
+            } else {
+              Debug.print("Skipped pool creation - race status: " # debug_show (race.status) # ", entries: " # debug_show (race.entries.size()));
+            };
+          };
+          case (null) {
+            Debug.print("Race not found: " # debug_show (raceId));
+          };
+        };
+      };
+      case (null) {
+        Debug.print("Could not decode race ID for betting pool creation");
+      };
+    };
+
+    actionId;
+  };
+
   // Handle race start - marks race as in progress
   func handleRaceStart<system>(actionId : TT.ActionId, action : TT.Action) : TT.ActionId {
     Debug.print("Race start handler triggered");
@@ -1175,7 +1285,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
         switch (raceManager.getRace(raceId)) {
           case (?race) {
-            // Allow all registered entries to race regardless of ELO changes
+            // Allow all registered entries to race regardless of rating changes during upgrade
             // Registrations are only a few days out, so letting bots race in their registered class is fine
 
             // Check if race has enough entries
@@ -1237,6 +1347,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                 Debug.print("Failed to update race with trackSeed");
               };
             };
+
+            // Close betting pool (betting window ends)
+            ignore bettingManager.closePool(raceId);
+            Debug.print("Closed betting pool for race " # debug_show (raceId));
 
             // Mark as in progress
             ignore raceManager.updateRaceStatus(raceId, #InProgress);
@@ -1408,6 +1522,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               case _ {};
             };
 
+            // Mark as completed IMMEDIATELY to prevent duplicate processing
+            ignore raceManager.updateRaceStatus(raceId, #Completed);
+            Debug.print("Marked race as Completed to prevent duplicate processing");
+
             // Results were already simulated and stored at race start
             // Just retrieve them and apply consequences (ELO, stats, prizes)
             Debug.print("Applying race results simulated at race start");
@@ -1424,6 +1542,36 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                 };
 
                 Debug.print("Applying race results, " # debug_show (results.size()) # " racers");
+
+                // Settle betting pool with race results
+                let rankings = Array.map<RacingSimulator.RaceResult, Nat>(
+                  results,
+                  func(r : RacingSimulator.RaceResult) : Nat {
+                    // Extract token index from nftId
+                    switch (Nat.fromText(r.nftId)) {
+                      case (?idx) { idx };
+                      case null { 0 }; // Should never happen
+                    };
+                  },
+                );
+                // Schedule bet settlement
+                type BetSettlementInfo = {
+                  raceId : Nat;
+                  rankings : [Nat];
+                };
+                let settlementActionId = tt().setActionSync<system>(
+                  Int.abs(Time.now() + 1_000_000_000), // 1 second from now
+                  {
+                    actionType = "bet_settlement";
+                    params = to_candid (
+                      {
+                        raceId = raceId;
+                        rankings = rankings;
+                      } : BetSettlementInfo
+                    );
+                  },
+                );
+                Debug.print("Scheduled bet_settlement action " # debug_show (settlementActionId) # " for race " # debug_show (raceId));
 
                 // Apply ELO rating changes first
                 let eloResults = Array.map<RacingSimulator.RaceResult, (Text, Nat)>(
@@ -1554,7 +1702,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   };
                 };
 
-                ignore raceManager.updateRaceStatus(raceId, #Completed);
                 Debug.print("Race completed successfully - " # debug_show (results.size()) # " participants updated");
               };
             };
@@ -1618,9 +1765,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   tt().registerExecutionListenerSync(?"upgrade_complete", handleUpgradeCompletion);
   tt().registerExecutionListenerSync(?"hourly_recharge", handleHourlyRecharge);
   tt().registerExecutionListenerSync(?"race_create", handleRaceCreation);
+  tt().registerExecutionListenerSync(?"betting_pool_create", handleBettingPoolCreate);
   tt().registerExecutionListenerSync(?"race_start", handleRaceStart);
   tt().registerExecutionListenerSync(?"race_finish", handleRaceFinish);
   tt().registerExecutionListenerAsync(?"prize_distribution", handlePrizeDistribution);
+  tt().registerExecutionListenerAsync(?"bet_settlement", handleBetSettlement);
 
   // Create the tool context that will be passed to all tools
   transient let toolContext : ToolContext.ToolContext = {
@@ -1629,6 +1778,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     appContext = appContext;
     garageManager = garageManager;
     raceManager = raceManager;
+    bettingManager = bettingManager;
     extCanister = extCanister;
     extCanisterId = extCanisterId;
     icpLedgerCanisterId = func() : ?Principal { icpLedgerCanisterId };
@@ -1679,6 +1829,27 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         };
       };
     };
+    checkBotInEvent = func(raceId : Nat, nftId : Text) : Result.Result<(), Text> {
+      switch (eventCalendar.getEventByRaceId(raceId)) {
+        case (?event) {
+          // Check if bot is in any race within this event
+          for (eventRaceId in event.raceIds.vals()) {
+            switch (Map.get(stable_races, Map.nhash, eventRaceId)) {
+              case (?eventRace) {
+                for (entry in eventRace.entries.vals()) {
+                  if (entry.nftId == nftId) {
+                    return #err("This bot is already entered in another race in this event (Race #" # Nat.toText(eventRaceId) # ")");
+                  };
+                };
+              };
+              case (null) {};
+            };
+          };
+          #ok();
+        };
+        case (null) { #ok() }; // No event, allow entry
+      };
+    };
   };
 
   // Import tool configurations from separate modules
@@ -1693,6 +1864,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     GarageRepairRobot.config(),
     GarageUpgradeRobot.config(),
     GarageCancelUpgrade.config(),
+    GarageTransferParts.config(),
     GarageStartScavenging.config(),
     GarageCompleteScavenging.config(),
     RacingListRaces.config(),
@@ -1700,6 +1872,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     RacingSponsorRace.config(),
     RacingGetRaceDetails.config(),
     RacingGetBotRaces.config(),
+    BettingPlaceBet.config(),
+    BettingListPools.config(),
+    BettingGetPoolInfo.config(),
+    BettingGetMyBets.config(),
   ];
 
   // --- 2. CONFIGURE THE SDK ---
@@ -1727,6 +1903,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       ("garage_repair_robot", GarageRepairRobot.handle(toolContext)),
       ("garage_upgrade_robot", GarageUpgradeRobot.handle(toolContext)),
       ("garage_cancel_upgrade", GarageCancelUpgrade.handle(toolContext)),
+      ("garage_transfer_parts", GarageTransferParts.handle(toolContext)),
       ("garage_start_scavenging", GarageStartScavenging.handle(toolContext)),
       ("garage_complete_scavenging", GarageCompleteScavenging.handle(toolContext)),
       ("racing_list_races", RacingListRaces.handle(toolContext)),
@@ -1734,6 +1911,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       ("racing_sponsor_race", RacingSponsorRace.handle(toolContext)),
       ("racing_get_race_details", RacingGetRaceDetails.handle(toolContext)),
       ("racing_get_bot_races", RacingGetBotRaces.handle(toolContext)),
+      ("betting_place_bet", BettingPlaceBet.handle(toolContext)),
+      ("betting_list_pools", BettingListPools.handle(toolContext)),
+      ("betting_get_pool_info", BettingGetPoolInfo.handle(toolContext)),
+      ("betting_get_my_bets", BettingGetMyBets.handle(toolContext)),
     ];
     beacon = beaconContext;
   };
@@ -2418,7 +2599,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         // Calculate rating based on stats at 100%
         let totalStats = statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability;
         let rating = totalStats / 4;
-        let raceClass = getRaceClassFromElo(botStats.eloRating);
+        let raceClass = getRaceClassFromRating(rating);
 
         ?{
           tokenIndex = tokenIndex;
@@ -3115,14 +3296,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             var hasEligibleBot = false;
 
             for (bot in callerBots.vals()) {
-              // Check if bot's ELO matches race class
-              let elo = bot.eloRating;
+              // Check if bot's rating (max stats) matches race class
+              let rating = calculateMaxRating(bot); // Use max stats, not current degraded stats
               let isEligible = switch (race.raceClass) {
-                case (#Scrap) { elo < 1200 };
-                case (#Junker) { elo >= 1200 and elo < 1400 };
-                case (#Raider) { elo >= 1400 and elo < 1600 };
-                case (#Elite) { elo >= 1600 and elo < 1800 };
-                case (#SilentKlan) { elo >= 1800 };
+                case (#Scrap) { rating < 20 };
+                case (#Junker) { rating >= 20 and rating < 30 };
+                case (#Raider) { rating >= 30 and rating < 40 };
+                case (#Elite) { rating >= 40 and rating < 50 };
+                case (#SilentKlan) { rating >= 50 };
               };
 
               // Check if this bot is not already entered
@@ -3229,6 +3410,51 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
   };
 
+  /// Admin function to manually create betting pool for an existing race
+  /// Useful for testing and recovery when races are created in advance
+  public shared ({ caller }) func admin_create_betting_pool(raceId : Nat) : async Result.Result<Text, Text> {
+    if (caller != owner) {
+      return #err("Only owner can manually create betting pools");
+    };
+
+    switch (raceManager.getRace(raceId)) {
+      case (?race) {
+        // Check if registration is closed (entry deadline has passed)
+        let now = Time.now();
+        if (race.entryDeadline > now) {
+          return #err("Cannot create betting pool - registration is still open (closes at " # Int.toText(race.entryDeadline / 1_000_000) # ")");
+        };
+
+        // Check if race has entries
+        if (race.entries.size() == 0) {
+          return #err("Race has no entries yet");
+        };
+
+        // Check if pool already exists
+        switch (bettingManager.getPool(raceId)) {
+          case (?_) {
+            return #err("Betting pool already exists for this race");
+          };
+          case (null) {
+            // Create the pool
+            let result = bettingManager.createPool(race);
+            switch (result) {
+              case (#ok(_)) {
+                #ok("Successfully created betting pool for race " # Nat.toText(raceId) # " with " # Nat.toText(race.entries.size()) # " entrants");
+              };
+              case (#err(msg)) {
+                #err("Failed to create pool: " # msg);
+              };
+            };
+          };
+        };
+      };
+      case (null) {
+        #err("Race not found");
+      };
+    };
+  };
+
   // Manually cancel specific races by ID (with refunds)
   public shared ({ caller }) func cancel_races_by_ids(raceIds : [Nat]) : async [(Nat, Text)] {
     if (caller != owner) {
@@ -3308,6 +3534,95 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     "Force-finished race " # Nat.toText(raceId);
   };
 
+  /// Admin method to remove a bot from a race (for fixing bugs/errors)
+  public shared ({ caller }) func admin_remove_race_entry(raceId : Nat, tokenIndex : Nat) : async Result.Result<Text, Text> {
+    if (caller != owner) {
+      return #err("Unauthorized: only owner can remove race entries");
+    };
+
+    let race = switch (Map.get(stable_races, Map.nhash, raceId)) {
+      case (?r) { r };
+      case (null) { return #err("Race not found") };
+    };
+
+    let nftId = Nat.toText(tokenIndex);
+
+    // Filter out the entry to remove
+    let newEntries = Array.filter<RacingSimulator.RaceEntry>(
+      race.entries,
+      func(e : RacingSimulator.RaceEntry) : Bool { e.nftId != nftId },
+    );
+
+    if (newEntries.size() == race.entries.size()) {
+      return #err("Bot #" # Nat.toText(tokenIndex) # " not found in race #" # Nat.toText(raceId));
+    };
+
+    // Refund entry fee to bot owner
+    let removedEntry = Array.find<RacingSimulator.RaceEntry>(
+      race.entries,
+      func(e : RacingSimulator.RaceEntry) : Bool { e.nftId == nftId },
+    );
+
+    switch (removedEntry) {
+      case (?entry) {
+        // Calculate new prize pool (subtract entry fee)
+        let newPrizePool = if (race.prizePool >= race.entryFee) {
+          race.prizePool - race.entryFee;
+        } else {
+          0;
+        };
+        let newTax = (newPrizePool * 5) / 100;
+
+        // Update race with removed entry
+        let updatedRace = {
+          race with
+          entries = newEntries;
+          prizePool = newPrizePool;
+          platformTax = newTax;
+        };
+
+        ignore Map.put(stable_races, Map.nhash, raceId, updatedRace);
+
+        // Issue refund
+        let ledgerId = switch (icpLedgerCanisterId) {
+          case (?id) { id };
+          case (null) {
+            return #ok("Bot removed but refund failed: ICP Ledger not configured. Manual refund required for " # Principal.toText(entry.owner));
+          };
+        };
+
+        let ledger = actor (Principal.toText(ledgerId)) : actor {
+          icrc1_transfer : shared IcpLedger.TransferArg -> async IcpLedger.Result;
+        };
+
+        try {
+          let transferResult = await ledger.icrc1_transfer({
+            from_subaccount = null;
+            to = { owner = entry.owner; subaccount = null };
+            amount = entry.entryFee;
+            fee = ?TRANSFER_FEE;
+            memo = null;
+            created_at_time = null;
+          });
+
+          switch (transferResult) {
+            case (#Ok(_blockIndex)) {
+              #ok("Bot #" # Nat.toText(tokenIndex) # " removed from race #" # Nat.toText(raceId) # " and refunded " # Nat.toText(entry.entryFee) # " e8s");
+            };
+            case (#Err(err)) {
+              #ok("Bot removed but refund failed: " # debug_show (err) # ". Manual refund required for " # Principal.toText(entry.owner));
+            };
+          };
+        } catch (e) {
+          #ok("Bot removed but refund failed: " # Error.message(e) # ". Manual refund required for " # Principal.toText(entry.owner));
+        };
+      };
+      case (null) {
+        #err("Entry not found");
+      };
+    };
+  };
+
   // Delete events and their associated races (cleanup duplicates)
   // Internal function to delete events and races
   private func delete_events_and_races_internal(eventIds : [Nat]) : async Text {
@@ -3384,6 +3699,59 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       return "Unauthorized: only owner can delete events";
     };
     return await delete_events_and_races_internal(eventIds);
+  };
+
+  // Admin function to clear a bot's stuck active mission (useful after upgrades that change ScavengingZone type)
+  public shared ({ caller }) func admin_clear_active_mission(tokenIndex : Nat) : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can clear missions";
+    };
+
+    switch (garageManager.getStats(tokenIndex)) {
+      case (null) { "Bot not found" };
+      case (?botStats) {
+        let updatedStats = {
+          botStats with
+          activeMission = null;
+        };
+        garageManager.updateStats(tokenIndex, updatedStats);
+        "Cleared active mission for bot #" # Nat.toText(tokenIndex);
+      };
+    };
+  };
+
+  // Admin function to debug/inspect a bot's active mission
+  public shared query ({ caller }) func admin_get_active_mission(tokenIndex : Nat) : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can inspect missions";
+    };
+
+    switch (garageManager.getStats(tokenIndex)) {
+      case (null) { "Bot not found" };
+      case (?botStats) {
+        switch (botStats.activeMission) {
+          case (null) {
+            "Bot #" # Nat.toText(tokenIndex) # " has NO active mission";
+          };
+          case (?mission) {
+            let zoneName = switch (mission.zone) {
+              case (#ScrapHeaps) { "ScrapHeaps" };
+              case (#AbandonedSettlements) { "AbandonedSettlements" };
+              case (#DeadMachineFields) { "DeadMachineFields" };
+              case (#RepairBay) { "RepairBay" };
+            };
+            "Bot #" # Nat.toText(tokenIndex) # " HAS active mission:\n" #
+            "  Mission ID: " # Nat.toText(mission.missionId) # "\n" #
+            "  Zone: " # zoneName # "\n" #
+            "  Start Time: " # Int.toText(mission.startTime) # "\n" #
+            "  Last Accumulation: " # Int.toText(mission.lastAccumulation) # "\n" #
+            "  Duration: " # (switch (mission.durationMinutes) { case (null) { "Continuous" }; case (?d) { Nat.toText(d) # " minutes" } }) # "\n" #
+            "  Pending Parts: " # Nat.toText(mission.pendingParts.speedChips + mission.pendingParts.powerCoreFragments + mission.pendingParts.thrusterKits + mission.pendingParts.gyroModules + mission.pendingParts.universalParts) # "\n" #
+            "  Pending Condition Restored: " # Nat.toText(mission.pendingConditionRestored);
+          };
+        };
+      };
+    };
   };
 
   // Admin function to manually trigger race start for races with missing timers
@@ -3697,7 +4065,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       };
     };
 
-    "Recalculated stats for " # Nat.toText(updatedCount) # " bots and updated leaderboards with " # Nat.toText(leaderboardUpdates) # " entries from " # Nat.toText(validRaceIds.size()) # " valid races";
+    "Recalculated stats for " # Nat.toText(updatedCount) # " bots and recorded " # Nat.toText(leaderboardUpdates) # " leaderboard entries from " # Nat.toText(allRaces.size()) # " races.";
   };
 
   system func preupgrade() {
@@ -3705,7 +4073,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     // Save the trait schema from statsManager to stable storage before upgrade
     stable_trait_schema := statsManager.getSchemaValue();
+
+    // Save betting next bet ID
+    stable_betting_next_bet_id := bettingManager.getNextBetId();
   };
+
   system func postupgrade() {
     HttpAssets.postupgrade(http_assets);
 
@@ -4356,7 +4728,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             // Find races this bot is entered in and races eligible to enter
             let nftId = Nat.toText(tokenIndex);
             let botEloClass = switch (stats) {
-              case (?s) { getRaceClassFromElo(s.eloRating) };
+              case (?s) {
+                let rating = calculateMaxRating(s); // Use max stats, not current degraded stats
+                getRaceClassFromRating(rating);
+              };
               case (null) { #Scrap };
             };
 
@@ -4398,7 +4773,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   enteredRaces := Array.append(enteredRaces, [raceInfo]);
                 };
                 case (null) {
-                  // Not entered - check if eligible (ELO class matches and not full)
+                  // Not entered - check if eligible (rating-based class matches and not full)
                   if (race.raceClass == botEloClass and race.entries.size() < race.maxEntries) {
                     eligibleRaces := Array.append(eligibleRaces, [raceInfo]);
                   };
@@ -4516,7 +4891,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
         // Find races this bot is entered in and races eligible to enter
         let nftId = Nat.toText(tokenIndex);
-        let botEloClass = getRaceClassFromElo(botStats.eloRating);
+        let rating = calculateMaxRating(botStats); // Use max stats, not current degraded stats
+        let botEloClass = getRaceClassFromRating(rating);
 
         var enteredRaces : [{
           raceId : Nat;
@@ -4556,7 +4932,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               enteredRaces := Array.append(enteredRaces, [raceInfo]);
             };
             case (null) {
-              // Not entered - check if eligible (ELO class matches and not full)
+              // Not entered - check if eligible (rating-based class matches and not full)
               if (race.raceClass == botEloClass and race.entries.size() < race.maxEntries) {
                 eligibleRaces := Array.append(eligibleRaces, [raceInfo]);
               };
@@ -5409,6 +5785,89 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     #ok("Upgrade cancelled. " # refundText # " returned to your account.");
   };
 
+  /// Respec a bot - reset all upgrades and refund parts (with penalty)
+  /// Cost escalates: 1 ICP, 2 ICP, 3 ICP... based on respecCount
+  public shared ({ caller }) func web_respec_bot(
+    tokenIndex : Nat
+  ) : async Result.Result<{ speedPartsRefunded : Nat; powerCorePartsRefunded : Nat; accelerationPartsRefunded : Nat; stabilityPartsRefunded : Nat; totalRefunded : Nat; respecCost : Nat }, Text> {
+    // Verify ownership
+    let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
+    let ownerResult = await extCanister.bearer(
+      ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), extCanisterId)
+    );
+
+    switch (ownerResult) {
+      case (#err(_)) { return #err("Bot does not exist") };
+      case (#ok(owner)) {
+        if (owner != walletAccountId) {
+          return #err("You do not own this bot");
+        };
+      };
+    };
+
+    // Get current stats
+    let stats = switch (garageManager.getStats(tokenIndex)) {
+      case (null) { return #err("Bot not initialized") };
+      case (?s) { s };
+    };
+
+    // Calculate respec cost
+    let respecCost = garageManager.calculateRespecCost(stats.respecCount);
+
+    // Process ICRC-2 payment
+    let ledgerId = switch (icpLedgerCanisterId) {
+      case (?id) { id };
+      case (null) { return #err("ICP Ledger not configured") };
+    };
+
+    let icpLedger = actor (Principal.toText(ledgerId)) : actor {
+      icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
+    };
+
+    let transferResult = try {
+      await icpLedger.icrc2_transfer_from({
+        from = { owner = caller; subaccount = null };
+        to = { owner = thisPrincipal; subaccount = null };
+        amount = respecCost + TRANSFER_FEE;
+        fee = ?TRANSFER_FEE;
+        memo = null;
+        created_at_time = null;
+        spender_subaccount = null;
+      });
+    } catch (e) {
+      return #err("Payment transfer failed: " # Error.message(e));
+    };
+
+    switch (transferResult) {
+      case (#Err(e)) {
+        let errorMsg = switch (e) {
+          case (#InsufficientAllowance({ allowance })) {
+            let requiredICP = (respecCost + TRANSFER_FEE) / 100_000_000;
+            "Insufficient spending allowance. Required: " # Nat.toText(requiredICP) # " ICP. Current: " # Nat.toText(allowance / 100_000_000) # " ICP. Please set a higher allowance first.";
+          };
+          case _ { "Payment failed: " # debug_show (e) };
+        };
+        #err(errorMsg);
+      };
+      case (#Ok(_blockIndex)) {
+        // Process respec
+        switch (garageManager.respecBot(tokenIndex, caller)) {
+          case (#err(msg)) { #err(msg) };
+          case (#ok(result)) {
+            #ok({
+              speedPartsRefunded = result.speedPartsRefunded;
+              powerCorePartsRefunded = result.powerCorePartsRefunded;
+              accelerationPartsRefunded = result.accelerationPartsRefunded;
+              stabilityPartsRefunded = result.stabilityPartsRefunded;
+              totalRefunded = result.totalRefunded;
+              respecCost = respecCost;
+            });
+          };
+        };
+      };
+    };
+  };
+
   /// Enter a race (with ICRC-2 payment for entry fee)
   public shared ({ caller }) func web_enter_race(
     raceId : Nat,
@@ -5449,6 +5908,28 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       case (null) { return #err("Race not found") };
     };
 
+    // Check if bot meets rating requirements for race class
+    let rating = garageManager.calculateRatingAt100(botStats);
+    let meetsClass = switch (race.raceClass) {
+      case (#Scrap) { rating < 20 };
+      case (#Junker) {
+        rating >= 20 and rating < 30
+      };
+      case (#Raider) {
+        rating >= 30 and rating < 40
+      };
+      case (#Elite) {
+        rating >= 40 and rating < 50
+      };
+      case (#SilentKlan) {
+        rating >= 50;
+      };
+    };
+
+    if (not meetsClass) {
+      return #err("Bot does not meet race class requirements (Rating: " # Nat.toText(rating) # ")");
+    };
+
     // Check if registration is open for this race's event
     let now = Time.now();
     switch (eventCalendar.getEventByRaceId(raceId)) {
@@ -5467,17 +5948,25 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       };
     };
 
-    // Check if bot is already entered in this race BEFORE taking payment
+    // Check if bot is already entered in any race within this event BEFORE taking payment
     let nftId = Nat.toText(tokenIndex);
-    let alreadyEntered = Array.find<RacingSimulator.RaceEntry>(
-      race.entries,
-      func(e : RacingSimulator.RaceEntry) : Bool { e.nftId == nftId },
-    );
-    switch (alreadyEntered) {
-      case (?_) {
-        return #err("This bot is already entered in this race");
+    switch (eventCalendar.getEventByRaceId(raceId)) {
+      case (?event) {
+        // Check if bot is in any race within this event
+        for (eventRaceId in event.raceIds.vals()) {
+          switch (Map.get(stable_races, Map.nhash, eventRaceId)) {
+            case (?eventRace) {
+              for (entry in eventRace.entries.vals()) {
+                if (entry.nftId == nftId) {
+                  return #err("This bot is already entered in another race in this event (Race #" # Nat.toText(eventRaceId) # ")");
+                };
+              };
+            };
+            case (null) {};
+          };
+        };
       };
-      case (null) {};
+      case (null) {}; // No event, allow entry
     };
 
     // Process entry fee via ICRC-2
@@ -5550,8 +6039,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       case ("ScrapHeaps") { #ScrapHeaps };
       case ("AbandonedSettlements") { #AbandonedSettlements };
       case ("DeadMachineFields") { #DeadMachineFields };
+      case ("RepairBay") { #RepairBay };
+      case ("ChargingStation") { #ChargingStation };
       case (_) {
-        return #err("Invalid zone. Must be ScrapHeaps, AbandonedSettlements, or DeadMachineFields");
+        return #err("Invalid zone. Must be ScrapHeaps, AbandonedSettlements, DeadMachineFields, RepairBay, or ChargingStation");
       };
     };
 
@@ -5673,5 +6164,221 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         #err(msg);
       };
     };
+  };
+
+  // ===========================
+  // WEB BETTING FUNCTIONS
+  // ===========================
+
+  /// Get betting pool info for UI
+  public query func web_betting_get_pool_info(raceId : Nat) : async ?BettingTypes.BettingPool {
+    bettingManager.getPool(raceId);
+  };
+
+  /// Get user's betting history for UI
+  public shared query ({ caller }) func web_betting_get_my_bets(limit : Nat) : async {
+    bets : [BettingTypes.Bet];
+    summary : {
+      totalBets : Nat;
+      totalWagered : Nat;
+      totalWon : Nat;
+      netProfit : Int;
+      winRate : Float;
+    };
+  } {
+    let userBets = bettingManager.getUserBets(caller, limit);
+
+    // Calculate summary
+    var totalWagered : Nat = 0;
+    var totalWon : Nat = 0;
+    var wins : Nat = 0;
+
+    for (bet in userBets.vals()) {
+      totalWagered += bet.amount;
+      switch (bet.potentialPayout) {
+        case (?payout) {
+          if (bet.status == #Won) {
+            totalWon += payout;
+            wins += 1;
+          };
+        };
+        case (null) {};
+      };
+    };
+
+    let netProfit : Int = totalWon - totalWagered;
+    let winRate : Float = if (userBets.size() > 0) {
+      Float.fromInt(wins) / Float.fromInt(userBets.size()) * 100.0;
+    } else {
+      0.0;
+    };
+
+    {
+      bets = userBets;
+      summary = {
+        totalBets = userBets.size();
+        totalWagered = totalWagered;
+        totalWon = totalWon;
+        netProfit = netProfit;
+        winRate = winRate;
+      };
+    };
+  };
+
+  /// Place a bet for UI
+  public shared ({ caller }) func web_betting_place_bet(
+    raceId : Nat,
+    tokenIndex : Nat,
+    betType : BettingTypes.BetType,
+    amountE8s : Nat,
+  ) : async Result.Result<{ betId : Nat; currentOdds : Float; potentialPayout : Nat }, Text> {
+    // Validate amount
+    if (amountE8s < 100_000_000) {
+      return #err("Minimum bet is 1 ICP");
+    };
+    if (amountE8s > 10_000_000_000) {
+      return #err("Maximum bet is 100 ICP");
+    };
+
+    // Get pool
+    let pool = switch (bettingManager.getPool(raceId)) {
+      case (?p) { p };
+      case (null) { return #err("Betting pool not found") };
+    };
+
+    // Check status
+    if (pool.status != #Open) {
+      return #err("Betting is not currently open for this race");
+    };
+
+    // Check timing
+    let now = Time.now();
+    if (now < pool.bettingOpensAt or now >= pool.bettingClosesAt) {
+      return #err("Outside betting window");
+    };
+
+    // Check bot is in race
+    let botInRace = Array.find<Nat>(pool.entrants, func(t) { t == tokenIndex });
+    if (botInRace == null) {
+      return #err("Bot #" # Nat.toText(tokenIndex) # " is not entered in this race");
+    };
+
+    // Check user hasn't exceeded per-race limit (100 ICP)
+    let userBetsInRace = bettingManager.getUserBetsForRaceDetailed(caller, raceId);
+    var userTotal : Nat = 0;
+    for (bet in userBetsInRace.vals()) {
+      userTotal += bet.amount;
+    };
+    if (userTotal + amountE8s > 10_000_000_000) {
+      return #err("Maximum 100 ICP total per race");
+    };
+
+    // Transfer ICP from user to betting pool subaccount
+    let ledgerCanisterId = switch (icpLedgerCanisterId) {
+      case (?id) { id };
+      case (null) { return #err("ICP Ledger not configured") };
+    };
+
+    let ledger = actor (Principal.toText(ledgerCanisterId)) : actor {
+      icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
+    };
+
+    let poolSubaccount = bettingManager.getPoolSubaccount(raceId);
+
+    let transferResult = try {
+      await ledger.icrc2_transfer_from({
+        from = { owner = caller; subaccount = null };
+        to = { owner = thisPrincipal; subaccount = ?poolSubaccount };
+        amount = amountE8s;
+        fee = null;
+        memo = null;
+        created_at_time = null;
+        spender_subaccount = null;
+      });
+    } catch (e) {
+      return #err("Transfer failed: " # Error.message(e));
+    };
+
+    switch (transferResult) {
+      case (#Ok(blockIndex)) {
+        // Record bet
+        let betResult = bettingManager.placeBet(caller, raceId, tokenIndex, betType, amountE8s);
+        switch (betResult) {
+          case (#ok(betId)) {
+            // Calculate current odds
+            let odds = bettingManager.calculateOdds(raceId, tokenIndex, betType);
+            let potentialPayout = Float.toInt(Float.fromInt(amountE8s) * odds);
+
+            #ok({
+              betId = betId;
+              currentOdds = odds;
+              potentialPayout = Int.abs(potentialPayout);
+            });
+          };
+          case (#err(msg)) {
+            // Transfer succeeded but bet recording failed - this shouldn't happen
+            // Funds are in pool subaccount, could be refunded manually if needed
+            #err("Bet recording failed: " # msg);
+          };
+        };
+      };
+      case (#Err(err)) {
+        let errMsg = switch (err) {
+          case (#BadFee { expected_fee }) {
+            "Bad fee, expected: " # Nat.toText(expected_fee);
+          };
+          case (#InsufficientFunds { balance }) {
+            "Insufficient funds, balance: " # Nat.toText(balance);
+          };
+          case (#InsufficientAllowance { allowance }) {
+            "Insufficient allowance: " # Nat.toText(allowance) # ". Please approve the racing canister first.";
+          };
+          case (#TooOld) { "Transfer too old" };
+          case (#CreatedInFuture { ledger_time }) {
+            "Transfer created in future";
+          };
+          case (#Duplicate { duplicate_of }) { "Duplicate transfer" };
+          case (#TemporarilyUnavailable) { "Ledger temporarily unavailable" };
+          case (#GenericError { error_code; message }) {
+            "Error " # Nat.toText(error_code) # ": " # message;
+          };
+          case _ { "Transfer failed" };
+        };
+        #err(errMsg);
+      };
+    };
+  };
+
+  /// List betting pools for UI
+  public query func web_betting_list_pools(
+    statusFilter : ?BettingTypes.PoolStatus,
+    limit : Nat,
+  ) : async {
+    pools : [{
+      raceId : Nat;
+      status : BettingTypes.PoolStatus;
+      totalPooled : Nat;
+      totalBets : Nat;
+      bettingOpensAt : Int;
+      bettingClosesAt : Int;
+    }];
+  } {
+    let allPools = bettingManager.listPools(statusFilter, limit);
+
+    let simplified = Array.map<BettingTypes.BettingPool, { raceId : Nat; status : BettingTypes.PoolStatus; totalPooled : Nat; totalBets : Nat; bettingOpensAt : Int; bettingClosesAt : Int }>(
+      allPools,
+      func(pool) {
+        {
+          raceId = pool.raceId;
+          status = pool.status;
+          totalPooled = pool.winPool + pool.placePool + pool.showPool;
+          totalBets = pool.betIds.size();
+          bettingOpensAt = pool.bettingOpensAt;
+          bettingClosesAt = pool.bettingClosesAt;
+        };
+      },
+    );
+
+    { pools = simplified };
   };
 };

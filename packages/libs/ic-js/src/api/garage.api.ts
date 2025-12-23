@@ -87,7 +87,7 @@ export interface BotListItem {
   activeMission?: {
     missionId: bigint;
     tokenIndex: bigint;
-    zone: { ScrapHeaps: null } | { AbandonedSettlements: null } | { DeadMachineFields: null };
+    zone: { ScrapHeaps: null } | { AbandonedSettlements: null } | { DeadMachineFields: null } | { RepairBay: null } | { ChargingStation: null };
     startTime: bigint;
     lastAccumulation: bigint;
     durationMinutes: [] | [bigint];
@@ -98,6 +98,8 @@ export interface BotListItem {
       gyroModules: bigint;
       universalParts: bigint;
     };
+    pendingConditionRestored: bigint;
+    pendingBatteryRestored: bigint;
   };
   upcomingRaces?: Array<{
     raceId: number;
@@ -232,6 +234,15 @@ export const listMyBots = async (identityOrAgent: IdentityOrAgent): Promise<BotL
     // Extract activeMission from stats if available
     const stats = bot.stats.length > 0 ? bot.stats[0] : undefined;
     const activeMission = stats && stats.activeMission && stats.activeMission.length > 0 ? stats.activeMission[0] : undefined;
+    
+    // Debug logging for bot #5972
+    if (tokenIndex === 5972) {
+      console.log('🔬 listMyBots parsing bot #5972:');
+      console.log('  - bot.stats:', bot.stats);
+      console.log('  - stats:', stats);
+      console.log('  - stats?.activeMission:', stats?.activeMission);
+      console.log('  - activeMission extracted:', activeMission);
+    }
     
     // Extract currentStats and maxStats from backend response
     const currentStats = bot.currentStats.length > 0 ? bot.currentStats[0] : undefined;
@@ -444,6 +455,39 @@ export const cancelUpgrade = async (
 };
 
 /**
+ * Strip a bot to reset all upgrade bonuses and refund parts (with 40% penalty).
+ * Cost escalates with each strip: 1 ICP, 2 ICP, 3 ICP, etc.
+ * This function automatically handles the ICRC-2 approval before stripping.
+ * Preserves: Pity counter
+ * Resets: All stat bonuses, all upgrade counts
+ * Refunds: 60% of parts invested (40% penalty)
+ * @param tokenIndex The token index of the bot to strip
+ * @param identityOrAgent Required identity for authentication
+ * @returns Success message with refund details or error
+ */
+export const respecBot = async (
+  tokenIndex: number,
+  identityOrAgent: IdentityOrAgent
+): Promise<string> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_respec_bot(BigInt(tokenIndex));
+  
+  if ('ok' in result) {
+    const refund = result.ok;
+    const cost = Number(refund.respecCost) / 100_000_000;
+    const total = Number(refund.totalRefunded);
+    const speed = Number(refund.speedPartsRefunded);
+    const power = Number(refund.powerCorePartsRefunded);
+    const accel = Number(refund.accelerationPartsRefunded);
+    const stab = Number(refund.stabilityPartsRefunded);
+    
+    return `Bot stripped! Cost: ${cost} ICP. Refunded ${total} parts (${speed} Speed, ${power} Power, ${accel} Accel, ${stab} Stability). All upgrades reset.`;
+  } else {
+    throw new Error(result.err);
+  }
+};
+
+/**
  * Enter a race with ICRC-2 payment for entry fee.
  * This function automatically handles the ICRC-2 approval before entering.
  * @param raceId The ID of the race to enter
@@ -564,7 +608,7 @@ export const approveIcpSpending = async (
  */
 export const startScavenging = async (
   tokenIndex: number,
-  zone: 'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields',
+  zone: 'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields' | 'RepairBay' | 'ChargingStation',
   identityOrAgent: IdentityOrAgent,
   durationMinutes?: number,
 ): Promise<string> => {

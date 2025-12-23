@@ -6,6 +6,7 @@ import Json "mo:json";
 import PokedBotsGarage "../PokedBotsGarage";
 import RacingSimulator "../RacingSimulator";
 import ExtIntegration "../ExtIntegration";
+import BettingManager "../BettingManager";
 import TimerTool "mo:timer-tool";
 
 module ToolContext {
@@ -23,6 +24,8 @@ module ToolContext {
     garageManager : PokedBotsGarage.PokedBotsGarageManager;
     /// Race manager (generic racing simulator)
     raceManager : RacingSimulator.RaceManager;
+    /// Betting manager (integrated betting system)
+    bettingManager : BettingManager.BettingManager;
     /// EXT canister interface for ownership verification
     extCanister : ExtIntegration.ExtCanisterInterface;
     /// EXT canister ID (needed for encoding token identifiers)
@@ -50,6 +53,8 @@ module ToolContext {
     addSponsor : (raceId : Nat, sponsor : Principal, amount : Nat, message : ?Text) -> ?RacingSimulator.Race;
     /// Check if registration is open for a race's event
     checkRegistrationWindow : (raceId : Nat, now : Int) -> Result.Result<(), Text>;
+    /// Check if a bot is already entered in any race within the same event
+    checkBotInEvent : (raceId : Nat, nftId : Text) -> Result.Result<(), Text>;
   };
 
   /// Helper function to create an error response and invoke callback

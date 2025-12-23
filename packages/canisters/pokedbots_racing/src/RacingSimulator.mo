@@ -158,6 +158,11 @@ module {
       case (3) { ?WASTELAND_GAUNTLET };
       case (4) { ?JUNKYARD_SPRINT };
       case (5) { ?METAL_MESA_LOOP };
+      case (6) { ?DUNE_RUNNER };
+      case (7) { ?RUST_BELT_RALLY };
+      case (8) { ?DEBRIS_FIELD_DASH };
+      case (9) { ?VELOCITY_VIADUCT };
+      case (10) { ?SANDSTORM_CIRCUIT };
       case (_) { null };
     };
   };
@@ -284,6 +289,125 @@ module {
       { length = 350; angle = 0; terrain = #WastelandSand; difficulty = 1.12 },
       { length = 300; angle = 0; terrain = #WastelandSand; difficulty = 1.1 },
       { length = 250; angle = -15; terrain = #WastelandSand; difficulty = 1.05 },
+    ];
+  };
+
+  /// Track 6: Dune Runner (WastelandSand, pure endurance)
+  private let DUNE_RUNNER : TrackTemplate = {
+    trackId = 6;
+    name = "Dune Runner";
+    description = "Brutal marathon through endless dunes - pure power core test";
+    totalDistance = 16600;
+    primaryTerrain = #WastelandSand;
+    laps = 1;
+    segments = [
+      { length = 1200; angle = 5; terrain = #WastelandSand; difficulty = 1.18 },
+      { length = 1100; angle = 8; terrain = #WastelandSand; difficulty = 1.22 },
+      { length = 1000; angle = 12; terrain = #WastelandSand; difficulty = 1.28 },
+      { length = 1300; angle = 15; terrain = #WastelandSand; difficulty = 1.32 },
+      { length = 1200; angle = 10; terrain = #WastelandSand; difficulty = 1.25 },
+      { length = 1100; angle = 0; terrain = #WastelandSand; difficulty = 1.2 },
+      { length = 1000; angle = -8; terrain = #WastelandSand; difficulty = 1.15 },
+      { length = 900; angle = -12; terrain = #WastelandSand; difficulty = 1.1 },
+      { length = 1200; angle = 0; terrain = #WastelandSand; difficulty = 1.22 },
+      { length = 1100; angle = 6; terrain = #WastelandSand; difficulty = 1.25 },
+      { length = 1000; angle = 10; terrain = #WastelandSand; difficulty = 1.28 },
+      { length = 900; angle = 8; terrain = #WastelandSand; difficulty = 1.2 },
+      { length = 1300; angle = 0; terrain = #WastelandSand; difficulty = 1.18 },
+      { length = 1200; angle = -5; terrain = #WastelandSand; difficulty = 1.12 },
+      {
+        length = 1000;
+        angle = -10;
+        terrain = #WastelandSand;
+        difficulty = 1.08;
+      },
+    ];
+  };
+
+  /// Track 7: Rust Belt Rally (MetalRoads, ultra-speed)
+  private let RUST_BELT_RALLY : TrackTemplate = {
+    trackId = 7;
+    name = "Rust Belt Rally";
+    description = "High-speed highway blast - acceleration and top speed critical";
+    totalDistance = 9200;
+    primaryTerrain = #MetalRoads;
+    laps = 1;
+    segments = [
+      { length = 900; angle = 0; terrain = #MetalRoads; difficulty = 0.82 },
+      { length = 850; angle = -2; terrain = #MetalRoads; difficulty = 0.78 },
+      { length = 800; angle = 0; terrain = #MetalRoads; difficulty = 0.8 },
+      { length = 750; angle = 0; terrain = #MetalRoads; difficulty = 0.85 },
+      { length = 700; angle = -4; terrain = #MetalRoads; difficulty = 0.76 },
+      { length = 650; angle = 0; terrain = #MetalRoads; difficulty = 0.88 },
+      { length = 600; angle = 0; terrain = #MetalRoads; difficulty = 0.9 },
+      { length = 550; angle = 0; terrain = #MetalRoads; difficulty = 0.85 },
+      { length = 900; angle = 0; terrain = #MetalRoads; difficulty = 0.82 },
+      { length = 850; angle = 0; terrain = #MetalRoads; difficulty = 0.8 },
+      { length = 800; angle = -3; terrain = #MetalRoads; difficulty = 0.78 },
+      { length = 850; angle = 0; terrain = #MetalRoads; difficulty = 0.83 },
+    ];
+  };
+
+  /// Track 8: Debris Field Dash (ScrapHeaps, stability specialist)
+  private let DEBRIS_FIELD_DASH : TrackTemplate = {
+    trackId = 8;
+    name = "Debris Field Dash";
+    description = "Treacherous obstacle course favoring stability masters";
+    totalDistance = 7100;
+    primaryTerrain = #ScrapHeaps;
+    laps = 2;
+    segments = [
+      { length = 300; angle = 8; terrain = #ScrapHeaps; difficulty = 1.22 },
+      { length = 350; angle = 12; terrain = #ScrapHeaps; difficulty = 1.28 },
+      { length = 280; angle = 18; terrain = #ScrapHeaps; difficulty = 1.35 },
+      { length = 320; angle = -10; terrain = #ScrapHeaps; difficulty = 1.18 },
+      { length = 400; angle = 0; terrain = #ScrapHeaps; difficulty = 1.25 },
+      { length = 350; angle = 15; terrain = #ScrapHeaps; difficulty = 1.3 },
+      { length = 300; angle = 20; terrain = #ScrapHeaps; difficulty = 1.38 },
+      { length = 280; angle = -15; terrain = #ScrapHeaps; difficulty = 1.2 },
+      { length = 320; angle = -8; terrain = #ScrapHeaps; difficulty = 1.15 },
+      { length = 350; angle = 0; terrain = #ScrapHeaps; difficulty = 1.28 },
+      { length = 300; angle = 10; terrain = #ScrapHeaps; difficulty = 1.25 },
+    ];
+  };
+
+  /// Track 9: Velocity Viaduct (MetalRoads, short speed burst)
+  private let VELOCITY_VIADUCT : TrackTemplate = {
+    trackId = 9;
+    name = "Velocity Viaduct";
+    description = "Lightning-fast elevated highway section - pure acceleration";
+    totalDistance = 4500;
+    primaryTerrain = #MetalRoads;
+    laps = 3;
+    segments = [
+      { length = 300; angle = 0; terrain = #MetalRoads; difficulty = 0.8 },
+      { length = 250; angle = 0; terrain = #MetalRoads; difficulty = 0.78 },
+      { length = 280; angle = -5; terrain = #MetalRoads; difficulty = 0.75 },
+      { length = 220; angle = -8; terrain = #MetalRoads; difficulty = 0.72 },
+      { length = 200; angle = 0; terrain = #MetalRoads; difficulty = 0.85 },
+      { length = 250; angle = 0; terrain = #MetalRoads; difficulty = 0.82 },
+    ];
+  };
+
+  /// Track 10: Sandstorm Circuit (WastelandSand, medium endurance)
+  private let SANDSTORM_CIRCUIT : TrackTemplate = {
+    trackId = 10;
+    name = "Sandstorm Circuit";
+    description = "Circular desert track with varying dune intensities";
+    totalDistance = 10800;
+    primaryTerrain = #WastelandSand;
+    laps = 2;
+    segments = [
+      { length = 600; angle = 0; terrain = #WastelandSand; difficulty = 1.15 },
+      { length = 550; angle = 5; terrain = #WastelandSand; difficulty = 1.2 },
+      { length = 500; angle = 10; terrain = #WastelandSand; difficulty = 1.25 },
+      { length = 450; angle = 12; terrain = #WastelandSand; difficulty = 1.28 },
+      { length = 500; angle = 8; terrain = #WastelandSand; difficulty = 1.22 },
+      { length = 550; angle = 0; terrain = #WastelandSand; difficulty = 1.18 },
+      { length = 600; angle = -6; terrain = #WastelandSand; difficulty = 1.12 },
+      { length = 550; angle = -10; terrain = #WastelandSand; difficulty = 1.08 },
+      { length = 500; angle = -8; terrain = #WastelandSand; difficulty = 1.1 },
+      { length = 600; angle = 0; terrain = #WastelandSand; difficulty = 1.15 },
     ];
   };
 
@@ -778,9 +902,9 @@ module {
     private func selectTrackForRace(terrain : Terrain, _distance : Nat, raceId : Nat) : Nat {
       // Filter tracks by terrain match
       let terrainMatches = switch (terrain) {
-        case (#ScrapHeaps) { [1, 4] }; // Scrap Mountain, Junkyard Sprint
-        case (#MetalRoads) { [2, 5] }; // Highway, Metal Mesa
-        case (#WastelandSand) { [3] }; // Wasteland Gauntlet
+        case (#ScrapHeaps) { [1, 4, 8] }; // Scrap Mountain, Junkyard Sprint, Debris Field Dash
+        case (#MetalRoads) { [2, 5, 7, 9] }; // Highway, Metal Mesa, Rust Belt Rally, Velocity Viaduct
+        case (#WastelandSand) { [3, 6, 10] }; // Wasteland Gauntlet, Dune Runner, Sandstorm Circuit
       };
 
       // Select from matching tracks using raceId for variety
