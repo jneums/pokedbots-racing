@@ -87,16 +87,33 @@ export interface Bet {
   amount_e8s: number;
   status: string;
   timestamp: number;
-  payout: {
+  payout: [] | [{
     payout_icp: string;
     payout_e8s: number;
     roi_percent: string;
-  } | null;
+  }];
 }
 
 export interface MyBetsResponse {
   bets: Bet[];
   count: number;
+  summary: {
+    total_bets: number;
+    wins: number;
+    losses: number;
+    pending: number;
+    total_wagered_icp: string;
+    total_won_icp: string;
+    net_profit_icp: string;
+    roi_percent: string;
+    win_rate_percent: string;
+  };
+}
+
+export interface MyBetsPaginatedResponse {
+  bets: Bet[];
+  hasMore: boolean;
+  total: number;
   summary: {
     total_bets: number;
     wins: number;
@@ -164,6 +181,19 @@ export async function bettingGetMyBets(
   const actor = await getActor(identityOrAgent);
   const response = await actor.web_betting_get_my_bets(BigInt(limit));
   return response as unknown as MyBetsResponse;
+}
+
+/**
+ * Get user's betting history with pagination
+ */
+export async function bettingGetMyBetsPaginated(
+  identityOrAgent: IdentityOrAgent,
+  limit: number = 10,
+  offset: number = 0
+): Promise<MyBetsPaginatedResponse> {
+  const actor = await getActor(identityOrAgent);
+  const response = await actor.web_betting_get_my_bets_paginated(BigInt(limit), BigInt(offset));
+  return response as unknown as MyBetsPaginatedResponse;
 }
 
 /**

@@ -274,30 +274,6 @@ export const idlFactory = ({ IDL }) => {
     'body' : IDL.Vec(IDL.Nat8),
     'headers' : IDL.Vec(HttpHeader),
   });
-  const BetStatus = IDL.Variant({
-    'Won' : IDL.Null,
-    'Refunded' : IDL.Null,
-    'Lost' : IDL.Null,
-    'Active' : IDL.Null,
-    'Pending' : IDL.Null,
-  });
-  const BetType = IDL.Variant({
-    'Win' : IDL.Null,
-    'Show' : IDL.Null,
-    'Place' : IDL.Null,
-  });
-  const Bet = IDL.Record({
-    'status' : BetStatus,
-    'tokenIndex' : IDL.Nat,
-    'userId' : IDL.Principal,
-    'paid' : IDL.Bool,
-    'betType' : BetType,
-    'potentialPayout' : IDL.Opt(IDL.Nat),
-    'timestamp' : IDL.Int,
-    'raceId' : IDL.Nat,
-    'betId' : IDL.Nat,
-    'amount' : IDL.Nat,
-  });
   const PoolStatus = IDL.Variant({
     'Open' : IDL.Null,
     'Closed' : IDL.Null,
@@ -339,6 +315,11 @@ export const idlFactory = ({ IDL }) => {
     'raceClass' : IDL.Text,
     'bettingClosesAt' : IDL.Int,
     'failedPayouts' : IDL.Vec(FailedPayout),
+  });
+  const BetType = IDL.Variant({
+    'Win' : IDL.Null,
+    'Show' : IDL.Null,
+    'Place' : IDL.Null,
   });
   const Result_4 = IDL.Variant({
     'ok' : IDL.Record({
@@ -921,13 +902,76 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [
           IDL.Record({
-            'bets' : IDL.Vec(Bet),
+            'bets' : IDL.Vec(
+              IDL.Record({
+                'status' : IDL.Text,
+                'token_index' : IDL.Nat,
+                'amount_e8s' : IDL.Nat,
+                'amount_icp' : IDL.Text,
+                'race_id' : IDL.Nat,
+                'bet_id' : IDL.Nat,
+                'timestamp' : IDL.Int,
+                'bet_type' : IDL.Text,
+                'payout' : IDL.Opt(
+                  IDL.Record({
+                    'payout_e8s' : IDL.Nat,
+                    'payout_icp' : IDL.Text,
+                    'roi_percent' : IDL.Text,
+                  })
+                ),
+              })
+            ),
+            'count' : IDL.Nat,
             'summary' : IDL.Record({
-              'totalWagered' : IDL.Nat,
-              'totalBets' : IDL.Nat,
-              'totalWon' : IDL.Nat,
-              'winRate' : IDL.Float64,
-              'netProfit' : IDL.Int,
+              'pending' : IDL.Nat,
+              'net_profit_icp' : IDL.Text,
+              'wins' : IDL.Nat,
+              'losses' : IDL.Nat,
+              'win_rate_percent' : IDL.Text,
+              'total_bets' : IDL.Nat,
+              'total_wagered_icp' : IDL.Text,
+              'total_won_icp' : IDL.Text,
+              'roi_percent' : IDL.Text,
+            }),
+          }),
+        ],
+        ['query'],
+      ),
+    'web_betting_get_my_bets_paginated' : IDL.Func(
+        [IDL.Nat, IDL.Nat],
+        [
+          IDL.Record({
+            'total' : IDL.Nat,
+            'hasMore' : IDL.Bool,
+            'bets' : IDL.Vec(
+              IDL.Record({
+                'status' : IDL.Text,
+                'token_index' : IDL.Nat,
+                'amount_e8s' : IDL.Nat,
+                'amount_icp' : IDL.Text,
+                'race_id' : IDL.Nat,
+                'bet_id' : IDL.Nat,
+                'timestamp' : IDL.Int,
+                'bet_type' : IDL.Text,
+                'payout' : IDL.Opt(
+                  IDL.Record({
+                    'payout_e8s' : IDL.Nat,
+                    'payout_icp' : IDL.Text,
+                    'roi_percent' : IDL.Text,
+                  })
+                ),
+              })
+            ),
+            'summary' : IDL.Record({
+              'pending' : IDL.Nat,
+              'net_profit_icp' : IDL.Text,
+              'wins' : IDL.Nat,
+              'losses' : IDL.Nat,
+              'win_rate_percent' : IDL.Text,
+              'total_bets' : IDL.Nat,
+              'total_wagered_icp' : IDL.Text,
+              'total_won_icp' : IDL.Text,
+              'roi_percent' : IDL.Text,
             }),
           }),
         ],

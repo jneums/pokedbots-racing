@@ -26,7 +26,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_upgrade_robot";
     title = ?"Upgrade Robot";
-    description = ?"Start a 12-hour V2 upgrade session with RNG mechanics. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability).\n\n**V2 MECHANICS:**\n• Dynamic ICP costs: 0.5 + (stat/40)² × tier premium (0.7-3.5×)\n• Success rates: 85% → 15% (attempts 1-15), then 8% → 1% (brutal soft cap)\n• Pity system: +5% per consecutive fail (max +25%), persists across deploys\n• Double lottery: 15% → 2% chance for +2 points (disabled after +15)\n• 50% refund on failure (ICP or parts returned based on payment method)\n• Pay with ICP or parts (100 parts = 1 ICP)\n\nUse garage_get_robot_details to see exact costs/rates. For full V2 mechanics, use help_get_compendium tool.";
+    description = ?"Start a 12-hour V2 upgrade session with RNG mechanics. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability).\n\n**V2 MECHANICS:**\n• Dynamic ICP costs: 0.5 + (stat/40)² × tier premium (0.7-3.5×)\n• Success rates PER STAT: 85% (first upgrade) smoothly decreasing to 1% (at 15 upgrades), then stays at 1%\n• Each stat tracked independently: Speed, Power Core, Acceleration, and Stability each get their own success rate curve\n• Pity system: +5% per consecutive fail (max +25%), persists across deploys\n• Double lottery: 15% → 2% chance for +2 points (disabled after +15 successful upgrades per stat)\n• 50% refund on failure (ICP or parts returned based on payment method)\n• Pay with ICP or parts (100 parts = 1 ICP)\n\nUse garage_get_robot_details to see exact costs/rates. For full V2 mechanics, use help_get_compendium tool.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -239,7 +239,7 @@ module {
         ("attempt_number", Json.int(attemptNumber + 1)),
         ("success_rate", Json.str(Float.format(#fix 1, successRate) # "%" # pityText)),
         ("double_chance", Json.str(Float.format(#fix 1, doubleChance) # "%")),
-        ("message", Json.str("🔧 Upgrade in progress! Success rate: " # Float.format(#fix 1, successRate) # "%" # pityText # ". If successful, " # Float.format(#fix 1, doubleChance) # "% chance for +2 stat points! Check back in 12 hours.")),
+        ("message", Json.str("🔧 Upgrade in progress! Success rate: " # Float.format(#fix 1, successRate) # "%" # pityText # ". If successful, " # Float.format(#fix 1, doubleChance) # "% chance for +2 stat points! Check back in 12 hours. Note: Success rate smoothly decreases from 85% to 1% over 15 upgrades per stat.")),
       ]);
 
       ToolContext.makeSuccess(response, cb);

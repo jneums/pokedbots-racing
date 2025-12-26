@@ -723,15 +723,72 @@ type McpServer =
    /// Get user's betting history for UI
    web_betting_get_my_bets: (limit: nat) ->
     (record {
-       bets: vec Bet;
+       bets:
+        vec
+         record {
+           amount_e8s: nat;
+           amount_icp: text;
+           bet_id: nat;
+           bet_type: text;
+           payout:
+            opt record {
+                  payout_e8s: nat;
+                  payout_icp: text;
+                  roi_percent: text;
+                };
+           race_id: nat;
+           status: text;
+           timestamp: int;
+           token_index: nat;
+         };
+       count: nat;
        summary:
         record {
-          netProfit: int;
-          totalBets: nat;
-          totalWagered: nat;
-          totalWon: nat;
-          winRate: float64;
+          losses: nat;
+          net_profit_icp: text;
+          pending: nat;
+          roi_percent: text;
+          total_bets: nat;
+          total_wagered_icp: text;
+          total_won_icp: text;
+          win_rate_percent: text;
+          wins: nat;
         };
+     }) query;
+   web_betting_get_my_bets_paginated: (limit: nat, offset: nat) ->
+    (record {
+       bets:
+        vec
+         record {
+           amount_e8s: nat;
+           amount_icp: text;
+           bet_id: nat;
+           bet_type: text;
+           payout:
+            opt record {
+                  payout_e8s: nat;
+                  payout_icp: text;
+                  roi_percent: text;
+                };
+           race_id: nat;
+           status: text;
+           timestamp: int;
+           token_index: nat;
+         };
+       hasMore: bool;
+       summary:
+        record {
+          losses: nat;
+          net_profit_icp: text;
+          pending: nat;
+          roi_percent: text;
+          total_bets: nat;
+          total_wagered_icp: text;
+          total_won_icp: text;
+          win_rate_percent: text;
+          wins: nat;
+        };
+       total: nat;
      }) query;
    /// Get betting pool info for UI
    web_betting_get_pool_info: (raceId: nat) -> (opt BettingPool) query;
@@ -1149,27 +1206,6 @@ type BetType =
    Place;
    Show;
    Win;
- };
-type BetStatus = 
- variant {
-   Active;
-   Lost;
-   Pending;
-   Refunded;
-   Won;
- };
-type Bet = 
- record {
-   amount: nat;
-   betId: nat;
-   betType: BetType;
-   paid: bool;
-   potentialPayout: opt nat;
-   raceId: nat;
-   status: BetStatus;
-   timestamp: int;
-   tokenIndex: nat;
-   userId: principal;
  };
 type ApiKeyMetadata = 
  record {

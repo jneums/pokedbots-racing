@@ -9,6 +9,7 @@ import SchedulePage from './app/schedule/page';
 import EventDetailsPage from './app/schedule/[eventId]/page';
 import RaceDetailsPage from './app/race/[raceId]/page';
 import LeaderboardPage from './app/leaderboard/page';
+import BettingPage from './app/betting/page';
 import SimulatorPage from './app/simulator/page';
 import DocsListPage from './app/docs/page';
 import DocPage from './app/docs/[slug]/page';
@@ -151,6 +152,7 @@ export default function App() {
           <Route path="/schedule/:eventId" element={<EventDetailsPage />} />
           <Route path="/race/:raceId" element={<RaceDetailsPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/betting" element={<BettingPage />} />
           <Route path="/simulator" element={<SimulatorPage />} />
           <Route path="/bot/:tokenIndex" element={<BotDetailsPage />} />
           <Route path="/docs" element={<DocsListPage />} />

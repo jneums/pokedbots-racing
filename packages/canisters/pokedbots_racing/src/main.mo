@@ -6177,29 +6177,208 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   /// Get user's betting history for UI
   public shared query ({ caller }) func web_betting_get_my_bets(limit : Nat) : async {
-    bets : [BettingTypes.Bet];
+    bets : [{
+      bet_id : Nat;
+      race_id : Nat;
+      token_index : Nat;
+      bet_type : Text;
+      amount_icp : Text;
+      amount_e8s : Nat;
+      status : Text;
+      timestamp : Int;
+      payout : ?{
+        payout_icp : Text;
+        payout_e8s : Nat;
+        roi_percent : Text;
+      };
+    }];
+    count : Nat;
     summary : {
-      totalBets : Nat;
-      totalWagered : Nat;
-      totalWon : Nat;
-      netProfit : Int;
-      winRate : Float;
+      total_bets : Nat;
+      wins : Nat;
+      losses : Nat;
+      pending : Nat;
+      total_wagered_icp : Text;
+      total_won_icp : Text;
+      net_profit_icp : Text;
+      roi_percent : Text;
+      win_rate_percent : Text;
     };
   } {
     let userBets = bettingManager.getUserBets(caller, limit);
 
-    // Calculate summary
+    // Calculate summary (excluding pending bets from ROI/profit calculations)
     var totalWagered : Nat = 0;
     var totalWon : Nat = 0;
     var wins : Nat = 0;
+    var losses : Nat = 0;
+    var pending : Nat = 0;
 
     for (bet in userBets.vals()) {
-      totalWagered += bet.amount;
-      switch (bet.potentialPayout) {
-        case (?payout) {
-          if (bet.status == #Won) {
-            totalWon += payout;
-            wins += 1;
+      switch (bet.status) {
+        case (#Won) {
+          wins += 1;
+          totalWagered += bet.amount; // Only count wagered if bet is settled
+          switch (bet.potentialPayout) {
+            case (?payout) { totalWon += payout };
+            case (null) {};
+          };
+        };
+        case (#Lost) {
+          losses += 1;
+          totalWagered += bet.amount; // Only count wagered if bet is settled
+        };
+        case (#Pending or #Active) { pending += 1 }; // Don't count pending in totals
+        case (#Refunded) {
+          totalWagered += bet.amount;
+          totalWon += bet.amount;
+        };
+      };
+    };
+
+    let netProfit : Int = totalWon - totalWagered;
+    let settledBets = wins + losses; // Only count settled bets for win rate
+    let winRate : Float = if (settledBets > 0) {
+      Float.fromInt(wins) / Float.fromInt(settledBets) * 100.0;
+    } else {
+      0.0;
+    };
+    let roi : Float = if (totalWagered > 0) {
+      (Float.fromInt(totalWon) / Float.fromInt(totalWagered) - 1.0) * 100.0;
+    } else {
+      0.0;
+    };
+
+    // Convert bets to web-friendly format
+    let webBets = Array.map<BettingTypes.Bet, { bet_id : Nat; race_id : Nat; token_index : Nat; bet_type : Text; amount_icp : Text; amount_e8s : Nat; status : Text; timestamp : Int; payout : ?{ payout_icp : Text; payout_e8s : Nat; roi_percent : Text } }>(
+      userBets,
+      func(bet) {
+        let statusText = switch (bet.status) {
+          case (#Pending) "Pending";
+          case (#Active) "Active";
+          case (#Won) "Won";
+          case (#Lost) "Lost";
+          case (#Refunded) "Refunded";
+        };
+
+        let betTypeText = switch (bet.betType) {
+          case (#Win) "Win";
+          case (#Place) "Place";
+          case (#Show) "Show";
+        };
+
+        let amountIcp = Float.fromInt(bet.amount) / 100_000_000.0;
+
+        let payoutInfo = switch (bet.potentialPayout) {
+          case (?payout) {
+            let payoutIcp = Float.fromInt(payout) / 100_000_000.0;
+            let betRoi = if (bet.amount > 0) {
+              (Float.fromInt(payout) / Float.fromInt(bet.amount) - 1.0) * 100.0;
+            } else {
+              0.0;
+            };
+            ?{
+              payout_icp = Float.format(#fix 2, payoutIcp);
+              payout_e8s = payout;
+              roi_percent = Float.format(#fix 1, betRoi) # "%";
+            };
+          };
+          case (null) { null };
+        };
+
+        {
+          bet_id = bet.betId;
+          race_id = bet.raceId;
+          token_index = bet.tokenIndex;
+          bet_type = betTypeText;
+          amount_icp = Float.format(#fix 2, amountIcp);
+          amount_e8s = bet.amount;
+          status = statusText;
+          timestamp = bet.timestamp;
+          payout = payoutInfo;
+        };
+      },
+    );
+
+    {
+      bets = webBets;
+      count = userBets.size();
+      summary = {
+        total_bets = userBets.size();
+        wins = wins;
+        losses = losses;
+        pending = pending;
+        total_wagered_icp = Float.format(#fix 2, Float.fromInt(totalWagered) / 100_000_000.0);
+        total_won_icp = Float.format(#fix 2, Float.fromInt(totalWon) / 100_000_000.0);
+        net_profit_icp = Float.format(#fix 2, Float.fromInt(netProfit) / 100_000_000.0);
+        roi_percent = Float.format(#fix 1, roi) # "%";
+        win_rate_percent = Float.format(#fix 1, winRate) # "%";
+      };
+    };
+  };
+
+  public shared query ({ caller }) func web_betting_get_my_bets_paginated(limit : Nat, offset : Nat) : async {
+    bets : [{
+      bet_id : Nat;
+      race_id : Nat;
+      token_index : Nat;
+      bet_type : Text;
+      amount_icp : Text;
+      amount_e8s : Nat;
+      status : Text;
+      timestamp : Int;
+      payout : ?{
+        payout_icp : Text;
+        payout_e8s : Nat;
+        roi_percent : Text;
+      };
+    }];
+    hasMore : Bool;
+    total : Nat;
+    summary : {
+      total_bets : Nat;
+      wins : Nat;
+      losses : Nat;
+      pending : Nat;
+      total_wagered_icp : Text;
+      total_won_icp : Text;
+      net_profit_icp : Text;
+      roi_percent : Text;
+      win_rate_percent : Text;
+    };
+  } {
+    let paginatedResult = bettingManager.getUserBetsPaginated(caller, limit, offset);
+    let userBets = paginatedResult.bets;
+
+    // Calculate summary from ALL user bets for accurate stats
+    let allBetIds = Option.get(Map.get(bettingManager.getUserBetsMap(), bettingManager.getPrincipalHash(), caller), []);
+    var totalWagered : Nat = 0;
+    var totalWon : Nat = 0;
+    var wins : Nat = 0;
+    var losses : Nat = 0;
+    var pending : Nat = 0;
+
+    for (betId in allBetIds.vals()) {
+      switch (Map.get(bettingManager.getBetsMap(), bettingManager.getNatHash(), betId)) {
+        case (?bet) {
+          switch (bet.status) {
+            case (#Won) {
+              wins += 1;
+              totalWagered += bet.amount;
+              switch (bet.potentialPayout) {
+                case (?payout) { totalWon += payout };
+                case (null) {};
+              };
+            };
+            case (#Lost) {
+              losses += 1;
+              totalWagered += bet.amount;
+            };
+            case (#Pending or #Active) { pending += 1 };
+            case (#Refunded) {
+              totalWagered += bet.amount;
+              totalWon += bet.amount;
+            };
           };
         };
         case (null) {};
@@ -6207,20 +6386,83 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
 
     let netProfit : Int = totalWon - totalWagered;
-    let winRate : Float = if (userBets.size() > 0) {
-      Float.fromInt(wins) / Float.fromInt(userBets.size()) * 100.0;
+    let settledBets = wins + losses;
+    let winRate : Float = if (settledBets > 0) {
+      Float.fromInt(wins) / Float.fromInt(settledBets) * 100.0;
+    } else {
+      0.0;
+    };
+    let roi : Float = if (totalWagered > 0) {
+      (Float.fromInt(totalWon) / Float.fromInt(totalWagered) - 1.0) * 100.0;
     } else {
       0.0;
     };
 
+    // Convert bets to web-friendly format
+    let webBets = Array.map<BettingTypes.Bet, { bet_id : Nat; race_id : Nat; token_index : Nat; bet_type : Text; amount_icp : Text; amount_e8s : Nat; status : Text; timestamp : Int; payout : ?{ payout_icp : Text; payout_e8s : Nat; roi_percent : Text } }>(
+      userBets,
+      func(bet) {
+        let statusText = switch (bet.status) {
+          case (#Pending) "Pending";
+          case (#Active) "Active";
+          case (#Won) "Won";
+          case (#Lost) "Lost";
+          case (#Refunded) "Refunded";
+        };
+
+        let betTypeText = switch (bet.betType) {
+          case (#Win) "Win";
+          case (#Place) "Place";
+          case (#Show) "Show";
+        };
+
+        let amountIcp = Float.fromInt(bet.amount) / 100_000_000.0;
+
+        let payoutInfo = switch (bet.potentialPayout) {
+          case (?payout) {
+            let payoutIcp = Float.fromInt(payout) / 100_000_000.0;
+            let betRoi = if (bet.amount > 0) {
+              (Float.fromInt(payout) / Float.fromInt(bet.amount) - 1.0) * 100.0;
+            } else {
+              0.0;
+            };
+            ?{
+              payout_icp = Float.format(#fix 2, payoutIcp);
+              payout_e8s = payout;
+              roi_percent = Float.format(#fix 1, betRoi) # "%";
+            };
+          };
+          case (null) { null };
+        };
+
+        {
+          bet_id = bet.betId;
+          race_id = bet.raceId;
+          token_index = bet.tokenIndex;
+          bet_type = betTypeText;
+          amount_icp = Float.format(#fix 2, amountIcp);
+          amount_e8s = bet.amount;
+          status = statusText;
+          timestamp = bet.timestamp;
+          payout = payoutInfo;
+        };
+      },
+    );
+
     {
-      bets = userBets;
+      bets = webBets;
+      hasMore = paginatedResult.hasMore;
+      total = paginatedResult.total;
       summary = {
-        totalBets = userBets.size();
-        totalWagered = totalWagered;
-        totalWon = totalWon;
-        netProfit = netProfit;
-        winRate = winRate;
+        total_bets = paginatedResult.total;
+        wins = wins;
+        losses = losses;
+        pending = pending;
+        total_wagered_icp = Float.format(#fix 2, Float.fromInt(totalWagered) / 100_000_000.0);
+        total_won_icp = Float.format(#fix 2, Float.fromInt(totalWon) / 100_000_000.0);
+        net_profit_icp = Float.format(#fix 2, Float.fromInt(netProfit) / 100_000_000.0);
+        roi_percent = Float.format(#fix 1, roi) # "%";
+        win_rate_percent = Float.format(#fix 1, winRate) # "%";
       };
     };
   };
@@ -6233,8 +6475,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     amountE8s : Nat,
   ) : async Result.Result<{ betId : Nat; currentOdds : Float; potentialPayout : Nat }, Text> {
     // Validate amount
-    if (amountE8s < 100_000_000) {
-      return #err("Minimum bet is 1 ICP");
+    if (amountE8s < 1_000_000) {
+      return #err("Minimum bet is 0.01 ICP");
     };
     if (amountE8s > 10_000_000_000) {
       return #err("Maximum bet is 100 ICP");

@@ -1,7 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import {
   bettingGetPoolInfo,
   bettingGetMyBets,
+  bettingGetMyBetsPaginated,
   bettingPlaceBet,
   bettingListPools,
   type BetType,
@@ -45,6 +46,31 @@ export function useGetMyBets() {
   });
 }
 
+// Hook to get user's bets with infinite scroll pagination
+export function useGetMyBetsInfinite(pageSize: number = 10) {
+  const { user } = useAuth();
+
+  return useInfiniteQuery({
+    queryKey: ['my-bets-infinite', user?.principal, pageSize],
+    queryFn: async ({ pageParam = 0 }) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return bettingGetMyBetsPaginated(user.agent, pageSize, pageParam);
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      // If there are more bets, return the next offset
+      if (lastPage.hasMore) {
+        return allPages.length * pageSize;
+      }
+      return undefined;
+    },
+    enabled: !!user?.agent,
+    staleTime: 30 * 1000, // 30 seconds
+    initialPageParam: 0,
+  });
+}
+
 // Hook to place a bet
 export function usePlaceBet() {
   const { user } = useAuth();
@@ -72,6 +98,7 @@ export function usePlaceBet() {
       // Invalidate relevant queries to refetch fresh data
       queryClient.invalidateQueries({ queryKey: ['betting-pool', variables.race_id] });
       queryClient.invalidateQueries({ queryKey: ['my-bets'] });
+      queryClient.invalidateQueries({ queryKey: ['my-bets-infinite'] });
     },
   });
 }

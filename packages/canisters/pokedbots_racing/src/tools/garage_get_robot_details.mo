@@ -241,24 +241,11 @@ module {
 
       // Calculate success rates and pity bonus
       let pityCounter = ctx.garageManager.getPityCounter(tokenIndex);
-      // Calculate base stats (current stats minus bonuses, but ensure no underflow)
-      let speedBase = if (currentStats.speed >= racingStats.speedBonus) {
-        currentStats.speed - racingStats.speedBonus;
-      } else { 0 };
-      let powerCoreBase = if (currentStats.powerCore >= racingStats.powerCoreBonus) {
-        currentStats.powerCore - racingStats.powerCoreBonus;
-      } else { 0 };
-      let accelerationBase = if (currentStats.acceleration >= racingStats.accelerationBonus) {
-        currentStats.acceleration - racingStats.accelerationBonus;
-      } else { 0 };
-      let stabilityBase = if (currentStats.stability >= racingStats.stabilityBonus) {
-        currentStats.stability - racingStats.stabilityBonus;
-      } else { 0 };
-
-      let speedAttempt = speedBase;
-      let powerCoreAttempt = powerCoreBase;
-      let accelerationAttempt = accelerationBase;
-      let stabilityAttempt = stabilityBase;
+      // Use upgrade counts (not base stats) for success rate calculation
+      let speedAttempt = racingStats.speedUpgrades;
+      let powerCoreAttempt = racingStats.powerCoreUpgrades;
+      let accelerationAttempt = racingStats.accelerationUpgrades;
+      let stabilityAttempt = racingStats.stabilityUpgrades;
 
       let speedSuccessRate = ctx.garageManager.calculateSuccessRate(speedAttempt, pityCounter);
       let powerCoreSuccessRate = ctx.garageManager.calculateSuccessRate(powerCoreAttempt, pityCounter);
@@ -283,7 +270,7 @@ module {
           ("faction", Json.str(factionText)),
           ("stats", Json.obj([("speed", Json.int(currentStats.speed)), ("power_core", Json.int(currentStats.powerCore)), ("acceleration", Json.int(currentStats.acceleration)), ("stability", Json.int(currentStats.stability)), ("total_current", Json.int(currentStats.speed + currentStats.powerCore + currentStats.acceleration + currentStats.stability)), ("stats_at_100_percent", Json.obj([("speed", Json.int(statsAt100.speed)), ("power_core", Json.int(statsAt100.powerCore)), ("acceleration", Json.int(statsAt100.acceleration)), ("stability", Json.int(statsAt100.stability)), ("total_at_100", Json.int(statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability))])), ("base_speed", Json.int(baseStats.speed)), ("base_power_core", Json.int(baseStats.powerCore)), ("base_acceleration", Json.int(baseStats.acceleration)), ("base_stability", Json.int(baseStats.stability)), ("total_base", Json.int(baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability)), ("speed_bonus", Json.int(racingStats.speedBonus)), ("power_core_bonus", Json.int(racingStats.powerCoreBonus)), ("acceleration_bonus", Json.int(racingStats.accelerationBonus)), ("stability_bonus", Json.int(racingStats.stabilityBonus)), ("speed_upgrades", Json.int(racingStats.speedUpgrades)), ("power_core_upgrades", Json.int(racingStats.powerCoreUpgrades)), ("acceleration_upgrades", Json.int(racingStats.accelerationUpgrades)), ("stability_upgrades", Json.int(racingStats.stabilityUpgrades))])),
           ("upgrade_costs_v2", Json.obj([("speed", Json.obj([("cost_e8s", Json.int(speedUpgradeCostE8s)), ("cost_icp", Json.str(Float.format(#fix 2, Float.fromInt(speedUpgradeCostE8s) / 100_000_000.0))), ("success_rate", Json.str(Float.format(#fix 1, speedSuccessRate) # "%"))])), ("power_core", Json.obj([("cost_e8s", Json.int(powerCoreUpgradeCostE8s)), ("cost_icp", Json.str(Float.format(#fix 2, Float.fromInt(powerCoreUpgradeCostE8s) / 100_000_000.0))), ("success_rate", Json.str(Float.format(#fix 1, powerCoreSuccessRate) # "%"))])), ("acceleration", Json.obj([("cost_e8s", Json.int(accelerationUpgradeCostE8s)), ("cost_icp", Json.str(Float.format(#fix 2, Float.fromInt(accelerationUpgradeCostE8s) / 100_000_000.0))), ("success_rate", Json.str(Float.format(#fix 1, accelerationSuccessRate) # "%"))])), ("stability", Json.obj([("cost_e8s", Json.int(stabilityUpgradeCostE8s)), ("cost_icp", Json.str(Float.format(#fix 2, Float.fromInt(stabilityUpgradeCostE8s) / 100_000_000.0))), ("success_rate", Json.str(Float.format(#fix 1, stabilitySuccessRate) # "%"))])), ("pity_counter", Json.int(pityCounter)), ("pity_bonus", Json.str("+" # Nat.toText(pityCounter * 5) # "%"))])),
-          ("upgrade_mechanics", Json.str("V2 Gacha System: Success rate decreases with attempts (85% → 15%). Pity system adds +5% per failure (max +25%). Successful upgrades have chance for double points (15% → 2%). Failed upgrades refund 50% of cost.")),
+          ("upgrade_mechanics", Json.str("V2 Gacha System: Success rate starts at 85% for first upgrade per stat, smoothly decreasing to 1% at 15 upgrades, then stays at 1%. Each stat (Speed/PowerCore/Acceleration/Stability) tracked independently. Pity system adds +5% per failure (max +25%). Successful upgrades have chance for double points (15% → 2%). Failed upgrades refund 50% of cost.")),
           (
             "condition",
             Json.obj([

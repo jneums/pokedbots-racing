@@ -25,23 +25,6 @@ export interface ApiKeyMetadata {
   'info' : ApiKeyInfo,
   'hashed_key' : HashedApiKey,
 }
-export interface Bet {
-  'status' : BetStatus,
-  'tokenIndex' : bigint,
-  'userId' : Principal,
-  'paid' : boolean,
-  'betType' : BetType,
-  'potentialPayout' : [] | [bigint],
-  'timestamp' : bigint,
-  'raceId' : bigint,
-  'betId' : bigint,
-  'amount' : bigint,
-}
-export type BetStatus = { 'Won' : null } |
-  { 'Refunded' : null } |
-  { 'Lost' : null } |
-  { 'Active' : null } |
-  { 'Pending' : null };
 export type BetType = { 'Win' : null } |
   { 'Show' : null } |
   { 'Place' : null };
@@ -465,13 +448,73 @@ export interface McpServer {
   'web_betting_get_my_bets' : ActorMethod<
     [bigint],
     {
-      'bets' : Array<Bet>,
+      'bets' : Array<
+        {
+          'status' : string,
+          'token_index' : bigint,
+          'amount_e8s' : bigint,
+          'amount_icp' : string,
+          'race_id' : bigint,
+          'bet_id' : bigint,
+          'timestamp' : bigint,
+          'bet_type' : string,
+          'payout' : [] | [
+            {
+              'payout_e8s' : bigint,
+              'payout_icp' : string,
+              'roi_percent' : string,
+            }
+          ],
+        }
+      >,
+      'count' : bigint,
       'summary' : {
-        'totalWagered' : bigint,
-        'totalBets' : bigint,
-        'totalWon' : bigint,
-        'winRate' : number,
-        'netProfit' : bigint,
+        'pending' : bigint,
+        'net_profit_icp' : string,
+        'wins' : bigint,
+        'losses' : bigint,
+        'win_rate_percent' : string,
+        'total_bets' : bigint,
+        'total_wagered_icp' : string,
+        'total_won_icp' : string,
+        'roi_percent' : string,
+      },
+    }
+  >,
+  'web_betting_get_my_bets_paginated' : ActorMethod<
+    [bigint, bigint],
+    {
+      'total' : bigint,
+      'hasMore' : boolean,
+      'bets' : Array<
+        {
+          'status' : string,
+          'token_index' : bigint,
+          'amount_e8s' : bigint,
+          'amount_icp' : string,
+          'race_id' : bigint,
+          'bet_id' : bigint,
+          'timestamp' : bigint,
+          'bet_type' : string,
+          'payout' : [] | [
+            {
+              'payout_e8s' : bigint,
+              'payout_icp' : string,
+              'roi_percent' : string,
+            }
+          ],
+        }
+      >,
+      'summary' : {
+        'pending' : bigint,
+        'net_profit_icp' : string,
+        'wins' : bigint,
+        'losses' : bigint,
+        'win_rate_percent' : string,
+        'total_bets' : bigint,
+        'total_wagered_icp' : string,
+        'total_won_icp' : string,
+        'roi_percent' : string,
       },
     }
   >,

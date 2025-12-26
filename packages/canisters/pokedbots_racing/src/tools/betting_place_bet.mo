@@ -21,7 +21,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "betting_place_bet";
     title = ?"Place Bet on Race";
-    description = ?"Place a bet on a PokedBot in an upcoming race. Bets are paid via ICRC-2 approval (same approval as race entry fees). You can bet on Win (1st place), Place (top 3), or Show (top 5).\n\n**BET TYPES:**\n• Win: Bot finishes 1st place (higher payout, higher risk)\n• Place: Bot finishes in top 3 (medium payout, medium risk)\n• Show: Bot finishes in top 5 (lower payout, lower risk)\n\n**BETTING LIMITS:**\n• Minimum bet: 1 ICP per bet\n• Maximum bet: 100 ICP per bet\n• Maximum total: 100 ICP per race (across all bet types)\n\n**BETTING WINDOW:**\n• Opens when race registration closes (1 hour before race)\n• Closes when race starts\n• Check pool status before betting\n\n**PAYOUT SYSTEM:**\n• Pari-mutuel: Pool-based betting with proportional payouts\n• 10% rake: 8% added to race prize pool, 2% to platform\n• Automatic payouts: Winners receive ICP automatically after race settlement\n• Live odds: View current odds with betting_get_pool_info\n\n**REQUIREMENTS:**\n• Must approve racing canister for ICP transfers (ICRC-2)\n• Same approval covers both racing entry fees and betting\n• Bot must be entered in the race\n• Pool must be open for betting";
+    description = ?"Place a bet on a PokedBot in an upcoming race. Bets are paid via ICRC-2 approval (same approval as race entry fees). You can bet on Win (1st place), Place (top 3), or Show (top 5).\n\n**BET TYPES:**\n• Win: Bot finishes 1st place (higher payout, higher risk)\n• Place: Bot finishes in top 3 (medium payout, medium risk)\n• Show: Bot finishes in top 5 (lower payout, lower risk)\n\n**BETTING LIMITS:**\n• Minimum bet: 0.01 ICP per bet\n• Maximum bet: 100 ICP per bet\n• Maximum total: 100 ICP per race (across all bet types)\n\n**BETTING WINDOW:**\n• Opens when race registration closes (1 hour before race)\n• Closes when race starts\n• Check pool status before betting\n\n**PAYOUT SYSTEM:**\n• Pari-mutuel: Pool-based betting with proportional payouts\n• 10% rake: 8% added to race prize pool, 2% to platform\n• Automatic payouts: Winners receive ICP automatically after race settlement\n• Live odds: View current odds with betting_get_pool_info\n\n**REQUIREMENTS:**\n• Must approve racing canister for ICP transfers (ICRC-2)\n• Same approval covers both racing entry fees and betting\n• Bot must be entered in the race\n• Pool must be open for betting";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -31,7 +31,7 @@ module {
           ("race_id", Json.obj([("type", Json.str("number")), ("description", Json.str("The race ID to bet on"))])),
           ("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("The bot's token index to bet on"))])),
           ("bet_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Win"), Json.str("Place"), Json.str("Show")])), ("description", Json.str("Bet type: Win (1st), Place (top 3), or Show (top 5)"))])),
-          ("amount_icp", Json.obj([("type", Json.str("number")), ("description", Json.str("Amount to bet in ICP (e.g., 1.5 for 1.5 ICP). Min 1, max 100."))])),
+          ("amount_icp", Json.obj([("type", Json.str("number")), ("description", Json.str("Amount to bet in ICP (e.g., 0.5 for 0.5 ICP). Min 0.01, max 100."))])),
         ]),
       ),
       ("required", Json.arr([Json.str("race_id"), Json.str("token_index"), Json.str("bet_type"), Json.str("amount_icp")])),
@@ -92,8 +92,8 @@ module {
       };
 
       // Convert ICP to e8s
-      if (amountIcp < 1.0) {
-        return ToolContext.makeError("Minimum bet is 1 ICP", cb);
+      if (amountIcp < 0.01) {
+        return ToolContext.makeError("Minimum bet is 0.01 ICP", cb);
       };
       if (amountIcp > 100.0) {
         return ToolContext.makeError("Maximum bet is 100 ICP", cb);
@@ -102,9 +102,9 @@ module {
       let amountE8s = Int.abs(Float.toInt(amountIcp * 100_000_000.0));
 
       // Validate amount limits BEFORE any transfer
-      if (amountE8s < 100_000_000) {
-        // 1 ICP minimum
-        return ToolContext.makeError("Minimum bet is 1 ICP", cb);
+      if (amountE8s < 1_000_000) {
+        // 0.01 ICP minimum
+        return ToolContext.makeError("Minimum bet is 0.01 ICP", cb);
       };
       if (amountE8s > 10_000_000_000) {
         // 100 ICP maximum

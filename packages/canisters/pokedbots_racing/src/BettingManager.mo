@@ -40,7 +40,7 @@ module {
   private let RAKE_PERCENT : Float = 0.10; // 10% rake
   private let RACING_RAKE_SHARE : Float = 0.80; // 80% of rake to racing (8% of total)
   private let PLATFORM_RAKE_SHARE : Float = 0.20; // 20% of rake to platform (2% of total)
-  private let MIN_BET : Nat = 100_000_000; // 1 ICP (e8s)
+  private let MIN_BET : Nat = 1_000_000; // 0.01 ICP (e8s)
   private let MAX_BET : Nat = 10_000_000_000; // 100 ICP (e8s)
   private let MAX_BET_PER_RACE : Nat = 10_000_000_000; // 100 ICP total per user per race
   private let ICP_TRANSFER_FEE : Nat = 10_000; // 0.0001 ICP (e8s)
@@ -243,7 +243,7 @@ module {
 
       // Validate amount
       if (amount < MIN_BET) {
-        return #err("Minimum bet is 1 ICP");
+        return #err("Minimum bet is 0.01 ICP");
       };
       if (amount > MAX_BET) {
         return #err("Maximum bet is 100 ICP");
@@ -718,6 +718,39 @@ module {
       };
     };
 
+    public func getUserBetsPaginated(userId : Principal, limit : Nat, offset : Nat) : {
+      bets : [Bet];
+      hasMore : Bool;
+      total : Nat;
+    } {
+      let betIds = Option.get(Map.get(userBets, phash, userId), []);
+      let userBetsArray = Array.mapFilter<Nat, Bet>(
+        betIds,
+        func(id) {
+          Map.get(bets, nhash, id);
+        },
+      );
+
+      let sorted = Array.sort<Bet>(
+        userBetsArray,
+        func(a, b) { Int.compare(b.timestamp, a.timestamp) },
+      );
+
+      let total = sorted.size();
+      let endIndex = Nat.min(offset + limit, total);
+      let hasMore = endIndex < total;
+
+      if (offset >= total) {
+        { bets = []; hasMore = false; total = total };
+      } else {
+        let pageBets = Array.tabulate<Bet>(
+          endIndex - offset,
+          func(i) { sorted[offset + i] },
+        );
+        { bets = pageBets; hasMore = hasMore; total = total };
+      };
+    };
+
     public func getUserStats(userId : Principal) : ?UserBettingStats {
       Map.get(userStats, phash, userId);
     };
@@ -728,6 +761,23 @@ module {
 
     public func setNextBetId(id : Nat) {
       nextBetId := id;
+    };
+
+    // Public getters for maps (needed for paginated endpoint)
+    public func getUserBetsMap() : Map.Map<Principal, [Nat]> {
+      userBets;
+    };
+
+    public func getBetsMap() : Map.Map<Nat, Bet> {
+      bets;
+    };
+
+    public func getPrincipalHash() : Map.HashUtils<Principal> {
+      phash;
+    };
+
+    public func getNatHash() : Map.HashUtils<Nat> {
+      nhash;
     };
   };
 };

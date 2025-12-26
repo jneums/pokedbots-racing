@@ -1533,18 +1533,15 @@ module {
     // ===== UPGRADE SYSTEM V2 RNG MECHANICS =====
 
     /// Calculate base success rate based on attempt number
-    /// Success rate decreases: 85% → 15% for attempts 1-15, then drops to 1% at +20
+    /// Success rate decreases smoothly: 85% (first upgrade) → 1% (at 15 upgrades), then stays at 1%
     private func calculateBaseSuccessRate(attemptNumber : Nat) : Float {
       if (attemptNumber <= 15) {
-        // Linear decrease from 85% to 15% over first 15 attempts
-        let baseRate = 85.0 - (Float.fromInt(attemptNumber) * 4.67);
-        Float.max(15.0, baseRate);
+        // Linear decrease from 85% to 1% over 15 attempts: 85 - (attemptNumber * 5.6)
+        let baseRate = 85.0 - (Float.fromInt(attemptNumber) * 5.6);
+        Float.max(1.0, baseRate);
       } else {
-        // Harsh drop after +15: 15% at +15, 8% at +16, 4% at +17, 2% at +18, 1% at +19+
-        let beyondFifteen = attemptNumber - 15;
-        if (beyondFifteen == 1) { 8.0 } else if (beyondFifteen == 2) { 4.0 } else if (beyondFifteen == 3) {
-          2.0;
-        } else { 1.0 }; // 1% at +19 and beyond (soft cap)
+        // Stay at 1% after 15 upgrades (soft cap)
+        1.0;
       };
     };
 

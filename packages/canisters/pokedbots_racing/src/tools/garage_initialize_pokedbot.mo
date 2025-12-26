@@ -22,7 +22,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_initialize_pokedbot";
     title = ?"Register PokedBot Racing License";
-    description = ?"Register your PokedBot for a wasteland racing license (0.1 ICP registration fee, one-time). Reveals faction and racing stats based on NFT traits. Race brackets are determined by overall rating (average of max stats): 50+ = SilentKlan, 40-49 = Elite, 30-39 = Raider, 20-29 = Junker, 0-19 = Scrap. Starting ELO (1100-1900) represents racing skill within your bracket. Required before entering races. Requires ICRC-2 approval.\n\nUse help_get_compendium tool to see all faction bonuses and mechanics.";
+    description = ?"Register your PokedBot for a wasteland racing license (0.1 ICP registration fee, one-time). Reveals faction and racing stats based on NFT traits.\n\n**RACE CLASS BRACKETS (Determined by RATING only):**\nRating = average of 4 max stats (Speed/PowerCore/Accel/Stability)\n• 50+ = SilentKlan\n• 40-49 = Elite  \n• 30-39 = Raider\n• 20-29 = Junker\n• 0-19 = Scrap\n\n**IMPORTANT:** Race class eligibility is based ONLY on rating (stat average), NOT ELO.\nELO (1100-1900) is assigned for matchmaking within your class but does NOT determine which races you can enter.\n\nRequired before entering races. Requires ICRC-2 approval. Use help_get_compendium tool for faction bonuses.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

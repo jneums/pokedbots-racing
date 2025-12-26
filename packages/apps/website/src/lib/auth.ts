@@ -226,10 +226,24 @@ export class AuthService {
       throw new Error('Plug wallet not available');
     }
 
-    // Not connected, request connection with host parameter
-    const connected = await window.ic.plug.requestConnect({ whitelist, host: this.host });
-    if (!connected) {
-      throw new Error('User denied Plug wallet connection');
+    // Check if already connected (e.g., user just unlocked Plug)
+    let isConnected = false;
+    try {
+      isConnected = await window.ic.plug.isConnected({ host: this.host });
+    } catch (error) {
+      console.log('Error checking Plug connection:', error);
+    }
+
+    // Only request connection if not already connected
+    if (!isConnected) {
+      const connected = await window.ic.plug.requestConnect({ whitelist, host: this.host });
+      if (!connected) {
+        throw new Error('User denied Plug wallet connection');
+      }
+    } else {
+      console.log('Plug already connected, creating agent...');
+      // Ensure agent is created even if already connected
+      await window.ic.plug.createAgent({ whitelist, host: this.host });
     }
   
 

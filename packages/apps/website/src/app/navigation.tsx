@@ -43,6 +43,9 @@ export default function Navigation() {
             <Link to="/leaderboard" className={linkClass('/leaderboard')}>
               Leaderboard
             </Link>
+            <Link to="/betting" className={linkClass('/betting')}>
+              Betting
+            </Link>
             <Link to="/garage" className={linkClass('/garage')}>
               Garage
             </Link>
@@ -95,6 +98,13 @@ export default function Navigation() {
                     onClick={() => setIsOpen(false)}
                   >
                     Leaderboard
+                  </Link>
+                  <Link 
+                    to="/betting" 
+                    className={mobileLinkClass('/betting')}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Betting
                   </Link>
                   <Link 
                     to="/garage" 

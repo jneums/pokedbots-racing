@@ -271,3 +271,32 @@ module {
     };
   };
 };
+                  ("message", Json.str("🏁 **RACE ENTRY CONFIRMED**")),
+                  ("race_id", Json.int(raceId)),
+                  ("race_name", Json.str(race.name)),
+                  ("race_class", Json.str(classText)),
+                  ("your_position", Json.int(updatedRace.entries.size())),
+                  ("total_entries", Json.int(updatedRace.entries.size())),
+                  ("max_entries", Json.int(race.maxEntries)),
+                  ("entry_fee_paid_icp", Json.str(Text.concat("0.", Nat.toText(race.entryFee / 100000)))),
+                  ("current_prize_pool_icp", Json.str(Text.concat("0.", Nat.toText((updatedRace.prizePool + updatedRace.platformBonus) / 100000)))),
+                  ("starts_in_hours", Json.int(hoursUntilStart)),
+                  ("starts_in_minutes", Json.int(minutesUntilStart)),
+                  ("battery_remaining", Json.int(botStats.battery)),
+                  ("wasteland_message", Json.str(wastelandMsg)),
+                ]);
+
+                ToolContext.makeSuccess(response, cb);
+              };
+              case (null) {
+                return ToolContext.makeError("Failed to enter race - bot may already be entered, race may be full, or entry deadline has passed", cb);
+              };
+            };
+          };
+        };
+      } catch (e) {
+        return ToolContext.makeError("Payment failed: " # Error.message(e), cb);
+      };
+    };
+  };
+};

@@ -70,7 +70,7 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
   const { mutate: placeBet, isPending: isPlacingBet } = usePlaceBet();
   const [selectedBot, setSelectedBot] = useState<number | null>(null);
   const [betType, setBetType] = useState<BetType>('Win');
-  const [amount, setAmount] = useState('1.0');
+  const [amount, setAmount] = useState('0.1');
 
   // Backend returns array or object, normalize it
   const poolInfo = Array.isArray(poolInfoRaw) ? poolInfoRaw[0] : poolInfoRaw;
@@ -148,8 +148,8 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
     }
 
     const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum < 1 || amountNum > 100) {
-      toast.error('Bet amount must be between 1 and 100 ICP');
+    if (isNaN(amountNum) || amountNum < 0.01 || amountNum > 100) {
+      toast.error('Bet amount must be between 0.01 and 100 ICP');
       return;
     }
 
@@ -163,7 +163,7 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
       {
         onSuccess: (result) => {
           toast.success(result.message);
-          setAmount('1.0');
+          setAmount('0.1');
           setSelectedBot(null);
         },
         onError: (error: any) => {
@@ -293,15 +293,32 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
                   <label className="text-sm font-medium">Bet Amount (ICP)</label>
                   <Input
                     type="number"
-                    min="1"
+                    min="0.01"
                     max="100"
-                    step="0.1"
+                    step="0.01"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    placeholder="1.0 - 100.0"
+                    placeholder="0.01 - 100.0"
                   />
+                  
+                  {/* Quick Amount Buttons */}
+                  <div className="flex gap-2 flex-wrap">
+                    {[0.25, 0.5, 1, 5, 10].map((amt) => (
+                      <Button
+                        key={amt}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAmount(amt.toString())}
+                        className="flex-1 min-w-[60px]"
+                      >
+                        {amt} ICP
+                      </Button>
+                    ))}
+                  </div>
+                  
                   <p className="text-xs text-muted-foreground">
-                    Minimum: 1 ICP • Maximum: 100 ICP per bet
+                    Minimum: 0.01 ICP • Maximum: 100 ICP per bet
                   </p>
                 </div>
 
