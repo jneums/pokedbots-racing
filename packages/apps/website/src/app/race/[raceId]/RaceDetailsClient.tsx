@@ -34,6 +34,7 @@ function formatDate(timestamp: bigint): string {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZoneName: 'short',
   });
 }
 
@@ -58,7 +59,12 @@ function getTrackName(trackId: number): string {
     "Highway of the Dead",
     "Wasteland Gauntlet",
     "Junkyard Sprint",
-    "Metal Mesa Run"
+    "Metal Mesa Loop",
+    "Dune Runner",
+    "Rust Belt Rally",
+    "Debris Field Dash",
+    "Velocity Viaduct",
+    "Sandstorm Circuit"
   ];
   return trackNames[trackId] || trackNames[0];
 }
@@ -165,7 +171,7 @@ function RacePlayback3DWrapper({ race }: { race: any }) {
   );
 }
 
-function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrain, botOrder, raceStartTime, raceStatus }: {
+function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrain, botOrder, raceStartTime, raceStatus, onRaceWatched, events }: {
   results: any[];
   trackSeed: bigint;
   trackId: number;
@@ -174,6 +180,8 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
   botOrder?: string[];
   raceStartTime?: bigint;
   raceStatus?: any;
+  onRaceWatched?: () => void;
+  events?: any[];
 }) {
   const botProfiles = results.map(r => {
     // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -222,6 +230,8 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
       raceStartTime={raceStartTime}
       raceStatus={raceStatus}
       bonusesAlreadyApplied={true}
+      onRaceWatched={onRaceWatched}
+      events={events}
     />
   );
 }
@@ -234,6 +244,7 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
   const enterRaceMutation = useEnterRace();
   const [showEnterDialog, setShowEnterDialog] = useState(false);
   const [selectedBotIndex, setSelectedBotIndex] = useState<string>('');
+  const [hasWatchedRace, setHasWatchedRace] = useState(false);
 
   if (!race) {
     return (
@@ -251,6 +262,14 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
   const now = Date.now();
   const entryDeadlinePassed = Number(race.entryDeadline) / 1_000_000 < now;
   const canEnter = isAuthenticated && isUpcoming && !isFull && !entryDeadlinePassed;
+
+  // Check if race is in "live view" period (within 15 minutes of start time)
+  const isInLiveViewPeriod = race.startTime && (
+    (now * 1_000_000) - Number(race.startTime) < (15 * 60 * 1_000_000_000)
+  ) && ('InProgress' in race.status || 'Completed' in race.status);
+
+  // Show results only if: not in live view period OR user has watched the race
+  const canShowResults = !isInLiveViewPeriod || hasWatchedRace;
 
   const userEnteredBots = race.entries
     .filter((entry: any) => entry.owner.toString() === user?.principal)
@@ -550,6 +569,8 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
                         botOrder={race.entries.map((entry: any) => entry.nftId)}
                         raceStartTime={race.startTime}
                         raceStatus={race.status}
+                        onRaceWatched={() => setHasWatchedRace(true)}
+                        events={(race as any).events || []}
                       />
                     </TabsContent>
                     <TabsContent value="3d">
@@ -559,7 +580,7 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
                 </div>
               )}
 
-              {race.results && race.results.length > 0 && race.results[0] && 'Completed' in race.status && (() => {
+              {canShowResults && race.results && race.results.length > 0 && race.results[0] && 'Completed' in race.status && (() => {
                 const finalResults = race.results[0];
                 const allFinishers = finalResults.filter((result: any) => result.finalTime && result.finalTime < 100000);
                 return allFinishers.length > 0 && (

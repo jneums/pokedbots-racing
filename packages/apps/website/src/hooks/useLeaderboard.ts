@@ -19,11 +19,11 @@ export type FactionType = PokedBotsRacing.FactionType;
 /**
  * React Query hook to fetch a specific leaderboard.
  */
-export const useGetLeaderboard = (lbType: LeaderboardType, limit?: number) => {
+export const useGetLeaderboard = (lbType: LeaderboardType, limit?: number, bracket?: PokedBotsRacing.RaceClass) => {
   return useQuery<LeaderboardEntry[]>({
-    queryKey: ['leaderboard', lbType, limit],
+    queryKey: ['leaderboard', lbType, limit, bracket],
     queryFn: async () => {
-      return getLeaderboard(lbType, limit);
+      return getLeaderboard(lbType, limit, bracket);
     },
   });
 };
@@ -31,11 +31,11 @@ export const useGetLeaderboard = (lbType: LeaderboardType, limit?: number) => {
 /**
  * React Query hook to fetch the monthly leaderboard.
  */
-export const useGetMonthlyLeaderboard = (limit?: number) => {
+export const useGetMonthlyLeaderboard = (limit?: number, bracket?: PokedBotsRacing.RaceClass) => {
   return useQuery<LeaderboardEntry[]>({
-    queryKey: ['leaderboard', 'monthly', limit],
+    queryKey: ['leaderboard', 'monthly', limit, bracket],
     queryFn: async () => {
-      return getMonthlyLeaderboard(limit);
+      return getMonthlyLeaderboard(limit, bracket);
     },
   });
 };
@@ -43,11 +43,11 @@ export const useGetMonthlyLeaderboard = (limit?: number) => {
 /**
  * React Query hook to fetch the season leaderboard.
  */
-export const useGetSeasonLeaderboard = (limit?: number) => {
+export const useGetSeasonLeaderboard = (limit?: number, bracket?: PokedBotsRacing.RaceClass) => {
   return useQuery<LeaderboardEntry[]>({
-    queryKey: ['leaderboard', 'season', limit],
+    queryKey: ['leaderboard', 'season', limit, bracket],
     queryFn: async () => {
-      return getSeasonLeaderboard(limit);
+      return getSeasonLeaderboard(limit, bracket);
     },
   });
 };
@@ -55,11 +55,11 @@ export const useGetSeasonLeaderboard = (limit?: number) => {
 /**
  * React Query hook to fetch the all-time leaderboard.
  */
-export const useGetAllTimeLeaderboard = (limit?: number) => {
+export const useGetAllTimeLeaderboard = (limit?: number, bracket?: PokedBotsRacing.RaceClass) => {
   return useQuery<LeaderboardEntry[]>({
-    queryKey: ['leaderboard', 'alltime', limit],
+    queryKey: ['leaderboard', 'alltime', limit, bracket],
     queryFn: async () => {
-      return getAllTimeLeaderboard(limit);
+      return getAllTimeLeaderboard(limit, bracket);
     },
   });
 };
@@ -67,11 +67,11 @@ export const useGetAllTimeLeaderboard = (limit?: number) => {
 /**
  * React Query hook to fetch a faction leaderboard.
  */
-export const useGetFactionLeaderboard = (faction: FactionType, limit?: number) => {
+export const useGetFactionLeaderboard = (faction: FactionType, limit?: number, bracket?: PokedBotsRacing.RaceClass) => {
   return useQuery<LeaderboardEntry[]>({
-    queryKey: ['leaderboard', 'faction', faction, limit],
+    queryKey: ['leaderboard', 'faction', faction, limit, bracket],
     queryFn: async () => {
-      return getFactionLeaderboard(faction, limit);
+      return getFactionLeaderboard(faction, limit, bracket);
     },
   });
 };

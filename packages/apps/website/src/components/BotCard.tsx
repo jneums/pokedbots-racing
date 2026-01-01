@@ -15,7 +15,7 @@ import { Label } from './ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
-import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus } from '../lib/utils';
+import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus, getFactionSpecialTerrain } from '../lib/utils';
 
 interface BotCardProps {
   bot: BotListItem;
@@ -46,7 +46,7 @@ function formatRelativeTime(timestampNanos: bigint): string {
   const targetMs = Number(timestampNanos) / 1_000_000;
   const diffMs = targetMs - now;
   
-  if (diffMs < 0) return 'starting soon';
+  if (diffMs < 0) return 'closed';
   
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -595,13 +595,16 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
           </div>
           <div className="flex items-center gap-1 text-xs flex-wrap">
             <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400 px-2 py-0">
-              {getTerrainIcon(getTerrainPreference(backgroundColor, getFactionName(stats.faction)))} {getTerrainName(getTerrainPreference(backgroundColor, getFactionName(stats.faction)))} 
-              {(() => {
-                const terrain = getTerrainPreference(backgroundColor, getFactionName(stats.faction));
-                const bonus = getFactionTerrainBonus(getFactionName(stats.faction), terrain);
-                return bonus ? ` (${bonus})` : ' (+5%)';
-              })()}
+              {getTerrainIcon(getTerrainPreference(backgroundColor, getFactionName(stats.faction)))} {getTerrainName(getTerrainPreference(backgroundColor, getFactionName(stats.faction)))} (+5%)
             </Badge>
+            {(() => {
+              const factionTerrain = getFactionSpecialTerrain(getFactionName(stats.faction));
+              return factionTerrain ? (
+                <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400 px-2 py-0">
+                  {getTerrainIcon(factionTerrain.terrain)} {getTerrainName(factionTerrain.terrain)} ({factionTerrain.bonus})
+                </Badge>
+              ) : null;
+            })()}
             <Badge variant="outline" className="border-blue-500/50 text-blue-600 dark:text-blue-400 px-2 py-0">
               ⚡ {getFactionBonus(getFactionName(stats.faction))}
             </Badge>
@@ -627,7 +630,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
         {/* Overcharge Status - Always visible to encourage usage */}
         {(() => {
           const overcharge = Number(stats.overcharge);
-          const maxOvercharge = 40;
+          const maxOvercharge = 60;
           const percentOfMax = Math.round((overcharge / maxOvercharge) * 100);
           
           return (
@@ -662,8 +665,8 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 <div className="text-xs space-y-0.5">
                   <p className="text-muted-foreground">Next race boost:</p>
                   <div className="flex justify-between">
-                    <span className="text-green-600">+{(overcharge * 0.3).toFixed(1)}% Speed/Accel</span>
-                    <span className="text-red-600">-{(overcharge * 0.2).toFixed(1)}% Power/Stab</span>
+                    <span className="text-green-600">+{(overcharge * 0.15).toFixed(1)}% Speed/Accel</span>
+                    <span className="text-red-600">-{(overcharge * 0.1).toFixed(1)}% Power/Stab</span>
                   </div>
                 </div>
               ) : (
@@ -893,10 +896,10 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 </div>
           
                 {/* Full Maintenance Button */}
-                {(Number(stats.battery) < 100 || Number(stats.condition) < 100) && !bot.activeMission && (
+                {!bot.activeMission && (
                   <Button
                     onClick={handleFullMaintenance}
-                    disabled={loading || recharging || repairing || rechargeCooldown || repairCooldown}
+                    disabled={loading || recharging || repairing || rechargeCooldown || repairCooldown || (Number(stats.battery) >= 100 || Number(stats.condition) >= 100)}
                     size="sm"
                     variant="secondary"
                     className="w-full"
@@ -1314,10 +1317,10 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                           to={`/race/${race.raceId}`}
                           className="text-xs text-foreground hover:text-primary transition-colors block truncate font-medium"
                         >
-                          {race.name}
+                          {getTerrainIcon(race.terrain)} {race.name}
                         </Link>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>Cutoff: {formatRelativeTime(race.entryDeadline)}</span>
+                          <span>Entry Closes: {formatRelativeTime(race.entryDeadline)}</span>
                           <span>•</span>
                           <span>{Number(race.entryFee) / 100_000_000} ICP</span>
                         </div>
@@ -1357,10 +1360,10 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                             to={`/race/${race.raceId}`}
                             className="text-xs text-foreground hover:text-primary transition-colors block truncate"
                           >
-                            {race.name}
+                            {getTerrainIcon(race.terrain)} {race.name}
                           </Link>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>Cutoff: {formatRelativeTime(race.entryDeadline)}</span>
+                            <span>Entry Closes: {formatRelativeTime(race.entryDeadline)}</span>
                             <span>•</span>
                             <span>{Number(race.entryFee) / 100_000_000} ICP</span>
                           </div>
@@ -1423,8 +1426,6 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
             Number(stats.accelerationUpgrades || 0) > 0 ||
             Number(stats.stabilityUpgrades || 0) > 0
           );
-          const respecCount = Number(stats.respecCount || 0);
-          const respecCost = respecCount + 1;
 
           return hasUpgrades && !bot.activeMission && !bot.activeUpgrade && (
             <Button
@@ -1434,7 +1435,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
               variant="destructive"
               className="w-full"
             >
-              🔧 Strip Bot ({respecCost} ICP)
+              {loading ? '🔧 Stripping...' : '🔧 Strip Bot (1 ICP)'}
             </Button>
           );
         })()}
@@ -1658,7 +1659,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Battery per Hour:</span>
-                      <span>~20</span>
+                      <span>~40</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Condition per Hour:</span>
@@ -1905,8 +1906,6 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 
                 {bot.stats && (() => {
                   const stats = bot.stats as any;
-                  const respecCount = Number(stats.respecCount || 0);
-                  const respecCost = respecCount + 1;
                   const speedUp = Number(stats.speedUpgrades || 0);
                   const powerUp = Number(stats.powerCoreUpgrades || 0);
                   const accelUp = Number(stats.accelerationUpgrades || 0);
@@ -1915,7 +1914,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                   return (
                     <>
                       <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg space-y-1 text-sm">
-                        <p className="font-semibold text-destructive">Cost: {respecCost} ICP</p>
+                        <p className="font-semibold text-destructive">Cost: 1 ICP</p>
                         <p className="text-muted-foreground">Current Upgrades:</p>
                         <div className="grid grid-cols-2 gap-1 text-xs">
                           <span>⚡ Speed: +{speedUp}</span>
@@ -1931,7 +1930,6 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                         <p className="text-green-600">✓ Refund 60% of parts invested</p>
                         <p className="text-destructive">✗ All stat bonuses reset to 0</p>
                         <p className="text-destructive">✗ Bot will drop to lower race class</p>
-                        <p className="text-muted-foreground">⚠️ Cost increases: next strip = {respecCost + 1} ICP</p>
                       </div>
                     </>
                   );

@@ -1,5 +1,5 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { browseMarketplace, purchaseBot, type BrowseMarketplaceParams } from '@pokedbots-racing/ic-js';
+import { browseMarketplace, browseAllBots, purchaseBot, type BrowseMarketplaceParams } from '@pokedbots-racing/ic-js';
 import { useAuth } from './useAuth';
 import { AnonymousIdentity } from '@dfinity/agent';
 
@@ -24,19 +24,30 @@ export function useMarketplace(params: BrowseMarketplaceParams = {}) {
 /**
  * Hook for infinite scrolling marketplace listings
  * Works for both authenticated and anonymous users
+ * Can show either listed bots only or all bots in collection
  */
-export function useInfiniteMarketplace(params: Omit<BrowseMarketplaceParams, 'after'> = {}) {
+export function useInfiniteMarketplace(params: Omit<BrowseMarketplaceParams, 'after'> & { showAllBots?: boolean } = {}) {
   const { user } = useAuth();
+  const { showAllBots, ...marketplaceParams } = params;
 
   return useInfiniteQuery({
-    queryKey: ['marketplace-infinite', params],
+    queryKey: ['marketplace-infinite', showAllBots, marketplaceParams],
     queryFn: async ({ pageParam }) => {
       // Use authenticated agent if available, otherwise use anonymous identity
       const identityOrAgent = user?.agent || new AnonymousIdentity();
-      return browseMarketplace(identityOrAgent as any, {
-        ...params,
-        after: pageParam,
-      });
+      
+      // Choose which API to call based on showAllBots flag
+      if (showAllBots) {
+        return browseAllBots(identityOrAgent as any, {
+          ...marketplaceParams,
+          after: pageParam,
+        });
+      } else {
+        return browseMarketplace(identityOrAgent as any, {
+          ...marketplaceParams,
+          after: pageParam,
+        });
+      }
     },
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => {

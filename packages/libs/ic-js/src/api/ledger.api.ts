@@ -43,6 +43,12 @@ async function createLedgerActor(identityOrAgent?: IdentityOrAgent): Promise<ICP
       return cachedPlugLedgerActor;
     }
     
+    // Check if Plug is still connected before calling createActor (which can trigger popup)
+    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
+    if (!isConnected) {
+      throw new Error('Plug session expired. Please reconnect.');
+    }
+    
     // Create new actor and cache it
     const newActor = await (globalThis as any).window.ic.plug.createActor({
       canisterId: ICP_LEDGER_CANISTER_ID,

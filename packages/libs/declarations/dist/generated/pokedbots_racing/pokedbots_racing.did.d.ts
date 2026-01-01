@@ -242,7 +242,7 @@ export interface McpServer {
         'owner' : [] | [Principal],
         'isInitialized' : boolean,
         'name' : [] | [string],
-        'eloRating' : bigint,
+        'eloRating' : [] | [bigint],
         'stats' : {
           'stability' : bigint,
           'speed' : bigint,
@@ -250,15 +250,15 @@ export interface McpServer {
           'acceleration' : bigint,
           'powerCore' : bigint,
         },
-        'preferredTerrain' : Terrain,
-        'faction' : FactionType,
+        'preferredTerrain' : [] | [Terrain],
+        'faction' : [] | [FactionType],
         'career' : {
           'wins' : bigint,
           'podiums' : bigint,
           'racesEntered' : bigint,
           'totalEarnings' : bigint,
         },
-        'raceClass' : RaceClass,
+        'raceClass' : [] | [RaceClass],
       }
     ]
   >,
@@ -333,8 +333,46 @@ export interface McpServer {
     [] | [ReconstitutionTrace]
   >,
   'get_leaderboard' : ActorMethod<
-    [LeaderboardType, bigint],
+    [LeaderboardType, bigint, [] | [RaceClass]],
     Array<LeaderboardEntry>
+  >,
+  'get_marketplace_bots_enriched' : ActorMethod<
+    [Uint32Array | number[]],
+    Array<
+      {
+        'tokenIndex' : number,
+        'isInitialized' : boolean,
+        'racingStats' : [] | [
+          {
+            'baseAcceleration' : bigint,
+            'places' : bigint,
+            'currentStability' : bigint,
+            'wins' : bigint,
+            'baseStability' : bigint,
+            'shows' : bigint,
+            'overallRating' : bigint,
+            'currentPowerCore' : bigint,
+            'baseSpeed' : bigint,
+            'baseRating' : bigint,
+            'basePowerCore' : bigint,
+            'currentRating' : bigint,
+            'racesEntered' : bigint,
+            'faction' : string,
+            'currentSpeed' : bigint,
+            'currentAcceleration' : bigint,
+            'battery' : bigint,
+            'winRate' : number,
+            'condition' : bigint,
+          }
+        ],
+        'baseStats' : {
+          'stability' : bigint,
+          'speed' : bigint,
+          'acceleration' : bigint,
+          'powerCore' : bigint,
+        },
+      }
+    >
   >,
   'get_my_ranking' : ActorMethod<
     [LeaderboardType, bigint],
@@ -538,39 +576,9 @@ export interface McpServer {
     [bigint, bigint, BetType, bigint],
     Result_4
   >,
-  'web_browse_marketplace' : ActorMethod<
-    [
-      [] | [bigint],
-      [] | [bigint],
-      [] | [number],
-      [] | [string],
-      [] | [string],
-      [] | [boolean],
-      [] | [bigint],
-    ],
-    {
-      'hasMore' : boolean,
-      'listings' : Array<
-        {
-          'baseAcceleration' : bigint,
-          'tokenIndex' : bigint,
-          'isInitialized' : boolean,
-          'wins' : bigint,
-          'baseStability' : bigint,
-          'imageUrl' : string,
-          'overallRating' : bigint,
-          'baseSpeed' : bigint,
-          'basePowerCore' : bigint,
-          'racesEntered' : bigint,
-          'faction' : [] | [string],
-          'price' : number,
-          'winRate' : number,
-        }
-      >,
-    }
-  >,
   'web_cancel_upgrade' : ActorMethod<[bigint], Result_1>,
   'web_complete_scavenging' : ActorMethod<[bigint], Result_1>,
+  'web_convert_parts' : ActorMethod<[string, string, bigint], Result_1>,
   'web_enter_race' : ActorMethod<[bigint, bigint], Result_1>,
   'web_get_bot_details' : ActorMethod<[bigint], Result_3>,
   'web_get_bot_details_batch' : ActorMethod<
@@ -879,7 +887,8 @@ export type Result_2 = {
 export type Result_3 = {
     'ok' : {
       'activeUpgrade' : [] | [UpgradeSession],
-      'stats' : PokedBotRacingStats,
+      'isInitialized' : boolean,
+      'stats' : [] | [PokedBotRacingStats],
       'baseStats' : {
         'stability' : bigint,
         'speed' : bigint,
@@ -887,14 +896,16 @@ export type Result_3 = {
         'powerCore' : bigint,
       },
       'isOwner' : boolean,
-      'currentBattery' : bigint,
-      'upgradeCosts' : {
-        'Gyro' : { 'icp' : bigint, 'parts' : bigint },
-        'PowerCore' : { 'icp' : bigint, 'parts' : bigint },
-        'Thruster' : { 'icp' : bigint, 'parts' : bigint },
-        'Velocity' : { 'icp' : bigint, 'parts' : bigint },
-      },
-      'currentCondition' : bigint,
+      'currentBattery' : [] | [bigint],
+      'upgradeCosts' : [] | [
+        {
+          'Gyro' : { 'icp' : bigint, 'parts' : bigint },
+          'PowerCore' : { 'icp' : bigint, 'parts' : bigint },
+          'Thruster' : { 'icp' : bigint, 'parts' : bigint },
+          'Velocity' : { 'icp' : bigint, 'parts' : bigint },
+        }
+      ],
+      'currentCondition' : [] | [bigint],
     }
   } |
   { 'err' : string };

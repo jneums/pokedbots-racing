@@ -29,6 +29,7 @@ function formatDate(timestamp: bigint): string {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZoneName: 'short',
   });
 }
 
@@ -53,7 +54,12 @@ function getTrackName(trackId: number): string {
     "Highway of the Dead",
     "Wasteland Gauntlet",
     "Junkyard Sprint",
-    "Metal Mesa Run"
+    "Metal Mesa Loop",
+    "Dune Runner",
+    "Rust Belt Rally",
+    "Debris Field Dash",
+    "Velocity Viaduct",
+    "Sandstorm Circuit"
   ];
   return trackNames[trackId] || trackNames[0];
 }
@@ -68,7 +74,7 @@ function BotName({ tokenIndex }: { tokenIndex: number }) {
   return <>PokedBot #{tokenIndex}</>;
 }
 
-function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrain, botOrder, raceStartTime, raceStatus }: {
+function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrain, botOrder, raceStartTime, raceStatus, events }: {
   results: any[];
   trackSeed: bigint;
   trackId: number;
@@ -77,6 +83,7 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
   botOrder?: string[];
   raceStartTime?: bigint;
   raceStatus?: any;
+  events?: any[];
 }) {
   // Fetch bot profiles for faction and preferredTerrain (not in stats snapshot)
   const botProfiles = results.map(r => {
@@ -129,6 +136,7 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
       raceStartTime={raceStartTime}
       raceStatus={raceStatus}
       bonusesAlreadyApplied={true}
+      events={events}
     />
   );
 }
@@ -459,6 +467,7 @@ function RaceCard({ raceId }: { raceId: bigint }) {
               botOrder={race.entries.map((entry: any) => entry.nftId)}
               raceStartTime={race.startTime}
               raceStatus={race.status}
+              events={(race as any).events || []}
             />
           </div>
         )}

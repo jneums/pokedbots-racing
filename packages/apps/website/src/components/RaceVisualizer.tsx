@@ -2,8 +2,25 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, RotateCcw, FastForward, SkipForward } from 'lucide-react';
+import { Play, Pause, RotateCcw, FastForward, SkipForward, Radio, PlayCircle, Zap, Trophy, TrendingUp, TrendingDown, Users } from 'lucide-react';
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+
+// Race event types matching backend
+type RaceEventType = 
+  | { Overtake: { overtaker: string; overtaken: string } }
+  | { LeadChange: { newLeader: string; previousLeader: string } }
+  | { LargeGap: { leader: string; gapSeconds: number } }
+  | { CloseRacing: { bots: string[]; gapSeconds: number } }
+  | { ExceptionalPerformance: { bot: string; performancePct: number } }
+  | { PoorPerformance: { bot: string; performancePct: number } }
+  | { SegmentComplete: { segmentIndex: bigint; leader: string } };
+
+interface RaceEvent {
+  eventType: RaceEventType;
+  timestamp: number; // Elapsed race time in seconds
+  segmentIndex: bigint;
+  description: string;
+}
 
 interface RaceResult {
   nftId: string;
@@ -32,6 +49,8 @@ interface RaceVisualizerProps {
   raceStatus?: any; // Race status (InProgress, Completed, etc.)
   bonusesAlreadyApplied?: boolean; // If true, stats already include terrain/faction bonuses (from backend snapshot)
   startAtEnd?: boolean; // Start visualization at the end (for simulator mode)
+  onRaceWatched?: () => void; // Callback when user watches race to completion
+  events?: RaceEvent[]; // Race commentary events
 }
 
 // Helper to extract terrain from variant object or string
@@ -201,8 +220,8 @@ const TRACK_TEMPLATES: Record<number, { segments: TrackSegment[]; laps: number }
       { length: 1000, terrain: 'WastelandSand', angle: 10, difficulty: 1.28 },
       { length: 900, terrain: 'WastelandSand', angle: 8, difficulty: 1.2 },
       { length: 1300, terrain: 'WastelandSand', angle: 0, difficulty: 1.18 },
-      { length: 1200, terrain: 'WastelandSand', angle: -5, difficulty: 1.12 },
-      { length: 1000, terrain: 'WastelandSand', angle: -10, difficulty: 1.08 }
+      { length: 1200, terrain: 'WastelandSand', angle: -15, difficulty: 1.12 },
+      { length: 1000, terrain: 'WastelandSand', angle: -39, difficulty: 1.08 }
     ],
     laps: 1
   },
@@ -217,9 +236,9 @@ const TRACK_TEMPLATES: Record<number, { segments: TrackSegment[]; laps: number }
       { length: 600, terrain: 'MetalRoads', angle: 0, difficulty: 0.9 },
       { length: 550, terrain: 'MetalRoads', angle: 0, difficulty: 0.85 },
       { length: 900, terrain: 'MetalRoads', angle: 0, difficulty: 0.82 },
-      { length: 850, terrain: 'MetalRoads', angle: 0, difficulty: 0.8 },
-      { length: 800, terrain: 'MetalRoads', angle: -3, difficulty: 0.78 },
-      { length: 850, terrain: 'MetalRoads', angle: 0, difficulty: 0.83 }
+      { length: 850, terrain: 'MetalRoads', angle: 3, difficulty: 0.8 },
+      { length: 800, terrain: 'MetalRoads', angle: 0, difficulty: 0.78 },
+      { length: 850, terrain: 'MetalRoads', angle: 3, difficulty: 0.83 }
     ],
     laps: 1
   },
@@ -235,7 +254,7 @@ const TRACK_TEMPLATES: Record<number, { segments: TrackSegment[]; laps: number }
       { length: 280, terrain: 'ScrapHeaps', angle: -15, difficulty: 1.2 },
       { length: 320, terrain: 'ScrapHeaps', angle: -8, difficulty: 1.15 },
       { length: 350, terrain: 'ScrapHeaps', angle: 0, difficulty: 1.28 },
-      { length: 300, terrain: 'ScrapHeaps', angle: 10, difficulty: 1.25 }
+      { length: 300, terrain: 'ScrapHeaps', angle: -40, difficulty: 1.25 }
     ],
     laps: 2
   },
@@ -245,8 +264,8 @@ const TRACK_TEMPLATES: Record<number, { segments: TrackSegment[]; laps: number }
       { length: 250, terrain: 'MetalRoads', angle: 0, difficulty: 0.78 },
       { length: 280, terrain: 'MetalRoads', angle: -5, difficulty: 0.75 },
       { length: 220, terrain: 'MetalRoads', angle: -8, difficulty: 0.72 },
-      { length: 200, terrain: 'MetalRoads', angle: 0, difficulty: 0.85 },
-      { length: 250, terrain: 'MetalRoads', angle: 0, difficulty: 0.82 }
+      { length: 200, terrain: 'MetalRoads', angle: 5, difficulty: 0.85 },
+      { length: 250, terrain: 'MetalRoads', angle: 8, difficulty: 0.82 }
     ],
     laps: 3
   },
@@ -261,7 +280,7 @@ const TRACK_TEMPLATES: Record<number, { segments: TrackSegment[]; laps: number }
       { length: 600, terrain: 'WastelandSand', angle: -6, difficulty: 1.12 },
       { length: 550, terrain: 'WastelandSand', angle: -10, difficulty: 1.08 },
       { length: 500, terrain: 'WastelandSand', angle: -8, difficulty: 1.1 },
-      { length: 600, terrain: 'WastelandSand', angle: 0, difficulty: 1.15 }
+      { length: 600, terrain: 'WastelandSand', angle: -11, difficulty: 1.15 }
     ],
     laps: 2
   }
@@ -674,7 +693,7 @@ function simulateRaceProgression(
   return positions;
 }
 
-export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain, botOrder, isValidating = false, raceStartTime, raceStatus, bonusesAlreadyApplied = false, startAtEnd = false }: RaceVisualizerProps) {
+export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain, botOrder, isValidating = false, raceStartTime, raceStatus, bonusesAlreadyApplied = false, startAtEnd = false, onRaceWatched, events = [] }: RaceVisualizerProps) {
   // Determine if race is currently in progress (live mode)
   // Race is live if status is InProgress
   const isLive = useMemo(() => {
@@ -692,13 +711,13 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     // Check for string key variant
     if ('InProgress' in raceStatus) return true;
     
-    // Check if race started within the last hour (grace period for recently completed races)
+    // Check if race started within the last 15 minutes (grace period for recently completed races)
     if (raceStartTime) {
       const now = Date.now() * 1_000_000;
       const hasStarted = Number(raceStartTime) <= now;
-      const withinGracePeriod = (now - Number(raceStartTime)) < (60 * 60 * 1_000_000_000); // Less than 1 hour ago
+      const withinGracePeriod = (now - Number(raceStartTime)) < (15 * 60 * 1_000_000_000); // Less than 15 minutes ago
       
-      // Show live view if race started and is within 1 hour, even if completed
+      // Show live view if race started and is within 15 minutes, even if completed
       if (hasStarted && withinGracePeriod) {
         return true;
       }
@@ -707,13 +726,34 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     return false;
   }, [raceStatus, raceStartTime, results]);
   
-  const [isPlaying, setIsPlaying] = useState(false); // Start paused - user can manually play
-  const [currentTime, setCurrentTime] = useState(0); // Always start at beginning
+  // Track if user has watched this race (via localStorage)
+  const raceKey = `race_watched_${trackSeed.toString()}`;
+  const raceTimeKey = `race_time_${trackSeed.toString()}`;
+  const hasWatchedBefore = useRef(typeof window !== 'undefined' && localStorage.getItem(raceKey) === 'true');
+  
+  // Load saved playback position from localStorage
+  const savedTime = useMemo(() => {
+    if (typeof window === 'undefined') return 0;
+    const saved = localStorage.getItem(raceTimeKey);
+    return saved ? parseFloat(saved) : 0;
+  }, [raceTimeKey]);
+  
+  // Autoplay if within live window and never watched before
+  const shouldAutoplay = isLive && !hasWatchedBefore.current;
+  
+  const [isPlaying, setIsPlaying] = useState(shouldAutoplay);
+  const [currentTime, setCurrentTime] = useState(savedTime); // Resume from saved position
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [liveMode, setLiveMode] = useState(isLive);
+  const [animationCompleted, setAnimationCompleted] = useState(false); // Track if animation has finished
   const animationRef = useRef<number | undefined>(undefined);
   const lastFrameTimeRef = useRef<number>(0);
   const hasSetFinalPosition = useRef<boolean>(false);
+  
+  // Filter events that should be visible based on current time
+  const visibleEvents = useMemo(() => {
+    return events.filter(event => event.timestamp <= currentTime);
+  }, [events, currentTime]);
   
   // Pre-calculate segment times for all bots (memoized)
   const segmentTimesMap = useMemo(() => {
@@ -804,15 +844,38 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     const wasLive = liveMode;
     setLiveMode(isLive);
     
-    // If transitioning from live to completed, jump to final position
-    if (wasLive && !isLive && maxTime > 0) {
-      setCurrentTime(maxTime);
-      setIsPlaying(false);
+    // If transitioning from live to completed, DON'T jump to end
+    // Let the animation play out naturally
+    if (wasLive && !isLive) {
+      // Just stop auto-playing, but don't skip to end
+      // User can still watch the animation complete
+      console.log('[RaceVisualizer] Race completed, but letting animation finish naturally');
     }
+  }, [isLive, maxTime, raceStartTime, raceKey, onRaceWatched]);
+  
+  // Mark race as watched when user completes watching it
+  useEffect(() => {
+    if (currentTime >= maxTime && currentTime > 0) {
+      setAnimationCompleted(true);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(raceKey, 'true');
+        localStorage.removeItem(raceTimeKey); // Clear saved time when completed
+        if (onRaceWatched) onRaceWatched();
+      }
+    }
+  }, [currentTime, maxTime, raceKey, raceTimeKey, onRaceWatched]);
+  
+  // Save current playback position to localStorage (debounced)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (currentTime <= 0 || currentTime >= maxTime) return; // Don't save at start or end
     
-    // Live races start at beginning, paused - user controls playback
-    // No automatic time adjustment or auto-play
-  }, [isLive, maxTime, raceStartTime]);
+    const timeoutId = setTimeout(() => {
+      localStorage.setItem(raceTimeKey, currentTime.toString());
+    }, 500); // Debounce by 500ms
+    
+    return () => clearTimeout(timeoutId);
+  }, [currentTime, maxTime, raceTimeKey]);
   
   useEffect(() => {
     if (!isPlaying) {
@@ -847,6 +910,10 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
         const newTime = prev + deltaTime;
         if (newTime >= maxTime) {
           setIsPlaying(false);
+          // Trigger callback when race finishes
+          if (onRaceWatched) {
+            onRaceWatched();
+          }
           return maxTime;
         }
         return newTime;
@@ -867,6 +934,10 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
   const handlePlayPause = () => {
     if (currentTime >= maxTime) {
       setCurrentTime(0);
+      setAnimationCompleted(false);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(raceTimeKey); // Clear saved time on replay
+      }
       lastFrameTimeRef.current = 0;
     }
     setIsPlaying(!isPlaying);
@@ -875,6 +946,10 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
   const handleReset = () => {
     setIsPlaying(false);
     setCurrentTime(0);
+    setAnimationCompleted(false);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(raceTimeKey); // Clear saved time on reset
+    }
     lastFrameTimeRef.current = 0;
   };
   
@@ -952,6 +1027,8 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                 variant={liveMode ? "default" : "outline"}
                 size="sm"
                 className="min-w-[4rem]"
+                disabled={liveMode && !hasWatchedBefore.current}
+                title={liveMode && !hasWatchedBefore.current ? "Watch the race first to enable manual controls" : undefined}
               >
                 {liveMode ? '🔴 LIVE' : 'Go Live'}
               </Button>
@@ -1291,8 +1368,73 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
         </div>
         
         {/* Race stats and leaderboard */}
-        <div className="grid grid-cols-1 gap-2 mt-4">
-          <div className="bg-card/50 border border-primary/20 rounded-lg p-3">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 mt-4">
+          {/* Event Feed - Left Column */}
+          {events.length > 0 && (
+            <div className="bg-card/50 border border-primary/20 rounded-lg p-3 lg:col-span-1 max-h-96 overflow-y-auto">
+              <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <Radio className="w-4 h-4" />
+                Race Commentary
+              </h3>
+              <div className="space-y-2">
+                {visibleEvents.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">Race starting...</p>
+                ) : (
+                  // Show most recent events first
+                  [...visibleEvents].reverse().slice(0, 20).map((event, idx) => {
+                    const eventKey = Object.keys(event.eventType)[0];
+                    const eventData = event.eventType[eventKey as keyof typeof event.eventType] as any;
+                    
+                    let icon = <Zap className="w-3 h-3" />;
+                    let colorClass = "text-muted-foreground";
+                    
+                    if ('Overtake' in event.eventType) {
+                      icon = <Users className="w-3 h-3" />;
+                      colorClass = "text-blue-500";
+                    } else if ('LeadChange' in event.eventType) {
+                      icon = <Trophy className="w-3 h-3" />;
+                      colorClass = "text-yellow-500";
+                    } else if ('ExceptionalPerformance' in event.eventType) {
+                      icon = <TrendingUp className="w-3 h-3" />;
+                      colorClass = "text-green-500";
+                    } else if ('PoorPerformance' in event.eventType) {
+                      icon = <TrendingDown className="w-3 h-3" />;
+                      colorClass = "text-red-500";
+                    } else if ('LargeGap' in event.eventType) {
+                      icon = <FastForward className="w-3 h-3" />;
+                      colorClass = "text-purple-500";
+                    } else if ('CloseRacing' in event.eventType) {
+                      icon = <Users className="w-3 h-3" />;
+                      colorClass = "text-orange-500";
+                    }
+                    
+                    return (
+                      <div
+                        key={`${event.timestamp}-${idx}`}
+                        className="flex items-start gap-2 text-xs p-2 rounded bg-card/30 border border-primary/10"
+                        style={{
+                          animation: idx === 0 ? 'fadeIn 0.3s ease-in' : undefined
+                        }}
+                      >
+                        <div className={`mt-0.5 ${colorClass}`}>{icon}</div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {event.timestamp.toFixed(1)}s
+                            </span>
+                          </div>
+                          <p className="text-xs leading-tight">{event.description}</p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Live Positions - Right Column(s) */}
+          <div className={`bg-card/50 border border-primary/20 rounded-lg p-3 ${events.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
             <h3 className="text-sm font-semibold mb-2">Live Positions</h3>
             <div className="space-y-1">
               {/* Sort by current race position (live standings) */}
@@ -1364,8 +1506,8 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
           </div>
         </div>
         
-        {/* Final results summary */}
-        {currentTime >= maxTime && (
+        {/* Final results summary - only show after animation completes */}
+        {animationCompleted && (
           <div className="mt-6 pt-4 border-t border-primary/20">
             <h3 className="text-sm font-semibold mb-3">Final Results:</h3>
             <div className="grid grid-cols-3 gap-2 text-xs">

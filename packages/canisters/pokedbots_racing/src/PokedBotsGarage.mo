@@ -403,13 +403,13 @@ module {
               let current = getCurrentStats(botStats);
               let boosted = applyTerrainBonus(current, botStats.faction, terrain, botStats.condition);
 
-              // Apply preferred terrain bonus (+10% if racing on preferred terrain)
+              // Apply preferred terrain bonus (+5% if racing on preferred terrain)
               let finalStats = if (botStats.preferredTerrain == terrain) {
                 {
-                  speed = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.speed) * 1.10)));
-                  powerCore = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.powerCore) * 1.10)));
-                  acceleration = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.acceleration) * 1.10)));
-                  stability = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.stability) * 1.10)));
+                  speed = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.speed) * 1.05)));
+                  powerCore = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.powerCore) * 1.05)));
+                  acceleration = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.acceleration) * 1.05)));
+                  stability = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.stability) * 1.05)));
                 };
               } else {
                 boosted;
@@ -449,13 +449,13 @@ module {
               // Apply faction terrain bonuses (condition=100 for Golden faction bonus)
               let boosted = applyTerrainBonus(statsAt100, botStats.faction, terrain, 100);
 
-              // Apply preferred terrain bonus (+10% if racing on preferred terrain)
+              // Apply preferred terrain bonus (+5% if racing on preferred terrain)
               let finalStats = if (botStats.preferredTerrain == terrain) {
                 {
-                  speed = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.speed) * 1.10)));
-                  powerCore = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.powerCore) * 1.10)));
-                  acceleration = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.acceleration) * 1.10)));
-                  stability = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.stability) * 1.10)));
+                  speed = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.speed) * 1.05)));
+                  powerCore = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.powerCore) * 1.05)));
+                  acceleration = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.acceleration) * 1.05)));
+                  stability = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.stability) * 1.05)));
                 };
               } else {
                 boosted;
@@ -710,19 +710,14 @@ module {
 
               // Condition wear scales linearly with distance
               // Formula: 1.2 condition per km (e.g., 4km = 4.8, 10km = 12, 20km = 24)
-              // Winners take less damage (better racing line), losers take more
+              // All racers pay the same - position doesn't affect wear
               let baseConditionWear = Float.toInt(Float.fromInt(distance) * 1.2);
-
-              // Position penalty (1st = 0.8x, 2nd = 1.0x, 3rd = 1.2x, 4th+ = 1.4x)
-              let positionMod = if (position == 1) { 0.8 } else if (position == 2) {
-                1.0;
-              } else if (position == 3) { 1.2 } else { 1.4 };
 
               // Terrain modifier already calculated from track composition above
 
               // STAT SCALING: Higher speed/stability = higher condition wear
               // Use same multiplier as battery drain for consistency
-              let totalConditionWear = Float.toInt(Float.fromInt(baseConditionWear) * positionMod * terrainConditionMod * statScalingMultiplier);
+              let totalConditionWear = Float.toInt(Float.fromInt(baseConditionWear) * terrainConditionMod * statScalingMultiplier);
               let finalConditionWear = Nat.min(botStats.condition, Int.abs(totalConditionWear));
 
               // CONSUME overcharge and world buff after race
@@ -1175,35 +1170,9 @@ module {
       };
     };
 
-    /// Apply faction modifier to upgrade gains
-    public func applyFactionModifier(faction : FactionType, baseGain : Nat, seed : Nat32) : Nat {
-      let roll = seed % 100;
-
-      switch (faction) {
-        // Ultra-rare factions: 10% chance (already powerful)
-        case (#UltimateMaster or #Golden or #Ultimate) {
-          if (roll < 10) { baseGain * 2 } else { baseGain };
-        };
-        case (#Wild) {
-          // High variance: -2 to +2
-          let varianceRoll = Nat32.toNat(seed % 5);
-          let variance : Int = varianceRoll - 2;
-          let modified = Int.abs(variance + baseGain);
-          Nat.max(1, modified);
-        };
-        // Super-rare factions: 20% chance
-        case (#Blackhole or #Dead or #Master) {
-          if (roll < 20) { baseGain * 2 } else { baseGain };
-        };
-        // Rare factions: 35% chance (catch-up mechanic)
-        case (#Bee or #Food or #Box or #Murder) {
-          if (roll < 35) { baseGain * 2 } else { baseGain };
-        };
-        // Common factions: 25% chance
-        case (_) {
-          if (roll < 25) { baseGain * 2 } else { baseGain };
-        };
-      };
+    /// Expose hash function for RNG in main.mo
+    public func hashForRNG(n : Nat) : Nat {
+      hashNat(n);
     };
 
     // ===== BATTERY RECHARGE SYSTEM =====
@@ -1501,6 +1470,103 @@ module {
       } else if (currentUpgradeCount == 4) { 2700 } else { 8100 };
     };
 
+    // ===== PARTS CONVERSION =====
+
+    /// Convert parts from one type to another (25% conversion cost)
+    /// Returns #ok on success, #err with error message on failure
+    public func convertParts(
+      user : Principal,
+      fromType : PartType,
+      toType : PartType,
+      amount : Nat,
+    ) : Result.Result<(), Text> {
+      // Can't convert to/from the same type
+      if (fromType == toType) {
+        return #err("Cannot convert parts to the same type");
+      };
+
+      // Can't convert Universal Parts (they already work for anything)
+      if (fromType == #UniversalPart) {
+        return #err("Universal Parts cannot be converted (they work for any upgrade)");
+      };
+
+      if (amount == 0) {
+        return #err("Amount must be greater than 0");
+      };
+
+      let inv = getUserInventory(user);
+
+      // Check if user has enough parts
+      let currentAmount = switch (fromType) {
+        case (#SpeedChip) { inv.speedChips };
+        case (#PowerCoreFragment) { inv.powerCoreFragments };
+        case (#ThrusterKit) { inv.thrusterKits };
+        case (#GyroModule) { inv.gyroModules };
+        case (#UniversalPart) { inv.universalParts };
+      };
+
+      if (currentAmount < amount) {
+        return #err("Insufficient parts");
+      };
+
+      // Calculate conversion with 25% cost (you get 75% of input)
+      let convertedAmount = (amount * 3) / 4;
+      if (convertedAmount == 0) {
+        return #err("Amount too small to convert (need at least 2 parts for 1 output)");
+      };
+
+      // Remove source parts
+      let invAfterRemoval = switch (fromType) {
+        case (#SpeedChip) {
+          { inv with speedChips = inv.speedChips - amount };
+        };
+        case (#PowerCoreFragment) {
+          { inv with powerCoreFragments = inv.powerCoreFragments - amount };
+        };
+        case (#ThrusterKit) {
+          { inv with thrusterKits = inv.thrusterKits - amount };
+        };
+        case (#GyroModule) {
+          { inv with gyroModules = inv.gyroModules - amount };
+        };
+        case (#UniversalPart) {
+          { inv with universalParts = inv.universalParts - amount };
+        };
+      };
+
+      // Add converted parts
+      let finalInv = switch (toType) {
+        case (#SpeedChip) {
+          {
+            invAfterRemoval with speedChips = invAfterRemoval.speedChips + convertedAmount
+          };
+        };
+        case (#PowerCoreFragment) {
+          {
+            invAfterRemoval with powerCoreFragments = invAfterRemoval.powerCoreFragments + convertedAmount;
+          };
+        };
+        case (#ThrusterKit) {
+          {
+            invAfterRemoval with thrusterKits = invAfterRemoval.thrusterKits + convertedAmount;
+          };
+        };
+        case (#GyroModule) {
+          {
+            invAfterRemoval with gyroModules = invAfterRemoval.gyroModules + convertedAmount;
+          };
+        };
+        case (#UniversalPart) {
+          {
+            invAfterRemoval with universalParts = invAfterRemoval.universalParts + convertedAmount;
+          };
+        };
+      };
+
+      ignore Map.put(userInventories, phash, user, finalInv);
+      #ok();
+    };
+
     // ===== STABLE STORAGE =====
 
     public func getStatsMap() : Map.Map<Nat, PokedBotRacingStats> {
@@ -1587,10 +1653,10 @@ module {
 
     // ===== RESPEC SYSTEM =====
 
-    /// Calculate respec cost in e8s based on respec count
-    /// Cost = (respecCount + 1) * 1 ICP
+    /// Calculate respec cost in e8s
+    /// Cost = 1 ICP (flat rate)
     public func calculateRespecCost(respecCount : Nat) : Nat {
-      (respecCount + 1) * 100_000_000; // 1 ICP, 2 ICP, 3 ICP...
+      100_000_000; // 1 ICP flat rate
     };
 
     /// Calculate parts refund for a single stat with 40% penalty (60% returned)
@@ -1799,14 +1865,25 @@ module {
     } {
       switch (faction) {
         // Common factions (no stat bonuses, only cost bonuses)
-        case (#Game or #Animal or #Industrial) {
+        case (#Game or #Industrial) {
           { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
+        };
+        case (#Animal) {
+          if (count >= 16) {
+            { speed = 3; powerCore = 3; acceleration = 3; stability = 3 };
+          } else if (count >= 8) {
+            { speed = 2; powerCore = 2; acceleration = 2; stability = 2 };
+          } else if (count >= 4) {
+            { speed = 1; powerCore = 1; acceleration = 1; stability = 1 };
+          } else {
+            { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
+          };
         };
 
         // Rare factions - stat bonuses at 2/4/6
         case (#Bee) {
           if (count >= 6) {
-            { speed = 10; powerCore = 0; acceleration = 0; stability = 0 };
+            { speed = 8; powerCore = 0; acceleration = 0; stability = 0 };
           } else if (count >= 4) {
             { speed = 6; powerCore = 0; acceleration = 0; stability = 0 };
           } else if (count >= 2) {
@@ -1820,7 +1897,7 @@ module {
         };
         case (#Box) {
           if (count >= 6) {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 10 };
+            { speed = 0; powerCore = 0; acceleration = 0; stability = 8 };
           } else if (count >= 4) {
             { speed = 0; powerCore = 0; acceleration = 0; stability = 6 };
           } else if (count >= 2) {
@@ -1831,7 +1908,7 @@ module {
         };
         case (#Murder) {
           if (count >= 6) {
-            { speed = 0; powerCore = 0; acceleration = 10; stability = 0 };
+            { speed = 0; powerCore = 0; acceleration = 8; stability = 0 };
           } else if (count >= 4) {
             { speed = 0; powerCore = 0; acceleration = 6; stability = 0 };
           } else if (count >= 2) {
@@ -1841,10 +1918,12 @@ module {
           };
         };
 
-        // Super-Rare factions - stat bonuses at 2/4
+        // Super-Rare factions - stat bonuses at 2/4/6
         case (#Blackhole) {
-          if (count >= 4) {
+          if (count >= 6) {
             { speed = 0; powerCore = 10; acceleration = 0; stability = 0 };
+          } else if (count >= 4) {
+            { speed = 0; powerCore = 8; acceleration = 0; stability = 0 };
           } else if (count >= 2) {
             { speed = 0; powerCore = 5; acceleration = 0; stability = 0 };
           } else {
@@ -1855,8 +1934,10 @@ module {
           { speed = 0; powerCore = 0; acceleration = 0; stability = 0 }; // Parts bonus only
         };
         case (#Master) {
-          if (count >= 4) {
-            { speed = 5; powerCore = 5; acceleration = 5; stability = 5 };
+          if (count >= 6) {
+            { speed = 4; powerCore = 4; acceleration = 4; stability = 4 };
+          } else if (count >= 4) {
+            { speed = 3; powerCore = 3; acceleration = 3; stability = 3 };
           } else if (count >= 2) {
             { speed = 2; powerCore = 2; acceleration = 2; stability = 2 };
           } else {
@@ -1867,10 +1948,9 @@ module {
         // Ultra-Rare factions - powerful bonuses at 2/3 or just 1
         case (#Ultimate) {
           if (count >= 3) {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
-          } // Drain bonus only
-          else if (count >= 2) {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
+            { speed = 5; powerCore = 0; acceleration = 5; stability = 0 };
+          } else if (count >= 2) {
+            { speed = 3; powerCore = 0; acceleration = 3; stability = 0 };
           } else {
             { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
           };
@@ -1880,14 +1960,14 @@ module {
         };
         case (#Wild) {
           if (count >= 2) {
-            { speed = 8; powerCore = 8; acceleration = 8; stability = 8 };
+            { speed = 4; powerCore = 4; acceleration = 4; stability = 4 };
           } else {
             { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
           };
         };
         case (#UltimateMaster) {
           if (count >= 1) {
-            { speed = 12; powerCore = 12; acceleration = 12; stability = 12 };
+            { speed = 5; powerCore = 5; acceleration = 5; stability = 5 };
           } else {
             { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
           };
@@ -1952,7 +2032,7 @@ module {
             scavengingParts = 1.0;
             racePrizes = 1.0;
             scavengingDrain = 1.0;
-          }; // World buff bonus (not implemented here)
+          };
         };
         case (#Industrial) {
           if (count >= 6) {
@@ -2033,7 +2113,16 @@ module {
           };
         };
         case (#Dead) {
-          if (count >= 4) {
+          if (count >= 6) {
+            {
+              upgradeCost = 1.0;
+              repairCost = 1.0;
+              rechargeCooldown = 1.0;
+              scavengingParts = 1.45;
+              racePrizes = 1.0;
+              scavengingDrain = 1.0;
+            };
+          } else if (count >= 4) {
             {
               upgradeCost = 1.0;
               repairCost = 1.0;
@@ -2099,7 +2188,7 @@ module {
               repairCost = 1.0;
               rechargeCooldown = 1.0;
               scavengingParts = 1.0;
-              racePrizes = 1.25;
+              racePrizes = 1.15;
               scavengingDrain = 1.0;
             };
           } else if (count >= 2) {
@@ -2108,7 +2197,7 @@ module {
               repairCost = 1.0;
               rechargeCooldown = 1.0;
               scavengingParts = 1.0;
-              racePrizes = 1.08;
+              racePrizes = 1.06;
               scavengingDrain = 1.0;
             };
           } else {
@@ -2213,23 +2302,23 @@ module {
           ];
         };
         case (#AbandonedSettlements) {
-          // 25% universal, more specialized
+          // 40% universal, balanced specialized (same split, more total parts)
           [
-            (#UniversalPart, 0.25),
-            (#SpeedChip, 0.20),
-            (#PowerCoreFragment, 0.20),
-            (#ThrusterKit, 0.20),
+            (#UniversalPart, 0.4),
+            (#SpeedChip, 0.15),
+            (#PowerCoreFragment, 0.15),
+            (#ThrusterKit, 0.15),
             (#GyroModule, 0.15),
           ];
         };
         case (#DeadMachineFields) {
-          // 10% universal, mostly specialized
+          // 40% universal, balanced specialized (same split, most total parts)
           [
-            (#UniversalPart, 0.10),
-            (#SpeedChip, 0.25),
-            (#PowerCoreFragment, 0.25),
-            (#ThrusterKit, 0.20),
-            (#GyroModule, 0.20),
+            (#UniversalPart, 0.4),
+            (#SpeedChip, 0.15),
+            (#PowerCoreFragment, 0.15),
+            (#ThrusterKit, 0.15),
+            (#GyroModule, 0.15),
           ];
         };
         case (#RepairBay) {
@@ -2386,10 +2475,10 @@ module {
         case (#DeadMachineFields) {
           { battery = 3.5; condition = 3.5; parts = 2.5 };
         };
-        // Repair Bay: Same battery drain as safe zone, but restores condition instead of gathering parts
+        // Repair Bay: Double battery drain compared to safe zone, but restores condition instead of gathering parts
         // Negative condition value = restoration instead of loss
         case (#RepairBay) {
-          { battery = 1.0; condition = -3.0; parts = 0.0 };
+          { battery = 2.0; condition = -3.0; parts = 0.0 };
         };
         // Charging Station: No battery drain, restores battery instead
         // Negative battery value = restoration instead of loss
@@ -2641,6 +2730,14 @@ module {
                 0;
               };
 
+              // BATTERY DEPLETION DAMAGE: If battery reaches 0 during scavenging, damage condition
+              // This penalizes letting bots run completely dry - creates strategic tension
+              let batteryDepletionPenalty = if (newBattery == 0 and botStats.battery == 0) {
+                // Bot has been at 0% battery - take 5-10 condition damage per 15min tick
+                let depletionRng = Float.fromInt(hashNat(tokenIndex + Int.abs(now) + 5) % 6); // 0-5
+                Int.abs(Float.toInt(5.0 + depletionRng)); // 5-10 damage
+              } else { 0 };
+
               let conditionFloor = Int.abs(Float.toInt(conditionLossWithVariance));
               let conditionFraction = Float.abs(conditionLossWithVariance) - Float.fromInt(conditionFloor);
               let conditionRng = Float.fromInt(hashNat(tokenIndex + Int.abs(now) + 3) % 100) / 100.0;
@@ -2655,9 +2752,10 @@ module {
                 // Restoration: add condition (capped at 100)
                 Nat.min(100, botStats.condition + conditionChangeRounded);
               } else {
-                // Loss: subtract condition (floored at 0)
-                if (botStats.condition > conditionChangeRounded) {
-                  botStats.condition - conditionChangeRounded;
+                // Loss: subtract condition (floored at 0), plus battery depletion penalty
+                let totalConditionLoss = conditionChangeRounded + batteryDepletionPenalty;
+                if (botStats.condition > totalConditionLoss) {
+                  botStats.condition - totalConditionLoss;
                 } else { 0 };
               };
 
@@ -2691,14 +2789,21 @@ module {
               // Total chance scales with time: hours_elapsed * 8% (capped at 90%)
               // Acceleration stat increases buff chance (at 100 accel: 3.2% instead of 2%)
               // hoursElapsed already calculated above for duration bonus
+              // NOTE: World buffs ONLY available in scavenging zones (not RepairBay/ChargingStation)
               let totalBuffChance = Float.min(90.0, Float.fromInt(hoursElapsed) * 8.0);
               let buffRoll = Float.fromInt((Int.abs(now / 1_000_000) * tokenIndex) % 1000) / 10.0; // 0-100
 
               var newWorldBuff = botStats.worldBuff; // Keep existing buff by default
               var buffMessage = "";
 
+              let isScavengingZone = switch (mission.zone) {
+                case (#RepairBay) { false };
+                case (#ChargingStation) { false };
+                case (_) { true }; // ScrapHeaps, AbandonedSettlements, DeadMachineFields
+              };
+
               let baseBuffChance = 2.0 * accelBuffBonus; // 2% base, up to 3.2% with max accel
-              if (buffRoll < baseBuffChance) {
+              if (isScavengingZone and buffRoll < baseBuffChance) {
                 // Acceleration-modified buff chance
                 // Buff strength scales with hours elapsed
                 let buffStats = if (hoursElapsed <= 3) {

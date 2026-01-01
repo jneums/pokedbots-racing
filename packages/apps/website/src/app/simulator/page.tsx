@@ -60,13 +60,13 @@ function applyFactionBonuses(
     stability: Math.min(100, Math.floor(stats.stability * bonus)),
   };
   
-  // Apply preferred terrain bonus (+10% if racing on preferred terrain)
+  // Apply preferred terrain bonus (+5% if racing on preferred terrain)
   if (preferredTerrain === terrain) {
     return {
-      speed: Math.min(100, Math.floor(boosted.speed * 1.10)),
-      powerCore: Math.min(100, Math.floor(boosted.powerCore * 1.10)),
-      acceleration: Math.min(100, Math.floor(boosted.acceleration * 1.10)),
-      stability: Math.min(100, Math.floor(boosted.stability * 1.10)),
+      speed: Math.min(100, Math.floor(boosted.speed * 1.05)),
+      powerCore: Math.min(100, Math.floor(boosted.powerCore * 1.05)),
+      acceleration: Math.min(100, Math.floor(boosted.acceleration * 1.05)),
+      stability: Math.min(100, Math.floor(boosted.stability * 1.05)),
     };
   }
   
@@ -328,6 +328,11 @@ export default function SimulatorPage() {
         <p className="text-muted-foreground">
           Set up custom races and watch them unfold in real-time with our visualization engine
         </p>
+        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            ℹ️ Simulator shows base stats only. Actual races include: garage stat bonuses, battery/condition penalties, overcharge effects, and world buffs.
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

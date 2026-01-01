@@ -204,24 +204,21 @@ export function ApiKeysManager() {
                       <button
                         onClick={() => toggleRevealKey(key.hashed_key)}
                         className="flex items-center gap-1 hover:text-foreground transition-colors"
+                        title="Key ID (for identification only - not the actual API key)"
                       >
                         {revealedKeys.has(key.hashed_key) ? (
                           <>
                             <EyeOff className="h-3 w-3" />
+                            <span className="mr-1">Key ID:</span>
                             <code className="font-mono">{key.hashed_key}</code>
                           </>
                         ) : (
                           <>
                             <Eye className="h-3 w-3" />
+                            <span className="mr-1">Key ID:</span>
                             <code className="font-mono">{maskKey(key.hashed_key)}</code>
                           </>
                         )}
-                      </button>
-                      <button
-                        onClick={() => copyToClipboard(key.hashed_key, 'Key ID')}
-                        className="hover:text-foreground transition-colors"
-                      >
-                        <Copy className="h-3 w-3" />
                       </button>
                     </div>
                   </div>

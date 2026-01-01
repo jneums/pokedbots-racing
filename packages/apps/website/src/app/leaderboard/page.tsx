@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import {
   useGetMonthlyLeaderboard,
   useGetSeasonLeaderboard,
@@ -12,6 +14,15 @@ import {
 } from "@/hooks/useLeaderboard";
 import { useGetBotProfile } from "@/hooks/useRacing";
 import { generatetokenIdentifier, generateExtThumbnailLink } from "@pokedbots-racing/ic-js";
+import { PokedBotsRacing } from '@pokedbots-racing/declarations';
+
+type BracketType = 'All' | 'SilentKlan' | 'Elite' | 'Raider' | 'Junker' | 'Scrap';
+type RaceClass = PokedBotsRacing.RaceClass;
+
+function bracketToRaceClass(bracket: BracketType): RaceClass | undefined {
+  if (bracket === 'All') return undefined;
+  return { [bracket]: null } as RaceClass;
+}
 
 function formatICP(amount: bigint): string {
   // ICP has 8 decimals (e8s)
@@ -175,9 +186,13 @@ function LeaderboardTable({ entries, type }: { entries: LeaderboardEntry[], type
 }
 
 export default function LeaderboardPage() {
-  const { data: monthlyLeaderboard, isLoading: monthlyLoading } = useGetMonthlyLeaderboard(50);
-  const { data: seasonLeaderboard, isLoading: seasonLoading } = useGetSeasonLeaderboard(50);
-  const { data: allTimeLeaderboard, isLoading: allTimeLoading } = useGetAllTimeLeaderboard(100);
+  const [selectedBracket, setSelectedBracket] = useState<BracketType>('All');
+  
+  const bracket = bracketToRaceClass(selectedBracket);
+  
+  const { data: monthlyLeaderboard, isLoading: monthlyLoading } = useGetMonthlyLeaderboard(50, bracket);
+  const { data: seasonLeaderboard, isLoading: seasonLoading } = useGetSeasonLeaderboard(50, bracket);
+  const { data: allTimeLeaderboard, isLoading: allTimeLoading } = useGetAllTimeLeaderboard(100, bracket);
 
   // Sort leaderboard by wins
   const winsSortedLeaderboard = allTimeLeaderboard ? [...allTimeLeaderboard].sort((a, b) => {
@@ -242,6 +257,28 @@ export default function LeaderboardPage() {
                 <CardDescription>Total Prize Money</CardDescription>
               </CardHeader>
             </Card>
+          </div>
+
+          {/* Bracket Filter Chips */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold mb-3 text-muted-foreground">Filter by Bracket</h3>
+            <div className="flex flex-wrap gap-2">
+              {(['All', 'SilentKlan', 'Elite', 'Raider', 'Junker', 'Scrap'] as BracketType[]).map((bracket) => (
+                <Button
+                  key={bracket}
+                  variant={selectedBracket === bracket ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedBracket(bracket)}
+                  className="font-semibold"
+                >
+                  {bracket === 'All' ? '🌐 All Brackets' : 
+                   bracket === 'SilentKlan' ? '👑 SilentKlan (50+)' :
+                   bracket === 'Elite' ? '⭐ Elite (40-49)' :
+                   bracket === 'Raider' ? '🔥 Raider (30-39)' :
+                   bracket === 'Junker' ? '⚙️ Junker (20-29)' : '🔧 Scrap (0-19)'}
+                </Button>
+              ))}
+            </div>
           </div>
 
           {/* Leaderboard Tabs */}

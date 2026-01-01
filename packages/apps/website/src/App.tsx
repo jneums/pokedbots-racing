@@ -56,21 +56,17 @@ function SessionExpirationHandler() {
   const { isAuthenticated, logout, user } = useAuth();
 
   useEffect(() => {
-    let hasShownExpiration = false;
+    let hasHandledDisconnect = false;
 
-    const showExpirationToast = () => {
-      if (hasShownExpiration) return;
-      hasShownExpiration = true;
+    const handleDisconnect = () => {
+      if (hasHandledDisconnect) return;
+      hasHandledDisconnect = true;
       
-      toast.error('Wallet Session Expired', {
-        description: 'Your Plug wallet session has expired. Please reconnect your wallet.',
-        duration: 10000,
-      });
-
-      // Auto-logout after showing the message
+      // Silently logout without showing toast
+      // User can click Connect Wallet button when ready
       setTimeout(() => {
         logout();
-      }, 500);
+      }, 100);
     };
 
     const handleError = (event: ErrorEvent | PromiseRejectionEvent) => {
@@ -85,7 +81,7 @@ function SessionExpirationHandler() {
          errorMessage.includes('keychain') ||
          errorMessage.includes('session'))
       ) {
-        showExpirationToast();
+        handleDisconnect();
       }
     };
 
@@ -101,7 +97,7 @@ function SessionExpirationHandler() {
          errorMessage.includes('tabMessenger') ||
          errorMessage.includes('keychain'))
       ) {
-        showExpirationToast();
+        handleDisconnect();
       }
       
       // Still call the original console.error
@@ -169,9 +165,6 @@ export default function App() {
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm">
               <Link to="/guides" className="text-muted-foreground hover:text-foreground transition-colors font-medium">
                 Guides
-              </Link>
-              <Link to="/docs" className="text-muted-foreground hover:text-foreground transition-colors font-medium">
-                Docs
               </Link>
               <a 
                 href="https://github.com/jneums/pokedbots-racing" 

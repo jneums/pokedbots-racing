@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useGetBotProfile, useGetBotRaceHistory } from '@/hooks/useRacing';
 import { useBackgrounds } from '@/hooks/useBackgrounds';
 import { generatetokenIdentifier, generateExtThumbnailLink, generateExtAssetLink } from '@pokedbots-racing/ic-js';
-import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus } from '@/lib/utils';
+import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus, getFactionSpecialTerrain } from '@/lib/utils';
 
 function formatICP(amount: bigint): string {
   const icp = Number(amount) / 100_000_000;
@@ -58,12 +58,18 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
   const { data: raceHistory, isLoading: historyLoading } = useGetBotRaceHistory(Number(tokenIndex), 10);
   const { data: backgroundData } = useBackgrounds();
 
-  if (isLoading || !profile) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">
-          {isLoading ? 'Loading bot details...' : 'Bot not found or not initialized for racing'}
-        </p>
+        <p className="text-muted-foreground">Loading bot details...</p>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Bot not found</p>
       </div>
     );
   }
@@ -72,7 +78,12 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
   const imageUrl = generateExtThumbnailLink(tokenId);
   const thumbnailUrl = generateExtThumbnailLink(tokenId);
 
-  const faction = Object.keys(profile.faction)[0];
+  const isInitialized = profile.isInitialized;
+  
+  // Handle Candid optional type: [] | [FactionType]
+  const factionOpt = Array.isArray(profile.faction) && profile.faction.length > 0 ? profile.faction[0] : profile.faction;
+  const faction = factionOpt ? Object.keys(factionOpt)[0] : null;
+  
   const racesEntered = Number(profile.career.racesEntered);
   const wins = Number(profile.career.wins);
   const podiums = Number(profile.career.podiums);
@@ -83,9 +94,10 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
     : '0';
 
   // Get actual background color for terrain preference
+  // For uninitialized bots, this shows estimated preference based on background color
   const backgroundColor = backgroundData?.backgrounds[tokenIndex];
-  const terrainPreference = getTerrainPreference(backgroundColor, faction);
-  const factionTerrainBonus = getFactionTerrainBonus(faction, terrainPreference);
+  const terrainPreference = faction ? getTerrainPreference(backgroundColor, faction) : null;
+  const factionSpecialTerrain = faction ? getFactionSpecialTerrain(faction) : null;
 
   const ownerPrincipal = profile.owner?.toString();
   const formatPrincipal = (principal: string): string => {
@@ -125,39 +137,67 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
               </h1>
               
               <div className="flex gap-2 mb-4 flex-wrap">
-                <Badge className={`bg-gradient-to-r ${getFactionColor(faction)} text-white`}>
+                {/* Show faction badge even for uninitialized bots */}
+                {faction && <Badge className={`bg-gradient-to-r ${getFactionColor(faction)} text-white`}>
                   {faction}
-                </Badge>
-                <Badge variant="outline">{getRaceClassBadge(profile.raceClass)}</Badge>
-                <Badge variant="secondary">Rating: {profile.stats.overallRating}/100</Badge>
-                <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
-                  ⚡ ELO: {profile.eloRating}
-                </Badge>
-                <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400">
-                  {getTerrainIcon(terrainPreference)} {getTerrainName(terrainPreference)} {factionTerrainBonus ? `(${factionTerrainBonus})` : '(+5%)'}
-                </Badge>
-                <Badge variant="outline" className="border-blue-500/50 text-blue-600 dark:text-blue-400">
+                </Badge>}
+                
+                {!isInitialized ? (
+                  <>
+                    <Badge variant="outline" className="border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
+                      ⚠️ Not Initialized
+                    </Badge>
+                    <Badge variant="secondary">Base Rating: {profile.stats.overallRating}/100</Badge>
+                  </>
+                ) : (
+                  <>
+                    {profile.raceClass && <Badge variant="outline">{getRaceClassBadge(profile.raceClass)}</Badge>}
+                    <Badge variant="secondary">Rating: {profile.stats.overallRating}/100</Badge>
+                    {profile.eloRating && <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
+                      ⚡ ELO: {profile.eloRating}
+                    </Badge>}
+                  </>
+                )}
+                
+                {/* Show terrain bonuses for both initialized and uninitialized */}
+                {terrainPreference && <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400">
+                  {getTerrainIcon(terrainPreference)} {getTerrainName(terrainPreference)} (+5%)
+                </Badge>}
+                
+                {factionSpecialTerrain && (
+                  <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
+                    {getTerrainIcon(factionSpecialTerrain.terrain)} {getTerrainName(factionSpecialTerrain.terrain)} ({factionSpecialTerrain.bonus})
+                  </Badge>
+                )}
+                
+                {faction && <Badge variant="outline" className="border-blue-500/50 text-blue-600 dark:text-blue-400">
                   {getFactionBonus(faction)}
-                </Badge>
+                </Badge>}
               </div>
+              
+              {!isInitialized && (
+                <p className="text-sm text-muted-foreground mb-4">
+                  📋 Initialize this bot to unlock racing and upgrades. Registration fee: 0.1 ICP (one-time). This will enable race entries, stat upgrades, and competitive leaderboard tracking.
+                </p>
+              )}
 
               {/* Quick Stats */}
               <div className="grid grid-cols-2 gap-3 mt-6">
                 <div className="p-4 bg-card border-2 border-primary/20 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Races</p>
-                  <p className="text-2xl font-bold text-primary">{racesEntered}</p>
+                  <p className="text-sm text-muted-foreground">{isInitialized ? 'Races' : 'Not Racing Yet'}</p>
+                  <p className="text-2xl font-bold text-primary">{isInitialized ? racesEntered : '-'}</p>
                 </div>
                 <div className="p-4 bg-card border-2 border-primary/20 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Wins</p>
-                  <p className="text-2xl font-bold text-primary">{wins}</p>
+                  <p className="text-sm text-muted-foreground">{isInitialized ? 'Wins' : 'No Wins Yet'}</p>
+                  <p className="text-2xl font-bold text-primary">{isInitialized ? wins : '-'}</p>
                 </div>
                 <div className="p-4 bg-card border-2 border-primary/20 rounded-lg">
                   <p className="text-sm text-muted-foreground">Win Rate</p>
-                  <p className="text-2xl font-bold text-primary">{winRate}%</p>
+                  <p className="text-2xl font-bold text-primary">{isInitialized && racesEntered > 0 ? `${winRate}%` : '-'}</p>
                 </div>
                 <div className="p-4 bg-card border-2 border-primary/20 rounded-lg">
                   <p className="text-sm text-muted-foreground">Earnings</p>
-                  <p className="text-2xl font-bold text-primary">{formatICP(totalEarnings)}</p>
+                  <p className="text-2xl font-bold text-primary">{isInitialized ? formatICP(totalEarnings) : '-'}</p>
                 </div>
               </div>
             </div>
@@ -166,7 +206,12 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
           {/* Stats Card */}
           <Card className="mb-8 border-2 border-primary/20">
             <CardHeader>
-              <CardTitle>Performance Stats</CardTitle>
+              <CardTitle>{isInitialized ? 'Performance Stats' : 'Base Stats'}</CardTitle>
+              {!isInitialized && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  These are the base stats. Initialize this bot to unlock faction bonuses, terrain preferences, and upgrades.
+                </p>
+              )}
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -187,46 +232,65 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
                   <p className="text-3xl font-bold text-primary">{profile.stats.stability}</p>
                 </div>
               </div>
+              {!isInitialized && (
+                <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                    💡 <strong>Tip:</strong> Initialize this bot for racing to unlock its faction abilities, preferred terrain, and upgrade system. Base rating: {profile.stats.overallRating}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {/* Career Stats */}
           <Card className="border-2 border-primary/20">
             <CardHeader>
-              <CardTitle>Career Highlights</CardTitle>
+              <CardTitle>{isInitialized ? 'Career Highlights' : 'Career Information'}</CardTitle>
+              {!isInitialized && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  This bot hasn't raced yet. Initialize to start its racing career!
+                </p>
+              )}
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between p-3 bg-card/50 border border-primary/20 rounded-lg">
-                  <span className="text-muted-foreground">Total Races</span>
-                  <span className="font-bold">{racesEntered}</span>
-                </div>
-                <div className="flex justify-between p-3 bg-card/50 border border-primary/20 rounded-lg">
-                  <span className="text-muted-foreground">🥇 Victories</span>
-                  <span className="font-bold">{wins}</span>
-                </div>
-                <div className="flex justify-between p-3 bg-card/50 border border-primary/20 rounded-lg">
-                  <span className="text-muted-foreground">🏆 Podium Finishes</span>
-                  <span className="font-bold">{podiums}</span>
-                </div>
-                <div className="flex justify-between p-3 bg-card/50 border border-primary/20 rounded-lg">
-                  <span className="text-muted-foreground">💰 Total Earnings</span>
-                  <span className="font-bold">{formatICP(totalEarnings)} ICP</span>
-                </div>
-                {ownerPrincipal && (
-                  <div className="flex justify-between items-center p-3 bg-card/50 border border-primary/20 rounded-lg">
-                    <span className="text-muted-foreground">👤 Registered Owner</span>
-                    <div className="flex items-center gap-2">
-                      <img
-                        src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${ownerPrincipal}`}
-                        alt="Owner avatar"
-                        className="w-6 h-6 rounded-full border border-primary/30"
-                      />
-                      <span className="font-mono text-sm">{formatPrincipal(ownerPrincipal)}</span>
-                    </div>
+              {isInitialized ? (
+                <div className="space-y-3">
+                  <div className="flex justify-between p-3 bg-card/50 border border-primary/20 rounded-lg">
+                    <span className="text-muted-foreground">Total Races</span>
+                    <span className="font-bold">{racesEntered}</span>
                   </div>
-                )}
-              </div>
+                  <div className="flex justify-between p-3 bg-card/50 border border-primary/20 rounded-lg">
+                    <span className="text-muted-foreground">🥇 Victories</span>
+                    <span className="font-bold">{wins}</span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-card/50 border border-primary/20 rounded-lg">
+                    <span className="text-muted-foreground">🏆 Podium Finishes</span>
+                    <span className="font-bold">{podiums}</span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-card/50 border border-primary/20 rounded-lg">
+                    <span className="text-muted-foreground">💰 Total Earnings</span>
+                    <span className="font-bold">{formatICP(totalEarnings)} ICP</span>
+                  </div>
+                  {ownerPrincipal && (
+                    <div className="flex justify-between items-center p-3 bg-card/50 border border-primary/20 rounded-lg">
+                      <span className="text-muted-foreground">👤 Registered Owner</span>
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${ownerPrincipal}`}
+                          alt="Owner avatar"
+                          className="w-6 h-6 rounded-full border border-primary/30"
+                        />
+                        <span className="font-mono text-sm">{formatPrincipal(ownerPrincipal)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p className="mb-2">🏁 No racing history yet</p>
+                  <p className="text-sm">Initialize this bot to start competing in wasteland races!</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -236,7 +300,12 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
               <CardTitle>Race History</CardTitle>
             </CardHeader>
             <CardContent>
-              {historyLoading ? (
+              {!isInitialized ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p className="mb-2">📊 No race data available</p>
+                  <p className="text-sm">This bot needs to be initialized and enter races to build a history.</p>
+                </div>
+              ) : historyLoading ? (
                 <p className="text-center text-muted-foreground">Loading race history...</p>
               ) : !raceHistory || raceHistory.races.length === 0 ? (
                 <p className="text-center text-muted-foreground">No completed races yet</p>

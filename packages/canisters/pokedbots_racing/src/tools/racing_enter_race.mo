@@ -25,7 +25,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_enter_race";
     title = ?"Enter Race";
-    description = ?"Enter your PokedBot in a wasteland race. Pays entry fee via ICRC-2. Bot must meet race class requirements based on overall rating (bracket system). ELO represents skill within bracket. Bots can race while upgrading or scavenging.\n\n**ENTRY FEES:**\n• Entry fees are paid via ICRC-2 approval when you register\n• If a race is cancelled due to insufficient entries, your entry fee will be automatically refunded\n• Refunds are processed shortly after the race is cancelled\n\n**SCAVENGING BOTS:** You can register for races while your bot is on a scavenging mission. When the race starts, your bot will be pulled from the mission with penalties:\n• Partial parts awarded based on progress (with 50% early withdrawal penalty)\n• Condition damage scales with mission type and progress (minimum 50% of full penalty)\n• Penalties applied at race start time, not at registration\n• WARNING: Starting long missions just to pull out early is NOT profitable due to harsh penalties\n\n**RACE COSTS (Applied after completion):**\n• Battery Drain: Base 10-20 (distance) × terrain (1.0-1.2×) × Power Core efficiency × condition penalty\n• Condition Wear: Base 3-7 (distance) × position (0.8-1.4×, winners wear less) × terrain (1.0-1.5×)\n\n**WARNING:** Low battery/condition severely reduces stats and can cause DNF (no prize). Check bot condition before entering.";
+    description = ?"Enter your PokedBot in a wasteland race. Pays entry fee via ICRC-2. Bot must meet race class requirements based on overall rating (bracket system). ELO represents skill within bracket. Bots can race while upgrading or scavenging.\n\n**ENTRY FEES:**\n• Entry fees are paid via ICRC-2 approval when you register\n• If a race is cancelled due to insufficient entries, your entry fee will be automatically refunded\n• Refunds are processed shortly after the race is cancelled\n\n**SCAVENGING BOTS:** You can register for races while your bot is on a scavenging mission. When the race starts, your bot will be pulled from the mission with penalties:\n• Partial parts awarded based on progress (with 50% early withdrawal penalty)\n• Condition damage scales with mission type and progress (minimum 50% of full penalty)\n• Penalties applied at race start time, not at registration\n• WARNING: Starting long missions just to pull out early is NOT profitable due to harsh penalties\n\n**RACE COSTS (Applied after completion):**\n• Battery Drain: Base 10-20 (distance) × terrain (1.0-1.2×) × Power Core efficiency × condition penalty\n• Condition Wear: Base 3-7 (distance) × terrain (1.0-1.5×)\n  - All racers pay the same wear cost regardless of finishing position\n\n**WARNING:** Low battery/condition severely reduces stats and can cause DNF (no prize). Check bot condition before entering.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -242,35 +242,6 @@ module {
                 };
 
                 let response = Json.obj([
-                  ("message", Json.str("🏁 **RACE ENTRY CONFIRMED**")),
-                  ("race_id", Json.int(raceId)),
-                  ("race_name", Json.str(race.name)),
-                  ("race_class", Json.str(classText)),
-                  ("your_position", Json.int(updatedRace.entries.size())),
-                  ("total_entries", Json.int(updatedRace.entries.size())),
-                  ("max_entries", Json.int(race.maxEntries)),
-                  ("entry_fee_paid_icp", Json.str(Text.concat("0.", Nat.toText(race.entryFee / 100000)))),
-                  ("current_prize_pool_icp", Json.str(Text.concat("0.", Nat.toText((updatedRace.prizePool + updatedRace.platformBonus) / 100000)))),
-                  ("starts_in_hours", Json.int(hoursUntilStart)),
-                  ("starts_in_minutes", Json.int(minutesUntilStart)),
-                  ("battery_remaining", Json.int(botStats.battery)),
-                  ("wasteland_message", Json.str(wastelandMsg)),
-                ]);
-
-                ToolContext.makeSuccess(response, cb);
-              };
-              case (null) {
-                return ToolContext.makeError("Failed to enter race - bot may already be entered, race may be full, or entry deadline has passed", cb);
-              };
-            };
-          };
-        };
-      } catch (e) {
-        return ToolContext.makeError("Payment failed: " # Error.message(e), cb);
-      };
-    };
-  };
-};
                   ("message", Json.str("🏁 **RACE ENTRY CONFIRMED**")),
                   ("race_id", Json.int(raceId)),
                   ("race_name", Json.str(race.name)),

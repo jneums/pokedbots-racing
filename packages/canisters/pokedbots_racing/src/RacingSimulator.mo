@@ -100,6 +100,24 @@ module {
     stats : ?RacingStats; // Stats used in the race (for accurate replay)
   };
 
+  /// Race event types for announcer commentary and recaps
+  public type RaceEventType = {
+    #Overtake : { overtaker : Text; overtaken : Text }; // Bot X passes Bot Y
+    #LeadChange : { newLeader : Text; previousLeader : Text }; // New race leader
+    #LargeGap : { leader : Text; gapSeconds : Float }; // Leader pulls away significantly
+    #CloseRacing : { bots : [Text]; gapSeconds : Float }; // Tight battle between bots
+    #ExceptionalPerformance : { bot : Text; performancePct : Float }; // Lucky segment (>103%)
+    #PoorPerformance : { bot : Text; performancePct : Float }; // Unlucky segment (<97%)
+    #SegmentComplete : { segmentIndex : Nat; leader : Text }; // Segment milestone
+  };
+
+  public type RaceEvent = {
+    eventType : RaceEventType;
+    timestamp : Float; // Elapsed race time in seconds
+    segmentIndex : Nat; // Which segment this occurred in
+    description : Text; // Human-readable description
+  };
+
   public type Sponsor = {
     sponsor : Principal;
     amount : Nat;
@@ -125,6 +143,7 @@ module {
     entries : [RaceEntry];
     status : RaceStatus;
     results : ?[RaceResult];
+    events : [RaceEvent]; // Race commentary events
     prizePool : Nat;
     platformTax : Nat; // 5% taken
     platformBonus : Nat; // Platform bonus for Junker/Raider classes
@@ -314,10 +333,15 @@ module {
       { length = 1000; angle = 10; terrain = #WastelandSand; difficulty = 1.28 },
       { length = 900; angle = 8; terrain = #WastelandSand; difficulty = 1.2 },
       { length = 1300; angle = 0; terrain = #WastelandSand; difficulty = 1.18 },
-      { length = 1200; angle = -5; terrain = #WastelandSand; difficulty = 1.12 },
+      {
+        length = 1200;
+        angle = -15;
+        terrain = #WastelandSand;
+        difficulty = 1.12;
+      },
       {
         length = 1000;
-        angle = -10;
+        angle = -39;
         terrain = #WastelandSand;
         difficulty = 1.08;
       },
@@ -342,9 +366,9 @@ module {
       { length = 600; angle = 0; terrain = #MetalRoads; difficulty = 0.9 },
       { length = 550; angle = 0; terrain = #MetalRoads; difficulty = 0.85 },
       { length = 900; angle = 0; terrain = #MetalRoads; difficulty = 0.82 },
-      { length = 850; angle = 0; terrain = #MetalRoads; difficulty = 0.8 },
-      { length = 800; angle = -3; terrain = #MetalRoads; difficulty = 0.78 },
-      { length = 850; angle = 0; terrain = #MetalRoads; difficulty = 0.83 },
+      { length = 850; angle = 3; terrain = #MetalRoads; difficulty = 0.8 },
+      { length = 800; angle = 0; terrain = #MetalRoads; difficulty = 0.78 },
+      { length = 850; angle = 3; terrain = #MetalRoads; difficulty = 0.83 },
     ];
   };
 
@@ -367,7 +391,7 @@ module {
       { length = 280; angle = -15; terrain = #ScrapHeaps; difficulty = 1.2 },
       { length = 320; angle = -8; terrain = #ScrapHeaps; difficulty = 1.15 },
       { length = 350; angle = 0; terrain = #ScrapHeaps; difficulty = 1.28 },
-      { length = 300; angle = 10; terrain = #ScrapHeaps; difficulty = 1.25 },
+      { length = 300; angle = -40; terrain = #ScrapHeaps; difficulty = 1.25 },
     ];
   };
 
@@ -384,8 +408,8 @@ module {
       { length = 250; angle = 0; terrain = #MetalRoads; difficulty = 0.78 },
       { length = 280; angle = -5; terrain = #MetalRoads; difficulty = 0.75 },
       { length = 220; angle = -8; terrain = #MetalRoads; difficulty = 0.72 },
-      { length = 200; angle = 0; terrain = #MetalRoads; difficulty = 0.85 },
-      { length = 250; angle = 0; terrain = #MetalRoads; difficulty = 0.82 },
+      { length = 200; angle = 5; terrain = #MetalRoads; difficulty = 0.85 },
+      { length = 250; angle = 8; terrain = #MetalRoads; difficulty = 0.82 },
     ];
   };
 
@@ -407,7 +431,7 @@ module {
       { length = 600; angle = -6; terrain = #WastelandSand; difficulty = 1.12 },
       { length = 550; angle = -10; terrain = #WastelandSand; difficulty = 1.08 },
       { length = 500; angle = -8; terrain = #WastelandSand; difficulty = 1.1 },
-      { length = 600; angle = 0; terrain = #WastelandSand; difficulty = 1.15 },
+      { length = 600; angle = -11; terrain = #WastelandSand; difficulty = 1.15 },
     ];
   };
 
@@ -573,7 +597,7 @@ module {
     public func simulateRaceSegmented(
       race : Race,
       participants : [RacingParticipant],
-    ) : ?[RaceResult] {
+    ) : ?([RaceResult], [RaceEvent]) {
       if (participants.size() < 2) {
         return null;
       };
@@ -584,7 +608,11 @@ module {
         case (?t) { t };
         case (null) {
           // Fallback to old simulation if track not found
-          return simulateRace(race, participants);
+          let resultsOpt = simulateRace(race, participants);
+          return switch (resultsOpt) {
+            case (?results) { ?(results, []) }; // No events for old simulation
+            case (null) { null };
+          };
         };
       };
 
@@ -594,71 +622,195 @@ module {
         allSegments := Array.append(allSegments, track.segments);
       };
 
-      // Calculate total time for each participant
-      var racerTimes : [(RacingParticipant, Float)] = [];
+      // Track cumulative times for each participant across segments
+      type RacerProgress = {
+        participant : RacingParticipant;
+        var cumulativeTime : Float;
+        var previousDifficulty : Float;
+      };
 
-      for (i in Iter.range(0, participants.size() - 1)) {
-        let participant = participants[i];
+      var racerProgress : [RacerProgress] = [];
+      for (participant in participants.vals()) {
+        racerProgress := Array.append(
+          racerProgress,
+          [{
+            participant = participant;
+            var cumulativeTime = 0.0;
+            var previousDifficulty = 1.0;
+          }],
+        );
+      };
 
-        // Debug logging for first participant
-        if (i == 0) {
-          Debug.print("Backend calculation for participant 0:");
-          Debug.print("  nftId: " # participant.nftId);
-          Debug.print("  speed: " # Nat.toText(participant.stats.speed));
-          Debug.print("  powerCore: " # Nat.toText(participant.stats.powerCore));
-          Debug.print("  acceleration: " # Nat.toText(participant.stats.acceleration));
-          Debug.print("  stability: " # Nat.toText(participant.stats.stability));
-          Debug.print("  trackId: " # Nat.toText(race.trackId));
-          Debug.print("  trackSeed: " # Nat.toText(race.trackSeed));
-          Debug.print("  totalSegments: " # Nat.toText(allSegments.size()));
-          Debug.print("  terrain: " # debug_show (race.terrain));
-        };
+      // Track race events
+      var events : [RaceEvent] = [];
+      var previousLeader : ?Text = null;
 
-        // Calculate time through all segments (no DNF - bots race with whatever stats they have)
-        var totalTime : Float = 0.0;
-        var previousDifficulty : Float = 1.0; // Start with neutral difficulty
+      // Simulate segment by segment
+      for (segmentIdx in Iter.range(0, allSegments.size() - 1)) {
+        let segment = allSegments[segmentIdx];
 
-        for (segmentIdx in Iter.range(0, allSegments.size() - 1)) {
-          let segment = allSegments[segmentIdx];
-          // Use trackSeed + participant index + segment index for deterministic randomness
+        // Calculate segment times for all participants
+        for (i in Iter.range(0, racerProgress.size() - 1)) {
+          let racer = racerProgress[i];
           let segmentSeed = race.trackSeed + (i * 1000) + segmentIdx;
 
           // Calculate base segment time
-          let baseSegmentTime = calculateSegmentTime(segment, participant.stats, segmentSeed, previousDifficulty);
+          let baseSegmentTime = calculateSegmentTime(
+            segment,
+            racer.participant.stats,
+            segmentSeed,
+            racer.previousDifficulty,
+          );
 
-          // Per-segment performance variation (driver errors, debris, wind, etc.)
-          // Each bot experiences different micro-conditions on each segment
+          // Per-segment performance variation
           let lap = segmentIdx / track.segments.size();
           let segmentConditionSeed = ((segmentSeed * 31337 + i * 7919 + lap * 12345) % 1000);
-          let segmentPerformance = 0.94 + (Float.fromInt(segmentConditionSeed) / 1666.67); // 0.94 to 1.06 (±6%)
+          let segmentPerformance = 0.94 + (Float.fromInt(segmentConditionSeed) / 1666.67); // 0.94 to 1.06
 
           let segmentTime = baseSegmentTime * segmentPerformance;
-          totalTime += segmentTime;
+          racer.cumulativeTime += segmentTime;
+          racer.previousDifficulty := segment.difficulty;
 
-          // Debug first 3 segments for participant 0
-          if (i == 0 and segmentIdx < 3) {
-            Debug.print("  Segment " # Nat.toText(segmentIdx) # ": baseTime=" # Float.toText(baseSegmentTime) # ", perf=" # Float.toText(segmentPerformance) # ", finalTime=" # Float.toText(segmentTime));
+          // Check for exceptional/poor performance (>103% or <97% of expected)
+          if (segmentPerformance > 1.03) {
+            let performancePct = (segmentPerformance - 1.0) * 100.0;
+            events := Array.append(
+              events,
+              [{
+                eventType = #ExceptionalPerformance {
+                  bot = racer.participant.nftId;
+                  performancePct = performancePct;
+                };
+                timestamp = racer.cumulativeTime;
+                segmentIndex = segmentIdx;
+                description = "Bot " # racer.participant.nftId # " nails the perfect line! (+" # Float.toText(performancePct) # "%)";
+              }],
+            );
+          } else if (segmentPerformance < 0.97) {
+            let performancePct = (1.0 - segmentPerformance) * 100.0;
+            events := Array.append(
+              events,
+              [{
+                eventType = #PoorPerformance {
+                  bot = racer.participant.nftId;
+                  performancePct = performancePct;
+                };
+                timestamp = racer.cumulativeTime;
+                segmentIndex = segmentIdx;
+                description = "Bot " # racer.participant.nftId # " struggles through this section! (-" # Float.toText(performancePct) # "%)";
+              }],
+            );
+          };
+        };
+
+        // Sort by cumulative time to determine current positions
+        let currentStandings = Array.sort<RacerProgress>(
+          racerProgress,
+          func(a, b) { Float.compare(a.cumulativeTime, b.cumulativeTime) },
+        );
+
+        // Detect lead changes
+        let currentLeader = currentStandings[0].participant.nftId;
+        switch (previousLeader) {
+          case (?prevLeader) {
+            if (currentLeader != prevLeader) {
+              events := Array.append(
+                events,
+                [{
+                  eventType = #LeadChange {
+                    newLeader = currentLeader;
+                    previousLeader = prevLeader;
+                  };
+                  timestamp = currentStandings[0].cumulativeTime;
+                  segmentIndex = segmentIdx;
+                  description = "Bot " # currentLeader # " takes the lead from Bot " # prevLeader # "!";
+                }],
+              );
+            };
+          };
+          case (null) {
+            // First segment leader
+            events := Array.append(
+              events,
+              [{
+                eventType = #LeadChange {
+                  newLeader = currentLeader;
+                  previousLeader = "none";
+                };
+                timestamp = currentStandings[0].cumulativeTime;
+                segmentIndex = segmentIdx;
+                description = "Bot " # currentLeader # " takes the early lead!";
+              }],
+            );
+          };
+        };
+        previousLeader := ?currentLeader;
+
+        // Check for large gaps (>10 seconds ahead of 2nd place)
+        if (currentStandings.size() >= 2) {
+          let gap = currentStandings[1].cumulativeTime - currentStandings[0].cumulativeTime;
+          if (gap > 10.0 and segmentIdx % 5 == 0) {
+            // Report every 5 segments if gap persists
+            events := Array.append(
+              events,
+              [{
+                eventType = #LargeGap {
+                  leader = currentLeader;
+                  gapSeconds = gap;
+                };
+                timestamp = currentStandings[0].cumulativeTime;
+                segmentIndex = segmentIdx;
+                description = "Bot " # currentLeader # " has pulled " # Float.toText(gap) # " seconds ahead!";
+              }],
+            );
           };
 
-          // Update previous difficulty for next segment
-          previousDifficulty := segment.difficulty;
+          // Check for close racing (within 2 seconds)
+          if (gap < 2.0) {
+            events := Array.append(
+              events,
+              [{
+                eventType = #CloseRacing {
+                  bots = [currentStandings[0].participant.nftId, currentStandings[1].participant.nftId];
+                  gapSeconds = gap;
+                };
+                timestamp = currentStandings[0].cumulativeTime;
+                segmentIndex = segmentIdx;
+                description = "Intense battle! Bot " # currentStandings[0].participant.nftId # " and Bot " # currentStandings[1].participant.nftId # " separated by just " # Float.toText(gap) # " seconds!";
+              }],
+            );
+          };
         };
 
-        // Debug logging for first participant
-        if (i == 0) {
-          Debug.print("Backend final time for participant 0: " # Float.toText(totalTime));
+        // Milestone events (every 10 segments or end of lap)
+        if ((segmentIdx + 1) % 10 == 0 or (segmentIdx + 1) % track.segments.size() == 0) {
+          events := Array.append(
+            events,
+            [{
+              eventType = #SegmentComplete {
+                segmentIndex = segmentIdx;
+                leader = currentLeader;
+              };
+              timestamp = currentStandings[0].cumulativeTime;
+              segmentIndex = segmentIdx;
+              description = if ((segmentIdx + 1) % track.segments.size() == 0) {
+                let lap = ((segmentIdx + 1) / track.segments.size());
+                "Lap " # Nat.toText(lap) # " complete! Bot " # currentLeader # " leads!";
+              } else {
+                "Segment " # Nat.toText(segmentIdx + 1) # " complete, Bot " # currentLeader # " in front";
+              };
+            }],
+          );
         };
-
-        racerTimes := Array.append(racerTimes, [(participant, totalTime)]);
       };
 
-      // Sort by time
-      let sorted = Array.sort<(RacingParticipant, Float)>(
-        racerTimes,
-        func(a, b) { Float.compare(a.1, b.1) },
+      // Final sort by total time
+      let finalStandings = Array.sort<RacerProgress>(
+        racerProgress,
+        func(a, b) { Float.compare(a.cumulativeTime, b.cumulativeTime) },
       );
 
-      // Calculate prizes (include platform bonus + entry fees + sponsorships - tax)
+      // Calculate prizes
       var totalSponsorships : Nat = 0;
       for (sponsor in race.sponsors.vals()) {
         totalSponsorships += sponsor.amount;
@@ -667,38 +819,36 @@ module {
       let netPrizePool = Nat.sub(totalPool, race.platformTax);
       var results : [RaceResult] = [];
 
-      // Add finishers with prizes
-      // Prize distribution curve: ensures top 3 profit, 4th breaks even
-      // Linear progression from 1st (45%) to 4th (9%)
-      for (i in Iter.range(0, sorted.size() - 1)) {
-        let (participant, time) = sorted[i];
+      for (i in Iter.range(0, finalStandings.size() - 1)) {
+        let racer = finalStandings[i];
         let position = i + 1;
 
         let prize = if (position == 1) {
-          (netPrizePool * 45) / 100; // 45%
+          (netPrizePool * 45) / 100;
         } else if (position == 2) {
-          (netPrizePool * 28) / 100; // 28%
+          (netPrizePool * 28) / 100;
         } else if (position == 3) {
-          (netPrizePool * 18) / 100; // 18%
+          (netPrizePool * 18) / 100;
         } else if (position == 4) {
-          (netPrizePool * 9) / 100; // 9%
+          (netPrizePool * 9) / 100;
         } else {
           0;
         };
 
-        let result : RaceResult = {
-          nftId = participant.nftId;
-          owner = participant.owner;
-          position = position;
-          finalTime = time;
-          prizeAmount = prize;
-          stats = ?participant.stats; // Store stats used in the race
-        };
-
-        results := Array.append(results, [result]);
+        results := Array.append(
+          results,
+          [{
+            nftId = racer.participant.nftId;
+            owner = racer.participant.owner;
+            position = position;
+            finalTime = racer.cumulativeTime;
+            prizeAmount = prize;
+            stats = ?racer.participant.stats;
+          }],
+        );
       };
 
-      ?results;
+      ?(results, events);
     };
 
     /// Simulate a race and return results (OLD METHOD - kept for backward compatibility)
@@ -888,6 +1038,7 @@ module {
         entries = [];
         status = #Upcoming;
         results = null;
+        events = []; // Race commentary events
         prizePool = 0;
         platformTax = 0;
         platformBonus = platformBonus;
@@ -934,6 +1085,7 @@ module {
             entries = race.entries;
             status = race.status;
             results = race.results;
+            events = race.events;
             prizePool = race.prizePool;
             platformTax = race.platformTax;
             platformBonus = race.platformBonus;
@@ -1102,12 +1254,13 @@ module {
     };
 
     /// Set race results
-    public func setRaceResults(raceId : Nat, results : [RaceResult]) : ?Race {
+    public func setRaceResults(raceId : Nat, results : [RaceResult], events : [RaceEvent]) : ?Race {
       switch (getRace(raceId)) {
         case (?race) {
           let updatedRace = {
             race with
             results = ?results;
+            events = events;
             // Don't change status here - race is still InProgress until handleRaceFinish
           };
           ignore Map.put(races, nhash, raceId, updatedRace);

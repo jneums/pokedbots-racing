@@ -91,19 +91,51 @@ export class AuthService {
     // If last provider was Plug, try to restore Plug session
     if (storedProvider === 'plug' && window.ic?.plug) {
       try {
-        // Only check once during initialization
-        const isConnected = await window.ic.plug.isConnected({ host: this.host });
-        if (isConnected && window.ic.plug.agent) {
-          const agent = window.ic.plug.agent;
-          const principal = await agent.getPrincipal();
-          
-          this.currentUser = {
-            principal: principal.toText(),
-            agent: agent,
-            provider: 'plug',
-          };
-          console.log('[Auth] Restored Plug session:', this.currentUser.principal);
+        const whitelist = [
+          'bzsui-sqaaa-aaaah-qce2a-cai', // NFT canister
+          'p6nop-vyaaa-aaaai-q4djq-cai', // Racing canister
+          'ryjl3-tyaaa-aaaaa-aaaba-cai' // ICP Ledger canister
+        ];
+        
+        // Only check connection status during initialization
+        // Note: isConnected should not trigger popup, but if disconnected we silently clear storage
+        let isConnected = false;
+        try {
+          isConnected = await window.ic.plug.isConnected({ host: this.host });
+        } catch (error) {
+          // If isConnected fails (e.g., Plug locked/disconnected), silently clear storage
+          console.log('[Auth] Plug isConnected check failed, clearing storage:', error);
+          this.clearStorage();
           return;
+        }
+        
+        if (isConnected) {
+          // Use existing agent without recreating (createAgent can trigger popup)
+          const agent = window.ic.plug.agent;
+          if (!agent) {
+            console.log('[Auth] Plug connected but no agent available, clearing storage');
+            this.clearStorage();
+            return;
+          }
+          
+          try {
+            const principal = await agent.getPrincipal();
+            this.currentUser = {
+              principal: principal.toText(),
+              agent: agent,
+              provider: 'plug',
+            };
+            console.log('[Auth] Restored Plug session:', this.currentUser.principal);
+            return;
+          } catch (error) {
+            console.log('[Auth] Failed to get principal from Plug agent:', error);
+            this.clearStorage();
+            return;
+          }
+        } else {
+          // Plug says not connected, clear storage
+          console.log('[Auth] Plug not connected, clearing storage');
+          this.clearStorage();
         }
       } catch (error) {
         console.log('[Auth] Failed to restore Plug session:', error);

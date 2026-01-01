@@ -70,22 +70,10 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
   const { mutate: placeBet, isPending: isPlacingBet } = usePlaceBet();
   const [selectedBot, setSelectedBot] = useState<number | null>(null);
   const [betType, setBetType] = useState<BetType>('Win');
-  const [amount, setAmount] = useState('0.1');
+  const [pendingBets, setPendingBets] = useState<Set<number>>(new Set());
 
   // Backend returns array or object, normalize it
   const poolInfo = Array.isArray(poolInfoRaw) ? poolInfoRaw[0] : poolInfoRaw;
-
-  // Debug logging
-  console.log('BettingInterface - raceId:', raceId);
-  console.log('BettingInterface - isLoading:', isLoading);
-  console.log('BettingInterface - error:', error);
-  console.log('BettingInterface - poolInfoRaw:', poolInfoRaw);
-  console.log('BettingInterface - poolInfo:', poolInfo);
-  console.log('BettingInterface - poolInfo.betIds:', poolInfo?.betIds);
-  console.log('BettingInterface - poolInfo.betIds.length:', poolInfo?.betIds?.length);
-  console.log('BettingInterface - poolInfo.entrants:', poolInfo?.entrants);
-  console.log('BettingInterface - poolInfo.entrants.length:', poolInfo?.entrants?.length);
-  console.log('BettingInterface - poolInfo.totalPooled:', poolInfo?.totalPooled);
 
   // Extract status string from Motoko variant format
   const getStatusString = (status: any): string => {
@@ -141,33 +129,44 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
   }) || [];
   const betsCount = poolInfo?.betIds?.length || 0;
 
-  const handlePlaceBet = async () => {
+  const handlePlaceBet = (betAmount: number) => {
     if (!selectedBot) {
       toast.error('Please select a bot to bet on');
       return;
     }
 
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum < 0.01 || amountNum > 100) {
-      toast.error('Bet amount must be between 0.01 and 100 ICP');
+    if (isNaN(betAmount) || betAmount < 0.1 || betAmount > 100) {
+      toast.error('Bet amount must be between 0.1 and 100 ICP');
       return;
     }
 
+    // Track pending bet for visual feedback
+    setPendingBets(prev => new Set(prev).add(betAmount));
+
+    // Fire and forget - don't await result for quick spam betting
     placeBet(
       {
         race_id: raceId,
         token_index: selectedBot,
         bet_type: betType,
-        amount_icp: amountNum,
+        amount_icp: betAmount,
       },
       {
         onSuccess: (result) => {
           toast.success(result.message);
-          setAmount('0.1');
-          setSelectedBot(null);
+          setPendingBets(prev => {
+            const next = new Set(prev);
+            next.delete(betAmount);
+            return next;
+          });
         },
         onError: (error: any) => {
           toast.error(error.message || 'Failed to place bet');
+          setPendingBets(prev => {
+            const next = new Set(prev);
+            next.delete(betAmount);
+            return next;
+          });
         },
       }
     );
@@ -285,61 +284,44 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
               </TabsContent>
             </Tabs>
 
-            {/* Only show bet amount and button if race is Open */}
+            {/* Only show bet buttons if race is Open */}
             {isOpen && (
               <>
-                {/* Bet Amount */}
-                <div className="space-y-2">
+                {/* Quick Bet Buttons */}
+                <div className="space-y-4">
                   <label className="text-sm font-medium">Bet Amount (ICP)</label>
-                  <Input
-                    type="number"
-                    min="0.01"
-                    max="100"
-                    step="0.01"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.01 - 100.0"
-                  />
-                  
-                  {/* Quick Amount Buttons */}
-                  <div className="flex gap-2 flex-wrap">
-                    {[0.25, 0.5, 1, 5, 10].map((amt) => (
+                  <div className="flex gap-3 flex-wrap">
+                    {[0.1, 0.5, 1, 2, 5].map((amt) => (
                       <Button
                         key={amt}
                         type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAmount(amt.toString())}
-                        className="flex-1 min-w-[60px]"
+                        variant={pendingBets.has(amt) ? "default" : "outline"}
+                        size="lg"
+                        onClick={() => handlePlaceBet(amt)}
+                        disabled={!selectedBot || !isAuthenticated || pendingBets.has(amt)}
+                        className="flex-1 min-w-[80px]"
                       >
-                        {amt} ICP
+                        {pendingBets.has(amt) ? (
+                          <>
+                            <span className="animate-pulse">⏳</span> {amt} ICP
+                          </>
+                        ) : (
+                          <>{amt} ICP</>
+                        )}
                       </Button>
                     ))}
                   </div>
-                  
-                  <p className="text-xs text-muted-foreground">
-                    Minimum: 0.01 ICP • Maximum: 100 ICP per bet
-                  </p>
                 </div>
 
-                {/* Place Bet Button */}
-                {!isAuthenticated ? (
+                {!isAuthenticated && (
                   <Button className="w-full" asChild>
                     <Link to="/wallet">Connect Wallet to Bet</Link>
                   </Button>
-                ) : (
-                  <Button
-                    className="w-full"
-                    onClick={handlePlaceBet}
-                    disabled={!selectedBot || isPlacingBet}
-                  >
-                    {isPlacingBet ? 'Placing Bet...' : `Place ${amount} ICP Bet`}
-                  </Button>
                 )}
 
-                {selectedBot && (
+                {selectedBot && isAuthenticated && (
                   <div className="text-sm text-center text-muted-foreground">
-                    Selected: Bot #{selectedBot} • {betType} • {amount} ICP
+                    Selected: Bot #{selectedBot} • {betType}
                   </div>
                 )}
               </>

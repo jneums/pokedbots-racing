@@ -40,7 +40,7 @@ module {
   private let RAKE_PERCENT : Float = 0.10; // 10% rake
   private let RACING_RAKE_SHARE : Float = 0.80; // 80% of rake to racing (8% of total)
   private let PLATFORM_RAKE_SHARE : Float = 0.20; // 20% of rake to platform (2% of total)
-  private let MIN_BET : Nat = 1_000_000; // 0.01 ICP (e8s)
+  private let MIN_BET : Nat = 10_000_000; // 0.1 ICP (e8s)
   private let MAX_BET : Nat = 10_000_000_000; // 100 ICP (e8s)
   private let MAX_BET_PER_RACE : Nat = 10_000_000_000; // 100 ICP total per user per race
   private let ICP_TRANSFER_FEE : Nat = 10_000; // 0.0001 ICP (e8s)
@@ -243,7 +243,7 @@ module {
 
       // Validate amount
       if (amount < MIN_BET) {
-        return #err("Minimum bet is 0.01 ICP");
+        return #err("Minimum bet is 0.1 ICP");
       };
       if (amount > MAX_BET) {
         return #err("Maximum bet is 100 ICP");
@@ -655,7 +655,7 @@ module {
             };
 
             // Subtract fee from payout so user receives (payout - fee) and pool is debited exactly payout
-            let amountToSend = payout - ICP_TRANSFER_FEE;
+            let amountToSend = Int.abs(payout - ICP_TRANSFER_FEE);
 
             let poolSubaccount = getPoolSubaccount(raceId);
             let transferResult = await ledger.icrc1_transfer({

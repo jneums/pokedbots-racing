@@ -196,29 +196,31 @@ type Result_3 =
          speed: nat;
          stability: nat;
        };
-      currentBattery: nat;
-      currentCondition: nat;
+      currentBattery: opt nat;
+      currentCondition: opt nat;
+      isInitialized: bool;
       isOwner: bool;
-      stats: PokedBotRacingStats;
+      stats: opt PokedBotRacingStats;
       upgradeCosts:
-       record {
-         Gyro: record {
-                 icp: nat;
-                 parts: nat;
-               };
-         PowerCore: record {
+       opt
+        record {
+          Gyro: record {
+                  icp: nat;
+                  parts: nat;
+                };
+          PowerCore: record {
+                       icp: nat;
+                       parts: nat;
+                     };
+          Thruster: record {
                       icp: nat;
                       parts: nat;
                     };
-         Thruster: record {
-                     icp: nat;
-                     parts: nat;
-                   };
-         Velocity: record {
-                     icp: nat;
-                     parts: nat;
-                   };
-       };
+          Velocity: record {
+                      icp: nat;
+                      parts: nat;
+                    };
+        };
     };
  };
 type Result_2 = 
@@ -504,13 +506,13 @@ type McpServer =
            totalEarnings: nat;
            wins: nat;
          };
-        eloRating: nat;
-        faction: FactionType;
+        eloRating: opt nat;
+        faction: opt FactionType;
         isInitialized: bool;
         name: opt text;
         owner: opt principal;
-        preferredTerrain: Terrain;
-        raceClass: RaceClass;
+        preferredTerrain: opt Terrain;
+        raceClass: opt RaceClass;
         stats:
          record {
            acceleration: nat;
@@ -587,8 +589,46 @@ type McpServer =
    /// Get the currently configured ICP ledger canister ID.
    get_icp_ledger: () -> (opt principal) query;
    get_latest_reconstitution_trace: () -> (opt ReconstitutionTrace) query;
-   get_leaderboard: (lbType: LeaderboardType, limit: nat) ->
-    (vec LeaderboardEntry) query;
+   get_leaderboard: (lbType: LeaderboardType, limit: nat, bracket:
+    opt RaceClass) -> (vec LeaderboardEntry) query;
+   /// Get enriched marketplace listings with racing stats (public query)
+   /// Takes a list of token indices to enrich (no inter-canister calls in queries)
+   get_marketplace_bots_enriched: (tokenIndices: vec nat32) ->
+    (vec
+      record {
+        baseStats:
+         record {
+           acceleration: nat;
+           powerCore: nat;
+           speed: nat;
+           stability: nat;
+         };
+        isInitialized: bool;
+        racingStats:
+         opt
+          record {
+            baseAcceleration: nat;
+            basePowerCore: nat;
+            baseRating: nat;
+            baseSpeed: nat;
+            baseStability: nat;
+            battery: nat;
+            condition: nat;
+            currentAcceleration: nat;
+            currentPowerCore: nat;
+            currentRating: nat;
+            currentSpeed: nat;
+            currentStability: nat;
+            faction: text;
+            overallRating: nat;
+            places: nat;
+            racesEntered: nat;
+            shows: nat;
+            winRate: float64;
+            wins: nat;
+          };
+        tokenIndex: nat32;
+      }) query;
    get_my_ranking: (lbType: LeaderboardType, tokenIndex: nat) ->
     (opt LeaderboardEntry) query;
    /// Get decoded metadata for a specific NFT (public query)
@@ -808,34 +848,13 @@ type McpServer =
    /// Place a bet for UI
    web_betting_place_bet: (raceId: nat, tokenIndex: nat, betType: BetType,
     amountE8s: nat) -> (Result_4);
-   /// Browse marketplace listings with filtering and pagination
-   web_browse_marketplace: (after: opt nat, minRating: opt nat, maxPrice:
-    opt float64, faction: opt text, sortBy: opt text, sortDesc: opt bool,
-    limit: opt nat) ->
-    (record {
-       hasMore: bool;
-       listings:
-        vec
-         record {
-           baseAcceleration: nat;
-           basePowerCore: nat;
-           baseSpeed: nat;
-           baseStability: nat;
-           faction: opt text;
-           imageUrl: text;
-           isInitialized: bool;
-           overallRating: nat;
-           price: float64;
-           racesEntered: nat;
-           tokenIndex: nat;
-           winRate: float64;
-           wins: nat;
-         };
-     });
    /// Cancel an in-progress upgrade and receive a full refund
    web_cancel_upgrade: (tokenIndex: nat) -> (Result_1);
    /// Complete a scavenging mission and collect rewards (web method)
    web_complete_scavenging: (tokenIndex: nat) -> (Result_1);
+   /// Convert parts from one type to another (25% conversion cost)
+   web_convert_parts: (fromType: text, toType: text, amount: nat) ->
+    (Result_1);
    /// Enter a race (with ICRC-2 payment for entry fee)
    web_enter_race: (raceId: nat, tokenIndex: nat) -> (Result_1);
    /// Get detailed stats for a specific bot
@@ -1021,7 +1040,7 @@ type McpServer =
    /// Repair a bot to restore condition (0.05 ICP + fee via ICRC-2)
    web_repair_bot: (tokenIndex: nat) -> (Result_1);
    /// Respec a bot - reset all upgrades and refund parts (with penalty)
-   /// Cost escalates: 1 ICP, 2 ICP, 3 ICP... based on respecCount
+   /// Cost: 1 ICP (flat rate)
    web_respec_bot: (tokenIndex: nat) -> (Result_2);
    /// Start a scavenging mission (web method)
    web_start_scavenging: (tokenIndex: nat, zone: text, durationMinutes:

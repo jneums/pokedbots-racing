@@ -97,9 +97,15 @@ export function BettingHistory() {
     );
   }
 
-  // Filter for won bets
+  // Filter for won bets from the current limited set for display
   const wonBets = bettingData.bets.filter(bet => bet.status === 'Won');
   const recentBets = bettingData.bets.slice(0, 10); // Show last 10 bets
+  
+  // Calculate actual won count from summary (not from limited bet list)
+  const actualWonCount = Math.round(
+    Number(bettingData.summary.total_bets) * 
+    (parseFloat(bettingData.summary.win_rate_percent) / 100)
+  );
 
   return (
     <Card>
@@ -126,7 +132,7 @@ export function BettingHistory() {
               <div className="text-xs text-muted-foreground">Total</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-bold text-green-500">{wonBets.length}</div>
+              <div className="text-lg font-bold text-green-500">{actualWonCount}</div>
               <div className="text-xs text-muted-foreground">Won</div>
             </div>
             <div className="text-center">
@@ -145,7 +151,7 @@ export function BettingHistory() {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm font-semibold text-green-500">
                 <Trophy className="h-4 w-4" />
-                Winning Bets ({wonBets.length})
+                Winning Bets ({actualWonCount})
               </div>
               {wonBets.slice(0, 5).map((bet) => (
                 <Link

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyBots, useUserInventory, useCollectionBonuses, useUserWalletNFTs } from '../../hooks/useGarage';
 import { useBackgrounds } from '../../hooks/useBackgrounds';
@@ -7,7 +8,8 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { WalletConnect } from '../../components/WalletConnect';
 import { BotCard } from '../../components/BotCard';
-import { Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical, Plus } from 'lucide-react';
+import { PartsConverter } from '../../components/PartsConverter';
+import { Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { BotListItem } from '@pokedbots-racing/ic-js';
 import { Progress } from '../../components/ui/progress';
@@ -52,11 +54,30 @@ function getUpgradeDisplayName(upgradeType: string): string {
 export default function GaragePage() {
   const { isAuthenticated, user } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedBotIndex, setSelectedBotIndex] = useState<bigint | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [customOrder, setCustomOrder] = useState<string[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(null);
   const [recallingAll, setRecallingAll] = useState(false);
+  
+  // UI state for new features - initialize from localStorage or defaults
+  const [collapsedBots, setCollapsedBots] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('garage_collapsed_bots');
+    // Default: all bots collapsed
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
+  const [collapsedBrackets, setCollapsedBrackets] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('garage_collapsed_brackets');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
+  const [groupByBracket, setGroupByBracket] = useState(() => {
+    const saved = localStorage.getItem('garage_group_by_bracket');
+    // Default: true (grouped by bracket)
+    return saved ? JSON.parse(saved) : true;
+  });
   
   // Per-bot loading states (keyed by tokenIndex)
   const [botLoadingStates, setBotLoadingStates] = useState<Map<string, boolean>>(new Map());
@@ -90,6 +111,29 @@ export default function GaragePage() {
       }
     }
   }, [user?.principal]);
+
+  // Set all bots as collapsed by default when they first load (if no saved state)
+  useEffect(() => {
+    const saved = localStorage.getItem('garage_collapsed_bots');
+    if (!saved && bots.length > 0) {
+      const allBotIndices = bots.map(bot => bot.tokenIndex.toString());
+      setCollapsedBots(new Set(allBotIndices));
+      localStorage.setItem('garage_collapsed_bots', JSON.stringify(allBotIndices));
+    }
+  }, [bots]);
+
+  // Persist UI state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('garage_collapsed_bots', JSON.stringify(Array.from(collapsedBots)));
+  }, [collapsedBots]);
+
+  useEffect(() => {
+    localStorage.setItem('garage_collapsed_brackets', JSON.stringify(Array.from(collapsedBrackets)));
+  }, [collapsedBrackets]);
+
+  useEffect(() => {
+    localStorage.setItem('garage_group_by_bracket', JSON.stringify(groupByBracket));
+  }, [groupByBracket]);
 
   // Save favorites to localStorage
   const toggleFavorite = (tokenIndex: string) => {
@@ -184,27 +228,65 @@ export default function GaragePage() {
 
   // Handle drag and drop
   const handleDragStart = (index: number) => {
+    console.log('[DRAG] Start - dragging index:', index);
     setDraggedIndex(index);
   };
 
   const handleDragEnd = () => {
+    console.log('[DRAG] End');
     setDraggedIndex(null);
+    setDropTargetIndex(null);
+    setDropPosition(null);
   };
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault(); // Required to allow dropping
   };
 
   const handleDrop = (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
+    
+    console.log('[DRAG] Drop on index:', dropIndex, 'draggedIndex:', draggedIndex);
+    
     if (draggedIndex === null || draggedIndex === dropIndex) {
+      console.log('[DRAG] Aborting - no drag or dropped on self');
       setDraggedIndex(null);
+      setDropTargetIndex(null);
+      setDropPosition(null);
       return;
     }
 
+    // Get mouse position relative to the drop target to determine before/after
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const mouseY = e.clientY;
+    const elementMiddle = rect.top + rect.height / 2;
+    const dropPosition = mouseY < elementMiddle ? 'before' : 'after';
+    
+    console.log('[DRAG] Drop position:', dropPosition, 'mouseY:', mouseY, 'middle:', elementMiddle);
+
+    // Calculate insert position BEFORE any array modifications
+    let insertIndex = dropIndex;
+    if (dropPosition === 'after') {
+      insertIndex = dropIndex + 1;
+    }
+    
+    console.log('[DRAG] Insert index (before removal):', insertIndex);
+
     const newBots = [...sortedBots];
     const [draggedBot] = newBots.splice(draggedIndex, 1);
-    newBots.splice(dropIndex, 0, draggedBot);
+    console.log('[DRAG] Removed bot from index:', draggedIndex);
+    
+    // After removal, adjust insert position if it was after the dragged item
+    let finalIndex = insertIndex;
+    if (insertIndex > draggedIndex) {
+      finalIndex = insertIndex - 1;
+    }
+    
+    console.log('[DRAG] Final insert index (after removal adjustment):', finalIndex);
+    
+    newBots.splice(finalIndex, 0, draggedBot);
+    console.log('[DRAG] After insert - array length:', newBots.length);
+    console.log('[DRAG] New order:', newBots.map(b => b.tokenIndex.toString()).join(', '));
     
     const newOrder = newBots.map(bot => bot.tokenIndex.toString());
     setCustomOrder(newOrder);
@@ -212,9 +294,12 @@ export default function GaragePage() {
     if (user?.principal) {
       const orderKey = `garage_order_${user.principal}`;
       localStorage.setItem(orderKey, JSON.stringify(newOrder));
+      console.log('[DRAG] Saved to localStorage');
     }
     
     setDraggedIndex(null);
+    setDropTargetIndex(null);
+    setDropPosition(null);
   };
 
   // Force immediate refetch of bots by invalidating cache
@@ -262,15 +347,90 @@ export default function GaragePage() {
 
   const error = botsError ? (botsError instanceof Error ? botsError.message : 'Failed to load bots') : null;
 
+  // Helper: Get bracket from bot rating
+  const getBotBracket = (bot: BotListItem): string => {
+    if (!bot.maxStats) return 'Unregistered';
+    const rating = Math.floor((
+      Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + 
+      Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)
+    ) / 4);
+    
+    return rating >= 50 ? 'SilentKlan' :
+           rating >= 40 ? 'Elite' :
+           rating >= 30 ? 'Raider' :
+           rating >= 20 ? 'Junker' : 'Scrap';
+  };
+
+  // Helper: Get next race start time as relative string
+  const getNextRaceStartTime = (bot: BotListItem): string | null => {
+    if (!bot.upcomingRaces || bot.upcomingRaces.length === 0) return null;
+    
+    const nextRace = bot.upcomingRaces.reduce((closest, race) => {
+      const raceStart = Number(race.startTime) / 1_000_000;
+      const closestStart = Number(closest.startTime) / 1_000_000;
+      return raceStart < closestStart ? race : closest;
+    });
+    
+    const timeUntil = (Number(nextRace.startTime) / 1_000_000) - Date.now();
+    if (timeUntil < 0) return 'Starting now';
+    
+    const hours = Math.floor(timeUntil / (1000 * 60 * 60));
+    const minutes = Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 24) return `${Math.floor(hours / 24)}d`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+
+  // Group bots by bracket
+  const groupedBots = useMemo(() => {
+    if (!groupByBracket) return null;
+    
+    const groups: Record<string, BotListItem[]> = {
+      'SilentKlan': [], 'Elite': [], 'Raider': [], 'Junker': [], 'Scrap': [], 'Unregistered': []
+    };
+    
+    sortedBots.forEach(bot => {
+      const bracket = getBotBracket(bot);
+      groups[bracket].push(bot);
+    });
+    
+    return groups;
+  }, [sortedBots, groupByBracket]);
+
   // Get the selected bot
   const selectedBot = selectedBotIndex !== null 
     ? sortedBots.find(b => b.tokenIndex === selectedBotIndex) 
     : null;
 
-  // Auto-select first bot when loaded
-  if (sortedBots.length > 0 && selectedBotIndex === null) {
-    setSelectedBotIndex(sortedBots[0].tokenIndex);
-  }
+  // Initialize selected bot from URL query param
+  useEffect(() => {
+    const botParam = searchParams.get('bot');
+    if (botParam && sortedBots.length > 0) {
+      const botIndex = BigInt(botParam);
+      const botExists = sortedBots.some(b => b.tokenIndex === botIndex);
+      if (botExists) {
+        setSelectedBotIndex(botIndex);
+      } else if (selectedBotIndex === null) {
+        // Bot from URL doesn't exist, select first bot
+        setSelectedBotIndex(sortedBots[0].tokenIndex);
+      }
+    } else if (sortedBots.length > 0 && selectedBotIndex === null) {
+      // No URL param, auto-select first bot
+      setSelectedBotIndex(sortedBots[0].tokenIndex);
+    }
+  }, [searchParams, sortedBots, selectedBotIndex]);
+
+  // Update URL when selected bot changes
+  useEffect(() => {
+    if (selectedBotIndex !== null) {
+      const currentBot = searchParams.get('bot');
+      const newBot = selectedBotIndex.toString();
+      if (currentBot !== newBot) {
+        setSearchParams({ bot: newBot }, { replace: true });
+      }
+    }
+  }, [selectedBotIndex, searchParams, setSearchParams]);
 
   if (!isAuthenticated) {
     return (
@@ -303,7 +463,16 @@ export default function GaragePage() {
         {/* Parts Inventory */}
         <Card className="border-2 border-primary/20 bg-card/80 backdrop-blur">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Parts Inventory</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Parts Inventory</CardTitle>
+              <PartsConverter 
+                inventory={inventory}
+                identityOrAgent={user?.agent}
+                onConversionComplete={() => {
+                  queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+                }}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="flex gap-4 text-sm">
@@ -480,18 +649,27 @@ export default function GaragePage() {
           {/* Bot List - Responsive */}
           <Card className="w-full lg:w-[480px] shrink-0 border-2 border-primary/20 bg-card/80 backdrop-blur">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-lg">Your Bots ({bots.length})</CardTitle>
-                {bots.some(bot => bot.activeMission) && (
+                <div className="flex items-center gap-2">
+                  {bots.some(bot => bot.activeMission) && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleRecallAll}
+                      disabled={recallingAll}
+                    >
+                      {recallingAll ? 'Recalling...' : 'Recall All'}
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleRecallAll}
-                    disabled={recallingAll}
+                    onClick={() => setGroupByBracket(!groupByBracket)}
                   >
-                    {recallingAll ? 'Recalling...' : 'Recall All Scavengers'}
+                    {groupByBracket ? 'Ungroup' : 'Group by Bracket'}
                   </Button>
-                )}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -500,6 +678,284 @@ export default function GaragePage() {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => e.preventDefault()}
               >
+                {groupByBracket && groupedBots ? (
+                  // Grouped view by bracket
+                  <>
+                    {(() => {
+                      let globalIndex = 0; // Track global index across all brackets
+                      return Object.entries(groupedBots).map(([bracket, botsInBracket]) => {
+                        if (botsInBracket.length === 0) return null;
+                        const isBracketCollapsed = collapsedBrackets.has(bracket);
+                        
+                        return (
+                          <div key={bracket}>
+                            {/* Bracket Header */}
+                            <button
+                              onClick={() => {
+                                setCollapsedBrackets(prev => {
+                                  const newSet = new Set(prev);
+                                  if (newSet.has(bracket)) {
+                                    newSet.delete(bracket);
+                                  } else {
+                                    newSet.add(bracket);
+                                  }
+                                  return newSet;
+                                });
+                              }}
+                              className="w-full flex items-center justify-between px-4 py-2 bg-muted/30 hover:bg-muted/50 border-b border-border transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                {isBracketCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                <span className="font-semibold">{bracket}</span>
+                                <Badge variant="secondary" className="text-xs">{botsInBracket.length}</Badge>
+                              </div>
+                            </button>
+                            
+                            {/* Bots in Bracket */}
+                            {botsInBracket.map((bot) => {
+                              const currentIndex = globalIndex++;
+                              if (isBracketCollapsed) return null; // Skip rendering but still increment index
+                              const isUnregistered = !bot.isInitialized;
+                            const faction = bot.stats?.faction;
+                            const factionName = faction ? Object.keys(faction)[0] : 'Unknown';
+                            const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.tokenIndex));
+                            const imageUrl = `https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=${tokenId}&type=thumbnail`;
+                            const isFavorite = favorites.has(bot.tokenIndex.toString());
+                            const isCollapsed = collapsedBots.has(bot.tokenIndex.toString());
+                            
+                            // Render unregistered bots differently
+                            if (isUnregistered) {
+                              const isSelected = selectedBotIndex === bot.tokenIndex;
+                              return (
+                                <button
+                                  key={bot.tokenIndex.toString()}
+                                  onClick={() => setSelectedBotIndex(bot.tokenIndex)}
+                                  className={`w-full text-left border-b border-dashed border-muted-foreground/20 hover:bg-muted/30 transition-colors ${
+                                    isSelected ? 'bg-muted/50 border-l-4 border-l-amber-500' : ''
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-4 p-4">
+                                    <div className="relative">
+                                      <Avatar className="h-16 w-16 border-2 border-dashed border-amber-500/30">
+                                        <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
+                                        <AvatarFallback className="bg-amber-500/10 text-amber-600">
+                                          #{bot.tokenIndex.toString().slice(-2)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="absolute -top-1 -right-1 bg-amber-500/20 border border-amber-500/50 rounded-full p-1">
+                                        <Plus className="h-3 w-3 text-amber-500" />
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <p className="font-semibold text-base">
+                                          PokedBot #{bot.tokenIndex.toString()}
+                                        </p>
+                                        <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 bg-amber-500/10">
+                                          Unregistered
+                                        </Badge>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground">
+                                        Click to register for racing
+                                      </p>
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        Cost: 0.1 ICP (one-time fee)
+                                      </p>
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            }
+                            
+                            // Render registered bots
+                            return (
+                              <div
+                                key={bot.tokenIndex.toString()}
+                                draggable
+                                onDragStart={() => handleDragStart(currentIndex)}
+                                onDragEnd={handleDragEnd}
+                                onDragOver={handleDragOver}
+                                onDrop={(e) => handleDrop(e, currentIndex)}
+                                className={`flex items-center border-b transition-colors cursor-grab active:cursor-grabbing ${
+                                  selectedBotIndex === bot.tokenIndex
+                                    ? 'bg-primary/10 border-l-4 border-l-primary'
+                                    : 'hover:bg-muted/50 border-l-4 border-l-transparent'
+                                } ${draggedIndex === currentIndex ? 'opacity-50' : ''} relative`}
+                              >
+                                <div className="px-2 text-muted-foreground hover:text-foreground flex items-center">
+                                  <GripVertical className="h-4 w-4" />
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedBotIndex(bot.tokenIndex);
+                                  }}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  className="flex-1 text-left px-2 py-3"
+                                >
+                                  <div className="space-y-2">
+                                    {/* Header with Avatar and Name */}
+                                    <div className="flex items-center gap-3">
+                                      <Avatar className="h-12 w-12">
+                                        <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
+                                        <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-semibold truncate text-sm text-foreground">
+                                          #{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                                          <span>{factionName}</span>
+                                        </div>
+                                        
+                                        {!isCollapsed && bot.stats && (
+                                          <>
+                                            {/* Stats Row */}
+                                            <div className="flex items-center gap-2 text-xs mb-1">
+                                              <div className="flex items-center gap-0.5">
+                                                <span className="text-yellow-500">⚡</span>
+                                                <span className="font-mono text-yellow-500">{Number(bot.currentStats?.speed || bot.stats.baseStats.speed)}</span>
+                                                <span className="text-muted-foreground/40">/{Number(bot.maxStats?.speed || 24)}</span>
+                                              </div>
+                                              <div className="flex items-center gap-0.5">
+                                                <span className="text-orange-500">💪</span>
+                                                <span className="font-mono text-orange-500">{Number(bot.currentStats?.powerCore || bot.stats.baseStats.powerCore)}</span>
+                                                <span className="text-muted-foreground/40">/{Number(bot.maxStats?.powerCore || 24)}</span>
+                                              </div>
+                                              <div className="flex items-center gap-0.5">
+                                                <span className="text-blue-500">🚀</span>
+                                                <span className="font-mono text-blue-500">{Number(bot.currentStats?.acceleration || bot.stats.baseStats.acceleration)}</span>
+                                                <span className="text-muted-foreground/40">/{Number(bot.maxStats?.acceleration || 20)}</span>
+                                              </div>
+                                              <div className="flex items-center gap-0.5">
+                                                <span className="text-red-500">🎯</span>
+                                                <span className="font-mono text-red-500">{Number(bot.currentStats?.stability || bot.stats.baseStats.stability)}</span>
+                                                <span className="text-muted-foreground/40">/{Number(bot.maxStats?.stability || 23)}</span>
+                                              </div>
+                                            </div>
+                                            {/* Battery and Condition Row */}
+                                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                              <div className="flex items-center gap-1">
+                                                <Battery className="h-3 w-3" />
+                                                <span className="font-mono">{Number(bot.stats.battery)}%</span>
+                                              </div>
+                                              <div className="flex items-center gap-1">
+                                                <Wrench className="h-3 w-3" />
+                                                <span className="font-mono">{Number(bot.stats.condition)}%</span>
+                                              </div>
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  
+                                  {!isCollapsed && bot.isInitialized && bot.stats ? (
+                                    <>      
+                                      {/* Cooldowns and Status */}
+                                      <div className="flex flex-wrap gap-1">
+                                        {(() => {
+                                          const now = Date.now();
+                                          const rechargeReady = bot.stats.lastRecharged 
+                                            ? Number(bot.stats.lastRecharged) / 1_000_000 + (6 * 60 * 60 * 1000)
+                                            : 0;
+                                          const repairReady = bot.stats.lastRepaired
+                                            ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
+                                            : 0;
+                                          
+                                          const rechargeTime = bot.stats.lastRecharged 
+                                            ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + 21_600_000_000_000n)
+                                            : null;
+                                          const repairTime = bot.stats.lastRepaired
+                                            ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)
+                                            : null;
+                                          
+                                          return (
+                                            <>
+                                              {(() => {
+                                                const nextRaceTime = getNextRaceStartTime(bot);
+                                                return nextRaceTime && (
+                                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                                    🏁 {nextRaceTime}
+                                                  </Badge>
+                                                );
+                                              })()}
+                                              {rechargeReady > now && rechargeTime && (
+                                                <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                                  <Zap className="h-3 w-3" />
+                                                  {rechargeTime}
+                                                </Badge>
+                                              )}
+                                              {repairReady > now && repairTime && (
+                                                <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                                  <Hammer className="h-3 w-3" />
+                                                  {repairTime}
+                                                </Badge>
+                                              )}
+                                              {bot.activeUpgrade && (
+                                                <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                                                  <Clock className="h-3 w-3" />
+                                                  {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])} {formatTimeRemaining(bot.activeUpgrade.endsAt)}
+                                                </Badge>
+                                              )}
+                                              {bot.activeMission && (
+                                                <Badge 
+                                                  variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
+                                                  className="text-xs"
+                                                >
+                                                  {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}Scavenging
+                                                </Badge>
+                                              )}
+                                            </>
+                                          );
+                                        })()}
+                                      </div>
+                                    </>
+                                  ) : !bot.isInitialized ? (
+                                    <Badge variant="outline" className="text-xs">Not Initialized</Badge>
+                                  ) : null}
+                                </div>
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCollapsedBots(prev => {
+                                    const newSet = new Set(prev);
+                                    const key = bot.tokenIndex.toString();
+                                    if (newSet.has(key)) {
+                                      newSet.delete(key);
+                                    } else {
+                                      newSet.add(key);
+                                    }
+                                    return newSet;
+                                  });
+                                }}
+                                className="px-2 text-muted-foreground hover:text-foreground transition-colors"
+                                title={isCollapsed ? 'Expand bot' : 'Collapse bot'}
+                              >
+                                {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleFavorite(bot.tokenIndex.toString());
+                                }}
+                                className="px-3 text-muted-foreground hover:text-yellow-500 transition-colors"
+                                title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                              >
+                                <Star className={`h-4 w-4 ${isFavorite ? 'fill-yellow-500 text-yellow-500' : ''}`} />
+                              </button>
+                            </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    });
+                    })()}
+                  </>
+                ) : (
+                  // Flat view (original rendering)
+                  <>
                 {sortedBots.map((bot, index) => {
                   const isUnregistered = !bot.isInitialized;
                   const faction = bot.stats?.faction;
@@ -554,27 +1010,31 @@ export default function GaragePage() {
                   }
                   
                   // Render registered bots normally
+                  const isCollapsed = collapsedBots.has(bot.tokenIndex.toString());
+                  
                   return (
                     <div
                       key={bot.tokenIndex.toString()}
-                      onDragOver={(e) => handleDragOver(e, index)}
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, index)}
-                      className={`flex items-center border-b transition-colors ${
+                      className={`flex items-center border-b transition-colors cursor-grab active:cursor-grabbing ${
                         selectedBotIndex === bot.tokenIndex
                           ? 'bg-primary/10 border-l-4 border-l-primary'
                           : 'hover:bg-muted/50 border-l-4 border-l-transparent'
-                      } ${draggedIndex === index ? 'opacity-50' : ''}`}
+                      } ${draggedIndex === index ? 'opacity-50' : ''} relative`}
                     >
-                      <div 
-                        draggable
-                        onDragStart={() => handleDragStart(index)}
-                        onDragEnd={handleDragEnd}
-                        className="px-2 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex items-center"
-                      >
+                      <div className="px-2 text-muted-foreground hover:text-foreground flex items-center">
                         <GripVertical className="h-4 w-4" />
                       </div>
                       <button
-                        onClick={() => setSelectedBotIndex(bot.tokenIndex)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedBotIndex(bot.tokenIndex);
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
                         className="flex-1 text-left px-2 py-3"
                       >
                         <div className="space-y-2">
@@ -616,7 +1076,7 @@ export default function GaragePage() {
                                 )}
                               </div>
                               
-                              {bot.stats && (
+                              {!isCollapsed && bot.stats && (
                                 <>
                                   {/* Stats Row */}
                                   <div className="flex items-center gap-2 text-xs mb-1">
@@ -657,7 +1117,7 @@ export default function GaragePage() {
                             </div>
                           </div>
                         
-                        {bot.stats ? (
+                        {!isCollapsed && bot.isInitialized && bot.stats ? (
                           <>
                             
                             {/* Cooldowns and Status */}
@@ -680,6 +1140,14 @@ export default function GaragePage() {
                                 
                                 return (
                                   <>
+                                    {(() => {
+                                      const nextRaceTime = getNextRaceStartTime(bot);
+                                      return nextRaceTime && (
+                                        <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                          🏁 {nextRaceTime}
+                                        </Badge>
+                                      );
+                                    })()}
                                     {rechargeReady > now && rechargeTime && (
                                       <Badge variant="outline" className="text-xs flex items-center gap-1">
                                         <Zap className="h-3 w-3" />
@@ -711,10 +1179,29 @@ export default function GaragePage() {
                               })()}
                             </div>
                           </>
-                        ) : (
+                        ) : !bot.isInitialized ? (
                           <Badge variant="outline" className="text-xs">Not Initialized</Badge>
-                        )}
+                        ) : null}
                       </div>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCollapsedBots(prev => {
+                          const newSet = new Set(prev);
+                          const key = bot.tokenIndex.toString();
+                          if (newSet.has(key)) {
+                            newSet.delete(key);
+                          } else {
+                            newSet.add(key);
+                          }
+                          return newSet;
+                        });
+                      }}
+                      className="px-2 text-muted-foreground hover:text-foreground transition-colors"
+                      title={isCollapsed ? 'Expand bot' : 'Collapse bot'}
+                    >
+                      {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </button>
                     <button
                       onClick={(e) => {
@@ -729,6 +1216,8 @@ export default function GaragePage() {
                   </div>
                   );
                 })}
+                </>
+                )}
               </div>
             </CardContent>
           </Card>

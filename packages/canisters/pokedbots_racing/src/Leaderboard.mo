@@ -137,6 +137,7 @@ module {
     initSeasonBoards : Map.Map<Nat, Map.Map<Nat, LeaderboardEntry>>, // seasonId -> (tokenIndex -> entry)
     initAllTimeBoard : Map.Map<Nat, LeaderboardEntry>, // tokenIndex -> entry
     initFactionBoards : Map.Map<Text, Map.Map<Nat, LeaderboardEntry>>, // factionName -> (tokenIndex -> entry)
+    getRaceClassCallback : (Nat) -> RaceClass, // Callback to get current race class for a bot
   ) {
     private let monthlyBoards = initMonthlyBoards;
     private let seasonBoards = initSeasonBoards;
@@ -260,7 +261,6 @@ module {
       earnings : Nat,
       pointsMultiplier : Float,
       faction : FactionType,
-      _division : RaceClass,
       raceTime : Int,
     ) {
       let points = getPointsForPosition(position, pointsMultiplier);
@@ -410,17 +410,15 @@ module {
     public func getLeaderboard(
       lbType : LeaderboardType,
       limit : ?Nat,
-      division : ?RaceClass,
+      bracket : ?RaceClass,
     ) : [LeaderboardEntry] {
       let board = getOrCreateBoard(lbType);
       var entries = Iter.toArray(Map.vals(board));
 
-      // Filter by division if specified
-      entries := switch (division) {
-        case (?_div) {
-          // Would need to cross-reference with racing stats to filter by division
-          // For now, return all (implement division filtering in query layer)
-          entries;
+      // Filter by bracket if specified
+      entries := switch (bracket) {
+        case (?b) {
+          Array.filter<LeaderboardEntry>(entries, func(e) { getRaceClassCallback(e.tokenIndex) == b });
         };
         case (null) { entries };
       };

@@ -49,14 +49,24 @@ export function getTerrainPreference(
   return 'ScrapHeaps';
 }
 
-export function getTerrainIcon(terrain: 'ScrapHeaps' | 'WastelandSand' | 'MetalRoads'): string {
-  switch (terrain) {
+export function getTerrainIcon(terrain: 'ScrapHeaps' | 'WastelandSand' | 'MetalRoads' | any): string {
+  // Handle variant object format from backend: { ScrapHeaps: null }
+  let terrainStr: string;
+  if (typeof terrain === 'object' && terrain !== null) {
+    terrainStr = Object.keys(terrain)[0];
+  } else {
+    terrainStr = terrain;
+  }
+  
+  switch (terrainStr) {
     case 'ScrapHeaps':
       return '🔩';
     case 'WastelandSand':
       return '🏜️';
     case 'MetalRoads':
       return '🛣️';
+    default:
+      return '🏁';
   }
 }
 
@@ -72,9 +82,16 @@ export function getTerrainName(terrain: 'ScrapHeaps' | 'WastelandSand' | 'MetalR
 }
 
 export function getFactionTerrainBonus(faction: string, terrain: 'ScrapHeaps' | 'WastelandSand' | 'MetalRoads'): string | null {
-  if (faction === 'Blackhole' && terrain === 'MetalRoads') return '+12% all stats';
-  if (faction === 'Box' && terrain === 'ScrapHeaps') return '+10% all stats';
-  if (faction === 'Game' && terrain === 'WastelandSand') return '+8% all stats';
+  if (faction === 'Blackhole' && terrain === 'MetalRoads') return '+12%';
+  if (faction === 'Box' && terrain === 'ScrapHeaps') return '+10%';
+  if (faction === 'Game' && terrain === 'WastelandSand') return '+8%';
+  return null;
+}
+
+export function getFactionSpecialTerrain(faction: string): { terrain: 'ScrapHeaps' | 'WastelandSand' | 'MetalRoads'; bonus: string } | null {
+  if (faction === 'Blackhole') return { terrain: 'MetalRoads', bonus: '+12%' };
+  if (faction === 'Box') return { terrain: 'ScrapHeaps', bonus: '+10%' };
+  if (faction === 'Game') return { terrain: 'WastelandSand', bonus: '+8%' };
   return null;
 }
 

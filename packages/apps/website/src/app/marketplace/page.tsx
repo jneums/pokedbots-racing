@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -9,7 +10,7 @@ import { PurchaseDialog } from '../../components/PurchaseDialog';
 import { useAuth } from '../../hooks/useAuth';
 import { useInfiniteMarketplace, usePurchaseBot } from '../../hooks/useMarketplace';
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
-import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus } from '../../lib/utils';
+import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus, getFactionSpecialTerrain } from '../../lib/utils';
 import { AlertCircle, ChevronDown } from 'lucide-react';
 
 interface PurchaseDialogState {
@@ -22,15 +23,36 @@ interface PurchaseDialogState {
 
 export default function MarketplacePage() {
   const { user } = useAuth();
-  const [sortBy, setSortBy] = useState<'price' | 'rating'>('price');
-  const [minPrice, setMinPrice] = useState<string>('');
-  const [maxPrice, setMaxPrice] = useState<string>('');
-  const [minRating, setMinRating] = useState<string>('');
-  const [maxRating, setMaxRating] = useState<string>('');
-  const [faction, setFaction] = useState<string>('');
-  const [raceClass, setRaceClass] = useState<string>('');
-  const [tokenIndexSearch, setTokenIndexSearch] = useState<string>('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Initialize state from URL params
+  const [showAllBots, setShowAllBots] = useState(searchParams.get('showAll') === 'true');
+  const [sortBy, setSortBy] = useState<'price' | 'rating' | 'index'>((searchParams.get('sort') as 'price' | 'rating' | 'index') || 'price');
+  const [minPrice, setMinPrice] = useState<string>(searchParams.get('minPrice') || '');
+  const [maxPrice, setMaxPrice] = useState<string>(searchParams.get('maxPrice') || '');
+  const [minRating, setMinRating] = useState<string>(searchParams.get('minRating') || '');
+  const [maxRating, setMaxRating] = useState<string>(searchParams.get('maxRating') || '');
+  const [faction, setFaction] = useState<string>(searchParams.get('faction') || '');
+  const [raceClass, setRaceClass] = useState<string>(searchParams.get('class') || '');
+  const [tokenIndexSearch, setTokenIndexSearch] = useState<string>(searchParams.get('token') || '');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  
+  // Update URL whenever filters change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (showAllBots) params.set('showAll', 'true');
+    if (sortBy !== 'price') params.set('sort', sortBy);
+    if (minPrice) params.set('minPrice', minPrice);
+    if (maxPrice) params.set('maxPrice', maxPrice);
+    if (minRating) params.set('minRating', minRating);
+    if (maxRating) params.set('maxRating', maxRating);
+    if (faction) params.set('faction', faction);
+    if (raceClass) params.set('class', raceClass);
+    if (tokenIndexSearch) params.set('token', tokenIndexSearch);
+    
+    setSearchParams(params, { replace: true });
+  }, [showAllBots, sortBy, minPrice, maxPrice, minRating, maxRating, faction, raceClass, tokenIndexSearch, setSearchParams]);
+  
   const { mutate: purchaseBot } = usePurchaseBot();
   const [showLoginAlert, setShowLoginAlert] = useState(false);
   const [purchaseDialog, setPurchaseDialog] = useState<PurchaseDialogState>({
@@ -83,6 +105,7 @@ export default function MarketplacePage() {
     isFetchingNextPage,
     isLoading,
   } = useInfiniteMarketplace({ 
+    showAllBots,
     sortBy,
     minPrice: minPrice ? parseFloat(minPrice) : undefined,
     maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
@@ -129,10 +152,35 @@ export default function MarketplacePage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">Wasteland Marketplace</h1>
-        <p className="text-muted-foreground">
-          Browse and purchase PokedBots NFTs for racing
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">Wasteland Marketplace</h1>
+            <p className="text-muted-foreground">
+              {showAllBots ? 'Browse all PokedBots in the collection' : 'Browse and purchase PokedBots NFTs for racing'}
+            </p>
+          </div>
+          
+          {/* Toggle Switch */}
+          <div className="flex items-center gap-3 bg-card border rounded-lg p-3">
+            <span className="text-sm font-medium whitespace-nowrap">
+              {showAllBots ? 'All Bots' : 'Listed Only'}
+            </span>
+            <button
+              onClick={() => setShowAllBots(!showAllBots)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                showAllBots ? 'bg-primary' : 'bg-muted'
+              }`}
+              role="switch"
+              aria-checked={showAllBots}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  showAllBots ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
       </div>
 
       <>
@@ -447,6 +495,13 @@ export default function MarketplacePage() {
               >
                 Sort by Rating
               </Button>
+              <Button
+                variant={sortBy === 'index' ? 'default' : 'outline'}
+                onClick={() => setSortBy('index')}
+                className="whitespace-nowrap"
+              >
+                Sort by Index
+              </Button>
             </div>
 
           {error && (
@@ -478,6 +533,7 @@ export default function MarketplacePage() {
                   
                   return (
                   <Card key={listing.tokenIndex} className="overflow-hidden hover:shadow-lg transition-shadow">
+                    <Link to={`/bot/${listing.tokenIndex}`} className="block">
                     <div className="aspect-square relative bg-gradient-to-br from-gray-800 to-gray-900 overflow-hidden">
                       <img
                         src={imageUrl}
@@ -494,34 +550,100 @@ export default function MarketplacePage() {
                         {getRaceClassBadge(listing.overallRating).emoji} {getRaceClassBadge(listing.overallRating).name}
                       </Badge>
                     </div>
+                    </Link>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-lg flex justify-between items-center">
                         <span>Bot #{listing.tokenIndex}</span>
-                        <span className="text-primary">{listing.price.toFixed(2)} ICP</span>
+                        {listing.price > 0 ? (
+                          <span className="text-primary">{listing.price.toFixed(2)} ICP</span>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">NFS</span>
+                        )}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Rating:</span>
-                          <span className="font-semibold">{listing.overallRating}/100</span>
+                          {listing.isInitialized && listing.baseRating !== listing.currentRating ? (
+                            <div className="flex flex-col items-end">
+                              <span className="font-semibold">{listing.baseRating}/100</span>
+                              <span className="text-[10px] text-muted-foreground">
+                                (Current: {listing.currentRating})
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="font-semibold">{listing.overallRating}/100</span>
+                          )}
                         </div>
                         <div className="grid grid-cols-4 gap-1 text-xs">
                           <div className="text-center">
                             <div className="text-muted-foreground">SPD</div>
-                            <div className="font-semibold">{listing.baseSpeed}</div>
+                            <div className="font-semibold">
+                              {listing.isInitialized && listing.currentSpeed !== undefined ? (
+                                <div className="flex flex-col items-center">
+                                  <span className={listing.currentSpeed > listing.baseSpeed ? "text-green-500" : ""}>
+                                    {listing.currentSpeed}
+                                  </span>
+                                  <span className="text-[9px] text-muted-foreground">
+                                    ({listing.baseSpeed})
+                                  </span>
+                                </div>
+                              ) : (
+                                listing.baseSpeed
+                              )}
+                            </div>
                           </div>
                           <div className="text-center">
                             <div className="text-muted-foreground">PWR</div>
-                            <div className="font-semibold">{listing.basePowerCore}</div>
+                            <div className="font-semibold">
+                              {listing.isInitialized && listing.currentPowerCore !== undefined ? (
+                                <div className="flex flex-col items-center">
+                                  <span className={listing.currentPowerCore > listing.basePowerCore ? "text-green-500" : ""}>
+                                    {listing.currentPowerCore}
+                                  </span>
+                                  <span className="text-[9px] text-muted-foreground">
+                                    ({listing.basePowerCore})
+                                  </span>
+                                </div>
+                              ) : (
+                                listing.basePowerCore
+                              )}
+                            </div>
                           </div>
                           <div className="text-center">
                             <div className="text-muted-foreground">ACC</div>
-                            <div className="font-semibold">{listing.baseAcceleration}</div>
+                            <div className="font-semibold">
+                              {listing.isInitialized && listing.currentAcceleration !== undefined ? (
+                                <div className="flex flex-col items-center">
+                                  <span className={listing.currentAcceleration > listing.baseAcceleration ? "text-green-500" : ""}>
+                                    {listing.currentAcceleration}
+                                  </span>
+                                  <span className="text-[9px] text-muted-foreground">
+                                    ({listing.baseAcceleration})
+                                  </span>
+                                </div>
+                              ) : (
+                                listing.baseAcceleration
+                              )}
+                            </div>
                           </div>
                           <div className="text-center">
                             <div className="text-muted-foreground">STB</div>
-                            <div className="font-semibold">{listing.baseStability}</div>
+                            <div className="font-semibold">
+                              {listing.isInitialized && listing.currentStability !== undefined ? (
+                                <div className="flex flex-col items-center">
+                                  <span className={listing.currentStability > listing.baseStability ? "text-green-500" : ""}>
+                                    {listing.currentStability}
+                                  </span>
+                                  <span className="text-[9px] text-muted-foreground">
+                                    ({listing.baseStability})
+                                  </span>
+                                </div>
+                              ) : (
+                                listing.baseStability
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="pt-2 border-t min-h-[2.5rem] flex items-center">
@@ -543,32 +665,50 @@ export default function MarketplacePage() {
                         {listing.faction && (
                           <div className="flex items-center gap-1 text-xs flex-wrap pt-2">
                             <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400 px-2 py-0">
-                              {getTerrainIcon(getTerrainPreference(listing.backgroundColor, listing.faction))} {getTerrainName(getTerrainPreference(listing.backgroundColor, listing.faction))} 
-                              {(() => {
-                                const terrain = getTerrainPreference(listing.backgroundColor, listing.faction);
-                                const bonus = getFactionTerrainBonus(listing.faction, terrain);
-                                return bonus ? ` (${bonus})` : ' (+5%)';
-                              })()}
+                              {getTerrainIcon(getTerrainPreference(listing.backgroundColor, listing.faction))} {getTerrainName(getTerrainPreference(listing.backgroundColor, listing.faction))} (+5%)
                             </Badge>
+                            {(() => {
+                              const factionTerrain = getFactionSpecialTerrain(listing.faction);
+                              return factionTerrain ? (
+                                <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400 px-2 py-0">
+                                  {getTerrainIcon(factionTerrain.terrain)} {getTerrainName(factionTerrain.terrain)} ({factionTerrain.bonus})
+                                </Badge>
+                              ) : null;
+                            })()}
                             <Badge variant="outline" className="border-blue-500/50 text-blue-600 dark:text-blue-400 px-2 py-0">
                               {getFactionBonus(listing.faction)}
                             </Badge>
                           </div>
                         )}
                       </div>
-                      <Button 
-                        className="w-full mt-4" 
-                        variant="default"
-                        disabled={!user}
-                        onClick={() => handlePurchaseClick(
-                          listing.tokenIndex, 
-                          listing.price,
-                          listing.faction,
-                          listing.overallRating
-                        )}
-                      >
-                        {user ? 'Purchase' : 'Connect Wallet'}
-                      </Button>
+                      {listing.price > 0 ? (
+                        <Button 
+                          className="w-full mt-4" 
+                          variant="default"
+                          disabled={!user}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handlePurchaseClick(
+                              listing.tokenIndex, 
+                              listing.price,
+                              listing.faction,
+                              listing.overallRating
+                            );
+                          }}
+                        >
+                          {user ? 'Purchase' : 'Connect Wallet'}
+                        </Button>
+                      ) : (
+                        <Link to={`/bot/${listing.tokenIndex}`}>
+                          <Button 
+                            className="w-full mt-4" 
+                            variant="outline"
+                          >
+                            View Details
+                          </Button>
+                        </Link>
+                      )}
                     </CardContent>
                   </Card>
                   );

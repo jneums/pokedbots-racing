@@ -16,6 +16,7 @@ interface AuthStore {
   getAgent: () => any;
   getPrincipal: () => string | null;
   invalidateQueries?: () => void;
+  handleSessionExpired?: () => void;
 }
 
 const network = process.env.DFX_NETWORK || 'local'; // 'ic' for mainnet, 'local' for local dev
@@ -84,6 +85,21 @@ export const useAuthStore = create<AuthStore>((set: any, get: any) => ({
 
   getPrincipal: () => {
     return authService.getPrincipal();
+  },
+  
+  // Handle session expiry (called when API detects expired session)
+  handleSessionExpired: () => {
+    console.log('[Auth] Session expired, logging out');
+    const currentUser = get().user;
+    if (currentUser?.provider === 'plug') {
+      // Don't call Plug disconnect as it may trigger popup
+      set({ 
+        user: null, 
+        isAuthenticated: false, 
+        error: 'Session expired. Please reconnect.' 
+      });
+      authService.logout().catch(() => {}); // Logout in background
+    }
   },
 }));
 

@@ -124,11 +124,14 @@ export default function BettingPage() {
       {/* Summary Stats */}
       {!isLoading && !error && summary && (
         <>
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardDescription>Total Bets</CardDescription>
                 <CardTitle className="text-3xl">{summary.total_bets}</CardTitle>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {summary.wins} W / {summary.losses} L / {summary.pending} Pending
+                </div>
               </CardHeader>
             </Card>
             <Card>
@@ -137,6 +140,9 @@ export default function BettingPage() {
                 <CardTitle className="text-3xl text-green-500">
                   {summary.win_rate_percent}
                 </CardTitle>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {summary.wins} wins out of {Number(summary.wins) + Number(summary.losses)} settled
+                </div>
               </CardHeader>
             </Card>
             <Card>
@@ -149,6 +155,9 @@ export default function BettingPage() {
                 }`}>
                   {summary.roi_percent}
                 </CardTitle>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Return on investment
+                </div>
               </CardHeader>
             </Card>
             <Card>
@@ -161,6 +170,9 @@ export default function BettingPage() {
                 }`}>
                   {summary.net_profit_icp}
                 </CardTitle>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Won {summary.total_won_icp} • Wagered {summary.total_wagered_icp}
+                </div>
               </CardHeader>
             </Card>
           </div>

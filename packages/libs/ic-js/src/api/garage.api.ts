@@ -31,6 +31,11 @@ function isPlugAgent(identityOrAgent: any): boolean {
 async function getActor(identityOrAgent: IdentityOrAgent): Promise<PokedBotsRacing._SERVICE> {
   // Check if it's a Plug agent - use window.ic.plug.createActor
   if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
+    // Check if Plug is still connected before calling createActor (which can trigger popup)
+    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
+    if (!isConnected) {
+      throw new Error('Plug session expired. Please reconnect.');
+    }
     const canisterId = getCanisterId('POKEDBOTS_RACING');
     return await (globalThis as any).window.ic.plug.createActor({
       canisterId,
@@ -44,6 +49,11 @@ async function getActor(identityOrAgent: IdentityOrAgent): Promise<PokedBotsRaci
 async function getNFTsActorFromAgent(identityOrAgent: IdentityOrAgent): Promise<PokedBotsNFTs._SERVICE> {
   // Check if it's a Plug agent - use window.ic.plug.createActor
   if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
+    // Check if Plug is still connected before calling createActor (which can trigger popup)
+    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
+    if (!isConnected) {
+      throw new Error('Plug session expired. Please reconnect.');
+    }
     const canisterId = getCanisterId('POKEDBOTS_NFTS');
     return await (globalThis as any).window.ic.plug.createActor({
       canisterId,
@@ -125,13 +135,24 @@ export interface BotListItem {
 }
 
 export interface BotDetailsResponse {
-  stats: any;
-  upgradeCosts: {
-    speed: { icp: bigint; parts: bigint };
-    powerCore: { icp: bigint; parts: bigint };
-    acceleration: { icp: bigint; parts: bigint };
-    stability: { icp: bigint; parts: bigint };
+  stats: any | null;
+  baseStats: {
+    speed: bigint;
+    powerCore: bigint;
+    acceleration: bigint;
+    stability: bigint;
   };
+  isOwner: boolean;
+  isInitialized: boolean;
+  currentCondition: [] | [bigint]; // Candid opt type
+  currentBattery: [] | [bigint]; // Candid opt type
+  activeUpgrade: [] | [any]; // Candid opt type
+  upgradeCosts: [] | [{
+    Velocity: { icp: bigint; parts: bigint };
+    PowerCore: { icp: bigint; parts: bigint };
+    Thruster: { icp: bigint; parts: bigint };
+    Gyro: { icp: bigint; parts: bigint };
+  }]; // Candid opt type
 }
 
 /**
@@ -146,6 +167,27 @@ export const listMyRegisteredBots = async (identityOrAgent: IdentityOrAgent): Pr
   
   const result = await racingActor.web_list_my_registered_bots();
   
+  // Get user's principal to verify ownership
+  let userPrincipal: any;
+  if (identityOrAgent && typeof identityOrAgent === 'object' && 'getPrincipal' in identityOrAgent) {
+    userPrincipal = await identityOrAgent.getPrincipal();
+  } else {
+    userPrincipal = (identityOrAgent as any).getPrincipal();
+  }
+  
+  // Convert principal to account identifier for EXT canister
+  const accountId = principalToAccountIdentifier(userPrincipal);
+  
+  // Get actual tokens owned by the user from EXT canister
+  const tokensResult = await nftsActor.tokens(accountId);
+  const ownedTokenIndices = new Set<number>();
+  
+  if ('ok' in tokensResult && tokensResult.ok) {
+    tokensResult.ok.forEach((tokenIndex: number) => {
+      ownedTokenIndices.add(Number(tokenIndex));
+    });
+  }
+  
   // Get all marketplace listings to check if any of our bots are listed
   let listingsMap = new Map<number, { price: number }>();
   try {
@@ -159,46 +201,52 @@ export const listMyRegisteredBots = async (identityOrAgent: IdentityOrAgent): Pr
     console.warn('Failed to fetch listings:', err);
   }
   
-  return result.map(bot => {
-    const tokenIndex = Number(bot.tokenIndex);
-    const listingInfo = listingsMap.get(tokenIndex);
-    
-    // Extract activeMission from stats
-    const activeMission = bot.stats.activeMission && bot.stats.activeMission.length > 0 
-      ? bot.stats.activeMission[0] 
-      : undefined;
-    
-    return {
-      tokenIndex: bot.tokenIndex,
-      isInitialized: true, // All registered bots are initialized
-      name: bot.name.length > 0 ? bot.name[0] : undefined,
-      currentOwner: bot.stats.ownerPrincipal.toText(),
-      stats: bot.stats,
-      currentStats: bot.currentStats,
-      maxStats: bot.maxStats,
-      upgradeCostsV2: bot.upgradeCostsV2,
-      isListed: !!listingInfo,
-      listPrice: listingInfo?.price,
-      activeUpgrade: bot.activeUpgrade.length > 0 ? bot.activeUpgrade[0] : undefined,
-      activeMission,
-      upcomingRaces: bot.upcomingRaces.map(race => ({
-        raceId: Number(race.raceId),
-        name: race.name,
-        startTime: race.startTime,
-        entryDeadline: race.entryDeadline,
-        entryFee: race.entryFee,
-        terrain: race.terrain,
-      })).sort((a, b) => Number(a.startTime - b.startTime)),
-      eligibleRaces: bot.eligibleRaces.map(race => ({
-        raceId: Number(race.raceId),
-        name: race.name,
-        startTime: race.startTime,
-        entryDeadline: race.entryDeadline,
-        entryFee: race.entryFee,
-        terrain: race.terrain,
-      })).sort((a, b) => Number(a.startTime - b.startTime)),
-    };
-  });
+  // Filter to only include bots that the user actually owns
+  return result
+    .filter(bot => {
+      const tokenIndex = Number(bot.tokenIndex);
+      return ownedTokenIndices.has(tokenIndex);
+    })
+    .map(bot => {
+      const tokenIndex = Number(bot.tokenIndex);
+      const listingInfo = listingsMap.get(tokenIndex);
+      
+      // Extract activeMission from stats
+      const activeMission = bot.stats.activeMission && bot.stats.activeMission.length > 0 
+        ? bot.stats.activeMission[0] 
+        : undefined;
+      
+      return {
+        tokenIndex: bot.tokenIndex,
+        isInitialized: true, // All registered bots are initialized
+        name: bot.name.length > 0 ? bot.name[0] : undefined,
+        currentOwner: bot.stats.ownerPrincipal.toText(),
+        stats: bot.stats,
+        currentStats: bot.currentStats,
+        maxStats: bot.maxStats,
+        upgradeCostsV2: bot.upgradeCostsV2,
+        isListed: !!listingInfo,
+        listPrice: listingInfo?.price,
+        activeUpgrade: bot.activeUpgrade.length > 0 ? bot.activeUpgrade[0] : undefined,
+        activeMission,
+        upcomingRaces: bot.upcomingRaces.map(race => ({
+          raceId: Number(race.raceId),
+          name: race.name,
+          startTime: race.startTime,
+          entryDeadline: race.entryDeadline,
+          entryFee: race.entryFee,
+          terrain: race.terrain,
+        })).sort((a, b) => Number(a.startTime - b.startTime)),
+        eligibleRaces: bot.eligibleRaces.map(race => ({
+          raceId: Number(race.raceId),
+          name: race.name,
+          startTime: race.startTime,
+          entryDeadline: race.entryDeadline,
+          entryFee: race.entryFee,
+          terrain: race.terrain,
+        })).sort((a, b) => Number(a.startTime - b.startTime)),
+      };
+    });
 };
 
 /**
@@ -401,7 +449,14 @@ export const upgradeBot = async (
     
     // Get upgrade cost based on type
     let upgradeCost: bigint;
-    const upgradeCosts = details.upgradeCosts;
+    const upgradeCostsOpt = details.upgradeCosts;
+    
+    // Handle optional upgradeCosts (Candid opt type returns [] or [value])
+    if (!upgradeCostsOpt || (Array.isArray(upgradeCostsOpt) && upgradeCostsOpt.length === 0)) {
+      throw new Error('Bot not initialized for racing');
+    }
+    
+    const upgradeCosts = Array.isArray(upgradeCostsOpt) ? upgradeCostsOpt[0] : upgradeCostsOpt;
     
     // Handle the UpgradeType variant structure
     if ('Velocity' in upgradeType) {
@@ -456,7 +511,7 @@ export const cancelUpgrade = async (
 
 /**
  * Strip a bot to reset all upgrade bonuses and refund parts (with 40% penalty).
- * Cost escalates with each strip: 1 ICP, 2 ICP, 3 ICP, etc.
+ * Cost: 1 ICP (flat rate)
  * This function automatically handles the ICRC-2 approval before stripping.
  * Preserves: Pity counter
  * Resets: All stat bonuses, all upgrade counts
@@ -651,6 +706,32 @@ export const completeScavenging = async (
 };
 
 /**
+ * Convert parts from one type to another with 25% conversion cost.
+ * @param fromType Part type to convert from (SpeedChip, PowerCoreFragment, ThrusterKit, GyroModule, UniversalPart)
+ * @param toType Part type to convert to
+ * @param amount Number of parts to convert
+ * @param identityOrAgent Required identity for authentication
+ * @returns Success message with conversion details
+ */
+export const convertParts = async (
+  fromType: string,
+  toType: string,
+  amount: number,
+  identityOrAgent: IdentityOrAgent
+): Promise<string> => {
+  const actor = await getActor(identityOrAgent);
+  
+  const result = await actor.web_convert_parts(fromType, toType, BigInt(amount));
+  
+  if ('ok' in result) {
+    return result.ok as string;
+  } else if ('err' in result) {
+    throw new Error(result.err as string);
+  }
+  throw new Error('Unexpected response from canister');
+};
+
+/**
  * API Key Management
  */
 
@@ -793,21 +874,15 @@ export const getUserWalletNFTs = async (identityOrAgent: IdentityOrAgent): Promi
   const accountId = principalToAccountIdentifier(userPrincipal);
   
   // Get user's tokens from the NFT canister
-  console.log('[getUserWalletNFTs] Fetching tokens for account ID:', accountId);
   const result = await nftsActor.tokens(accountId);
-  console.log('[getUserWalletNFTs] Raw result from tokens():', result);
   
   if ('err' in result) {
     console.error('[getUserWalletNFTs] Error fetching tokens:', result.err);
     throw new Error(`Failed to fetch user tokens: ${JSON.stringify(result.err)}`);
   }
   
-  console.log('[getUserWalletNFTs] result.ok type:', typeof result.ok, 'isArray:', Array.isArray(result.ok), 'isUint32Array:', result.ok instanceof Uint32Array);
-  console.log('[getUserWalletNFTs] result.ok contents:', result.ok);
-  
   // Handle token indices - result.ok is a Uint32Array or array of numbers
   const tokenIndices = Array.from(result.ok).map((tokenIndex: any) => {
-    console.log('[getUserWalletNFTs] Processing tokenIndex:', tokenIndex, 'type:', typeof tokenIndex);
     if (tokenIndex === null || tokenIndex === undefined) {
       console.error('Received null/undefined tokenIndex:', tokenIndex);
       return null;
@@ -817,12 +892,9 @@ export const getUserWalletNFTs = async (identityOrAgent: IdentityOrAgent): Promi
     return isNaN(value) ? null : value;
   }).filter((idx: number | null): idx is number => idx !== null);
   
-  console.log('[getUserWalletNFTs] Processed token indices:', tokenIndices);
-  
   // Get registered bots to check which ones are already registered
   const racingActor = await getActor(identityOrAgent);
   const registeredBotsResult = await racingActor.web_list_my_registered_bots();
-  console.log('[getUserWalletNFTs] Registered bots:', registeredBotsResult.map((bot: any) => Number(bot.tokenIndex)));
   const registeredTokenIndices = new Set(registeredBotsResult.map((bot: any) => Number(bot.tokenIndex)));
   
   // Return all tokens with their registration status
@@ -830,9 +902,6 @@ export const getUserWalletNFTs = async (identityOrAgent: IdentityOrAgent): Promi
     tokenIndex,
     isRegistered: registeredTokenIndices.has(tokenIndex),
   }));
-  
-  console.log('[getUserWalletNFTs] Final wallet NFTs:', walletNFTs);
-  console.log('[getUserWalletNFTs] Unregistered NFTs:', walletNFTs.filter(nft => !nft.isRegistered));
   
   return walletNFTs;
 };

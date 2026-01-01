@@ -5,6 +5,7 @@ import Nat32 "mo:base/Nat32";
 import Int "mo:base/Int";
 import Float "mo:base/Float";
 import Time "mo:base/Time";
+import Array "mo:base/Array";
 
 import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
@@ -12,6 +13,7 @@ import Json "mo:json";
 
 import ToolContext "./ToolContext";
 import ExtIntegration "../ExtIntegration";
+import RacingSimulator "../RacingSimulator";
 
 module {
   let RECHARGE_COOLDOWN : Int = 21600000000000; // 6 hours in nanoseconds
@@ -260,10 +262,77 @@ module {
                         case (#ScrapHeaps) { "ScrapHeaps" };
                         case (#AbandonedSettlements) { "AbandonedSettlements" };
                         case (#DeadMachineFields) { "DeadMachineFields" };
+                        case (#RepairBay) { "RepairBay" };
+                        case (#ChargingStation) { "ChargingStation" };
                       };
                       msg #= "   🔍 SCAVENGING: Active (" # Nat.toText(Int.abs(hoursElapsed)) # "h elapsed) in " # zoneName # " | Pending: " # Nat.toText(totalPending) # " parts ✅ Ready to collect!\n";
                     };
                     case (null) {};
+                  };
+
+                  // Show next race if bot is entered
+                  let nftId = Nat.toText(Nat32.toNat(tokenIndex));
+                  let allRaces = ctx.raceManager.getAllRaces();
+                  var nextRace : ?RacingSimulator.Race = null;
+
+                  label findRace for (race in allRaces.vals()) {
+                    // Check if bot is entered in this race
+                    let isEntered = Array.find<RacingSimulator.RaceEntry>(
+                      race.entries,
+                      func(entry) { entry.nftId == nftId },
+                    );
+
+                    switch (isEntered) {
+                      case (?_) {
+                        // Found a race with this bot
+                        switch (race.status) {
+                          case (#Upcoming) {
+                            // Only show upcoming races, find the nearest one
+                            switch (nextRace) {
+                              case (null) { nextRace := ?race };
+                              case (?current) {
+                                if (race.startTime < current.startTime) {
+                                  nextRace := ?race;
+                                };
+                              };
+                            };
+                          };
+                          case (#InProgress) {
+                            // In-progress race takes priority
+                            nextRace := ?race;
+                            break findRace;
+                          };
+                          case _ {};
+                        };
+                      };
+                      case null {};
+                    };
+                  };
+
+                  switch (nextRace) {
+                    case (?race) {
+                      let statusText = switch (race.status) {
+                        case (#Upcoming) { "🕐 UPCOMING" };
+                        case (#InProgress) { "🏁 IN PROGRESS" };
+                        case _ { "" };
+                      };
+                      let timeUntil = race.startTime - now;
+                      let hoursUntil = timeUntil / (3600 * 1_000_000_000);
+                      let minsUntil = (timeUntil % (3600 * 1_000_000_000)) / (60 * 1_000_000_000);
+
+                      if (race.status == #InProgress) {
+                        msg #= "   🏁 RACE: " # statusText # " - Race #" # Nat.toText(race.raceId) # " (" # race.name # ")\n";
+                      } else if (hoursUntil > 0) {
+                        msg #= "   🏁 NEXT RACE: " # statusText # " in " # Nat.toText(Int.abs(hoursUntil)) # "h " # Nat.toText(Int.abs(minsUntil)) # "m - Race #" # Nat.toText(race.raceId) # " (" # race.name # ")\n";
+                      } else if (minsUntil > 0) {
+                        msg #= "   🏁 NEXT RACE: " # statusText # " in " # Nat.toText(Int.abs(minsUntil)) # "m - Race #" # Nat.toText(race.raceId) # " (" # race.name # ")\n";
+                      } else {
+                        msg #= "   🏁 NEXT RACE: " # statusText # " - Race #" # Nat.toText(race.raceId) # " (" # race.name # ")\n";
+                      };
+                    };
+                    case (null) {
+                      msg #= "   🏁 NEXT RACE: None registered\n";
+                    };
                   };
 
                   // Show service cooldowns (using Food faction synergy adjusted cooldown)

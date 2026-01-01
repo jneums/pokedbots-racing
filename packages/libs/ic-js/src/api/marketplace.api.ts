@@ -24,13 +24,21 @@ export interface MarketplaceListing {
   basePowerCore: number;
   baseAcceleration: number;
   baseStability: number;
-  overallRating: number;
+  currentSpeed?: number; // Present if initialized
+  currentPowerCore?: number; // Present if initialized
+  currentAcceleration?: number; // Present if initialized
+  currentStability?: number; // Present if initialized
+  baseRating: number; // Rating based on base+upgrades (no condition penalty) - used for race class
+  currentRating: number; // Rating with condition/battery penalties
+  overallRating: number; // Same as baseRating for backward compatibility
   wins: number;
   racesEntered: number;
   winRate: number;
   imageUrl: string;
   isInitialized: boolean;
   backgroundColor?: string;
+  battery?: number; // Present if initialized
+  condition?: number; // Present if initialized
 }
 
 export interface BrowseMarketplaceParams {
@@ -41,7 +49,7 @@ export interface BrowseMarketplaceParams {
   maxPrice?: number;
   faction?: string;
   raceClass?: string;
-  sortBy?: "price" | "rating";
+  sortBy?: "price" | "rating" | "index";
   sortDesc?: boolean;
   limit?: number;
   tokenIndex?: string; // Search by token index (partial match)
@@ -67,6 +75,11 @@ function isPlugAgent(identityOrAgent: any): boolean {
 async function getRacingActorFromIdentity(identityOrAgent: IdentityOrAgent): Promise<PokedBotsRacing._SERVICE> {
   // Check if it's a Plug agent - use window.ic.plug.createActor
   if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
+    // Check if Plug is still connected before calling createActor (which can trigger popup)
+    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
+    if (!isConnected) {
+      throw new Error('Plug session expired. Please reconnect.');
+    }
     const canisterId = getCanisterId('POKEDBOTS_RACING');
     return await (globalThis as any).window.ic.plug.createActor({
       canisterId,
@@ -79,6 +92,11 @@ async function getRacingActorFromIdentity(identityOrAgent: IdentityOrAgent): Pro
 async function getNFTsActorFromIdentity(identityOrAgent: IdentityOrAgent): Promise<PokedBotsNFTs._SERVICE> {
   // Check if it's a Plug agent - use window.ic.plug.createActor
   if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
+    // Check if Plug is still connected before calling createActor (which can trigger popup)
+    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
+    if (!isConnected) {
+      throw new Error('Plug session expired. Please reconnect.');
+    }
     const canisterId = getCanisterId('POKEDBOTS_NFTS');
     return await (globalThis as any).window.ic.plug.createActor({
       canisterId,
@@ -91,6 +109,11 @@ async function getNFTsActorFromIdentity(identityOrAgent: IdentityOrAgent): Promi
 async function getLedgerActorFromIdentity(identityOrAgent: IdentityOrAgent): Promise<Ledger._SERVICE> {
   // Check if it's a Plug agent - use window.ic.plug.createActor
   if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
+    // Check if Plug is still connected before calling createActor (which can trigger popup)
+    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
+    if (!isConnected) {
+      throw new Error('Plug session expired. Please reconnect.');
+    }
     const canisterId = getCanisterId('ICP_LEDGER');
     return await (globalThis as any).window.ic.plug.createActor({
       canisterId,
@@ -126,18 +149,17 @@ async function loadBackgrounds(): Promise<BackgroundData> {
 }
 
 /**
- * Browse marketplace listings - gets EXT listings and enriches with precomputed stats
+ * Browse marketplace listings - gets EXT listings then enriches with racing stats from backend
  */
 export async function browseMarketplace(
   identityOrAgent: IdentityOrAgent,
   params: BrowseMarketplaceParams = {}
 ): Promise<BrowseMarketplaceResult> {
   const nftActor = await getNFTsActorFromIdentity(identityOrAgent);
+  const racingActor = await getRacingActorFromIdentity(identityOrAgent);
   const nftCanisterId = getCanisterId('POKEDBOTS_NFTS');
 
-  // Load precomputed stats and backgrounds
-  const allStats = await loadPrecomputedStats();
-  const statsMap = new Map(allStats.map(s => [s.tokenId, s]));
+  // Load backgrounds for terrain display
   const backgroundData = await loadBackgrounds();
 
   // Get all listings from EXT canister (fast query call)
@@ -147,39 +169,106 @@ export async function browseMarketplace(
     return { listings: [], hasMore: false };
   }
 
-  // Merge EXT listings with precomputed stats and backgrounds
+  // Extract token indices from EXT listings
+  const tokenIndices = extListings.map(([tokenIndex32, _listing, _metadata]: any) => tokenIndex32);
+
+  // Get enriched data from racing canister (query call with token indices)
+  const enrichedData = await racingActor.get_marketplace_bots_enriched(tokenIndices);
+  
+  // Load precomputed stats for faction info on uninitialized bots
+  const precomputedStats = await loadPrecomputedStats();
+  const precomputedMap = new Map(precomputedStats.map(s => [s.tokenId, s]));
+  
+  // Create a map of enriched data by token index for quick lookup
+  const enrichedMap = new Map(enrichedData.map((item: any) => [Number(item.tokenIndex), item]));
+
+  // Merge EXT listings with enriched racing data
   let enrichedListings: MarketplaceListing[] = extListings.map(([tokenIndex32, listing, _metadata]: any) => {
     const tokenIndex = Number(tokenIndex32);
     const priceICP = Number(listing.price) / 100_000_000;
-    const stats = statsMap.get(tokenIndex);
     const backgroundColor = backgroundData.backgrounds[tokenIndex.toString()];
-    
-    // Calculate overall rating from base stats
-    const baseSpeed = stats?.speed || 0;
-    const basePowerCore = stats?.powerCore || 0;
-    const baseAcceleration = stats?.acceleration || 0;
-    const baseStability = stats?.stability || 0;
-    const overallRating = Math.floor((baseSpeed + basePowerCore + baseAcceleration + baseStability) / 4);
+    const enriched = enrichedMap.get(tokenIndex);
+    const precomputed = precomputedMap.get(tokenIndex);
     
     const tokenId = `${tokenIndex}`.padStart(8, '0');
     const imageUrl = `https://${nftCanisterId}.raw.icp0.io/?tokenid=${nftCanisterId}-${tokenId}&type=thumbnail`;
     
-    return {
-      tokenIndex,
-      price: priceICP,
-      faction: stats?.faction || null,
-      baseSpeed,
-      basePowerCore,
-      baseAcceleration,
-      baseStability,
-      overallRating,
-      wins: 0, // Not available from precomputed stats
-      racesEntered: 0, // Not available from precomputed stats
-      winRate: 0, // Not available from precomputed stats
-      imageUrl,
-      isInitialized: false, // Not available from precomputed stats
-      backgroundColor,
-    };
+    // Candid optional types are converted to arrays in JS: [] = null, [value] = Some(value)
+    const racingStats = enriched?.racingStats && Array.isArray(enriched.racingStats) && enriched.racingStats.length > 0 
+      ? enriched.racingStats[0] 
+      : null;
+    
+    if (enriched?.isInitialized && racingStats) {
+      // Bot has racing history
+      const stats = racingStats;
+      return {
+        tokenIndex,
+        price: priceICP,
+        faction: stats.faction || precomputed?.faction || null,
+        baseSpeed: Number(stats.baseSpeed || 0),
+        basePowerCore: Number(stats.basePowerCore || 0),
+        baseAcceleration: Number(stats.baseAcceleration || 0),
+        baseStability: Number(stats.baseStability || 0),
+        currentSpeed: Number(stats.currentSpeed || stats.baseSpeed || 0),
+        currentPowerCore: Number(stats.currentPowerCore || stats.basePowerCore || 0),
+        currentAcceleration: Number(stats.currentAcceleration || stats.baseAcceleration || 0),
+        currentStability: Number(stats.currentStability || stats.baseStability || 0),
+        baseRating: Number(stats.baseRating || stats.overallRating || 0),
+        currentRating: Number(stats.currentRating || stats.overallRating || 0),
+        overallRating: Number(stats.baseRating || stats.overallRating || 0),
+        wins: Number(stats.wins || 0),
+        racesEntered: Number(stats.racesEntered || 0),
+        winRate: Number(stats.winRate || 0),
+        imageUrl,
+        isInitialized: true,
+        backgroundColor,
+        battery: Number(stats.battery || 0),
+        condition: Number(stats.condition || 0),
+      };
+    } else if (enriched?.baseStats) {
+      // Uninitialized bot - show base stats and get faction from precomputed data
+      const baseStats = enriched.baseStats;
+      const overallRating = Math.floor((Number(baseStats.speed) + Number(baseStats.powerCore) + Number(baseStats.acceleration) + Number(baseStats.stability)) / 4);
+      
+      return {
+        tokenIndex,
+        price: priceICP,
+        faction: precomputed?.faction || null,
+        baseSpeed: Number(baseStats.speed),
+        basePowerCore: Number(baseStats.powerCore),
+        baseAcceleration: Number(baseStats.acceleration),
+        baseStability: Number(baseStats.stability),
+        baseRating: overallRating,
+        currentRating: overallRating,
+        overallRating,
+        wins: 0,
+        racesEntered: 0,
+        winRate: 0,
+        imageUrl,
+        isInitialized: false,
+        backgroundColor,
+      };
+    } else {
+      // Fallback - should not happen but handle gracefully
+      return {
+        tokenIndex,
+        price: priceICP,
+        faction: precomputed?.faction || null,
+        baseSpeed: 0,
+        basePowerCore: 0,
+        baseAcceleration: 0,
+        baseStability: 0,
+        baseRating: 0,
+        currentRating: 0,
+        overallRating: 0,
+        wins: 0,
+        racesEntered: 0,
+        winRate: 0,
+        imageUrl,
+        isInitialized: false,
+        backgroundColor,
+      };
+    }
   });
 
   // Apply filters
@@ -258,6 +347,199 @@ export async function browseMarketplace(
   return {
     listings: pageListings,
     hasMore: endIdx < enrichedListings.length,
+  };
+}
+
+/**
+ * Browse all bots in the collection (not just marketplace listings)
+ * Uses precomputed stats and enriches with get_bot_profile for each bot
+ */
+export async function browseAllBots(
+  identityOrAgent: IdentityOrAgent,
+  params: BrowseMarketplaceParams = {}
+): Promise<BrowseMarketplaceResult> {
+  const racingActor = await getRacingActorFromIdentity(identityOrAgent);
+  const nftActor = await getNFTsActorFromIdentity(identityOrAgent);
+  const nftCanisterId = getCanisterId('POKEDBOTS_NFTS');
+
+  // Load precomputed stats and backgrounds
+  const [precomputedStats, backgroundData, extListings] = await Promise.all([
+    loadPrecomputedStats(),
+    loadBackgrounds(),
+    nftActor.listings()
+  ]);
+
+  // Create a map of listed prices
+  const priceMap = new Map<number, number>();
+  for (const [tokenIndex32, listing] of extListings) {
+    priceMap.set(Number(tokenIndex32), Number(listing.price) / 100_000_000);
+  }
+
+  // Apply filters first (before fetching profiles - more efficient)
+  let filteredStats = [...precomputedStats];
+
+  // Faction filter - normalize faction names (handle "Ultimate-master" vs "UltimateMaster")
+  if (params.faction) {
+    const normalizedFilter = params.faction.toLowerCase().replace(/-/g, '');
+    filteredStats = filteredStats.filter(s => {
+      const normalizedFaction = s.faction.toLowerCase().replace(/-/g, '');
+      return normalizedFaction === normalizedFilter;
+    });
+  }
+
+  // Rating filter (based on base stats)
+  if (params.minRating !== undefined || params.maxRating !== undefined) {
+    filteredStats = filteredStats.filter(s => {
+      const rating = Math.floor((s.speed + s.powerCore + s.acceleration + s.stability) / 4);
+      if (params.minRating !== undefined && rating < params.minRating) return false;
+      if (params.maxRating !== undefined && rating > params.maxRating) return false;
+      return true;
+    });
+  }
+
+  // Race class filter
+  if (params.raceClass) {
+    filteredStats = filteredStats.filter(s => {
+      const rating = Math.floor((s.speed + s.powerCore + s.acceleration + s.stability) / 4);
+      switch (params.raceClass) {
+        case 'SilentKlan': return rating >= 50;
+        case 'Elite': return rating >= 40 && rating < 50;
+        case 'Raider': return rating >= 30 && rating < 40;
+        case 'Junker': return rating >= 20 && rating < 30;
+        case 'Scrap': return rating < 20;
+        default: return true;
+      }
+    });
+  }
+
+  // Token index search
+  if (params.tokenIndex !== undefined && params.tokenIndex.trim() !== '') {
+    const searchStr = params.tokenIndex.trim();
+    filteredStats = filteredStats.filter(s => s.tokenId.toString().startsWith(searchStr));
+  }
+
+  // Sort the filtered stats
+  const sortKey = params.sortBy || 'rating';
+  // Default: ascending for price (cheap first), descending for rating (best first), ascending for index
+  const descending = params.sortDesc !== undefined 
+    ? params.sortDesc 
+    : (sortKey === 'rating');
+
+  filteredStats.sort((a, b) => {
+    let comparison = 0;
+    switch (sortKey) {
+      case 'price': {
+        const priceA = priceMap.get(a.tokenId) || 0;
+        const priceB = priceMap.get(b.tokenId) || 0;
+        comparison = priceA - priceB;
+        break;
+      }
+      case 'rating': {
+        const ratingA = Math.floor((a.speed + a.powerCore + a.acceleration + a.stability) / 4);
+        const ratingB = Math.floor((b.speed + b.powerCore + b.acceleration + b.stability) / 4);
+        comparison = ratingA - ratingB;
+        break;
+      }
+      case 'index': {
+        comparison = a.tokenId - b.tokenId;
+        break;
+      }
+    }
+    return descending ? -comparison : comparison;
+  });
+
+  // Pagination
+  const pageSize = params.limit || 20;
+  let startIdx = 0;
+  
+  if (params.after !== undefined) {
+    const foundIdx = filteredStats.findIndex(s => s.tokenId === params.after);
+    if (foundIdx !== -1) {
+      startIdx = foundIdx + 1;
+    }
+  }
+
+  const endIdx = Math.min(startIdx + pageSize, filteredStats.length);
+  const pageStats = filteredStats.slice(startIdx, endIdx);
+
+  // Now fetch profiles for this page only
+  const listings: MarketplaceListing[] = await Promise.all(
+    pageStats.map(async (stat) => {
+      const tokenIndex = stat.tokenId;
+      const backgroundColor = backgroundData.backgrounds[tokenIndex.toString()];
+      const tokenId = `${tokenIndex}`.padStart(8, '0');
+      const imageUrl = `https://${nftCanisterId}.raw.icp0.io/?tokenid=${nftCanisterId}-${tokenId}&type=thumbnail`;
+      const price = priceMap.get(tokenIndex) || 0;
+
+      try {
+        const profile = await racingActor.get_bot_profile(BigInt(tokenIndex));
+        const profileData = profile && profile.length > 0 ? profile[0] : null;
+
+        if (profileData?.isInitialized && profileData.stats) {
+          // Extract faction safely
+          let factionName = stat.faction;
+          if (profileData.faction && Array.isArray(profileData.faction) && profileData.faction.length > 0) {
+            const factionObj = profileData.faction[0];
+            if (factionObj && typeof factionObj === 'object') {
+              factionName = Object.keys(factionObj)[0];
+            }
+          }
+          
+          return {
+            tokenIndex,
+            price,
+            faction: factionName,
+            baseSpeed: Number(stat.speed),
+            basePowerCore: Number(stat.powerCore),
+            baseAcceleration: Number(stat.acceleration),
+            baseStability: Number(stat.stability),
+            currentSpeed: Number(profileData.stats.speed),
+            currentPowerCore: Number(profileData.stats.powerCore),
+            currentAcceleration: Number(profileData.stats.acceleration),
+            currentStability: Number(profileData.stats.stability),
+            baseRating: Number(profileData.stats.overallRating),
+            currentRating: Number(profileData.stats.overallRating),
+            overallRating: Number(profileData.stats.overallRating),
+            wins: Number(profileData.career.wins),
+            racesEntered: Number(profileData.career.racesEntered),
+            winRate: profileData.career.racesEntered > 0 
+              ? (Number(profileData.career.wins) / Number(profileData.career.racesEntered)) * 100 
+              : 0,
+            imageUrl,
+            isInitialized: true,
+            backgroundColor,
+          };
+        }
+      } catch (err) {
+        // If profile fetch fails, fall back to base stats
+      }
+
+      // Uninitialized or error - use base stats
+      const overallRating = Math.floor((stat.speed + stat.powerCore + stat.acceleration + stat.stability) / 4);
+      return {
+        tokenIndex,
+        price,
+        faction: stat.faction,
+        baseSpeed: stat.speed,
+        basePowerCore: stat.powerCore,
+        baseAcceleration: stat.acceleration,
+        baseStability: stat.stability,
+        baseRating: overallRating,
+        currentRating: overallRating,
+        overallRating,
+        wins: 0,
+        racesEntered: 0,
+        winRate: 0,
+        imageUrl,
+        isInitialized: false,
+        backgroundColor,
+      };
+    })
+  );
+
+  return {
+    listings,
+    hasMore: endIdx < filteredStats.length,
   };
 }
 

@@ -25,7 +25,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_recharge_robot";
     title = ?"Recharge Robot Battery";
-    description = ?"Recharge robot battery. Costs 0.1 ICP + 0.0001 fee. Restores 75 battery. Does NOT restore condition (use garage_repair_robot). 6hr cooldown. Requires ICRC-2 approval.\n\n**OVERCHARGE MECHANIC:**\n• Base overcharge: (100 - battery) × 0.4, max 40%\n• Efficiency affected by CONDITION + RNG: 0.5 + (condition/200) + random(-0.2, +0.2)\n  - 100% condition: 80-120% efficiency (reliable)\n  - 50% condition: 55-95% efficiency (risky)\n  - 0% condition: 30-70% efficiency (wildcard)\n• Examples at 100% condition:\n  - 10% battery → 28-43% overcharge (avg 36%, capped at 40%)\n  - 50% battery → 16-24% overcharge (avg 20%)\n• Overcharge consumed in next race for one-time stat boost:\n  - Speed: +0.15% per 1% overcharge (max +6% at 40%)\n  - Acceleration: +0.15% per 1% overcharge (max +6% at 40%)\n  - Stability: -0.1% per 1% overcharge (max -4% at 40%)\n  - Power Core: -0.1% per 1% overcharge (max -4% at 40%)\n• ⚠️ REPAIR RESETS OVERCHARGE: Repairing clears overcharge to prevent exploit cycles\n• Strategic: Low battery + high condition = reliable boost";
+    description = ?"Recharge robot battery. Costs 0.1 ICP + 0.0001 fee. Restores 50-90 battery (RNG-based). Does NOT restore condition (use garage_repair_robot). 6hr cooldown. Requires ICRC-2 approval.\n\n**BATTERY RECHARGE:**\n• Base recharge: 70 battery\n• RNG variance: ±20 battery (50-90 range)\n• Cannot predict exact amount - waiting for 0% is risky!\n\n**OVERCHARGE MECHANIC:**\n• Base overcharge: (100 - battery) × 0.4, max 40%\n• Efficiency affected by CONDITION + HIGH RNG: 0.4 + (condition/200) + random(-0.35, +0.35)\n  - 100% condition: 55-135% efficiency (volatile!)\n  - 50% condition: 30-110% efficiency (very risky)\n  - 0% condition: 5-75% efficiency (wildcard)\n• Examples at 100% condition:\n  - 10% battery → 22-54% overcharge (highly variable, capped at 40%)\n  - 50% battery → 11-27% overcharge (unpredictable)\n• Overcharge consumed in next race for one-time stat boost:\n  - Speed: +0.15% per 1% overcharge (max +6% at 40%)\n  - Acceleration: +0.15% per 1% overcharge (max +6% at 40%)\n  - Stability: -0.1% per 1% overcharge (max -4% at 40%)\n  - Power Core: -0.1% per 1% overcharge (max -4% at 40%)\n• ⚠️ REPAIR RESETS OVERCHARGE: Repairing clears overcharge to prevent exploit cycles\n• Strategic: High variance makes optimization unpredictable";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -150,37 +150,43 @@ module {
           };
           case (#Ok(blockIndex)) {
             // Payment successful, calculate battery and overcharge
-            let totalRecharge = 75;
             let currentBattery = racingStats.battery;
             let currentCondition = racingStats.condition;
             let maxBattery = 100;
 
-            // Battery increases by 75 (capped at 100)
+            // Generate pseudo-random values based on timestamp and token index
+            let seed = Int.abs(now) + tokenIndex;
+            let randomHash1 = seed % 1000; // 0-999
+            let randomHash2 = (seed * 7919) % 1000; // Different seed for battery RNG
+
+            // BATTERY RECHARGE: 50-90 range (base 70 ± 20)
+            // This makes waiting for 0% battery risky - you might only get +50!
+            let batteryRNG = (Float.fromInt(randomHash2) / 1000.0) * 40.0 - 20.0; // -20 to +20
+            let totalRecharge = Int.abs(Float.toInt(70.0 + batteryRNG)); // 50-90
             let newBattery = Nat.min(maxBattery, currentBattery + totalRecharge);
 
             // Overcharge based on how LOW battery was before recharge
             // Lower battery = bigger overcharge potential (risk/reward mechanic)
-            // Base formula: (100 - currentBattery) * 0.4, max 40%
+            // Base formula: (100 - currentBattery) * 0.4, theoretical max 40%
+            // With efficiency variance (0.55-1.35), actual max is ~54%
             let batteryDeficit = if (currentBattery >= 100) { 0 } else {
               100 - currentBattery;
             };
             let baseOvercharge = Float.fromInt(batteryDeficit) * 0.4;
 
-            // Condition affects efficiency with randomness
-            // efficiency = 0.5 + (condition / 200) + random(-0.2, +0.2)
-            // At 100% condition: 0.5 + 0.5 + random = 0.8-1.2 (avg 1.0)
-            // At 50% condition: 0.5 + 0.25 + random = 0.55-0.95 (avg 0.75)
-            // At 0% condition: 0.5 + 0 + random = 0.3-0.7 (avg 0.5)
+            // Condition affects efficiency with HIGH randomness
+            // efficiency = 0.4 + (condition / 200) + random(-0.35, +0.35)
+            // At 100% condition: 0.4 + 0.5 + random = 0.55-1.35 (avg 0.9, highly variable)
+            // At 50% condition: 0.4 + 0.25 + random = 0.30-1.10 (avg 0.65, very risky)
+            // At 0% condition: 0.4 + 0 + random = 0.05-0.75 (avg 0.4, wildcard)
             let conditionBonus = Float.fromInt(currentCondition) / 200.0;
 
-            // Generate pseudo-random variance based on timestamp and token index
-            let seed = Int.abs(now) + tokenIndex;
-            let randomHash = seed % 1000; // 0-999
-            let randomVariance = (Float.fromInt(randomHash) / 1000.0) * 0.4 - 0.2; // -0.2 to +0.2
+            // INCREASED RNG variance: -0.35 to +0.35 (was -0.2 to +0.2)
+            let randomVariance = (Float.fromInt(randomHash1) / 1000.0) * 0.7 - 0.35; // -0.35 to +0.35
 
-            let efficiency = 0.5 + conditionBonus + randomVariance;
+            let efficiency = 0.4 + conditionBonus + randomVariance;
             let finalOvercharge = baseOvercharge * efficiency;
-            let newOvercharge = Nat.min(40, Int.abs(Float.toInt(finalOvercharge)));
+            let newOvercharge = Nat.min(60, Int.abs(Float.toInt(finalOvercharge))); // Cap at 60 for safety
 
             let batteryRestored = if (newBattery >= currentBattery) {
               newBattery - currentBattery;

@@ -58,6 +58,9 @@ export default function Navigation() {
             <Link to="/marketplace" className={linkClass('/marketplace')}>
               Marketplace
             </Link>
+            <Link to="/guides" className={linkClass('/guides')}>
+              Guides
+            </Link>
             <WalletButton />
           </nav>
           
@@ -152,13 +155,6 @@ export default function Navigation() {
                     onClick={() => setIsOpen(false)}
                   >
                     Guides
-                  </Link>
-                  <Link 
-                    to="/docs" 
-                    className={mobileLinkClass('/docs')}
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Docs
                   </Link>
                   <a 
                     href="https://github.com/jneums/pokedbots-racing" 

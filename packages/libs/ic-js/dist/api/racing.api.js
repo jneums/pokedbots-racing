@@ -17,6 +17,11 @@ function isPlugAgent(identityOrAgent) {
 async function getActor(identityOrAgent) {
     // Check if it's a Plug agent - use window.ic.plug.createActor
     if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && globalThis.window?.ic?.plug?.createActor) {
+        // Check if Plug is still connected before calling createActor (which can trigger popup)
+        const isConnected = await globalThis.window.ic.plug.isConnected();
+        if (!isConnected) {
+            throw new Error('Plug session expired. Please reconnect.');
+        }
         const canisterId = getCanisterId('POKEDBOTS_RACING');
         return await globalThis.window.ic.plug.createActor({
             canisterId,
