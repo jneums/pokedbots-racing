@@ -10,7 +10,7 @@ import {
 import { useAuth } from './useAuth';
 
 // Hook to get betting pool info for a race
-export function useGetBettingPool(raceId: number | undefined) {
+export function useGetBettingPool(raceId: number | undefined, isOpen: boolean = false) {
   const { user } = useAuth();
 
   return useQuery({
@@ -23,8 +23,8 @@ export function useGetBettingPool(raceId: number | undefined) {
       return bettingGetPoolInfo(user?.agent, raceId);
     },
     enabled: !!raceId,
-    staleTime: 10 * 1000, // 10 seconds - odds change frequently
-    refetchInterval: 10 * 1000, // Auto-refetch to keep odds fresh
+    staleTime: isOpen ? 3 * 1000 : 30 * 1000, // 3s when open, 30s otherwise
+    refetchInterval: isOpen ? 3 * 1000 : 30 * 1000, // Aggressive refetch only when betting is open
   });
 }
 
@@ -41,8 +41,8 @@ export function useGetMyBets() {
       return bettingGetMyBets(user.agent, 50);
     },
     enabled: !!user?.agent,
-    staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 30 * 1000,
+    staleTime: 15 * 1000, // 15 seconds - reasonable default
+    refetchInterval: 15 * 1000,
   });
 }
 
@@ -94,9 +94,13 @@ export function usePlaceBet() {
         params.amount_icp
       );
     },
-    onSuccess: (_, variables) => {
-      // Invalidate relevant queries to refetch fresh data
-      queryClient.invalidateQueries({ queryKey: ['betting-pool', variables.race_id] });
+    onSuccess: async (_, variables) => {
+      // Immediately refetch to show the bet in UI
+      await queryClient.refetchQueries({ 
+        queryKey: ['betting-pool', variables.race_id],
+        type: 'active'
+      });
+      // Invalidate my bets queries
       queryClient.invalidateQueries({ queryKey: ['my-bets'] });
       queryClient.invalidateQueries({ queryKey: ['my-bets-infinite'] });
     },

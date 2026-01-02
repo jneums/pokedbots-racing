@@ -403,25 +403,26 @@ export default function GaragePage() {
     ? sortedBots.find(b => b.tokenIndex === selectedBotIndex) 
     : null;
 
-  // Initialize selected bot from URL query param
+  // Initialize selected bot from URL query param (only on mount or when URL/bots change)
   useEffect(() => {
     const botParam = searchParams.get('bot');
     if (botParam && sortedBots.length > 0) {
       const botIndex = BigInt(botParam);
       const botExists = sortedBots.some(b => b.tokenIndex === botIndex);
-      if (botExists) {
+      if (botExists && selectedBotIndex !== botIndex) {
         setSelectedBotIndex(botIndex);
-      } else if (selectedBotIndex === null) {
+      } else if (!botExists && sortedBots.length > 0 && selectedBotIndex === null) {
         // Bot from URL doesn't exist, select first bot
         setSelectedBotIndex(sortedBots[0].tokenIndex);
       }
-    } else if (sortedBots.length > 0 && selectedBotIndex === null) {
+    } else if (!botParam && sortedBots.length > 0 && selectedBotIndex === null) {
       // No URL param, auto-select first bot
       setSelectedBotIndex(sortedBots[0].tokenIndex);
     }
-  }, [searchParams, sortedBots, selectedBotIndex]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, sortedBots]);
 
-  // Update URL when selected bot changes
+  // Update URL when selected bot changes (user clicks a bot)
   useEffect(() => {
     if (selectedBotIndex !== null) {
       const currentBot = searchParams.get('bot');

@@ -284,6 +284,44 @@ type RaceResult =
    prizeAmount: nat;
    stats: opt RacingStats;
  };
+type RaceEventType = 
+ variant {
+   CloseRacing: record {
+                  bots: vec text;
+                  gapSeconds: float64;
+                };
+   ExceptionalPerformance: record {
+                             bot: text;
+                             performancePct: float64;
+                           };
+   LargeGap: record {
+               gapSeconds: float64;
+               leader: text;
+             };
+   LeadChange: record {
+                 newLeader: text;
+                 previousLeader: text;
+               };
+   Overtake: record {
+               overtaken: text;
+               overtaker: text;
+             };
+   PoorPerformance: record {
+                      bot: text;
+                      performancePct: float64;
+                    };
+   SegmentComplete: record {
+                      leader: text;
+                      segmentIndex: nat;
+                    };
+ };
+type RaceEvent = 
+ record {
+   description: text;
+   eventType: RaceEventType;
+   segmentIndex: nat;
+   timestamp: float64;
+ };
 type RaceEntry = 
  record {
    enteredAt: int;
@@ -308,6 +346,7 @@ type Race =
    entries: vec RaceEntry;
    entryDeadline: int;
    entryFee: nat;
+   events: vec RaceEvent;
    maxEntries: nat;
    minEntries: nat;
    name: text;

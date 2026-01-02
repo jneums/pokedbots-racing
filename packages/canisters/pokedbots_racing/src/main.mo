@@ -1398,7 +1398,13 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   };
                 };
 
+                // Update race duration to actual slowest time (rounded up)
+                let actualDuration = Nat.max(1, Int.abs(Float.toInt(Float.ceil(slowestTime))));
+                ignore raceManager.updateRaceDuration(raceId, actualDuration);
+                Debug.print("Updated race duration from " # Nat.toText(race.duration) # "s to actual " # Nat.toText(actualDuration) # "s");
+
                 // Convert slowest time to nanoseconds and schedule finish
+                // Note: slowestTime is already divided by 10 for display, so use it as-is for real-time scheduling
                 let raceDurationNanos = Int.abs(Float.toInt(slowestTime * 1_000_000_000.0));
                 let finishTime = race.startTime + raceDurationNanos;
 
@@ -3076,6 +3082,78 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   // Get race details by race ID
   public query func get_race_by_id(raceId : Nat) : async ?RacingSimulator.Race {
     raceManager.getRace(raceId);
+  };
+
+  // Debug: Regenerate commentary for a completed race
+  public shared ({ caller }) func debug_regenerate_race_commentary(raceId : Nat) : async Result.Result<Text, Text> {
+    if (caller != owner) {
+      return #err("Unauthorized: Only owner can regenerate commentary");
+    };
+
+    let ?race = Map.get(stable_races, Map.nhash, raceId) else {
+      return #err("Race not found");
+    };
+
+    // Only regenerate for completed races
+    switch (race.status) {
+      case (#Completed) {};
+      case (_) {
+        return #err("Can only regenerate commentary for completed races");
+      };
+    };
+
+    // Verify race has results
+    let ?results = race.results else {
+      return #err("Race has no results to generate commentary from");
+    };
+
+    // Use original entries to maintain deterministic simulation order
+    // The simulation is seeded and depends on participant order
+    let participants = Array.map<RacingSimulator.RaceEntry, RacingSimulator.RacingParticipant>(
+      race.entries,
+      func(entry) : RacingSimulator.RacingParticipant {
+        {
+          nftId = entry.nftId;
+          owner = entry.owner;
+          stats = Option.get(entry.stats, { speed = 100; stability = 100; powerCore = 100; acceleration = 100 });
+        };
+      },
+    );
+
+    // Call simulator with existing race data to regenerate events
+    let ?(_, newEvents) = raceSimulator.simulateRaceSegmented(race, participants) else {
+      return #err("Failed to regenerate commentary");
+    };
+
+    // Update race with new events
+    let updatedRace : RacingSimulator.Race = {
+      raceId = race.raceId;
+      name = race.name;
+      distance = race.distance;
+      terrain = race.terrain;
+      trackId = race.trackId;
+      trackSeed = race.trackSeed;
+      raceClass = race.raceClass;
+      entryFee = race.entryFee;
+      maxEntries = race.maxEntries;
+      minEntries = race.minEntries;
+      startTime = race.startTime;
+      duration = race.duration;
+      entryDeadline = race.entryDeadline;
+      createdAt = race.createdAt;
+      entries = race.entries;
+      status = race.status;
+      results = race.results;
+      events = newEvents; // Updated commentary
+      prizePool = race.prizePool;
+      platformTax = race.platformTax;
+      platformBonus = race.platformBonus;
+      sponsors = race.sponsors;
+    };
+
+    ignore Map.put(stable_races, Map.nhash, raceId, updatedRace);
+
+    #ok("Successfully regenerated commentary for race " # Nat.toText(raceId) # " with " # Nat.toText(newEvents.size()) # " events (was " # Nat.toText(race.events.size()) # ")");
   };
 
   // Get race history for a specific bot

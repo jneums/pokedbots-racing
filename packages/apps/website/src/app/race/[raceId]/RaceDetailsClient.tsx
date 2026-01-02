@@ -335,11 +335,10 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-16">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-5xl mx-auto space-y-6">
           <Button 
             variant="ghost" 
             onClick={() => navigate('/schedule')}
-            className="mb-6"
           >
             ← Back to Schedule
           </Button>

@@ -143,12 +143,21 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
 
 
 function RaceCard({ raceId }: { raceId: bigint }) {
-  const { data: race } = useGetRaceById(Number(raceId));
   const { user } = useAuth();
   const { data: myBots, isLoading: botsLoading } = useMyBots();
   const enterRaceMutation = useEnterRace();
   const [showEnterDialog, setShowEnterDialog] = useState(false);
   const [selectedBotIndex, setSelectedBotIndex] = useState<string>('');
+  
+  // Calculate if we need aggressive polling
+  const { data: race } = useGetRaceById(Number(raceId));
+  const now = Date.now() * 1_000_000;
+  const isUpcoming = race && 'Upcoming' in race.status;
+  const isInProgress = race && 'InProgress' in race.status;
+  const raceStartTime = race ? Number(race.startTime) : 0;
+  const isImminentStart = isUpcoming && raceStartTime < now;
+  const isActiveOrImminent = !!(isInProgress || isImminentStart);
+  
 
   if (!race) {
     return (
@@ -166,11 +175,8 @@ function RaceCard({ raceId }: { raceId: bigint }) {
   // Check if user is authenticated
   const isAuthenticated = !!user;
   
-  // Check if race is open for entry
-  const isUpcoming = 'Upcoming' in race.status;
   const isFull = race.entries.length >= Number(race.maxEntries);
-  const now = Date.now();
-  const entryDeadlinePassed = Number(race.entryDeadline) / 1_000_000 < now;
+  const entryDeadlinePassed = Number(race.entryDeadline) / 1_000_000 < Date.now();
   const canEnter = isAuthenticated && isUpcoming && !isFull && !entryDeadlinePassed;
 
   // Check if user already entered
@@ -270,7 +276,7 @@ function RaceCard({ raceId }: { raceId: bigint }) {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {/* Race Stats */}
         <div className="grid grid-cols-3 gap-3">
           <div className="text-center p-3 bg-card/50 border border-primary/20 rounded-lg">
@@ -652,6 +658,10 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
   const isPast = Number(event.scheduledTime) < now;
   const isCompleted = 'Completed' in event.status;
   const registrationClosed = Number(event.registrationCloses) < now;
+  const hasActiveOrImminentRaces = isPast && !isCompleted;
+  
+  // Re-fetch aggressively if event is starting/running
+  useGetEventDetails(Number(eventId), hasActiveOrImminentRaces);
   
   const getStatusBadge = () => {
     if ('Cancelled' in event.status) {

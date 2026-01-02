@@ -66,12 +66,10 @@ function BotName({ tokenIndex }: { tokenIndex: number }) {
 
 export function BettingInterface({ raceId }: BettingInterfaceProps) {
   const { isAuthenticated } = useAuth();
+  
+  // Initial fetch without isOpen parameter
   const { data: poolInfoRaw, isLoading, error } = useGetBettingPool(raceId);
-  const { mutate: placeBet, isPending: isPlacingBet } = usePlaceBet();
-  const [selectedBot, setSelectedBot] = useState<number | null>(null);
-  const [betType, setBetType] = useState<BetType>('Win');
-  const [pendingBets, setPendingBets] = useState<Set<number>>(new Set());
-
+  
   // Backend returns array or object, normalize it
   const poolInfo = Array.isArray(poolInfoRaw) ? poolInfoRaw[0] : poolInfoRaw;
 
@@ -86,9 +84,19 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
 
   const statusString = poolInfo ? getStatusString(poolInfo.status) : '';
   const isOpen = statusString === 'Open';
+  
+  // Re-fetch with proper isOpen status for aggressive polling when betting is open
+  const { data: poolInfoUpdated } = useGetBettingPool(raceId, isOpen);
+  const poolInfoFinal = Array.isArray(poolInfoUpdated) ? poolInfoUpdated[0] : (poolInfoUpdated || poolInfo);
+  
+  const { mutate: placeBet, isPending: isPlacingBet } = usePlaceBet();
+  const [selectedBot, setSelectedBot] = useState<number | null>(null);
+  const [betType, setBetType] = useState<BetType>('Win');
+  const [pendingBets, setPendingBets] = useState<Set<string>>(new Set());
+
   // Convert bigint e8s to ICP string
-  const totalPool = poolInfo?.totalPooled ? formatICP(Number(poolInfo.totalPooled) / 100_000_000) : '0.00';
-  const entrantsCount = poolInfo?.entrants?.length || 0;
+  const totalPool = poolInfoFinal?.totalPooled ? formatICP(Number(poolInfoFinal.totalPooled) / 100_000_000) : '0.00';
+  const entrantsCount = poolInfoFinal?.entrants?.length || 0;
 
   // Calculate odds for each entrant from raw bet data
   const calculateOdds = (betsByBot: [bigint, bigint][], totalPool: bigint): number => {
@@ -99,18 +107,18 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
   };
 
   // Create entrants with calculated odds
-  const entrantsWithOdds = poolInfo?.entrants?.map((tokenIndex: bigint) => {
-    const winBet = poolInfo.winBetsByBot.find(([idx]: [bigint, bigint]) => idx === tokenIndex);
-    const placeBet = poolInfo.placeBetsByBot.find(([idx]: [bigint, bigint]) => idx === tokenIndex);
-    const showBet = poolInfo.showBetsByBot.find(([idx]: [bigint, bigint]) => idx === tokenIndex);
+  const entrantsWithOdds = poolInfoFinal?.entrants?.map((tokenIndex: bigint) => {
+    const winBet = poolInfoFinal.winBetsByBot.find(([idx]: [bigint, bigint]) => idx === tokenIndex);
+    const placeBet = poolInfoFinal.placeBetsByBot.find(([idx]: [bigint, bigint]) => idx === tokenIndex);
+    const showBet = poolInfoFinal.showBetsByBot.find(([idx]: [bigint, bigint]) => idx === tokenIndex);
 
     const winAmount = winBet ? winBet[1] : 0n;
     const placeAmount = placeBet ? placeBet[1] : 0n;
     const showAmount = showBet ? showBet[1] : 0n;
 
-    const netWinPool = poolInfo.winPool * 9n / 10n; // After 10% rake
-    const netPlacePool = poolInfo.placePool * 9n / 10n;
-    const netShowPool = poolInfo.showPool * 9n / 10n;
+    const netWinPool = poolInfoFinal.winPool * 9n / 10n; // After 10% rake
+    const netPlacePool = poolInfoFinal.placePool * 9n / 10n;
+    const netShowPool = poolInfoFinal.showPool * 9n / 10n;
 
     // Calculate odds or show dash if no bets
     const winOdds = winAmount > 0n ? (Number(netWinPool) / Number(winAmount)).toFixed(2) : '-';
@@ -127,7 +135,7 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
       show_pool_icp: formatICP(Number(showAmount) / 100_000_000),
     };
   }) || [];
-  const betsCount = poolInfo?.betIds?.length || 0;
+  const betsCount = poolInfoFinal?.betIds?.length || 0;
 
   const handlePlaceBet = (betAmount: number) => {
     if (!selectedBot) {
@@ -140,8 +148,16 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
       return;
     }
 
+    // Create unique key for this specific bet (race + bot + betType + amount)
+    const betKey = `${raceId}-${selectedBot}-${betType}-${betAmount}`;
+
+    // Prevent double submission
+    if (pendingBets.has(betKey)) {
+      return;
+    }
+
     // Track pending bet for visual feedback
-    setPendingBets(prev => new Set(prev).add(betAmount));
+    setPendingBets(prev => new Set(prev).add(betKey));
 
     // Fire and forget - don't await result for quick spam betting
     placeBet(
@@ -156,7 +172,7 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
           toast.success(result.message);
           setPendingBets(prev => {
             const next = new Set(prev);
-            next.delete(betAmount);
+            next.delete(betKey);
             return next;
           });
         },
@@ -164,7 +180,7 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
           toast.error(error.message || 'Failed to place bet');
           setPendingBets(prev => {
             const next = new Set(prev);
-            next.delete(betAmount);
+            next.delete(betKey);
             return next;
           });
         },
@@ -197,7 +213,7 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
     );
   }
 
-  if (!poolInfo) {
+  if (!poolInfoFinal) {
     return (
       <Card>
         <CardHeader>
@@ -291,25 +307,33 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
                 <div className="space-y-4">
                   <label className="text-sm font-medium">Bet Amount (ICP)</label>
                   <div className="flex gap-3 flex-wrap">
-                    {[0.1, 0.5, 1, 2, 5].map((amt) => (
-                      <Button
-                        key={amt}
-                        type="button"
-                        variant={pendingBets.has(amt) ? "default" : "outline"}
-                        size="lg"
-                        onClick={() => handlePlaceBet(amt)}
-                        disabled={!selectedBot || !isAuthenticated || pendingBets.has(amt)}
-                        className="flex-1 min-w-[80px]"
-                      >
-                        {pendingBets.has(amt) ? (
-                          <>
-                            <span className="animate-pulse">⏳</span> {amt} ICP
-                          </>
-                        ) : (
-                          <>{amt} ICP</>
-                        )}
-                      </Button>
-                    ))}
+                    {[0.1, 0.5, 1, 2, 5].map((amt) => {
+                      const betKey = `${raceId}-${selectedBot}-${betType}-${amt}`;
+                      const isPending = pendingBets.has(betKey);
+                      return (
+                        <Button
+                          key={amt}
+                          type="button"
+                          variant={isPending ? "default" : "outline"}
+                          size="lg"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handlePlaceBet(amt);
+                          }}
+                          disabled={!selectedBot || !isAuthenticated || isPending}
+                          className="flex-1 min-w-[80px]"
+                        >
+                          {isPending ? (
+                            <>
+                              <span className="animate-pulse">⏳</span> {amt} ICP
+                            </>
+                          ) : (
+                            <>{amt} ICP</>
+                          )}
+                        </Button>
+                      );
+                    })}
                   </div>
                 </div>
 

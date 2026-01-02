@@ -818,6 +818,7 @@ export interface Race {
   'platformBonus' : bigint,
   'entries' : Array<RaceEntry>,
   'trackId' : bigint,
+  'events' : Array<RaceEvent>,
   'raceId' : bigint,
   'entryDeadline' : bigint,
   'entryFee' : bigint,
@@ -838,6 +839,21 @@ export interface RaceEntry {
   'entryFee' : bigint,
   'enteredAt' : bigint,
 }
+export interface RaceEvent {
+  'description' : string,
+  'timestamp' : number,
+  'segmentIndex' : bigint,
+  'eventType' : RaceEventType,
+}
+export type RaceEventType = {
+    'Overtake' : { 'overtaken' : string, 'overtaker' : string }
+  } |
+  { 'LeadChange' : { 'newLeader' : string, 'previousLeader' : string } } |
+  { 'ExceptionalPerformance' : { 'bot' : string, 'performancePct' : number } } |
+  { 'CloseRacing' : { 'bots' : Array<string>, 'gapSeconds' : number } } |
+  { 'SegmentComplete' : { 'leader' : string, 'segmentIndex' : bigint } } |
+  { 'LargeGap' : { 'gapSeconds' : number, 'leader' : string } } |
+  { 'PoorPerformance' : { 'bot' : string, 'performancePct' : number } };
 export interface RaceResult {
   'owner' : Principal,
   'prizeAmount' : bigint,

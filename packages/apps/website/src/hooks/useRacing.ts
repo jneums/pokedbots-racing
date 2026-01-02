@@ -72,7 +72,7 @@ export const useGetPastEvents = (offset: number, limit: number, enabled: boolean
 /**
  * React Query hook to fetch details for a specific event.
  */
-export const useGetEventDetails = (eventId: number | null) => {
+export const useGetEventDetails = (eventId: number | null, hasActiveOrImminent: boolean = false) => {
   return useQuery<ScheduledEvent | null>({
     queryKey: ['eventDetails', eventId],
     queryFn: () => {
@@ -82,7 +82,7 @@ export const useGetEventDetails = (eventId: number | null) => {
       return getEventDetails(eventId);
     },
     enabled: eventId !== null,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: hasActiveOrImminent ? 5000 : 30000, // 5s when races starting, 30s otherwise
   });
 };
 
@@ -106,7 +106,7 @@ export const useGetEventWithRaces = (eventId: number | null) => {
 /**
  * React Query hook to fetch details for a specific race.
  */
-export const useGetRaceById = (raceId: number | null) => {
+export const useGetRaceById = (raceId: number | null, isActiveOrImminent: boolean = false) => {
   return useQuery<Race | null>({
     queryKey: ['race', raceId],
     queryFn: () => {
@@ -116,7 +116,7 @@ export const useGetRaceById = (raceId: number | null) => {
       return getRaceById(raceId);
     },
     enabled: raceId !== null,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: isActiveOrImminent ? 5000 : 30000, // 5s when race starting/running, 30s otherwise
   });
 };
 

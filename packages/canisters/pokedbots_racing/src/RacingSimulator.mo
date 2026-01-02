@@ -7,6 +7,9 @@ import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Principal "mo:base/Principal";
 import Debug "mo:base/Debug";
+import HashMap "mo:base/HashMap";
+import Hash "mo:base/Hash";
+import Buffer "mo:base/Buffer";
 import Map "mo:map/Map";
 import { nhash } "mo:map/Map";
 
@@ -449,7 +452,9 @@ module {
         case (#MetalRoads) { 1.0 };
       };
 
-      Int.abs(Float.toInt(Float.fromInt(baseTime) * terrainMultiplier));
+      // Apply 10x speed multiplier to match actual race simulation
+      let uncompressedDuration = Float.fromInt(baseTime) * terrainMultiplier;
+      Int.abs(Float.toInt(uncompressedDuration / 10.0));
     };
 
     /// Calculate race time for a participant
@@ -627,23 +632,55 @@ module {
         participant : RacingParticipant;
         var cumulativeTime : Float;
         var previousDifficulty : Float;
+        var poorPerformanceThisSegment : ?(Float, Nat, Nat); // (performancePct, streak, seed)
       };
 
       var racerProgress : [RacerProgress] = [];
       for (participant in participants.vals()) {
+        let newRacer : RacerProgress = {
+          participant = participant;
+          var cumulativeTime = 0.0;
+          var previousDifficulty = 1.0;
+          var poorPerformanceThisSegment = null;
+        };
         racerProgress := Array.append(
           racerProgress,
-          [{
-            participant = participant;
-            var cumulativeTime = 0.0;
-            var previousDifficulty = 1.0;
-          }],
+          [newRacer],
         );
       };
 
       // Track race events
       var events : [RaceEvent] = [];
       var previousLeader : ?Text = null;
+
+      // Track performance streaks for commentary flavor
+      var poorPerformanceStreaks = HashMap.HashMap<Text, Nat>(10, Text.equal, Text.hash);
+      var goodPerformanceStreaks = HashMap.HashMap<Text, Nat>(10, Text.equal, Text.hash);
+
+      // Track gap trends for progressive commentary
+      var previousGap : Float = 0.0;
+      var consecutiveLargeGaps : Nat = 0;
+      var previousCloseGap : Float = 0.0;
+      var lastCloseRacingSegment : Nat = 0; // Cooldown for close racing messages
+      var hasUsedIntenseBattle : Bool = false; // Track if we've used "intense battle" already
+
+      // Track finishers for podium announcements
+      var finisherCount : Nat = 0;
+      var announcedFinishers = HashMap.HashMap<Text, Bool>(10, Text.equal, Text.hash);
+
+      // Add race start announcement
+      events := Array.append(
+        events,
+        [{
+          eventType = #SegmentComplete {
+            segmentIndex = 0;
+            leader = "none";
+          };
+          timestamp = 0.0;
+          segmentIndex = 0;
+          description = "Race start! " # Nat.toText(participants.size()) # " bots charge off the line!";
+        }],
+      );
 
       // Simulate segment by segment
       for (segmentIdx in Iter.range(0, allSegments.size() - 1)) {
@@ -671,9 +708,31 @@ module {
           racer.cumulativeTime += segmentTime;
           racer.previousDifficulty := segment.difficulty;
 
-          // Check for exceptional/poor performance (>103% or <97% of expected)
-          if (segmentPerformance > 1.03) {
-            let performancePct = (segmentPerformance - 1.0) * 100.0;
+          // Check for exceptional/poor performance
+          // segmentPerformance is a TIME MULTIPLIER: <1.0 = faster (good), >1.0 = slower (bad)
+          if (segmentPerformance < 0.97) {
+            // Faster than expected (good performance) - report if >3% faster
+            let performancePct = (1.0 - segmentPerformance) * 100.0;
+
+            // Track streak for this bot
+            let currentStreak = switch (goodPerformanceStreaks.get(racer.participant.nftId)) {
+              case null { 0 };
+              case (?count) { count };
+            };
+            let newStreak = currentStreak + 1;
+            goodPerformanceStreaks.put(racer.participant.nftId, newStreak);
+
+            // Generate message based on streak
+            let message = if (newStreak == 1) {
+              "Bot " # racer.participant.nftId # " nails the perfect line!";
+            } else if (newStreak == 2) {
+              "Bot " # racer.participant.nftId # " finds the line again!";
+            } else if (newStreak == 3) {
+              "Bot " # racer.participant.nftId # " is on fire!";
+            } else {
+              "Bot " # racer.participant.nftId # " is absolutely flying!";
+            };
+
             events := Array.append(
               events,
               [{
@@ -683,23 +742,28 @@ module {
                 };
                 timestamp = racer.cumulativeTime;
                 segmentIndex = segmentIdx;
-                description = "Bot " # racer.participant.nftId # " nails the perfect line! (+" # Float.toText(performancePct) # "%)";
+                description = message;
               }],
             );
-          } else if (segmentPerformance < 0.97) {
-            let performancePct = (1.0 - segmentPerformance) * 100.0;
-            events := Array.append(
-              events,
-              [{
-                eventType = #PoorPerformance {
-                  bot = racer.participant.nftId;
-                  performancePct = performancePct;
-                };
-                timestamp = racer.cumulativeTime;
-                segmentIndex = segmentIdx;
-                description = "Bot " # racer.participant.nftId # " struggles through this section! (-" # Float.toText(performancePct) # "%)";
-              }],
-            );
+            // Reset poor performance streak on good performance
+            poorPerformanceStreaks.put(racer.participant.nftId, 0);
+          } else if (segmentPerformance > 1.48) {
+            // Slower than expected (poor performance) - track for later position-aware messaging
+            let performancePct = (segmentPerformance - 1.0) * 100.0;
+
+            // Track streak for this bot
+            let currentStreak = switch (poorPerformanceStreaks.get(racer.participant.nftId)) {
+              case null { 0 };
+              case (?count) { count };
+            };
+            let newStreak = currentStreak + 1;
+            poorPerformanceStreaks.put(racer.participant.nftId, newStreak);
+
+            // Store poor performance data to generate messages after standings calculated
+            racer.poorPerformanceThisSegment := ?(performancePct, newStreak, segmentConditionSeed);
+
+            // Reset good performance streak on poor performance
+            goodPerformanceStreaks.put(racer.participant.nftId, 0);
           };
         };
 
@@ -708,6 +772,68 @@ module {
           racerProgress,
           func(a, b) { Float.compare(a.cumulativeTime, b.cumulativeTime) },
         );
+
+        // Generate position-aware poor performance messages
+        for (standingIdx in currentStandings.keys()) {
+          let racer = currentStandings[standingIdx];
+          switch (racer.poorPerformanceThisSegment) {
+            case (?(performancePct, newStreak, seed)) {
+              // Cap at 3 occurrences to avoid spam
+              if (newStreak <= 3) {
+                let isLeader = standingIdx == 0;
+                let isTop3 = standingIdx < 3;
+
+                let message = if (newStreak == 1) {
+                  // First struggle - describe the mistake, not position change
+                  let messageVariant = seed % 6;
+                  if (messageVariant == 0) {
+                    "Bot " # racer.participant.nftId # " takes that turn wide!";
+                  } else if (messageVariant == 1) {
+                    "Bot " # racer.participant.nftId # " clips the barrier!";
+                  } else if (messageVariant == 2) {
+                    "Bot " # racer.participant.nftId # " misses the apex!";
+                  } else if (messageVariant == 3) {
+                    "Bot " # racer.participant.nftId # " slides through the corner!";
+                  } else if (messageVariant == 4) {
+                    "Bot " # racer.participant.nftId # " loses traction!";
+                  } else {
+                    "Bot " # racer.participant.nftId # " runs wide through debris!";
+                  };
+                } else if (newStreak == 2) {
+                  let messageVariant = seed % 4;
+                  if (messageVariant == 0) {
+                    "Bot " # racer.participant.nftId # " struggles again!";
+                  } else if (messageVariant == 1) {
+                    "Bot " # racer.participant.nftId # " another mistake!";
+                  } else if (messageVariant == 2) {
+                    "Bot " # racer.participant.nftId # " can't find the line!";
+                  } else {
+                    "Bot " # racer.participant.nftId # " hits trouble again!";
+                  };
+                } else {
+                  "Just not Bot " # racer.participant.nftId # "'s day at all!";
+                };
+
+                events := Array.append(
+                  events,
+                  [{
+                    eventType = #PoorPerformance {
+                      bot = racer.participant.nftId;
+                      performancePct = performancePct;
+                    };
+                    timestamp = racer.cumulativeTime;
+                    segmentIndex = segmentIdx;
+                    description = message;
+                  }],
+                );
+              };
+
+              // Clear the flag
+              racer.poorPerformanceThisSegment := null;
+            };
+            case null {};
+          };
+        };
 
         // Detect lead changes
         let currentLeader = currentStandings[0].participant.nftId;
@@ -750,7 +876,24 @@ module {
         if (currentStandings.size() >= 2) {
           let gap = currentStandings[1].cumulativeTime - currentStandings[0].cumulativeTime;
           if (gap > 10.0 and segmentIdx % 5 == 0) {
-            // Report every 5 segments if gap persists
+            // Track if gap is growing or shrinking
+            let gapGrowing = gap > previousGap;
+            let roundedGap = Float.fromInt(Int.abs(Float.toInt(gap * 10.0))) / 10.0;
+
+            // Progressive commentary based on streak
+            consecutiveLargeGaps += 1;
+            let message = if (consecutiveLargeGaps == 1) {
+              "Bot " # currentLeader # " has pulled " # Float.toText(roundedGap) # " seconds ahead!";
+            } else if (consecutiveLargeGaps == 2 and gapGrowing) {
+              "Bot " # currentLeader # " is still in the lead and the gap is growing!";
+            } else if (consecutiveLargeGaps >= 3 and gapGrowing) {
+              "Bot " # currentLeader # " is so far ahead, this race might be over!";
+            } else if (not gapGrowing and gap > 10.0) {
+              "Bot " # currentStandings[1].participant.nftId # " is gaining on the leader!";
+            } else {
+              "Bot " # currentLeader # " maintains a " # Float.toText(roundedGap) # " second lead!";
+            };
+
             events := Array.append(
               events,
               [{
@@ -760,47 +903,140 @@ module {
                 };
                 timestamp = currentStandings[0].cumulativeTime;
                 segmentIndex = segmentIdx;
-                description = "Bot " # currentLeader # " has pulled " # Float.toText(gap) # " seconds ahead!";
+                description = message;
               }],
             );
+            previousGap := gap;
+          } else if (gap <= 10.0) {
+            // Reset streak if gap closes
+            consecutiveLargeGaps := 0;
           };
 
-          // Check for close racing (within 2 seconds)
-          if (gap < 2.0) {
+          // Check for close racing (within 3 seconds) - report when gap changes
+          // Skip first 3 segments to avoid false positives at race start
+          if (gap < 3.0 and segmentIdx >= 3) {
+            // Check if gap changed significantly (lower threshold for more updates)
+            let gapChanged = previousCloseGap == 0.0 or Float.abs(gap - previousCloseGap) > 0.1;
+            let gapShrinking = previousCloseGap > 0.0 and gap < previousCloseGap;
+            let cooldownPassed = segmentIdx >= lastCloseRacingSegment and (segmentIdx - lastCloseRacingSegment) >= 2;
+
+            // Create event if: cooldown passed OR gap is shrinking (always report exciting moments!)
+            if (gapChanged and (cooldownPassed or gapShrinking)) {
+              // Round gap to 1 decimal place for cleaner display
+              let roundedGap = Float.fromInt(Int.abs(Float.toInt(gap * 10.0))) / 10.0;
+              // Format as string with 1 decimal place
+              let gapText = if (roundedGap < 0.1) {
+                "0.1";
+              } else if (roundedGap >= 10.0) {
+                Nat.toText(Int.abs(Float.toInt(roundedGap)));
+              } else {
+                // Convert to string: multiply by 10, convert to int, then format as X.Y
+                let tenths = Int.abs(Float.toInt(roundedGap * 10.0));
+                let wholes = tenths / 10;
+                let decimals = tenths % 10;
+                Nat.toText(wholes) # "." # Nat.toText(decimals);
+              };
+
+              // Progressive commentary based on whether gap is shrinking
+              let gapShrinking = previousCloseGap > 0.0 and gap < previousCloseGap;
+              let gapGrowing = previousCloseGap > 0.0 and gap > previousCloseGap;
+
+              let message = if (gapShrinking and gap < 0.5) {
+                "Bot " # currentStandings[1].participant.nftId # " is right on the heels of Bot " # currentStandings[0].participant.nftId # "!";
+              } else if (gapShrinking) {
+                "Bot " # currentStandings[1].participant.nftId # " closing in! Gap down to " # gapText # "s!";
+              } else if (previousCloseGap == 0.0 and not hasUsedIntenseBattle) {
+                hasUsedIntenseBattle := true;
+                "Intense battle! Bot " # currentStandings[0].participant.nftId # " and Bot " # currentStandings[1].participant.nftId # " separated by just " # gapText # "s!";
+              } else if (gapGrowing) {
+                "Bot " # currentStandings[0].participant.nftId # " pulling away, gap now " # gapText # "s";
+              } else {
+                // Close racing but no significant change
+                "Still tight racing at " # gapText # "s apart";
+              };
+
+              events := Array.append(
+                events,
+                [{
+                  eventType = #CloseRacing {
+                    bots = [currentStandings[0].participant.nftId, currentStandings[1].participant.nftId];
+                    gapSeconds = gap;
+                  };
+                  timestamp = currentStandings[0].cumulativeTime;
+                  segmentIndex = segmentIdx;
+                  description = message;
+                }],
+              );
+              lastCloseRacingSegment := segmentIdx; // Update cooldown
+            };
+            // Always update gap tracker when close, regardless of whether we created event
+            previousCloseGap := gap;
+          } else {
+            // Reset when gap opens up
+            previousCloseGap := 0.0;
+          };
+        };
+
+        // Lap completion events (end of lap only, no intermediate segments)
+        if ((segmentIdx + 1) % track.segments.size() == 0) {
+          let lap = ((segmentIdx + 1) / track.segments.size());
+          let isFinalLap = lap == track.laps;
+
+          if (isFinalLap) {
+            // Announce each finisher as they complete (top 3 only)
+            for (racer in currentStandings.vals()) {
+              let alreadyAnnounced = switch (announcedFinishers.get(racer.participant.nftId)) {
+                case (?_) { true };
+                case null { false };
+              };
+
+              if (not alreadyAnnounced and finisherCount < 3) {
+                finisherCount += 1;
+                announcedFinishers.put(racer.participant.nftId, true);
+
+                let message = if (finisherCount == 1) {
+                  "Bot " # racer.participant.nftId # " wins the race!";
+                } else if (finisherCount == 2) {
+                  "Bot " # racer.participant.nftId # " takes second place!";
+                } else {
+                  "Bot " # racer.participant.nftId # " rounds out the podium in third!";
+                };
+
+                events := Array.append(
+                  events,
+                  [{
+                    eventType = #SegmentComplete {
+                      segmentIndex = segmentIdx;
+                      leader = racer.participant.nftId;
+                    };
+                    timestamp = racer.cumulativeTime;
+                    segmentIndex = segmentIdx;
+                    description = message;
+                  }],
+                );
+              };
+            };
+          } else {
+            // Non-final lap completion
             events := Array.append(
               events,
               [{
-                eventType = #CloseRacing {
-                  bots = [currentStandings[0].participant.nftId, currentStandings[1].participant.nftId];
-                  gapSeconds = gap;
+                eventType = #SegmentComplete {
+                  segmentIndex = segmentIdx;
+                  leader = currentLeader;
                 };
                 timestamp = currentStandings[0].cumulativeTime;
                 segmentIndex = segmentIdx;
-                description = "Intense battle! Bot " # currentStandings[0].participant.nftId # " and Bot " # currentStandings[1].participant.nftId # " separated by just " # Float.toText(gap) # " seconds!";
+                description = "Lap " # Nat.toText(lap) # " complete! Bot " # currentLeader # " leads!";
               }],
             );
           };
         };
 
-        // Milestone events (every 10 segments or end of lap)
-        if ((segmentIdx + 1) % 10 == 0 or (segmentIdx + 1) % track.segments.size() == 0) {
-          events := Array.append(
-            events,
-            [{
-              eventType = #SegmentComplete {
-                segmentIndex = segmentIdx;
-                leader = currentLeader;
-              };
-              timestamp = currentStandings[0].cumulativeTime;
-              segmentIndex = segmentIdx;
-              description = if ((segmentIdx + 1) % track.segments.size() == 0) {
-                let lap = ((segmentIdx + 1) / track.segments.size());
-                "Lap " # Nat.toText(lap) # " complete! Bot " # currentLeader # " leads!";
-              } else {
-                "Segment " # Nat.toText(segmentIdx + 1) # " complete, Bot " # currentLeader # " in front";
-              };
-            }],
-          );
+        // Stop most commentary after top 3 finish (but continue to end for filtering)
+        if (finisherCount >= 3) {
+          // Set flag to skip generating more events
+          // We'll still continue the loop to finish the race simulation
         };
       };
 
@@ -848,7 +1084,66 @@ module {
         );
       };
 
-      ?(results, events);
+      // Filter events to keep only highest priority per segment
+      // Priority: 1=Podium, 2=Lead Change, 3=Lap Complete, 4=Exceptional, 5=Close Racing, 6=Large Gap, 7=Poor Performance
+      func getEventPriority(event : RaceEvent) : Nat {
+        switch (event.eventType) {
+          case (#SegmentComplete(_)) {
+            // Check if it's a podium finish
+            if (
+              Text.contains(event.description, #text "wins the race") or
+              Text.contains(event.description, #text "second place") or
+              Text.contains(event.description, #text "podium in third")
+            ) {
+              return 1; // Podium - highest priority
+            };
+            return 3; // Lap completion
+          };
+          case (#LeadChange(_)) { 2 }; // Lead changes
+          case (#ExceptionalPerformance(_)) { 4 }; // Good performance
+          case (#CloseRacing(_)) { 5 }; // Close racing
+          case (#LargeGap(_)) { 6 }; // Large gaps
+          case (#PoorPerformance(_)) { 7 }; // Poor performance - lowest priority
+          case (#Overtake(_)) { 2 }; // Same as lead change
+        };
+      };
+
+      // Sort events by timestamp first
+      let sortedEvents = Array.sort<RaceEvent>(
+        events,
+        func(a, b) {
+          if (a.timestamp < b.timestamp) { #less } else if (a.timestamp > b.timestamp) {
+            #greater;
+          } else { #equal };
+        },
+      );
+
+      // Filter: keep only highest priority event per 1-second bucket
+      var filteredEvents = Buffer.Buffer<RaceEvent>(sortedEvents.size());
+      var lastBucket : Int = -1;
+      var lastPriority : Nat = 999;
+
+      for (event in sortedEvents.vals()) {
+        // Bucket by 1-second intervals
+        let bucket = Int.abs(Float.toInt(event.timestamp));
+        let priority = getEventPriority(event);
+
+        if (bucket > lastBucket) {
+          // New time bucket
+          filteredEvents.add(event);
+          lastBucket := bucket;
+          lastPriority := priority;
+        } else if (priority < lastPriority) {
+          // Same bucket, but higher priority - replace the last event
+          let lastIndex = filteredEvents.size() - 1;
+          ignore filteredEvents.remove(lastIndex);
+          filteredEvents.add(event);
+          lastPriority := priority;
+        };
+        // Otherwise skip (same bucket, lower or equal priority)
+      };
+
+      ?(results, Buffer.toArray(filteredEvents));
     };
 
     /// Simulate a race and return results (OLD METHOD - kept for backward compatibility)
@@ -1262,6 +1557,21 @@ module {
             results = ?results;
             events = events;
             // Don't change status here - race is still InProgress until handleRaceFinish
+          };
+          ignore Map.put(races, nhash, raceId, updatedRace);
+          ?updatedRace;
+        };
+        case (null) { null };
+      };
+    };
+
+    /// Update race duration to actual time (after simulation)
+    public func updateRaceDuration(raceId : Nat, actualDuration : Nat) : ?Race {
+      switch (getRace(raceId)) {
+        case (?race) {
+          let updatedRace = {
+            race with
+            duration = actualDuration;
           };
           ignore Map.put(races, nhash, raceId, updatedRace);
           ?updatedRace;

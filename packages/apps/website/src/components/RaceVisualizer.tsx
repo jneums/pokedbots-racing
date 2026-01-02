@@ -4,6 +4,48 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause, RotateCcw, FastForward, SkipForward, Radio, PlayCircle, Zap, Trophy, TrendingUp, TrendingDown, Users } from 'lucide-react';
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { useGetBotProfile } from '@/hooks/useRacing';
+
+// Bot name component
+function BotName({ tokenIndex }: { tokenIndex: number }) {
+  const { data: botProfile } = useGetBotProfile(tokenIndex);
+  
+  if (botProfile?.name && botProfile.name.length > 0 && botProfile.name[0]) {
+    return <>{botProfile.name[0]}</>;
+  }
+  
+  return <>Bot #{tokenIndex}</>;
+}
+
+// Hook to get bot name as string
+function useBotName(tokenIndex: number): string {
+  const { data: botProfile } = useGetBotProfile(tokenIndex);
+  
+  if (botProfile?.name && botProfile.name.length > 0 && botProfile.name[0]) {
+    return botProfile.name[0];
+  }
+  
+  return `Bot #${tokenIndex}`;
+}
+
+// Replace bot references in event descriptions with actual names
+const EventDescription = ({ event, allBotIds }: { event: RaceEvent; allBotIds: string[] }) => {
+  // Call hooks unconditionally for ALL bots (required by React rules)
+  const botNames = new Map<string, string>();
+  allBotIds.forEach(id => {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const name = useBotName(Number(id));
+    botNames.set(id, name);
+  });
+
+  // Replace bot references in description
+  let description = event.description;
+  botNames.forEach((name, id) => {
+    description = description.replace(new RegExp(`Bot ${id}\\b`, 'g'), name);
+  });
+
+  return <>{description}</>;
+};
 
 // Race event types matching backend
 type RaceEventType = 
@@ -754,6 +796,13 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
   const visibleEvents = useMemo(() => {
     return events.filter(event => event.timestamp <= currentTime);
   }, [events, currentTime]);
+
+  // Sort and slice events for display (memoized to prevent re-sorting on every render)
+  const sortedEvents = useMemo(() => {
+    return [...visibleEvents]
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 20);
+  }, [visibleEvents]);
   
   // Pre-calculate segment times for all bots (memoized)
   const segmentTimesMap = useMemo(() => {
@@ -1314,7 +1363,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                       zIndex: 100 - (livePosition || 0),
                       flexShrink: 0 // Prevent squishing
                     }}
-                    title={`#${livePosition} Bot #${bot.nftId} - ${Math.round(bot.distance)}m / ${Math.round(actualTrackDistance)}m`}
+                    title={`#${livePosition} - ${Math.round(bot.distance)}m / ${Math.round(actualTrackDistance)}m`}
                   >
                     <div className="relative">
                       {/* Position badge */}
@@ -1369,9 +1418,92 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
         
         {/* Race stats and leaderboard */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 mt-4">
-          {/* Event Feed - Left Column */}
+          {/* Live Positions - Left Column */}
+          <div className={`bg-card/50 border border-primary/20 rounded-lg p-3 ${events.length > 0 ? 'lg:col-span-1' : 'lg:col-span-3'}`}>
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Trophy className="w-4 h-4" />
+              Live Positions
+            </h3>
+            <div className="space-y-1.5">
+              {/* Sort by current race position (live standings) */}
+              {[...stablePositions].sort((a, b) => a.position - b.position).map((bot) => {
+                const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.nftId));
+                const imageUrl = generateExtThumbnailLink(tokenId);
+                const isFinished = bot.progress >= 99.9 || currentTime >= bot.finalTime;
+                const isDNF = bot.finalTime > 100000;
+                const livePosition = bot.position;
+                const leaderTime = Math.min(...stablePositions.map(b => b.finalTime));
+                const timeBehind = bot.finalTime - leaderTime;
+                const result = results.find(r => r.nftId === bot.nftId);
+                const rating = result?.rating || (result?.stats ? 
+                  Math.round((result.stats.speed + result.stats.stability + result.stats.powerCore + result.stats.acceleration) / 4) : null);
+                
+                return (
+                  <div 
+                    key={bot.nftId} 
+                    className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                      livePosition === 1 ? 'bg-yellow-500/10 border-yellow-500/30' :
+                      livePosition === 2 ? 'bg-gray-500/10 border-gray-500/30' :
+                      livePosition === 3 ? 'bg-orange-600/10 border-orange-600/30' :
+                      'bg-card/30 border-primary/10 hover:border-primary/20'
+                    }`}
+                  >
+                    <span className={`font-bold w-7 text-center ${
+                      livePosition === 1 ? 'text-yellow-500' :
+                      livePosition === 2 ? 'text-gray-400' :
+                      livePosition === 3 ? 'text-orange-600' :
+                      'text-muted-foreground'
+                    }`}>
+                      {livePosition === 1 && '🥇'}
+                      {livePosition === 2 && '🥈'}
+                      {livePosition === 3 && '🥉'}
+                      {livePosition > 3 && `#${livePosition}`}
+                    </span>
+                    <img
+                      src={imageUrl}
+                      alt={`Bot #${bot.nftId}`}
+                      className="w-8 h-8 rounded border border-primary/40 shadow-sm"
+                    />
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <span className="font-mono text-xs font-semibold"><BotName tokenIndex={Number(bot.nftId)} /></span>
+                      {rating && (
+                        <span className="text-[10px] text-muted-foreground">⭐ {rating}</span>
+                      )}
+                    </div>
+                    {!isDNF && !isFinished && (
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-[10px] text-muted-foreground font-mono">
+                          {(bot.distance / 1000).toFixed(2)}km
+                        </span>
+                        <span className="text-primary font-bold text-xs">
+                          {bot.currentSpeed.toFixed(1)}m/s
+                        </span>
+                      </div>
+                    )}
+                    {isFinished && !isDNF && (
+                      <div className="flex flex-col items-end gap-0.5">
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground font-mono text-xs font-semibold">
+                            {bot.finalTime.toFixed(2)}s
+                          </span>
+                          <span className="text-green-500 font-bold">✓</span>
+                        </div>
+                        {livePosition > 1 && (
+                          <span className="text-red-500 text-[10px] font-mono">
+                            +{timeBehind.toFixed(2)}s
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          
+          {/* Event Feed - Right Column(s) */}
           {events.length > 0 && (
-            <div className="bg-card/50 border border-primary/20 rounded-lg p-3 lg:col-span-1 max-h-96 overflow-y-auto">
+            <div className="bg-card/50 border border-primary/20 rounded-lg p-3 lg:col-span-2 max-h-96 overflow-y-auto">
               <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
                 <Radio className="w-4 h-4" />
                 Race Commentary
@@ -1380,8 +1512,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                 {visibleEvents.length === 0 ? (
                   <p className="text-xs text-muted-foreground italic">Race starting...</p>
                 ) : (
-                  // Show most recent events first
-                  [...visibleEvents].reverse().slice(0, 20).map((event, idx) => {
+                  sortedEvents.map((event, idx) => {
                     const eventKey = Object.keys(event.eventType)[0];
                     const eventData = event.eventType[eventKey as keyof typeof event.eventType] as any;
                     
@@ -1423,7 +1554,9 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                               {event.timestamp.toFixed(1)}s
                             </span>
                           </div>
-                          <p className="text-xs leading-tight">{event.description}</p>
+                          <p className="text-xs leading-tight">
+                            <EventDescription event={event} allBotIds={results.map(r => r.nftId)} />
+                          </p>
                         </div>
                       </div>
                     );
@@ -1432,78 +1565,6 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
               </div>
             </div>
           )}
-          
-          {/* Live Positions - Right Column(s) */}
-          <div className={`bg-card/50 border border-primary/20 rounded-lg p-3 ${events.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
-            <h3 className="text-sm font-semibold mb-2">Live Positions</h3>
-            <div className="space-y-1">
-              {/* Sort by current race position (live standings) */}
-              {[...stablePositions].sort((a, b) => a.position - b.position).map((bot) => {
-                const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.nftId));
-                const imageUrl = generateExtThumbnailLink(tokenId);
-                // Bot is finished when visualization shows they've crossed the line (progress >= 99.9%)
-                // OR when currentTime has reached/passed their backend finalTime
-                const isFinished = bot.progress >= 99.9 || currentTime >= bot.finalTime;
-                const isDNF = bot.finalTime > 100000;
-                const livePosition = bot.position;
-                const leaderTime = Math.min(...stablePositions.map(b => b.finalTime));
-                const timeBehind = bot.finalTime - leaderTime;
-                const result = results.find(r => r.nftId === bot.nftId);
-                const rating = result?.rating || (result?.stats ? 
-                  Math.round((result.stats.speed + result.stats.stability + result.stats.powerCore + result.stats.acceleration) / 4) : null);
-                
-                return (
-                  <div key={bot.nftId} className="flex items-center gap-2 text-xs">
-                    <span className={`font-bold w-6 ${
-                      livePosition === 1 ? 'text-yellow-500' :
-                      livePosition === 2 ? 'text-gray-400' :
-                      livePosition === 3 ? 'text-orange-600' :
-                      'text-muted-foreground'
-                    }`}>
-                      {livePosition === 1 && '🥇'}
-                      {livePosition === 2 && '🥈'}
-                      {livePosition === 3 && '🥉'}
-                      {livePosition > 3 && `#${livePosition}`}
-                    </span>
-                    <img
-                      src={imageUrl}
-                      alt={`Bot #${bot.nftId}`}
-                      className="w-5 h-5 rounded border border-primary/30"
-                    />
-                    <div className="flex flex-col flex-1 min-w-0">
-                      <span className="font-mono text-xs">Bot #{bot.nftId}</span>
-                      {rating && (
-                        <span className="text-[10px] text-muted-foreground">Rating: {rating}</span>
-                      )}
-                    </div>
-                    {!isDNF && !isFinished && (
-                      <>
-                        <span className="text-muted-foreground">
-                          {(bot.distance / 1000).toFixed(2)}km
-                        </span>
-                        <span className="text-primary font-medium">
-                          {bot.currentSpeed.toFixed(1)}m/s
-                        </span>
-                      </>
-                    )}
-                    {isFinished && !isDNF && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground font-mono">
-                          {bot.finalTime.toFixed(2)}s
-                        </span>
-                        {livePosition > 1 && (
-                          <span className="text-red-500 text-[10px]">
-                            +{timeBehind.toFixed(2)}s
-                          </span>
-                        )}
-                        <span className="text-green-500 font-bold">✓</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </div>
         
         {/* Final results summary - only show after animation completes */}
@@ -1532,7 +1593,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                       alt={`Bot #${result.nftId}`}
                       className="w-8 h-8 rounded"
                     />
-                    <span className="font-mono">#{result.nftId}</span>
+                    <span className="font-mono text-xs font-semibold"><BotName tokenIndex={Number(result.nftId)} /></span>
                     <span className="text-muted-foreground">{localTime.toFixed(2)}s</span>
                   </div>
                 );

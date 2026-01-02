@@ -153,6 +153,39 @@ export const idlFactory = ({ IDL }) => {
     'entryFee' : IDL.Nat,
     'enteredAt' : IDL.Int,
   });
+  const RaceEventType = IDL.Variant({
+    'Overtake' : IDL.Record({ 'overtaken' : IDL.Text, 'overtaker' : IDL.Text }),
+    'LeadChange' : IDL.Record({
+      'newLeader' : IDL.Text,
+      'previousLeader' : IDL.Text,
+    }),
+    'ExceptionalPerformance' : IDL.Record({
+      'bot' : IDL.Text,
+      'performancePct' : IDL.Float64,
+    }),
+    'CloseRacing' : IDL.Record({
+      'bots' : IDL.Vec(IDL.Text),
+      'gapSeconds' : IDL.Float64,
+    }),
+    'SegmentComplete' : IDL.Record({
+      'leader' : IDL.Text,
+      'segmentIndex' : IDL.Nat,
+    }),
+    'LargeGap' : IDL.Record({
+      'gapSeconds' : IDL.Float64,
+      'leader' : IDL.Text,
+    }),
+    'PoorPerformance' : IDL.Record({
+      'bot' : IDL.Text,
+      'performancePct' : IDL.Float64,
+    }),
+  });
+  const RaceEvent = IDL.Record({
+    'description' : IDL.Text,
+    'timestamp' : IDL.Float64,
+    'segmentIndex' : IDL.Nat,
+    'eventType' : RaceEventType,
+  });
   const Sponsor = IDL.Record({
     'message' : IDL.Opt(IDL.Text),
     'timestamp' : IDL.Int,
@@ -174,6 +207,7 @@ export const idlFactory = ({ IDL }) => {
     'platformBonus' : IDL.Nat,
     'entries' : IDL.Vec(RaceEntry),
     'trackId' : IDL.Nat,
+    'events' : IDL.Vec(RaceEvent),
     'raceId' : IDL.Nat,
     'entryDeadline' : IDL.Int,
     'entryFee' : IDL.Nat,
