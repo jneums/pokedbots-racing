@@ -1266,6 +1266,83 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                 Debug.print("Scheduled sponsor refund " # debug_show (sponsorRefundActionId) # " of " # debug_show (sponsor.amount) # " to " # Principal.toText(sponsor.sponsor));
               };
 
+              // Chain to next race in event if there is one (cancelled races don't break the chain)
+              switch (eventCalendar.getEventByRaceId(raceId)) {
+                case (?event) {
+                  // Find current race index in event
+                  let raceIndexOpt = Array.indexOf<Nat>(raceId, event.raceIds, Nat.equal);
+                  switch (raceIndexOpt) {
+                    case (?currentIndex) {
+                      // Check if there's a next race
+                      if (currentIndex + 1 < event.raceIds.size()) {
+                        let nextRaceId = event.raceIds[currentIndex + 1];
+
+                        // Check if next race already has a start timer scheduled
+                        let existingTimers = tt().getActionsByFilter(#ByType("race_start"));
+                        var alreadyScheduled = false;
+                        for ((timerId, timerAction) in existingTimers.vals()) {
+                          let timerRaceIdOpt : ?Nat = from_candid (timerAction.params);
+                          switch (timerRaceIdOpt) {
+                            case (?timerRaceId) {
+                              if (timerRaceId == nextRaceId) {
+                                alreadyScheduled := true;
+                                Debug.print("Next race " # debug_show (nextRaceId) # " already has scheduled start timer, skipping chain");
+                              };
+                            };
+                            case (null) {};
+                          };
+                        };
+
+                        // Also check if next race already started or completed
+                        switch (raceManager.getRace(nextRaceId)) {
+                          case (?nextRace) {
+                            switch (nextRace.status) {
+                              case (#InProgress) {
+                                alreadyScheduled := true;
+                                Debug.print("Next race " # debug_show (nextRaceId) # " already in progress, skipping chain");
+                              };
+                              case (#Completed) {
+                                alreadyScheduled := true;
+                                Debug.print("Next race " # debug_show (nextRaceId) # " already completed, skipping chain");
+                              };
+                              case (#Cancelled) {
+                                alreadyScheduled := true;
+                                Debug.print("Next race " # debug_show (nextRaceId) # " already cancelled, skipping chain");
+                              };
+                              case (_) {};
+                            };
+                          };
+                          case (null) {};
+                        };
+
+                        if (not alreadyScheduled) {
+                          Debug.print("Chaining to next race " # debug_show (nextRaceId) # " in event " # debug_show (event.eventId) # " after cancellation");
+
+                          // Schedule next race start after a short delay (no commercial break for cancelled races)
+                          let nextRaceStartTime = Time.now() + 5_000_000_000; // 5 seconds
+                          let nextRaceActionId = tt().setActionSync<system>(
+                            Int.abs(nextRaceStartTime),
+                            {
+                              actionType = "race_start";
+                              params = to_candid (nextRaceId);
+                            },
+                          );
+                          Debug.print("Scheduled next race start " # debug_show (nextRaceActionId) # " at " # debug_show (nextRaceStartTime) # " after cancelled race");
+                        };
+                      } else {
+                        Debug.print("Last race in event was cancelled");
+                      };
+                    };
+                    case (null) {
+                      Debug.print("Cancelled race not found in event race list");
+                    };
+                  };
+                };
+                case (null) {
+                  Debug.print("No event found for cancelled race " # debug_show (raceId));
+                };
+              };
+
               return actionId;
             };
 
