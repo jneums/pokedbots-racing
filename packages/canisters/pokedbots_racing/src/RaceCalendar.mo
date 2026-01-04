@@ -379,7 +379,7 @@ module {
     public func createWeeklyLeagueEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Weekly League Championship";
-        description = "Major competitive event - Entry scales by class (Scrap 0.4, Junker 0.8, Raider 1.2, Elite 1.6, SilentKlan 2.4 ICP). All classes receive platform bonus to guarantee top 3 profitability.";
+        description = "The wasteland's premier weekly competition where survivors from all classes gather to prove their worth. All divisions welcome - platform subsidies ensure even the underdog can walk away with profit.";
         entryFee = 80_000_000; // 0.8 ICP base (Junker)
         maxEntries = 50; // Multiple heats if needed
         minEntries = 4;
@@ -402,7 +402,7 @@ module {
     public func createDailySprintEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Daily Sprint Challenge";
-        description = "Quick races across all classes. Entry fees range from 0.1-0.6 ICP based on class. Platform contributes bonus to all prize pools.";
+        description = "Fast-paced wasteland action for racers of all skill levels. These daily scrambles keep the circuits hot and the prize pools flowing.";
         entryFee = 20_000_000; // 0.2 ICP base (Junker)
         maxEntries = 12;
         minEntries = 2;
@@ -425,7 +425,7 @@ module {
     public func createMonthlyCupEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Monthly Championship Cup";
-        description = "Elite tournament - Entry scales by class (Elite 4.0, SilentKlan 6.0 ICP). Platform bonus ensures competitive prize pools.";
+        description = "The wasteland's most prestigious tournament - only the strongest survive. Elite and Silent Klan racers compete for glory and massive prize pools in this monthly showdown.";
         entryFee = 200_000_000; // 2.0 ICP base (Elite)
         maxEntries = 64; // Top 64 qualify
         minEntries = 16; // At least 16 for bracket

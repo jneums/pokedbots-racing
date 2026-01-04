@@ -185,6 +185,7 @@ module {
       case (8) { ?DEBRIS_FIELD_DASH };
       case (9) { ?VELOCITY_VIADUCT };
       case (10) { ?SANDSTORM_CIRCUIT };
+      case (11) { ?DESERT_SPRINT };
       case (_) { null };
     };
   };
@@ -435,6 +436,25 @@ module {
       { length = 550; angle = -10; terrain = #WastelandSand; difficulty = 1.08 },
       { length = 500; angle = -8; terrain = #WastelandSand; difficulty = 1.1 },
       { length = 600; angle = -11; terrain = #WastelandSand; difficulty = 1.15 },
+    ];
+  };
+
+  /// Track 11: Desert Sprint (WastelandSand, short/quick)
+  private let DESERT_SPRINT : TrackTemplate = {
+    trackId = 11;
+    name = "Desert Sprint";
+    description = "Quick dash across packed sand flats - short and fast";
+    totalDistance = 6300;
+    primaryTerrain = #WastelandSand;
+    laps = 3;
+    segments = [
+      { length = 350; angle = 0; terrain = #WastelandSand; difficulty = 1.1 },
+      { length = 300; angle = 4; terrain = #WastelandSand; difficulty = 1.15 },
+      { length = 250; angle = 8; terrain = #WastelandSand; difficulty = 1.2 },
+      { length = 280; angle = -6; terrain = #WastelandSand; difficulty = 1.12 },
+      { length = 320; angle = 0; terrain = #WastelandSand; difficulty = 1.18 },
+      { length = 300; angle = -5; terrain = #WastelandSand; difficulty = 1.08 },
+      { length = 300; angle = -1; terrain = #WastelandSand; difficulty = 1.15 },
     ];
   };
 
@@ -1345,17 +1365,70 @@ module {
     };
 
     /// Select appropriate track based on terrain and distance
-    private func selectTrackForRace(terrain : Terrain, _distance : Nat, raceId : Nat) : Nat {
-      // Filter tracks by terrain match
-      let terrainMatches = switch (terrain) {
-        case (#ScrapHeaps) { [1, 4, 8] }; // Scrap Mountain, Junkyard Sprint, Debris Field Dash
-        case (#MetalRoads) { [2, 5, 7, 9] }; // Highway, Metal Mesa, Rust Belt Rally, Velocity Viaduct
-        case (#WastelandSand) { [3, 6, 10] }; // Wasteland Gauntlet, Dune Runner, Sandstorm Circuit
+    private func selectTrackForRace(terrain : Terrain, distance : Nat, raceId : Nat) : Nat {
+      // Define tracks by terrain and distance ranges
+      // Short tracks (< 8km): suitable for Daily Sprints (5-10km)
+      // Medium tracks (8-14km): suitable for Weekly Leagues (15-25km) - will use multiple laps
+      // Long tracks (> 14km): suitable for longer events (20-30km)
+      
+      let (shortTracks, mediumTracks, longTracks) = switch (terrain) {
+        case (#ScrapHeaps) {
+          (
+            [4, 8], // Junkyard Sprint (4.05km), Debris Field Dash (7.1km)
+            [1], // Scrap Mountain Circuit (10.1km)
+            [], // No long tracks yet
+          );
+        };
+        case (#MetalRoads) {
+          (
+            [2, 7, 9], // Highway (6.7km), Rust Belt Rally (9.2km), Velocity Viaduct (4.5km)
+            [5], // Metal Mesa Loop (7.4km)
+            [], // No long tracks yet
+          );
+        };
+        case (#WastelandSand) {
+          (
+            [11], // Desert Sprint (6.3km)
+            [10, 3], // Sandstorm Circuit (10.8km), Wasteland Gauntlet (13.3km)
+            [6], // Dune Runner (16.6km)
+          );
+        };
+      };
+
+      // Select appropriate track pool based on distance
+      let candidateTracks = if (distance <= 10) {
+        // Short distance races (5-10km) - use short tracks
+        shortTracks;
+      } else if (distance <= 20) {
+        // Medium distance races (11-20km) - prefer medium, fallback to short
+        if (mediumTracks.size() > 0) {
+          mediumTracks;
+        } else {
+          shortTracks;
+        };
+      } else {
+        // Long distance races (> 20km) - prefer long, fallback to medium, then short
+        if (longTracks.size() > 0) {
+          longTracks;
+        } else if (mediumTracks.size() > 0) {
+          mediumTracks;
+        } else {
+          shortTracks;
+        };
+      };
+
+      // If no candidates found, fall back to default track for terrain
+      if (candidateTracks.size() == 0) {
+        return switch (terrain) {
+          case (#ScrapHeaps) { 1 };
+          case (#MetalRoads) { 2 };
+          case (#WastelandSand) { 3 };
+        };
       };
 
       // Select from matching tracks using raceId for variety
-      let index = raceId % terrainMatches.size();
-      terrainMatches[index];
+      let index = raceId % candidateTracks.size();
+      candidateTracks[index];
     };
 
     /// Set trackSeed for a race (called at race finish with random beacon)

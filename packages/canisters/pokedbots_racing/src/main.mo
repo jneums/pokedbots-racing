@@ -3027,17 +3027,19 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       terrains : [RacingSimulator.Terrain];
       distances : [Nat];
       totalParticipants : Nat;
+      totalPrizePool : Nat;
     };
   }] {
     let now = Time.now();
     let events = eventCalendar.getUpcomingEvents(now, daysAhead);
 
-    Array.map<RaceCalendar.ScheduledEvent, { event : RaceCalendar.ScheduledEvent; raceSummary : { totalRaces : Nat; terrains : [RacingSimulator.Terrain]; distances : [Nat]; totalParticipants : Nat } }>(
+    Array.map<RaceCalendar.ScheduledEvent, { event : RaceCalendar.ScheduledEvent; raceSummary : { totalRaces : Nat; terrains : [RacingSimulator.Terrain]; distances : [Nat]; totalParticipants : Nat; totalPrizePool : Nat } }>(
       events,
       func(event) {
         var terrains : [RacingSimulator.Terrain] = [];
         var distances : [Nat] = [];
         var totalParticipants : Nat = 0;
+        var totalPrizePool : Nat = 0;
 
         for (raceId in event.raceIds.vals()) {
           switch (raceManager.getRace(raceId)) {
@@ -3045,6 +3047,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               terrains := Array.append(terrains, [race.terrain]);
               distances := Array.append(distances, [race.distance]);
               totalParticipants += race.entries.size();
+              totalPrizePool += race.prizePool;
             };
             case (null) {};
           };
@@ -3057,6 +3060,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             terrains = terrains;
             distances = distances;
             totalParticipants = totalParticipants;
+            totalPrizePool = totalPrizePool;
           };
         };
       },
