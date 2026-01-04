@@ -658,10 +658,6 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
   const isPast = Number(event.scheduledTime) < now;
   const isCompleted = 'Completed' in event.status;
   const registrationClosed = Number(event.registrationCloses) < now;
-  const hasActiveOrImminentRaces = isPast && !isCompleted;
-  
-  // Re-fetch aggressively if event is starting/running
-  useGetEventDetails(Number(eventId), hasActiveOrImminentRaces);
   
   const getStatusBadge = () => {
     if ('Cancelled' in event.status) {

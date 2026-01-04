@@ -31,48 +31,6 @@ interface Track {
   description: string;
 }
 
-// Apply faction bonuses to stats - matches backend PokedBotsGarage.mo applyTerrainBonus
-function applyFactionBonuses(
-  stats: { speed: number; powerCore: number; acceleration: number; stability: number },
-  faction: string,
-  terrain: string,
-  preferredTerrain: string,
-  condition: number = 100 // Default to 100% for simulator
-): { speed: number; powerCore: number; acceleration: number; stability: number } {
-  let bonus = 1.0;
-  
-  // Faction-terrain bonuses (matches backend)
-  if (faction === 'Blackhole' && terrain === 'MetalRoads') {
-    bonus = 1.12; // +12% on MetalRoads
-  } else if (faction === 'Box' && terrain === 'ScrapHeaps') {
-    bonus = 1.10; // +10% on ScrapHeaps
-  } else if (faction === 'Game' && terrain === 'WastelandSand') {
-    bonus = 1.08; // +8% on WastelandSand
-  } else if (faction === 'Golden' && condition >= 90) {
-    bonus = 1.15; // +15% when condition >= 90%
-  }
-  
-  // Apply faction bonus first
-  let boosted = {
-    speed: Math.min(100, Math.floor(stats.speed * bonus)),
-    powerCore: Math.min(100, Math.floor(stats.powerCore * bonus)),
-    acceleration: Math.min(100, Math.floor(stats.acceleration * bonus)),
-    stability: Math.min(100, Math.floor(stats.stability * bonus)),
-  };
-  
-  // Apply preferred terrain bonus (+5% if racing on preferred terrain)
-  if (preferredTerrain === terrain) {
-    return {
-      speed: Math.min(100, Math.floor(boosted.speed * 1.05)),
-      powerCore: Math.min(100, Math.floor(boosted.powerCore * 1.05)),
-      acceleration: Math.min(100, Math.floor(boosted.acceleration * 1.05)),
-      stability: Math.min(100, Math.floor(boosted.stability * 1.05)),
-    };
-  }
-  
-  return boosted;
-}
-
 // Wrapper component to handle backend query
 const RaceVisualizerWithBackend = ({ raceData }: { raceData: any }) => {
   const botIndexes = raceData.botOrder?.map((id: string) => parseInt(id)) || [];
@@ -171,15 +129,40 @@ export default function SimulatorPage() {
         const bots: Bot[] = profiles
           .filter(profile => profile !== null)
           .map((profile: any) => {
-            // Extract faction name from variant object (e.g., { Murder: null } -> "Murder")
-            const factionName = profile.faction && typeof profile.faction === 'object' 
-              ? Object.keys(profile.faction)[0] 
-              : 'Unknown';
+            // Extract faction name from variant object (e.g., [{ Murder: null }] -> "Murder")
+            // Candid variants come as single-element arrays from the JS library
+            let factionName = 'Unknown';
+            if (profile.faction) {
+              if (Array.isArray(profile.faction) && profile.faction.length > 0) {
+                const factionObj = profile.faction[0];
+                if (typeof factionObj === 'object' && factionObj !== null) {
+                  const keys = Object.keys(factionObj);
+                  factionName = keys[0] || 'Unknown';
+                }
+              } else if (typeof profile.faction === 'object' && !Array.isArray(profile.faction)) {
+                const keys = Object.keys(profile.faction);
+                factionName = keys[0] || 'Unknown';
+              } else if (typeof profile.faction === 'string') {
+                factionName = profile.faction;
+              }
+            }
             
-            // Extract preferred terrain from variant object
-            const preferredTerrain = profile.preferredTerrain && typeof profile.preferredTerrain === 'object'
-              ? Object.keys(profile.preferredTerrain)[0]
-              : 'ScrapHeaps';
+            // Extract preferred terrain from variant object (e.g., [{ ScrapHeaps: null }] -> "ScrapHeaps")
+            let preferredTerrain = 'ScrapHeaps';
+            if (profile.preferredTerrain) {
+              if (Array.isArray(profile.preferredTerrain) && profile.preferredTerrain.length > 0) {
+                const terrainObj = profile.preferredTerrain[0];
+                if (typeof terrainObj === 'object' && terrainObj !== null) {
+                  const keys = Object.keys(terrainObj);
+                  preferredTerrain = keys[0] || 'ScrapHeaps';
+                }
+              } else if (typeof profile.preferredTerrain === 'object' && !Array.isArray(profile.preferredTerrain)) {
+                const keys = Object.keys(profile.preferredTerrain);
+                preferredTerrain = keys[0] || 'ScrapHeaps';
+              } else if (typeof profile.preferredTerrain === 'string') {
+                preferredTerrain = profile.preferredTerrain;
+              }
+            }
             
             return {
               tokenIndex: Number(profile.tokenIndex),

@@ -54,22 +54,14 @@ function getRaceClassBadge(raceClass: any): string {
 
 export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
   const navigate = useNavigate();
-  const { data: profile, isLoading } = useGetBotProfile(Number(tokenIndex));
-  const { data: raceHistory, isLoading: historyLoading } = useGetBotRaceHistory(Number(tokenIndex), 10);
+  const { data: profile } = useGetBotProfile(Number(tokenIndex));
+  const { data: raceHistory } = useGetBotRaceHistory(Number(tokenIndex), 10);
   const { data: backgroundData } = useBackgrounds();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading bot details...</p>
-      </div>
-    );
-  }
 
   if (!profile) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Bot not found</p>
+        <p className="text-muted-foreground">Loading bot details...</p>
       </div>
     );
   }
@@ -305,9 +297,9 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
                   <p className="mb-2">📊 No race data available</p>
                   <p className="text-sm">This bot needs to be initialized and enter races to build a history.</p>
                 </div>
-              ) : historyLoading ? (
+              ) : !raceHistory ? (
                 <p className="text-center text-muted-foreground">Loading race history...</p>
-              ) : !raceHistory || raceHistory.races.length === 0 ? (
+              ) : raceHistory.races.length === 0 ? (
                 <p className="text-center text-muted-foreground">No completed races yet</p>
               ) : (
                 <div className="space-y-2">

@@ -329,6 +329,8 @@ const TRACK_TEMPLATES: Record<number, { segments: TrackSegment[]; laps: number }
 };
 
 // Apply faction bonuses to stats - matches backend PokedBotsGarage.mo
+// CRITICAL: Backend uses Int.abs(Float.toInt(...)) which TRUNCATES (floor for positive numbers)
+// Must use Math.floor() to match backend exactly
 function applyFactionBonuses(
   stats: { speed: number; powerCore: number; acceleration: number; stability: number },
   faction: string | undefined,
@@ -421,22 +423,25 @@ function applyFactionBonuses(
       powerCore = Math.floor(powerCore * 1.05);
       stability = Math.floor(stability * 1.05);
       break;
+    case 'Food':
+      // Food faction has no racing bonuses (condition recovery only)
+      break;
   }
   
   let boosted = {
-    speed: Math.min(100, speed),
-    powerCore: Math.min(100, powerCore),
-    acceleration: Math.min(100, acceleration),
-    stability: Math.min(100, stability),
+    speed: Math.min(100, Math.max(1, speed)),
+    powerCore: Math.min(100, Math.max(1, powerCore)),
+    acceleration: Math.min(100, Math.max(1, acceleration)),
+    stability: Math.min(100, Math.max(1, stability)),
   };
   
-  // Apply preferred terrain bonus (+10% if racing on preferred terrain)
+  // Apply preferred terrain bonus (+5% if racing on preferred terrain)
   if (preferredTerrain === terrain) {
     return {
-      speed: Math.min(100, Math.floor(boosted.speed * 1.10)),
-      powerCore: Math.min(100, Math.floor(boosted.powerCore * 1.10)),
-      acceleration: Math.min(100, Math.floor(boosted.acceleration * 1.10)),
-      stability: Math.min(100, Math.floor(boosted.stability * 1.10)),
+      speed: Math.min(100, Math.max(1, Math.floor(boosted.speed * 1.05))),
+      powerCore: Math.min(100, Math.max(1, Math.floor(boosted.powerCore * 1.05))),
+      acceleration: Math.min(100, Math.max(1, Math.floor(boosted.acceleration * 1.05))),
+      stability: Math.min(100, Math.max(1, Math.floor(boosted.stability * 1.05))),
     };
   }
   
@@ -544,16 +549,18 @@ function calculateBotSegmentTimes(
       const globalSegmentIdx = lap * track.segments.length + segIdx;
       
       // Use same seed calculation as backend
-      // Use trackSeed as bigint for precision
+      // Backend: segmentSeed = race.trackSeed + (i * 1000) + segmentIdx
+      // Backend: segmentConditionSeed = ((segmentSeed * 31337 + i * 7919 + lap * 12345) % 1000)
       const seedBase = typeof trackSeed === 'bigint' ? trackSeed : BigInt(trackSeed);
-      const seed = seedBase + BigInt(participantIndex * 1000 + globalSegmentIdx);
+      const segmentSeed = seedBase + BigInt(participantIndex * 1000 + globalSegmentIdx);
       
       // Per-segment performance variation (driver errors, debris, wind, etc.)
       // Each bot experiences different micro-conditions on each segment
-      const segmentConditionSeed = Number((seed * 31337n + BigInt(participantIndex * 7919) + BigInt(lap * 12345)) % 1000n);
+      // CRITICAL: Must match backend exactly - use participantIndex in both places
+      const segmentConditionSeed = Number((segmentSeed * 31337n + BigInt(participantIndex * 7919) + BigInt(lap * 12345)) % 1000n);
       const segmentPerformance = 0.94 + (segmentConditionSeed / 1666.67); // 0.94 to 1.06 (±6%)
       
-      const time = calculateSegmentTimeEstimate(segment, seed, botStats, previousDifficulty) * segmentPerformance;
+      const time = calculateSegmentTimeEstimate(segment, segmentSeed, botStats, previousDifficulty) * segmentPerformance;
       
       cumulativeTime += time;
       cumulativeDistance += segment.length;
@@ -827,7 +834,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
       map.set(result.nftId, segmentTimes);
     });
     return map;
-  }, [results, trackId, trackSeed]);
+  }, [results, trackId, trackSeed, bonusesAlreadyApplied, botOrder, terrain]);
   
   // Find the slowest finisher based on actual segment-calculated times
   const maxTime = useMemo(() => {

@@ -14,6 +14,12 @@ import {
   createApiKey,
   revokeApiKey,
   getUserWalletNFTs,
+  listBotForSale,
+  unlistBot,
+  transferBot,
+  startScavenging,
+  completeScavenging,
+  respecBot,
   type UpgradeType,
   type PaymentMethod,
   type ApiKeyMetadata,
@@ -321,5 +327,141 @@ export function useUserWalletNFTs() {
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 60 * 1000, // Auto-refetch every minute (less frequent than registered bots)
+  });
+}
+
+/**
+ * Hook to list a bot for sale on the marketplace
+ */
+export function useListBotForSale() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ tokenIndex, priceE8s }: { tokenIndex: number; priceE8s: bigint }) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return listBotForSale(tokenIndex, Number(priceE8s), user.agent as any);
+    },
+    onSuccess: (_, { tokenIndex }) => {
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
+    },
+  });
+}
+
+/**
+ * Hook to unlist a bot from the marketplace
+ */
+export function useUnlistBot() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (tokenIndex: number) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return unlistBot(tokenIndex, user.agent as any);
+    },
+    onSuccess: (_, tokenIndex) => {
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
+    },
+  });
+}
+
+/**
+ * Hook to transfer a bot to another account
+ */
+export function useTransferBot() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ tokenIndex, toAccountId }: { tokenIndex: number; toAccountId: string }) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return transferBot(tokenIndex, toAccountId, user.agent as any);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['user-wallet-nfts'] });
+    },
+  });
+}
+
+/**
+ * Hook to start a scavenging mission
+ */
+export function useStartScavenging() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ 
+      tokenIndex, 
+      zone, 
+      duration 
+    }: { 
+      tokenIndex: number; 
+      zone: 'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields' | 'RepairBay' | 'ChargingStation';
+      duration?: number;
+    }) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return startScavenging(tokenIndex, zone, user.agent as any, duration);
+    },
+    onSuccess: (_, { tokenIndex }) => {
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
+    },
+  });
+}
+
+/**
+ * Hook to complete a scavenging mission
+ */
+export function useCompleteScavenging() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (tokenIndex: number) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return completeScavenging(tokenIndex, user.agent as any);
+    },
+    onSuccess: (_, tokenIndex) => {
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+    },
+  });
+}
+
+/**
+ * Hook to respec a bot (reset upgrades)
+ */
+export function useRespecBot() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (tokenIndex: number) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return respecBot(tokenIndex, user.agent as any);
+    },
+    onSuccess: (_, tokenIndex) => {
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+    },
   });
 }

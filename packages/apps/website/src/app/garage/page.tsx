@@ -79,10 +79,7 @@ export default function GaragePage() {
     return saved ? JSON.parse(saved) : true;
   });
   
-  // Per-bot loading states (keyed by tokenIndex)
-  const [botLoadingStates, setBotLoadingStates] = useState<Map<string, boolean>>(new Map());
-  const [botRechargingStates, setBotRechargingStates] = useState<Map<string, boolean>>(new Map());
-  const [botRepairingStates, setBotRepairingStates] = useState<Map<string, boolean>>(new Map());
+  // Per-bot loading states (keyed by tokenIndex) - only tracking entering races now
   const [botEnteringRacesStates, setBotEnteringRacesStates] = useState<Map<string, boolean>>(new Map());
   
   // Use React Query hooks - isFetching is true during both initial load and refetch
@@ -156,26 +153,19 @@ export default function GaragePage() {
 
   // Sort bots: favorites first, then by custom order, then registered, then unregistered
   const sortedBots = useMemo(() => {
-    console.log('[GaragePage] Starting sortedBots calculation');
-    console.log('[GaragePage] Registered bots:', bots.length, bots.map(b => Number(b.tokenIndex)));
-    console.log('[GaragePage] Wallet NFTs:', walletNFTs.length, walletNFTs);
-    
     // Start with registered bots
     const botsArray = [...bots];
     
     // Add unregistered bots to the end (filter out already registered ones)
     const registeredTokenIndices = new Set(bots.map(b => Number(b.tokenIndex)));
-    console.log('[GaragePage] Registered token indices Set:', Array.from(registeredTokenIndices));
     
     const unregisteredBots = walletNFTs
       .filter(nft => {
         const isNotRegistered = !nft.isRegistered;
         const notInRegisteredSet = !registeredTokenIndices.has(nft.tokenIndex);
-        console.log(`[GaragePage] Checking NFT ${nft.tokenIndex}: isRegistered=${nft.isRegistered}, inSet=${registeredTokenIndices.has(nft.tokenIndex)}, includeInUnregistered=${isNotRegistered && notInRegisteredSet}`);
         return isNotRegistered && notInRegisteredSet;
       })
       .map(nft => {
-        console.log('[GaragePage] Mapping unregistered NFT:', nft.tokenIndex);
         return {
           tokenIndex: BigInt(nft.tokenIndex),
           isInitialized: false,
@@ -193,10 +183,7 @@ export default function GaragePage() {
         };
       });
     
-    console.log('[GaragePage] Unregistered bots after filtering:', unregisteredBots.length, unregisteredBots.map(b => Number(b.tokenIndex)));
-    
     const allBots = [...botsArray, ...unregisteredBots];
-    console.log('[GaragePage] All bots combined:', allBots.length, allBots.map(b => ({ tokenIndex: Number(b.tokenIndex), isInitialized: b.isInitialized })));
     
     // Sort by custom order if exists (only for registered bots)
     if (customOrder.length > 0) {
@@ -1227,14 +1214,9 @@ export default function GaragePage() {
           <div className="flex-1 min-w-0">
             {selectedBot ? (
               <BotCard 
+                key={selectedBot.tokenIndex.toString()}
                 bot={selectedBot} 
                 onUpdate={() => refetchBots()}
-                loading={botLoadingStates.get(selectedBot.tokenIndex.toString()) || false}
-                setLoading={(val) => setBotLoadingStates(new Map(botLoadingStates.set(selectedBot.tokenIndex.toString(), val)))}
-                recharging={botRechargingStates.get(selectedBot.tokenIndex.toString()) || false}
-                setRecharging={(val) => setBotRechargingStates(new Map(botRechargingStates.set(selectedBot.tokenIndex.toString(), val)))}
-                repairing={botRepairingStates.get(selectedBot.tokenIndex.toString()) || false}
-                setRepairing={(val) => setBotRepairingStates(new Map(botRepairingStates.set(selectedBot.tokenIndex.toString(), val)))}
                 enteringRaces={botEnteringRacesStates.get(selectedBot.tokenIndex.toString()) || false}
                 setEnteringRaces={(val) => setBotEnteringRacesStates(new Map(botEnteringRacesStates.set(selectedBot.tokenIndex.toString(), val)))}
                 rechargeCooldownMultiplier={bonuses?.costMultipliers.rechargeCooldown}

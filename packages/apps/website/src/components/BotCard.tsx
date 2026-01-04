@@ -1,9 +1,22 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BotListItem, initializeBot, rechargeBot, repairBot, respecBot, generatetokenIdentifier, listBotForSale, unlistBot, transferBot, startScavenging, completeScavenging, enterRace } from '@pokedbots-racing/ic-js';
+import { BotListItem, generatetokenIdentifier } from '@pokedbots-racing/ic-js';
 import { useAuth } from '../hooks/useAuth';
-import { useUpgradeBot, useCancelUpgrade } from '../hooks/useGarage';
+import { 
+  useInitializeBot,
+  useRechargeBot,
+  useRepairBot,
+  useUpgradeBot, 
+  useCancelUpgrade,
+  useListBotForSale,
+  useUnlistBot,
+  useTransferBot,
+  useStartScavenging,
+  useCompleteScavenging,
+  useRespecBot,
+  useEnterRace,
+} from '../hooks/useGarage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -15,17 +28,11 @@ import { Label } from './ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
-import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus, getFactionSpecialTerrain } from '../lib/utils';
+import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionBonus, getFactionSpecialTerrain } from '../lib/utils';
 
 interface BotCardProps {
   bot: BotListItem;
   onUpdate: () => void;
-  loading: boolean;
-  setLoading: (val: boolean) => void;
-  recharging: boolean;
-  setRecharging: (val: boolean) => void;
-  repairing: boolean;
-  setRepairing: (val: boolean) => void;
   enteringRaces: boolean;
   setEnteringRaces: (val: boolean) => void;
   rechargeCooldownMultiplier?: number;
@@ -38,24 +45,6 @@ interface BotCardProps {
     gyroModules: bigint;
     universalParts: bigint;
   };
-}
-
-// Format time relative to now (e.g., "in 2h", "in 5m", "in 3d")
-function formatRelativeTime(timestampNanos: bigint): string {
-  const now = Date.now();
-  const targetMs = Number(timestampNanos) / 1_000_000;
-  const diffMs = targetMs - now;
-  
-  if (diffMs < 0) return 'closed';
-  
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
-  if (diffDays > 0) return `in ${diffDays}d`;
-  if (diffHours > 0) return `in ${diffHours}h`;
-  if (diffMinutes > 0) return `in ${diffMinutes}m`;
-  return 'starting soon';
 }
 
 // Convert upgrade type to display name
@@ -73,25 +62,24 @@ function getUpgradeDisplayName(upgradeType: string): string {
   return nameMap[upgradeType] || upgradeType;
 }
 
-export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRecharging, repairing, setRepairing, enteringRaces, setEnteringRaces, rechargeCooldownMultiplier = 1.0, backgroundColor, inventory }: BotCardProps) {
+export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechargeCooldownMultiplier = 1.0, backgroundColor, inventory }: BotCardProps) {
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   const { user } = useAuth();
+  
+  // Mutation hooks
+  const initializeMutation = useInitializeBot();
+  const rechargeMutation = useRechargeBot();
+  const repairMutation = useRepairBot();
   const upgradeMutation = useUpgradeBot();
   const cancelUpgradeMutation = useCancelUpgrade();
-  
-  // Debug logging for activeMission
-  useEffect(() => {
-    console.log('🤖 BotCard Debug - Bot #' + bot.tokenIndex);
-    console.log('  - activeMission:', bot.activeMission);
-    console.log('  - stats:', bot.stats);
-    if (bot.activeMission) {
-      console.log('  - zone:', bot.activeMission.zone);
-      console.log('  - zone keys:', Object.keys(bot.activeMission.zone));
-    }
-    if (bot.stats?.activeMission) {
-      console.log('  - stats.activeMission:', bot.stats.activeMission);
-    }
-  }, [bot]);
+  const listForSaleMutation = useListBotForSale();
+  const unlistMutation = useUnlistBot();
+  const transferMutation = useTransferBot();
+  const startScavengingMutation = useStartScavenging();
+  const completeScavengingMutation = useCompleteScavenging();
+  const respecMutation = useRespecBot();
+  const enterRaceMutation = useEnterRace();
+
   
   const [showInitialize, setShowInitialize] = useState(false);
   const [showListForSale, setShowListForSale] = useState(false);
@@ -107,7 +95,6 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
   const [botName, setBotName] = useState('');
   const [listPrice, setListPrice] = useState('');
   const [transferTo, setTransferTo] = useState('');
-  const [error, setError] = useState<string | null>(null);
   
   // Racing section state - must be at top level
   const [selectedRaces, setSelectedRaces] = useState<Set<number>>(new Set());
@@ -118,157 +105,122 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
     setSelectedRaces(new Set());
   }, [bot.tokenIndex]);
 
-  const handleInitialize = async () => {
-    if (!user?.agent) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      console.log('Initializing bot', bot.tokenIndex, 'with name:', botName || 'none');
-      const result = await initializeBot(Number(bot.tokenIndex), botName || undefined, user.agent as any);
-      console.log('Initialization result:', result);
-      setShowInitialize(false);
-      setBotName(''); // Reset name field
-      onUpdate();
-      toast.success(result);
-    } catch (err) {
-      console.error('Initialization error:', err);
-      const errorMsg = err instanceof Error ? err.message : 'Failed to initialize bot';
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
+  const handleInitialize = () => {
+    initializeMutation.mutate(
+      { tokenIndex: Number(bot.tokenIndex), name: botName || undefined },
+      {
+        onSuccess: (result) => {
+          toast.success(result);
+          setShowInitialize(false);
+          setBotName('');
+          onUpdate();
+        },
+        onError: (err: Error) => {
+          toast.error(err.message || 'Failed to initialize bot');
+        },
+      }
+    );
   };
 
-  const handleRecharge = async () => {
-    if (!user?.agent) return;
-    
-    setRecharging(true);
-    setError(null);
-    try {
-      const result = await rechargeBot(Number(bot.tokenIndex), user.agent as any);
-      toast.success(result);
-      onUpdate();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to recharge';
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setRecharging(false);
-    }
+  const handleRecharge = () => {
+    rechargeMutation.mutate(Number(bot.tokenIndex), {
+      onSuccess: (result) => {
+        toast.success(result);
+        onUpdate();
+      },
+      onError: (err: Error) => {
+        toast.error(err.message || 'Failed to recharge');
+      },
+    });
   };
 
-  const handleRepair = async () => {
-    if (!user?.agent) return;
-    
-    setRepairing(true);
-    setError(null);
-    try {
-      const result = await repairBot(Number(bot.tokenIndex), user.agent as any);
-      toast.success(result);
-      onUpdate();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to repair';
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setRepairing(false);
-    }
+  const handleRepair = () => {
+    repairMutation.mutate(Number(bot.tokenIndex), {
+      onSuccess: (result) => {
+        toast.success(result);
+        onUpdate();
+      },
+      onError: (err: Error) => {
+        toast.error(err.message || 'Failed to repair');
+      },
+    });
   };
 
-  const handleFullMaintenance = async () => {
-    if (!user?.agent) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      // Perform both recharge and repair
-      const rechargeResult = await rechargeBot(Number(bot.tokenIndex), user.agent as any);
-      const repairResult = await repairBot(Number(bot.tokenIndex), user.agent as any);
-      toast.success(`🔧 Full maintenance complete!\n${rechargeResult}\n${repairResult}`);
-      onUpdate();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to perform maintenance';
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
+  const handleFullMaintenance = () => {
+    // Perform recharge first, then repair
+    rechargeMutation.mutate(Number(bot.tokenIndex), {
+      onSuccess: (rechargeResult) => {
+        repairMutation.mutate(Number(bot.tokenIndex), {
+          onSuccess: (repairResult) => {
+            toast.success(`🔧 Full maintenance complete!\n${rechargeResult}\n${repairResult}`);
+            onUpdate();
+          },
+          onError: (err: Error) => {
+            toast.error(err.message || 'Failed to repair');
+          },
+        });
+      },
+      onError: (err: Error) => {
+        toast.error(err.message || 'Failed to recharge');
+      },
+    });
   };
 
-  const handleStartScavenging = async () => {
-    if (!user?.agent) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      console.log('🚀 Starting scavenging for bot #' + bot.tokenIndex + ' in ' + scavengingZone);
-      const result = await startScavenging(Number(bot.tokenIndex), scavengingZone, user.agent as any, scavengingDuration);
-      console.log('✅ Scavenging started successfully:', result);
-      setShowScavenging(false);
-      console.log('🔄 Calling onUpdate to refresh bot data...');
-      await onUpdate();
-      console.log('✅ Bot data refreshed');
-      toast.success(result);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to start scavenging';
-      console.error('❌ Scavenging failed:', errorMsg);
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
+  const handleStartScavenging = () => {
+    startScavengingMutation.mutate(
+      { 
+        tokenIndex: Number(bot.tokenIndex), 
+        zone: scavengingZone, 
+        duration: scavengingDuration 
+      },
+      {
+        onSuccess: (result) => {
+          toast.success(result);
+          setShowScavenging(false);
+          onUpdate();
+        },
+        onError: (err: Error) => {
+          toast.error(err.message || 'Failed to start scavenging');
+        },
+      }
+    );
   };
 
-  const handleCompleteScavenging = async () => {
-    if (!user?.agent) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await completeScavenging(Number(bot.tokenIndex), user.agent as any);
-      onUpdate();
-      toast.success(result);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to complete scavenging';
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
+  const handleCompleteScavenging = () => {
+    completeScavengingMutation.mutate(Number(bot.tokenIndex), {
+      onSuccess: (result) => {
+        toast.success(result);
+        onUpdate();
+      },
+      onError: (err: Error) => {
+        toast.error(err.message || 'Failed to complete scavenging');
+      },
+    });
   };
 
-  const handleCancelUpgrade = async () => {
-    setError(null);
-    try {
-      const result = await cancelUpgradeMutation.mutateAsync(Number(bot.tokenIndex));
-      onUpdate();
-      toast.success(result);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to cancel upgrade';
-      setError(errorMsg);
-      toast.error(errorMsg);
-    }
+  const handleCancelUpgrade = () => {
+    cancelUpgradeMutation.mutate(Number(bot.tokenIndex), {
+      onSuccess: (result) => {
+        toast.success(result);
+        onUpdate();
+      },
+      onError: (err: Error) => {
+        toast.error(err.message || 'Failed to cancel upgrade');
+      },
+    });
   };
 
-  const handleRespec = async () => {
-    if (!user?.agent) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await respecBot(Number(bot.tokenIndex), user.agent as any);
-      setShowRespec(false);
-      onUpdate();
-      toast.success(result);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to strip bot';
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
+  const handleRespec = () => {
+    respecMutation.mutate(Number(bot.tokenIndex), {
+      onSuccess: (result) => {
+        toast.success(result);
+        setShowRespec(false);
+        onUpdate();
+      },
+      onError: (err: Error) => {
+        toast.error(err.message || 'Failed to strip bot');
+      },
+    });
   };
 
   // Get V2 upgrade costs and success rates from backend data
@@ -375,66 +327,62 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
     }
   };
 
-  const handleListForSale = async () => {
-    if (!user?.agent) return;
+  const handleListForSale = () => {
     const price = parseFloat(listPrice);
     if (isNaN(price) || price <= 0) {
-      setError('Please enter a valid price');
+      toast.error('Please enter a valid price');
       return;
     }
     
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await listBotForSale(Number(bot.tokenIndex), price, user.agent as any);
-      setShowListForSale(false);
-      setListPrice('');
-      onUpdate();
-      toast.success(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to list bot');
-    } finally {
-      setLoading(false);
-    }
+    const priceE8s = BigInt(Math.floor(price * 100_000_000));
+    listForSaleMutation.mutate(
+      { tokenIndex: Number(bot.tokenIndex), priceE8s },
+      {
+        onSuccess: (result) => {
+          toast.success(result);
+          setShowListForSale(false);
+          setListPrice('');
+          onUpdate();
+        },
+        onError: (err: Error) => {
+          toast.error(err.message || 'Failed to list bot');
+        },
+      }
+    );
   };
 
-  const handleUnlist = async () => {
-    if (!user?.agent) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await unlistBot(Number(bot.tokenIndex), user.agent as any);
-      toast.success(result);
-      // Force immediate refetch
-      onUpdate();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to unlist bot');
-    } finally {
-      setLoading(false);
-    }
+  const handleUnlist = () => {
+    unlistMutation.mutate(Number(bot.tokenIndex), {
+      onSuccess: (result) => {
+        toast.success(result);
+        onUpdate();
+      },
+      onError: (err: Error) => {
+        toast.error(err.message || 'Failed to unlist bot');
+      },
+    });
   };
 
-  const handleTransfer = async () => {
-    if (!user?.agent) return;
+  const handleTransfer = () => {
     if (!transferTo.trim()) {
-      setError('Please enter a recipient account ID');
+      toast.error('Please enter a recipient account ID');
       return;
     }
     
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await transferBot(Number(bot.tokenIndex), transferTo.trim(), user.agent as any);
-      setShowTransfer(false);
-      setTransferTo('');
-      onUpdate();
-      toast.success(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to transfer bot');
-    } finally {
-      setLoading(false);
-    }
+    transferMutation.mutate(
+      { tokenIndex: Number(bot.tokenIndex), toAccountId: transferTo.trim() },
+      {
+        onSuccess: (result) => {
+          toast.success(result);
+          setShowTransfer(false);
+          setTransferTo('');
+          onUpdate();
+        },
+        onError: (err: Error) => {
+          toast.error(err.message || 'Failed to transfer bot');
+        },
+      }
+    );
   };
 
   const getFactionName = (faction: any): string => {
@@ -536,22 +484,19 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                   maxLength={30}
                 />
               </div>
-              {error && (
-                <p className="text-sm text-destructive">{error}</p>
-              )}
             </div>
             <div className="flex gap-2">
               <Button
                 onClick={handleInitialize}
-                disabled={loading}
+                disabled={initializeMutation.isPending}
                 className="flex-1"
               >
-                {loading ? 'Processing Payment...' : 'Initialize (0.1 ICP)'}
+                {initializeMutation.isPending ? 'Processing Payment...' : 'Initialize (0.1 ICP)'}
               </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowInitialize(false)}
-                disabled={loading}
+                disabled={initializeMutation.isPending}
               >
                 Cancel
               </Button>
@@ -612,10 +557,6 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {error && (
-          <p className="text-sm text-destructive">{error}</p>
-        )}
-
         {/* World Buff Status */}
         {formatWorldBuff() && (
           <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg space-y-1">
@@ -851,7 +792,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     onClick={handleRecharge}
-                    disabled={recharging || Number(stats.battery) >= 100 || !!bot.activeMission || rechargeCooldown}
+                    disabled={rechargeMutation.isPending || Number(stats.battery) >= 100 || !!bot.activeMission || rechargeCooldown}
                     size="sm"
                     variant="outline"
                     title={
@@ -862,7 +803,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                           : ""
                     }
                   >
-                  {recharging ? (
+                  {rechargeMutation.isPending ? (
                     <>
                       <span className="animate-spin mr-1">⚡</span>
                       Recharging...
@@ -873,7 +814,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                   </Button>
                   <Button
                     onClick={handleRepair}
-              disabled={repairing || Number(stats.condition) >= 100 || !!bot.activeMission || repairCooldown}
+              disabled={repairMutation.isPending || Number(stats.condition) >= 100 || !!bot.activeMission || repairCooldown}
               size="sm"
               variant="outline"
               title={
@@ -884,7 +825,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                     : ""
               }
                   >
-                  {repairing ? (
+                  {repairMutation.isPending ? (
                     <>
                       <span className="animate-spin mr-1">🔧</span>
                       Repairing...
@@ -899,12 +840,12 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 {!bot.activeMission && (
                   <Button
                     onClick={handleFullMaintenance}
-                    disabled={loading || recharging || repairing || rechargeCooldown || repairCooldown || (Number(stats.battery) >= 100 || Number(stats.condition) >= 100)}
+                    disabled={rechargeMutation.isPending || repairMutation.isPending || rechargeCooldown || repairCooldown || (Number(stats.battery) >= 100 || Number(stats.condition) >= 100)}
                     size="sm"
                     variant="secondary"
                     className="w-full"
                   >
-                  {loading ? (
+                  {rechargeMutation.isPending || repairMutation.isPending ? (
                     <>
                       <span className="animate-spin mr-2">⚙️</span>
                       Full Maintenance...
@@ -978,7 +919,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                       size="sm"
                       className="col-span-2"
                       onClick={() => setShowUpgrade(true)}
-                      disabled={loading}
+                      disabled={upgradeMutation.isPending}
                     >
                       ⚡ Start Next Upgrade
                     </Button>
@@ -989,7 +930,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                       size="sm"
                       className="col-span-2"
                       onClick={() => setShowCancelUpgradeConfirm(true)}
-                      disabled={cancelUpgradeMutation.isPending || loading}
+                      disabled={cancelUpgradeMutation.isPending || upgradeMutation.isPending}
                     >
                       {cancelUpgradeMutation.isPending ? (
                         <>
@@ -1034,7 +975,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 </p>
                 <Button
                   onClick={() => setShowUpgrade(true)}
-                  disabled={loading}
+                  disabled={upgradeMutation.isPending}
                   size="sm"
                   className="w-full"
                   variant="default"
@@ -1048,12 +989,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
 
         {/* Scavenging Section - V2 Continuous */}
         {(() => {
-          console.log('🔍 Scavenging Section Render - Bot #' + bot.tokenIndex);
-          console.log('  - bot.activeMission exists?', !!bot.activeMission);
-          console.log('  - bot.activeMission value:', bot.activeMission);
-          
           if (bot.activeMission) {
-            console.log('  ✅ Showing active mission panel');
             // Active mission state
             const mission = bot.activeMission;
             const startTimeMs = Number(mission.startTime) / 1_000_000;
@@ -1145,12 +1081,12 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 </div>
                 <Button
                   onClick={handleCompleteScavenging}
-                  disabled={loading}
+                  disabled={completeScavengingMutation.isPending}
                   size="sm"
                   className="w-full"
                   variant="outline"
                 >
-                  {loading ? 'Retrieving...' : Object.keys(mission.zone)[0] === 'RepairBay' ? '🏠 Retrieve Bot' : Object.keys(mission.zone)[0] === 'ChargingStation' ? '🔌 Retrieve Bot' : '🏠 Retrieve Bot & Collect Parts'}
+                  {completeScavengingMutation.isPending ? 'Retrieving...' : Object.keys(mission.zone)[0] === 'RepairBay' ? '🏠 Retrieve Bot' : Object.keys(mission.zone)[0] === 'ChargingStation' ? '🔌 Retrieve Bot' : '🏠 Retrieve Bot & Collect Parts'}
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
                   {Object.keys(mission.zone)[0] === 'RepairBay' 
@@ -1162,7 +1098,6 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
               </div>
             );
           } else {
-            console.log('  ❌ Showing idle state panel');
             // Idle state - show send button
             return (
               <div className="p-3 bg-muted/30 border border-muted rounded-lg space-y-2">
@@ -1172,7 +1107,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 </p>
                 <Button
                   onClick={() => setShowScavenging(true)}
-                  disabled={loading}
+                  disabled={startScavengingMutation.isPending}
                   size="sm"
                   className="w-full"
                   variant="default"
@@ -1247,33 +1182,51 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
             }
           };
 
-          const handleEnterSelected = async () => {
-            if (!user?.agent || selectedRaces.size === 0) return;
+          const handleEnterSelected = () => {
+            if (selectedRaces.size === 0) return;
             
             setEnteringRaces(true);
             let successCount = 0;
             let failCount = 0;
+            const racesToEnter = Array.from(selectedRaces);
+            let currentIndex = 0;
 
-            for (const raceId of selectedRaces) {
-              try {
-                await enterRace(raceId, Number(bot.tokenIndex), user.agent as any);
-                successCount++;
-              } catch (error: any) {
-                console.error(`Failed to enter race ${raceId}:`, error);
-                failCount++;
+            const enterNext = () => {
+              if (currentIndex >= racesToEnter.length) {
+                // All done
+                setEnteringRaces(false);
+                setSelectedRaces(new Set());
+
+                if (successCount > 0) {
+                  toast.success(`Entered ${successCount} race${successCount > 1 ? 's' : ''}!`);
+                  onUpdate();
+                }
+                if (failCount > 0) {
+                  toast.error(`Failed to enter ${failCount} race${failCount > 1 ? 's' : ''}`);
+                }
+                return;
               }
-            }
 
-            setEnteringRaces(false);
-            setSelectedRaces(new Set());
+              const raceId = racesToEnter[currentIndex];
+              currentIndex++;
 
-            if (successCount > 0) {
-              toast.success(`Entered ${successCount} race${successCount > 1 ? 's' : ''}!`);
-              onUpdate();
-            }
-            if (failCount > 0) {
-              toast.error(`Failed to enter ${failCount} race${failCount > 1 ? 's' : ''}`);
-            }
+              enterRaceMutation.mutate(
+                { raceId, tokenIndex: Number(bot.tokenIndex) },
+                {
+                  onSuccess: () => {
+                    successCount++;
+                    enterNext();
+                  },
+                  onError: (error) => {
+                    console.error(`Failed to enter race ${raceId}:`, error);
+                    failCount++;
+                    enterNext();
+                  },
+                }
+              );
+            };
+
+            enterNext();
           };
 
           const hasEnteredRaces = bot.upcomingRaces && bot.upcomingRaces.length > 0;
@@ -1391,7 +1344,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
           {bot.isListed ? (
             <Button
               onClick={handleUnlist}
-              disabled={loading}
+              disabled={unlistMutation.isPending}
               size="sm"
               variant="destructive"
             >
@@ -1400,7 +1353,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
           ) : (
             <Button
               onClick={() => setShowListForSale(true)}
-              disabled={loading}
+              disabled={listForSaleMutation.isPending}
               size="sm"
               variant="secondary"
             >
@@ -1409,7 +1362,7 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
           )}
           <Button
             onClick={() => setShowTransfer(true)}
-            disabled={loading}
+            disabled={transferMutation.isPending}
             size="sm"
             variant="secondary"
           >
@@ -1418,27 +1371,15 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
         </div>
 
         {/* Strip Bot Button - Advanced/Dangerous Action */}
-        {bot.stats && (() => {
-          const stats = bot.stats as any;
-          const hasUpgrades = (
-            Number(stats.speedUpgrades || 0) > 0 ||
-            Number(stats.powerCoreUpgrades || 0) > 0 ||
-            Number(stats.accelerationUpgrades || 0) > 0 ||
-            Number(stats.stabilityUpgrades || 0) > 0
-          );
-
-          return hasUpgrades && !bot.activeMission && !bot.activeUpgrade && (
-            <Button
-              onClick={() => setShowRespec(true)}
-              disabled={loading}
-              size="sm"
-              variant="destructive"
-              className="w-full"
-            >
-              {loading ? '🔧 Stripping...' : '🔧 Strip Bot (1 ICP)'}
-            </Button>
-          );
-        })()}
+        <Button
+          onClick={() => setShowRespec(true)}
+          disabled={respecMutation.isPending}
+          size="sm"
+          variant="destructive"
+          className="w-full"
+        >
+          {respecMutation.isPending ? '🔧 Stripping...' : '🔧 Strip Bot (1 ICP)'}
+        </Button>
         
         {bot.isListed && bot.listPrice && (
           <p className="text-xs text-muted-foreground text-center">
@@ -1469,22 +1410,19 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 onChange={(e) => setListPrice(e.target.value)}
               />
             </div>
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
           </div>
           <div className="flex gap-2">
             <Button
               onClick={handleListForSale}
-              disabled={loading}
+              disabled={listForSaleMutation.isPending}
               className="flex-1"
             >
-              {loading ? 'Listing...' : 'List for Sale'}
+              {listForSaleMutation.isPending ? 'Listing...' : 'List for Sale'}
             </Button>
             <Button
               variant="outline"
               onClick={() => setShowListForSale(false)}
-              disabled={loading}
+              disabled={listForSaleMutation.isPending}
             >
               Cancel
             </Button>
@@ -1515,22 +1453,19 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 Enter a principal ID or account identifier
               </p>
             </div>
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
           </div>
           <div className="flex gap-2">
             <Button
               onClick={handleTransfer}
-              disabled={loading}
+              disabled={transferMutation.isPending}
               className="flex-1"
             >
-              {loading ? 'Transferring...' : 'Transfer Bot'}
+              {transferMutation.isPending ? 'Transferring...' : 'Transfer Bot'}
             </Button>
             <Button
               variant="outline"
               onClick={() => setShowTransfer(false)}
-              disabled={loading}
+              disabled={transferMutation.isPending}
             >
               Cancel
             </Button>
@@ -1695,22 +1630,19 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                 💡 <strong>Continuous Scavenging:</strong> {scavengingZone === 'RepairBay' ? 'Condition restores every 15 min. Retrieve when ready!' : scavengingZone === 'ChargingStation' ? 'Battery restores every 15 min (4/hr). Retrieve anytime!' : 'Parts accumulate every 15 min. Retrieve anytime to collect!'} <strong>Rates shown are base values</strong> - your bot's faction and stats provide bonuses.
               </p>
             </div>
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
           </div>
           <div className="flex gap-2">
             <Button
               onClick={handleStartScavenging}
-              disabled={loading}
+              disabled={startScavengingMutation.isPending}
               className="flex-1"
             >
-              {loading ? 'Sending...' : '🔍 Send Bot Out'}
+              {startScavengingMutation.isPending ? 'Sending...' : '🔍 Send Bot Out'}
             </Button>
             <Button
               variant="outline"
               onClick={() => setShowScavenging(false)}
-              disabled={loading}
+              disabled={startScavengingMutation.isPending}
             >
               Cancel
             </Button>
@@ -1845,9 +1777,6 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                   : 'Parts will be deducted from your inventory'}
               </p>
             </div>
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
           </div>
           <div className="flex gap-2">
             <Button
@@ -1901,18 +1830,54 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
           <AlertDialogHeader>
             <AlertDialogTitle>⚠️ Strip Bot?</AlertDialogTitle>
             <AlertDialogDescription>
-              <div className="space-y-3">
-                <p>This will <strong>reset all upgrade bonuses to 0</strong> and refund 60% of invested parts (40% penalty).</p>
-                
-                {bot.stats && (() => {
+              {(() => {
+                // Check if bot can be stripped
+                if (bot.activeMission) {
+                  return (
+                    <div className="space-y-3">
+                      <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                        <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">⚠️ Cannot Strip Bot</p>
+                        <p className="text-sm text-muted-foreground mt-2">Your bot is currently on a scavenging mission. Retrieve your bot from its mission first before stripping upgrades.</p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (bot.activeUpgrade) {
+                  return (
+                    <div className="space-y-3">
+                      <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                        <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">⚠️ Cannot Strip Bot</p>
+                        <p className="text-sm text-muted-foreground mt-2">Your bot has an upgrade in progress. Cancel the upgrade first before stripping all upgrades.</p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (bot.stats) {
                   const stats = bot.stats as any;
                   const speedUp = Number(stats.speedUpgrades || 0);
                   const powerUp = Number(stats.powerCoreUpgrades || 0);
                   const accelUp = Number(stats.accelerationUpgrades || 0);
                   const stabUp = Number(stats.stabilityUpgrades || 0);
-                  
+                  const hasUpgrades = speedUp > 0 || powerUp > 0 || accelUp > 0 || stabUp > 0;
+
+                  if (!hasUpgrades) {
+                    return (
+                      <div className="space-y-3">
+                        <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                          <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">⚠️ No Upgrades to Strip</p>
+                          <p className="text-sm text-muted-foreground mt-2">Your bot has no upgrade bonuses. There's nothing to strip!</p>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Bot can be stripped - show confirmation
                   return (
-                    <>
+                    <div className="space-y-3">
+                      <p>This will <strong>reset all upgrade bonuses to 0</strong> and refund 60% of invested parts (40% penalty).</p>
+                      
                       <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg space-y-1 text-sm">
                         <p className="font-semibold text-destructive">Cost: 1 ICP</p>
                         <p className="text-muted-foreground">Current Upgrades:</p>
@@ -1931,23 +1896,38 @@ export function BotCard({ bot, onUpdate, loading, setLoading, recharging, setRec
                         <p className="text-destructive">✗ All stat bonuses reset to 0</p>
                         <p className="text-destructive">✗ Bot will drop to lower race class</p>
                       </div>
-                    </>
+                      
+                      <p className="text-sm font-semibold">This action cannot be undone!</p>
+                    </div>
                   );
-                })()}
-                
-                <p className="text-sm font-semibold">This action cannot be undone!</p>
-              </div>
+                }
+
+                return null;
+              })()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleRespec}
-              disabled={loading}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {loading ? 'Stripping...' : 'Strip Bot'}
-            </AlertDialogAction>
+            {(() => {
+              const stats = bot.stats as any;
+              const hasUpgrades = stats && (
+                Number(stats.speedUpgrades || 0) > 0 ||
+                Number(stats.powerCoreUpgrades || 0) > 0 ||
+                Number(stats.accelerationUpgrades || 0) > 0 ||
+                Number(stats.stabilityUpgrades || 0) > 0
+              );
+              const canStrip = hasUpgrades && !bot.activeMission && !bot.activeUpgrade;
+
+              return (
+                <AlertDialogAction
+                  onClick={handleRespec}
+                  disabled={!canStrip || respecMutation.isPending}
+                  className="bg-destructive hover:bg-destructive/90"
+                >
+                  {respecMutation.isPending ? 'Stripping...' : 'Strip Bot'}
+                </AlertDialogAction>
+              );
+            })()}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
