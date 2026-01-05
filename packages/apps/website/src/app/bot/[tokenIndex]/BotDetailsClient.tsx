@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useGetBotProfile, useGetBotRaceHistory } from '@/hooks/useRacing';
 import { useBackgrounds } from '@/hooks/useBackgrounds';
+import { useBotBaseStats } from '@/hooks/usePrecomputedStats';
 import { generatetokenIdentifier, generateExtThumbnailLink, generateExtAssetLink } from '@pokedbots-racing/ic-js';
 import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus, getFactionSpecialTerrain } from '@/lib/utils';
 
@@ -57,6 +58,7 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
   const { data: profile } = useGetBotProfile(Number(tokenIndex));
   const { data: raceHistory } = useGetBotRaceHistory(Number(tokenIndex), 10);
   const { data: backgroundData } = useBackgrounds();
+  const baseStats = useBotBaseStats(Number(tokenIndex));
 
   if (!profile) {
     return (
@@ -139,12 +141,12 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
                     <Badge variant="outline" className="border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
                       ⚠️ Not Initialized
                     </Badge>
-                    <Badge variant="secondary">Base Rating: {profile.stats.overallRating}/100</Badge>
+                    <Badge variant="secondary">Base Rating: {profile.stats.overallRating}</Badge>
                   </>
                 ) : (
                   <>
-                    {profile.raceClass && <Badge variant="outline">{getRaceClassBadge(profile.raceClass)}</Badge>}
-                    <Badge variant="secondary">Rating: {profile.stats.overallRating}/100</Badge>
+                    {profile.raceClass && getRaceClassBadge(profile.raceClass) !== 'Unknown' && <Badge variant="outline">{getRaceClassBadge(profile.raceClass)}</Badge>}
+                    <Badge variant="secondary">Rating: {profile.stats.overallRating}</Badge>
                     {profile.eloRating && <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
                       ⚡ ELO: {profile.eloRating}
                     </Badge>}
@@ -209,19 +211,47 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center p-4 bg-card/50 border border-primary/20 rounded-lg">
                   <p className="text-sm text-muted-foreground mb-2">Speed</p>
-                  <p className="text-3xl font-bold text-primary">{profile.stats.speed}</p>
+                  <p className="text-3xl font-bold text-primary">
+                    {profile.stats.speed}
+                  </p>
+                  {isInitialized && baseStats && baseStats.speed !== profile.stats.speed && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ({baseStats.speed})
+                    </p>
+                  )}
                 </div>
                 <div className="text-center p-4 bg-card/50 border border-primary/20 rounded-lg">
                   <p className="text-sm text-muted-foreground mb-2">Power Core</p>
-                  <p className="text-3xl font-bold text-primary">{profile.stats.powerCore}</p>
+                  <p className="text-3xl font-bold text-primary">
+                    {profile.stats.powerCore}
+                  </p>
+                  {isInitialized && baseStats && baseStats.powerCore !== profile.stats.powerCore && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ({baseStats.powerCore})
+                    </p>
+                  )}
                 </div>
                 <div className="text-center p-4 bg-card/50 border border-primary/20 rounded-lg">
                   <p className="text-sm text-muted-foreground mb-2">Acceleration</p>
-                  <p className="text-3xl font-bold text-primary">{profile.stats.acceleration}</p>
+                  <p className="text-3xl font-bold text-primary">
+                    {profile.stats.acceleration}
+                  </p>
+                  {isInitialized && baseStats && baseStats.acceleration !== profile.stats.acceleration && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ({baseStats.acceleration})
+                    </p>
+                  )}
                 </div>
                 <div className="text-center p-4 bg-card/50 border border-primary/20 rounded-lg">
                   <p className="text-sm text-muted-foreground mb-2">Stability</p>
-                  <p className="text-3xl font-bold text-primary">{profile.stats.stability}</p>
+                  <p className="text-3xl font-bold text-primary">
+                    {profile.stats.stability}
+                  </p>
+                  {isInitialized && baseStats && baseStats.stability !== profile.stats.stability && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ({baseStats.stability})
+                    </p>
+                  )}
                 </div>
               </div>
               {!isInitialized && (

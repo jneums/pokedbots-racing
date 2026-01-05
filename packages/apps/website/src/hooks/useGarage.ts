@@ -445,20 +445,20 @@ export function useCompleteScavenging() {
 }
 
 /**
- * Hook to respec a bot (reset upgrades)
+ * Hook to respec a bot (reset selected stat upgrades)
  */
 export function useRespecBot() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (tokenIndex: number) => {
+    mutationFn: async ({ tokenIndex, statsToStrip }: { tokenIndex: number; statsToStrip: string[] }) => {
       if (!user?.agent) {
         throw new Error('Not authenticated');
       }
-      return respecBot(tokenIndex, user.agent as any);
+      return respecBot(tokenIndex, statsToStrip, user.agent as any);
     },
-    onSuccess: (_, tokenIndex) => {
+    onSuccess: (_, { tokenIndex }) => {
       queryClient.invalidateQueries({ queryKey: ['my-bots'] });
       queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
       queryClient.invalidateQueries({ queryKey: ['user-inventory'] });

@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from '../hooks/useAuth';
 import WalletButton from '../components/WalletButton';
+import EventsHub from '../components/EventsHub';
 
 export default function Navigation() {
   const location = useLocation();
@@ -40,6 +41,7 @@ export default function Navigation() {
           
           {/* Desktop Navigation */}
           <nav className="hidden sm:flex items-center gap-6">
+            <EventsHub />
             <Link to="/leaderboard" className={linkClass('/leaderboard')}>
               Leaderboard
             </Link>
@@ -91,7 +93,8 @@ export default function Navigation() {
               {/* Drawer */}
               <div className="fixed top-[80px] right-0 bottom-0 w-64 border-l-2 border-primary/40 z-40 sm:hidden shadow-2xl">
                 <nav className="flex flex-col py-4 bg-card">
-                  <div className="px-4 pb-4">
+                  <div className="px-4 pb-4 space-y-3">
+                    <EventsHub />
                     <WalletButton />
                   </div>
                   <div className="h-px bg-border mb-2" />

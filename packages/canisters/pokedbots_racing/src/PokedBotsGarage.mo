@@ -1684,9 +1684,11 @@ module {
       totalRefund;
     };
 
-    /// Respec a bot - reset all upgrades and refund parts (minus penalty)
+    /// Respec a bot - reset selected stat upgrades and refund parts (minus penalty)
+    /// statsToStrip: Array of stat names to reset (["speed", "powerCore", "acceleration", "stability"])
+    /// Empty array strips all stats (backward compatible)
     /// Returns the parts refunded by type
-    public func respecBot(tokenIndex : Nat, owner : Principal) : Result.Result<{ speedPartsRefunded : Nat; powerCorePartsRefunded : Nat; accelerationPartsRefunded : Nat; stabilityPartsRefunded : Nat; totalRefunded : Nat }, Text> {
+    public func respecBot(tokenIndex : Nat, owner : Principal, statsToStrip : [Text]) : Result.Result<{ speedPartsRefunded : Nat; powerCorePartsRefunded : Nat; accelerationPartsRefunded : Nat; stabilityPartsRefunded : Nat; totalRefunded : Nat }, Text> {
       switch (Map.get(stats, nhash, tokenIndex)) {
         case (null) { #err("Bot not initialized") };
         case (?botStats) {
@@ -1699,12 +1701,30 @@ module {
             return #err("Cannot respec while upgrade is in progress");
           };
 
-          // Can't respec if no upgrades
+          // Determine which stats to strip (empty array = all stats for backward compatibility)
+          let stripAll = statsToStrip.size() == 0;
+          let stripSpeed = stripAll or Array.find(statsToStrip, func(s : Text) : Bool { s == "speed" }) != null;
+          let stripPowerCore = stripAll or Array.find(statsToStrip, func(s : Text) : Bool { s == "powerCore" }) != null;
+          let stripAcceleration = stripAll or Array.find(statsToStrip, func(s : Text) : Bool { s == "acceleration" }) != null;
+          let stripStability = stripAll or Array.find(statsToStrip, func(s : Text) : Bool { s == "stability" }) != null;
+
+          // Can't respec if no upgrades in selected stats
           if (
-            botStats.speedBonus == 0 and botStats.powerCoreBonus == 0 and
-            botStats.accelerationBonus == 0 and botStats.stabilityBonus == 0
+            (stripSpeed and botStats.speedBonus == 0) or
+            (stripPowerCore and botStats.powerCoreBonus == 0) or
+            (stripAcceleration and botStats.accelerationBonus == 0) or
+            (stripStability and botStats.stabilityBonus == 0)
           ) {
-            return #err("No upgrades to respec");
+            if (not stripSpeed and not stripPowerCore and not stripAcceleration and not stripStability) {
+              return #err("No stats selected to strip");
+            };
+          };
+
+          // Verify at least one stat has upgrades
+          let hasAnyUpgrades = (stripSpeed and botStats.speedBonus > 0) or (stripPowerCore and botStats.powerCoreBonus > 0) or (stripAcceleration and botStats.accelerationBonus > 0) or (stripStability and botStats.stabilityBonus > 0);
+
+          if (not hasAnyUpgrades) {
+            return #err("No upgrades to respec in selected stats");
           };
 
           let baseStats = getBaseStats(tokenIndex);
@@ -1713,31 +1733,47 @@ module {
             baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability
           ) / 4;
 
-          // Calculate refunds for each stat
-          let speedRefund = calculateStatPartsRefund(
-            baseStats.speed,
-            botStats.speedBonus,
-            overallRating,
-            synergies.costMultipliers.upgradeCost,
-          );
-          let powerCoreRefund = calculateStatPartsRefund(
-            baseStats.powerCore,
-            botStats.powerCoreBonus,
-            overallRating,
-            synergies.costMultipliers.upgradeCost,
-          );
-          let accelerationRefund = calculateStatPartsRefund(
-            baseStats.acceleration,
-            botStats.accelerationBonus,
-            overallRating,
-            synergies.costMultipliers.upgradeCost,
-          );
-          let stabilityRefund = calculateStatPartsRefund(
-            baseStats.stability,
-            botStats.stabilityBonus,
-            overallRating,
-            synergies.costMultipliers.upgradeCost,
-          );
+          // Calculate refunds only for selected stats
+          var speedRefund : Nat = 0;
+          var powerCoreRefund : Nat = 0;
+          var accelerationRefund : Nat = 0;
+          var stabilityRefund : Nat = 0;
+
+          if (stripSpeed) {
+            speedRefund := calculateStatPartsRefund(
+              baseStats.speed,
+              botStats.speedBonus,
+              overallRating,
+              synergies.costMultipliers.upgradeCost,
+            );
+          };
+
+          if (stripPowerCore) {
+            powerCoreRefund := calculateStatPartsRefund(
+              baseStats.powerCore,
+              botStats.powerCoreBonus,
+              overallRating,
+              synergies.costMultipliers.upgradeCost,
+            );
+          };
+
+          if (stripAcceleration) {
+            accelerationRefund := calculateStatPartsRefund(
+              baseStats.acceleration,
+              botStats.accelerationBonus,
+              overallRating,
+              synergies.costMultipliers.upgradeCost,
+            );
+          };
+
+          if (stripStability) {
+            stabilityRefund := calculateStatPartsRefund(
+              baseStats.stability,
+              botStats.stabilityBonus,
+              overallRating,
+              synergies.costMultipliers.upgradeCost,
+            );
+          };
 
           // Refund parts to user inventory
           if (speedRefund > 0) {
@@ -1753,17 +1789,31 @@ module {
             addParts(owner, #GyroModule, stabilityRefund);
           };
 
-          // Reset bot stats (keep pity counter)
+          // Reset only selected stats (keep pity counter and non-selected stats)
           let updatedStats : PokedBotRacingStats = {
             botStats with
-            speedBonus = 0;
-            powerCoreBonus = 0;
-            accelerationBonus = 0;
-            stabilityBonus = 0;
-            speedUpgrades = 0;
-            powerCoreUpgrades = 0;
-            accelerationUpgrades = 0;
-            stabilityUpgrades = 0;
+            speedBonus = if (stripSpeed) { 0 } else { botStats.speedBonus };
+            powerCoreBonus = if (stripPowerCore) { 0 } else {
+              botStats.powerCoreBonus;
+            };
+            accelerationBonus = if (stripAcceleration) { 0 } else {
+              botStats.accelerationBonus;
+            };
+            stabilityBonus = if (stripStability) { 0 } else {
+              botStats.stabilityBonus;
+            };
+            speedUpgrades = if (stripSpeed) { 0 } else {
+              botStats.speedUpgrades;
+            };
+            powerCoreUpgrades = if (stripPowerCore) { 0 } else {
+              botStats.powerCoreUpgrades;
+            };
+            accelerationUpgrades = if (stripAcceleration) { 0 } else {
+              botStats.accelerationUpgrades;
+            };
+            stabilityUpgrades = if (stripStability) { 0 } else {
+              botStats.stabilityUpgrades;
+            };
             respecCount = botStats.respecCount + 1;
           };
 

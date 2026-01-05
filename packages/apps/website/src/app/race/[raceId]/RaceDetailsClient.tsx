@@ -438,21 +438,25 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
               )}
               
               {isFull && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                  <p className="text-sm text-red-500">Race is full ({Number(race.maxEntries)} entries)</p>
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
+                  <p className="text-sm text-destructive">Race is full ({Number(race.maxEntries)} entries)</p>
                 </div>
               )}
               
               {entryDeadlinePassed && isUpcoming && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                  <p className="text-sm text-red-500">Entry deadline has passed</p>
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
+                  <p className="text-sm text-destructive">Entry deadline has passed</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
           {/* Betting Interface */}
-          <BettingInterface raceId={Number(raceId)} />
+          <BettingInterface 
+            raceId={Number(raceId)} 
+            entryDeadline={race.entryDeadline}
+            raceStatus={race.status}
+          />
 
           {/* Race Entries Section */}
           <Card className="border-primary/20">

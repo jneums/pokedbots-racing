@@ -510,22 +510,24 @@ export const cancelUpgrade = async (
 };
 
 /**
- * Strip a bot to reset all upgrade bonuses and refund parts (with 40% penalty).
+ * Strip a bot to reset selected upgrade bonuses and refund parts (with 40% penalty).
  * Cost: 1 ICP (flat rate)
  * This function automatically handles the ICRC-2 approval before stripping.
- * Preserves: Pity counter
- * Resets: All stat bonuses, all upgrade counts
- * Refunds: 60% of parts invested (40% penalty)
+ * Preserves: Pity counter, non-selected stats
+ * Resets: Selected stat bonuses and upgrade counts
+ * Refunds: 60% of parts invested in selected stats (40% penalty)
  * @param tokenIndex The token index of the bot to strip
+ * @param statsToStrip Array of stat names to reset (e.g., ['speed', 'powerCore']). Empty array strips all stats.
  * @param identityOrAgent Required identity for authentication
  * @returns Success message with refund details or error
  */
 export const respecBot = async (
   tokenIndex: number,
+  statsToStrip: string[],
   identityOrAgent: IdentityOrAgent
 ): Promise<string> => {
   const racingActor = await getActor(identityOrAgent);
-  const result = await racingActor.web_respec_bot(BigInt(tokenIndex));
+  const result = await racingActor.web_respec_bot(BigInt(tokenIndex), statsToStrip);
   
   if ('ok' in result) {
     const refund = result.ok;
@@ -536,7 +538,8 @@ export const respecBot = async (
     const accel = Number(refund.accelerationPartsRefunded);
     const stab = Number(refund.stabilityPartsRefunded);
     
-    return `Bot stripped! Cost: ${cost} ICP. Refunded ${total} parts (${speed} Speed, ${power} Power, ${accel} Accel, ${stab} Stability). All upgrades reset.`;
+    const strippedStats = statsToStrip.length === 0 ? 'All stats' : statsToStrip.join(', ');
+    return `Bot stripped! Cost: ${cost} ICP. Refunded ${total} parts (${speed} Speed, ${power} Power, ${accel} Accel, ${stab} Stability). Stripped: ${strippedStats}.`;
   } else {
     throw new Error(result.err);
   }

@@ -568,6 +568,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'debug_regenerate_race_commentary' : IDL.Func([IDL.Nat], [Result_1], []),
     'debug_simulate_race' : IDL.Func(
         [IDL.Nat, IDL.Vec(IDL.Nat), IDL.Nat],
         [
@@ -882,6 +883,7 @@ export const idlFactory = ({ IDL }) => {
               'raceSummary' : IDL.Record({
                 'distances' : IDL.Vec(IDL.Nat),
                 'totalParticipants' : IDL.Nat,
+                'totalPrizePool' : IDL.Nat,
                 'terrains' : IDL.Vec(Terrain),
                 'totalRaces' : IDL.Nat,
               }),
@@ -1284,7 +1286,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'web_recharge_bot' : IDL.Func([IDL.Nat], [Result_1], []),
     'web_repair_bot' : IDL.Func([IDL.Nat], [Result_1], []),
-    'web_respec_bot' : IDL.Func([IDL.Nat], [Result_2], []),
+    'web_respec_bot' : IDL.Func([IDL.Nat, IDL.Vec(IDL.Text)], [Result_2], []),
     'web_start_scavenging' : IDL.Func(
         [IDL.Nat, IDL.Text, IDL.Opt(IDL.Nat)],
         [Result_1],

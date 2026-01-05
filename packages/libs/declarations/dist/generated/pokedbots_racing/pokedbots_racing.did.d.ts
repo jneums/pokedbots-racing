@@ -176,6 +176,7 @@ export interface McpServer {
       }
     >
   >,
+  'debug_regenerate_race_commentary' : ActorMethod<[bigint], Result_1>,
   'debug_simulate_race' : ActorMethod<
     [bigint, Array<bigint>, bigint],
     [] | [
@@ -409,6 +410,7 @@ export interface McpServer {
         'raceSummary' : {
           'distances' : Array<bigint>,
           'totalParticipants' : bigint,
+          'totalPrizePool' : bigint,
           'terrains' : Array<Terrain>,
           'totalRaces' : bigint,
         },
@@ -730,7 +732,7 @@ export interface McpServer {
   >,
   'web_recharge_bot' : ActorMethod<[bigint], Result_1>,
   'web_repair_bot' : ActorMethod<[bigint], Result_1>,
-  'web_respec_bot' : ActorMethod<[bigint], Result_2>,
+  'web_respec_bot' : ActorMethod<[bigint, Array<string>], Result_2>,
   'web_start_scavenging' : ActorMethod<
     [bigint, string, [] | [bigint]],
     Result_1

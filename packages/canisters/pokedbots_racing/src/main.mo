@@ -497,6 +497,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           case (?session) {
             Debug.print("Found active upgrade session: " # debug_show (session.upgradeType));
 
+            // CRITICAL: Verify that the upgrade duration has actually elapsed
+            let now = Time.now();
+            if (now < session.endsAt) {
+              let remainingMs = (session.endsAt - now) / 1_000_000;
+              Debug.print("ERROR: Upgrade called too early! Still " # debug_show (remainingMs) # "ms remaining. Ignoring.");
+              return actionId; // Don't process - return immediately
+            };
+
             // Get current stats
             switch (garageManager.getStats(tokenIndex)) {
               case (?stats) {
@@ -3047,7 +3055,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               terrains := Array.append(terrains, [race.terrain]);
               distances := Array.append(distances, [race.distance]);
               totalParticipants += race.entries.size();
-              totalPrizePool += race.prizePool;
+              // Calculate total pool: entry fees + platform bonus + sponsorships
+              var sponsorships : Nat = 0;
+              for (sponsor in race.sponsors.vals()) {
+                sponsorships += sponsor.amount;
+              };
+              totalPrizePool += race.prizePool + race.platformBonus + sponsorships;
             };
             case (null) {};
           };
@@ -5863,10 +5876,13 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     #ok("Upgrade cancelled. " # refundText # " returned to your account.");
   };
 
-  /// Respec a bot - reset all upgrades and refund parts (with penalty)
+  /// Respec a bot - reset selected stat upgrades and refund parts (with penalty)
   /// Cost: 1 ICP (flat rate)
+  /// statsToStrip: Array of stat names to reset (["speed", "powerCore", "acceleration", "stability"])
+  /// Empty array strips all stats (backward compatible)
   public shared ({ caller }) func web_respec_bot(
-    tokenIndex : Nat
+    tokenIndex : Nat,
+    statsToStrip : [Text],
   ) : async Result.Result<{ speedPartsRefunded : Nat; powerCorePartsRefunded : Nat; accelerationPartsRefunded : Nat; stabilityPartsRefunded : Nat; totalRefunded : Nat; respecCost : Nat }, Text> {
     // Verify ownership
     let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
@@ -5929,7 +5945,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       };
       case (#Ok(_blockIndex)) {
         // Process respec
-        switch (garageManager.respecBot(tokenIndex, caller)) {
+        switch (garageManager.respecBot(tokenIndex, caller, statsToStrip)) {
           case (#err(msg)) { #err(msg) };
           case (#ok(result)) {
             #ok({

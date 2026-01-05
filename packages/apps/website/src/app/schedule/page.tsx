@@ -152,11 +152,23 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
   return (
     <Card className={`border-2 ${hasStarted && !isPastEvent ? 'border-orange-500/40 bg-orange-950/20' : 'border-primary/20 bg-card/50'} hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 backdrop-blur`}>
       <CardHeader>
-        <div className="flex justify-between items-start gap-4">
-          <div className="space-y-2 flex-1">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">{getEventTypeIcon(event.eventType)}</span>
-              <div className="flex-1">
+        <div className="flex flex-col gap-4">
+          {/* Prize Pool - Mobile First */}
+          {raceSummary?.totalPrizePool !== undefined && Number(raceSummary.totalPrizePool) > 0 && (
+            <div className="text-center p-4 bg-gradient-to-br from-amber-500/20 via-yellow-500/20 to-orange-500/20 border-2 border-amber-500/40 rounded-xl sm:hidden">
+              <div className="text-3xl mb-1">💰</div>
+              <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1">Total Prize Pool</div>
+              <div className="text-2xl font-bold text-amber-500 dark:text-amber-400">
+                {formatICP(raceSummary.totalPrizePool)}
+              </div>
+            </div>
+          )}
+          
+          <div className="flex justify-between items-start gap-4">
+            <div className="space-y-2 flex-1">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">{getEventTypeIcon(event.eventType)}</span>
+                <div className="flex-1">
                 <div className="flex items-center gap-3 flex-wrap">
                   <CardTitle className="text-2xl">{event.metadata.name}</CardTitle>
                   <Badge variant="outline" className="bg-primary/20 text-primary font-mono text-sm">
@@ -223,9 +235,9 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
             </div>
           </div>
 
-          {/* Prize Pool - Large and Prominent */}
+          {/* Prize Pool - Desktop Only */}
           {raceSummary?.totalPrizePool !== undefined && Number(raceSummary.totalPrizePool) > 0 && (
-            <div className="flex-shrink-0 text-center p-4 bg-gradient-to-br from-amber-500/20 via-yellow-500/20 to-orange-500/20 border-2 border-amber-500/40 rounded-xl min-w-[160px]">
+            <div className="hidden sm:flex flex-shrink-0 text-center p-4 bg-gradient-to-br from-amber-500/20 via-yellow-500/20 to-orange-500/20 border-2 border-amber-500/40 rounded-xl min-w-[160px] flex-col">
               <div className="text-3xl mb-1">💰</div>
               <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1">Total Prize Pool</div>
               <div className="text-2xl font-bold text-amber-500 dark:text-amber-400">
@@ -233,6 +245,7 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
               </div>
             </div>
           )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

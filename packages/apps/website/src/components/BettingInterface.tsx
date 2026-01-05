@@ -16,6 +16,24 @@ import type { BetType } from '@pokedbots-racing/ic-js';
 
 interface BettingInterfaceProps {
   raceId: number;
+  entryDeadline?: bigint;
+  raceStatus?: any;
+}
+
+function formatRelativeTime(timestampNanos: bigint): string {
+  const targetMs = Number(timestampNanos) / 1_000_000;
+  const now = Date.now();
+  const diffMs = targetMs - now;
+  
+  if (diffMs <= 0) return 'soon';
+  
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
 }
 
 function formatICP(e8s: number | string): string {
@@ -64,7 +82,7 @@ function BotName({ tokenIndex }: { tokenIndex: number }) {
   return <>Bot #{tokenIndex}</>;
 }
 
-export function BettingInterface({ raceId }: BettingInterfaceProps) {
+export function BettingInterface({ raceId, entryDeadline, raceStatus }: BettingInterfaceProps) {
   const { isAuthenticated } = useAuth();
   
   // Initial fetch without isOpen parameter
@@ -214,13 +232,28 @@ export function BettingInterface({ raceId }: BettingInterfaceProps) {
   }
 
   if (!poolInfoFinal) {
+    // Check if race is still open for entries
+    const isRaceOpenForEntry = raceStatus && 'Upcoming' in raceStatus;
+    const hasEntryDeadline = entryDeadline && entryDeadline > 0n;
+    
     return (
       <Card>
         <CardHeader>
           <CardTitle>Betting</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">No betting pool available for this race.</p>
+          {isRaceOpenForEntry && hasEntryDeadline ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Betting will become available once race entries close in <span className="font-semibold text-foreground">{formatRelativeTime(entryDeadline)}</span>
+              </p>
+              <div className="bg-muted/30 rounded-lg p-3 text-xs text-muted-foreground">
+                💡 Betting opens 1 hour before the race starts, after the entry deadline passes
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground">No betting pool available for this race.</p>
+          )}
         </CardContent>
       </Card>
     );

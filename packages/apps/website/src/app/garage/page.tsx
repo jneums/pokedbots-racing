@@ -844,15 +844,16 @@ export default function GaragePage() {
                                       <div className="flex flex-wrap gap-1">
                                         {(() => {
                                           const now = Date.now();
+                                          const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
                                           const rechargeReady = bot.stats.lastRecharged 
-                                            ? Number(bot.stats.lastRecharged) / 1_000_000 + (6 * 60 * 60 * 1000)
+                                            ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
                                             : 0;
                                           const repairReady = bot.stats.lastRepaired
                                             ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
                                             : 0;
                                           
                                           const rechargeTime = bot.stats.lastRecharged 
-                                            ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + 21_600_000_000_000n)
+                                            ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + BigInt(Math.round(rechargeCooldownMs * 1_000_000)))
                                             : null;
                                           const repairTime = bot.stats.lastRepaired
                                             ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)
@@ -1112,15 +1113,16 @@ export default function GaragePage() {
                             <div className="flex flex-wrap gap-1">
                               {(() => {
                                 const now = Date.now();
+                                const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
                                 const rechargeReady = bot.stats.lastRecharged 
-                                  ? Number(bot.stats.lastRecharged) / 1_000_000 + (6 * 60 * 60 * 1000)
+                                  ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
                                   : 0;
                                 const repairReady = bot.stats.lastRepaired
                                   ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
                                   : 0;
                                 
                                 const rechargeTime = bot.stats.lastRecharged 
-                                  ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + 21_600_000_000_000n)
+                                  ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + BigInt(Math.round(rechargeCooldownMs * 1_000_000)))
                                   : null;
                                 const repairTime = bot.stats.lastRepaired
                                   ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)

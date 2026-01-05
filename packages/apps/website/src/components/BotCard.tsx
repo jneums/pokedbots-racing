@@ -95,6 +95,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   const [botName, setBotName] = useState('');
   const [listPrice, setListPrice] = useState('');
   const [transferTo, setTransferTo] = useState('');
+  const [statsToStrip, setStatsToStrip] = useState<Set<string>>(new Set());
   
   // Racing section state - must be at top level
   const [selectedRaces, setSelectedRaces] = useState<Set<number>>(new Set());
@@ -211,10 +212,13 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   };
 
   const handleRespec = () => {
-    respecMutation.mutate(Number(bot.tokenIndex), {
+    // Convert Set to array (empty array = strip all stats)
+    const statsArray = Array.from(statsToStrip);
+    respecMutation.mutate({ tokenIndex: Number(bot.tokenIndex), statsToStrip: statsArray }, {
       onSuccess: (result) => {
         toast.success(result);
         setShowRespec(false);
+        setStatsToStrip(new Set()); // Reset selection
         onUpdate();
       },
       onError: (err: Error) => {
@@ -1876,25 +1880,129 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                   // Bot can be stripped - show confirmation
                   return (
                     <div className="space-y-3">
-                      <p>This will <strong>reset all upgrade bonuses to 0</strong> and refund 60% of invested parts (40% penalty).</p>
+                      <p>This will <strong>reset selected stat upgrade bonuses to 0</strong> and refund 60% of invested parts (40% penalty).</p>
+                      
+                      <div className="p-3 bg-muted rounded-lg space-y-3">
+                        <p className="text-sm font-semibold">Select stats to strip:</p>
+                        
+                        <div className="space-y-2">
+                          {speedUp > 0 && (
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="strip-speed" 
+                                checked={statsToStrip.has('speed')}
+                                onCheckedChange={(checked) => {
+                                  const newSet = new Set(statsToStrip);
+                                  if (checked) {
+                                    newSet.add('speed');
+                                  } else {
+                                    newSet.delete('speed');
+                                  }
+                                  setStatsToStrip(newSet);
+                                }}
+                              />
+                              <label htmlFor="strip-speed" className="text-sm cursor-pointer">
+                                ⚡ Speed: +{speedUp} upgrades
+                              </label>
+                            </div>
+                          )}
+                          
+                          {powerUp > 0 && (
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="strip-power" 
+                                checked={statsToStrip.has('powerCore')}
+                                onCheckedChange={(checked) => {
+                                  const newSet = new Set(statsToStrip);
+                                  if (checked) {
+                                    newSet.add('powerCore');
+                                  } else {
+                                    newSet.delete('powerCore');
+                                  }
+                                  setStatsToStrip(newSet);
+                                }}
+                              />
+                              <label htmlFor="strip-power" className="text-sm cursor-pointer">
+                                💪 Power Core: +{powerUp} upgrades
+                              </label>
+                            </div>
+                          )}
+                          
+                          {accelUp > 0 && (
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="strip-accel" 
+                                checked={statsToStrip.has('acceleration')}
+                                onCheckedChange={(checked) => {
+                                  const newSet = new Set(statsToStrip);
+                                  if (checked) {
+                                    newSet.add('acceleration');
+                                  } else {
+                                    newSet.delete('acceleration');
+                                  }
+                                  setStatsToStrip(newSet);
+                                }}
+                              />
+                              <label htmlFor="strip-accel" className="text-sm cursor-pointer">
+                                🚀 Acceleration: +{accelUp} upgrades
+                              </label>
+                            </div>
+                          )}
+                          
+                          {stabUp > 0 && (
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="strip-stab" 
+                                checked={statsToStrip.has('stability')}
+                                onCheckedChange={(checked) => {
+                                  const newSet = new Set(statsToStrip);
+                                  if (checked) {
+                                    newSet.add('stability');
+                                  } else {
+                                    newSet.delete('stability');
+                                  }
+                                  setStatsToStrip(newSet);
+                                }}
+                              />
+                              <label htmlFor="strip-stab" className="text-sm cursor-pointer">
+                                🎯 Stability: +{stabUp} upgrades
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center justify-between pt-2 border-t">
+                          <span className="text-xs text-muted-foreground">
+                            {statsToStrip.size === 0 ? 'Select stats above' : `${statsToStrip.size} stat${statsToStrip.size > 1 ? 's' : ''} selected`}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const allStats = new Set<string>();
+                              if (speedUp > 0) allStats.add('speed');
+                              if (powerUp > 0) allStats.add('powerCore');
+                              if (accelUp > 0) allStats.add('acceleration');
+                              if (stabUp > 0) allStats.add('stability');
+                              setStatsToStrip(allStats);
+                            }}
+                            className="text-xs h-7"
+                          >
+                            Select All
+                          </Button>
+                        </div>
+                      </div>
                       
                       <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg space-y-1 text-sm">
                         <p className="font-semibold text-destructive">Cost: 1 ICP</p>
-                        <p className="text-muted-foreground">Current Upgrades:</p>
-                        <div className="grid grid-cols-2 gap-1 text-xs">
-                          <span>⚡ Speed: +{speedUp}</span>
-                          <span>💪 Power: +{powerUp}</span>
-                          <span>🚀 Accel: +{accelUp}</span>
-                          <span>🎯 Stability: +{stabUp}</span>
-                        </div>
                       </div>
                       
                       <div className="p-3 bg-muted rounded-lg space-y-1 text-xs">
                         <p className="font-semibold">After Stripping:</p>
                         <p className="text-green-600">✓ Pity counter preserved ({Number(bot.upgradeCostsV2?.pityCounter || 0)})</p>
                         <p className="text-green-600">✓ Refund 60% of parts invested</p>
-                        <p className="text-destructive">✗ All stat bonuses reset to 0</p>
-                        <p className="text-destructive">✗ Bot will drop to lower race class</p>
+                        <p className="text-green-600">✓ Non-selected stats keep their bonuses</p>
+                        <p className="text-destructive">✗ Selected stat bonuses reset to 0</p>
                       </div>
                       
                       <p className="text-sm font-semibold">This action cannot be undone!</p>
@@ -1907,7 +2015,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setStatsToStrip(new Set())}>Cancel</AlertDialogCancel>
             {(() => {
               const stats = bot.stats as any;
               const hasUpgrades = stats && (
@@ -1916,7 +2024,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 Number(stats.accelerationUpgrades || 0) > 0 ||
                 Number(stats.stabilityUpgrades || 0) > 0
               );
-              const canStrip = hasUpgrades && !bot.activeMission && !bot.activeUpgrade;
+              const canStrip = hasUpgrades && !bot.activeMission && !bot.activeUpgrade && statsToStrip.size > 0;
 
               return (
                 <AlertDialogAction
@@ -1924,7 +2032,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                   disabled={!canStrip || respecMutation.isPending}
                   className="bg-destructive hover:bg-destructive/90"
                 >
-                  {respecMutation.isPending ? 'Stripping...' : 'Strip Bot'}
+                  {respecMutation.isPending ? 'Stripping...' : `Strip ${statsToStrip.size > 0 ? statsToStrip.size + ' Stat' + (statsToStrip.size > 1 ? 's' : '') : 'Bot'}`}
                 </AlertDialogAction>
               );
             })()}

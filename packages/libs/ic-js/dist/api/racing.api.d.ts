@@ -58,6 +58,7 @@ export declare const getUpcomingEventsWithRaces: (daysAhead?: number, identity?:
         terrains: Array<PokedBotsRacing.Terrain>;
         distances: Array<bigint>;
         totalParticipants: bigint;
+        totalPrizePool: bigint;
     };
 }>>;
 /**

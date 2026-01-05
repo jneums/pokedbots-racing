@@ -468,6 +468,7 @@ type McpServer =
         totalDistance: nat;
         trackId: nat;
       }) query;
+   debug_regenerate_race_commentary: (raceId: nat) -> (Result_1);
    /// Test/debug: Simulate a race with specific bots on a specific track
    /// Returns detailed results for balance testing
    debug_simulate_race: (trackId: nat, tokenIndices: vec nat, seed: nat) ->
@@ -718,6 +719,7 @@ type McpServer =
            distances: vec nat;
            terrains: vec Terrain;
            totalParticipants: nat;
+           totalPrizePool: nat;
            totalRaces: nat;
          };
       }) query;
@@ -1078,9 +1080,11 @@ type McpServer =
    web_recharge_bot: (tokenIndex: nat) -> (Result_1);
    /// Repair a bot to restore condition (0.05 ICP + fee via ICRC-2)
    web_repair_bot: (tokenIndex: nat) -> (Result_1);
-   /// Respec a bot - reset all upgrades and refund parts (with penalty)
+   /// Respec a bot - reset selected stat upgrades and refund parts (with penalty)
    /// Cost: 1 ICP (flat rate)
-   web_respec_bot: (tokenIndex: nat) -> (Result_2);
+   /// statsToStrip: Array of stat names to reset (["speed", "powerCore", "acceleration", "stability"])
+   /// Empty array strips all stats (backward compatible)
+   web_respec_bot: (tokenIndex: nat, statsToStrip: vec text) -> (Result_2);
    /// Start a scavenging mission (web method)
    web_start_scavenging: (tokenIndex: nat, zone: text, durationMinutes:
     opt nat) -> (Result_1);

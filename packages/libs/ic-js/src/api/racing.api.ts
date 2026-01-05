@@ -150,6 +150,7 @@ export const getUpcomingEventsWithRaces = async (
     terrains: Array<PokedBotsRacing.Terrain>;
     distances: Array<bigint>;
     totalParticipants: bigint;
+    totalPrizePool: bigint;
   };
 }>> => {
   const racingActor = await getActor(identity);

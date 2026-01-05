@@ -1370,7 +1370,7 @@ module {
       // Short tracks (< 8km): suitable for Daily Sprints (5-10km)
       // Medium tracks (8-14km): suitable for Weekly Leagues (15-25km) - will use multiple laps
       // Long tracks (> 14km): suitable for longer events (20-30km)
-      
+
       let (shortTracks, mediumTracks, longTracks) = switch (terrain) {
         case (#ScrapHeaps) {
           (
