@@ -37,7 +37,7 @@ function getCanisterIds() {
 export default defineConfig(({ mode }) => {
   const canisterEnvVariables = getCanisterIds();
   const isDevelopment = mode !== 'production';
-  const newsApiUrl = process.env.NEWS_API_URL || (isDevelopment ? 'http://localhost:3001/api' : 'https://your-render-app.onrender.com/api');
+  const newsApiUrl = process.env.NEWS_API_URL || (isDevelopment ? 'http://localhost:3001/api' : 'https://pokedbots-racing.onrender.com/api');
 
   console.log(`[VITE] Network: ${network}, Mode: ${mode}`);
   console.log('[VITE] Canister IDs:', canisterEnvVariables);
