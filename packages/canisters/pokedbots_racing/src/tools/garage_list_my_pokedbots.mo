@@ -161,6 +161,25 @@ module {
 
             msg #= "Found " # Nat32.toText(Nat32.fromNat(tokens.size())) # " PokedBot(s)\n\n";
 
+            // Lazily accumulate rewards for all bots with active scavenging missions BEFORE displaying
+            let now = Time.now();
+            for (tokenIndex in tokens.vals()) {
+              let tokenIndexNat = Nat32.toNat(tokenIndex);
+              switch (ctx.garageManager.getStats(tokenIndexNat)) {
+                case (?stats) {
+                  switch (stats.activeMission) {
+                    case (?_mission) {
+                      // Accumulate rewards on-demand (lazy evaluation) - this updates stats in place
+                      ignore ctx.garageManager.accumulateScavengingRewards(tokenIndexNat, now);
+                    };
+                    case (null) {};
+                  };
+                };
+                case (null) {};
+              };
+            };
+
+            // Now display bots with updated stats (including accumulated rewards)
             for (tokenIndex in tokens.vals()) {
               let tokenId = ExtIntegration.encodeTokenIdentifier(tokenIndex, ctx.extCanisterId);
               let thumbnailUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId # "&type=thumbnail";

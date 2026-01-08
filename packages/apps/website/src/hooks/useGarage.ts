@@ -20,6 +20,10 @@ import {
   startScavenging,
   completeScavenging,
   respecBot,
+  batchRechargeBots,
+  batchRepairBots,
+  batchStartScavenging,
+  batchCompleteScavenging,
   type UpgradeType,
   type PaymentMethod,
   type ApiKeyMetadata,
@@ -46,6 +50,8 @@ export function useMyBots() {
     staleTime: 30 * 1000, // 30 seconds - cache shared across pages
     gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache when unmounted
     refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds to keep data fresh
+    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 }
 
@@ -128,6 +134,95 @@ export function useRepairBot() {
     onSuccess: (_, tokenIndex) => {
       queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
       queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+    },
+  });
+}
+
+/**
+ * Hook to batch recharge multiple bots
+ */
+export function useBatchRechargeBots() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (tokenIndices: number[]) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return batchRechargeBots(tokenIndices, user.agent);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+    },
+  });
+}
+
+/**
+ * Hook to batch repair multiple bots
+ */
+export function useBatchRepairBots() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (tokenIndices: number[]) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return batchRepairBots(tokenIndices, user.agent);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+    },
+  });
+}
+
+/**
+ * Hook to batch start scavenging for multiple bots
+ */
+export function useBatchStartScavenging() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ 
+      tokenIndices, 
+      zone, 
+      durationMinutes 
+    }: { 
+      tokenIndices: number[]; 
+      zone: string; 
+      durationMinutes?: number;
+    }) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return batchStartScavenging(tokenIndices, zone, durationMinutes, user.agent);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+    },
+  });
+}
+
+/**
+ * Hook to batch complete scavenging for multiple bots
+ */
+export function useBatchCompleteScavenging() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (tokenIndices: number[]) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return batchCompleteScavenging(tokenIndices, user.agent);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
     },
   });
 }

@@ -176,7 +176,7 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
                   </Badge>
                   {hasStarted && !isPastEvent && (
                     <Badge className="bg-orange-500/90 hover:bg-orange-500 border-orange-400/50 animate-pulse">
-                      🏁 In Progress
+                      🏁 Last Event
                     </Badge>
                   )}
                   {!hasStarted && getStatusBadge(event.status, event.registrationCloses, isPastEvent)}

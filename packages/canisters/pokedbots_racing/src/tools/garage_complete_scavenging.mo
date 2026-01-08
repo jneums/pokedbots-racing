@@ -18,7 +18,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_complete_scavenging";
     title = ?"Complete Scavenging Mission";
-    description = ?"Retrieve your PokedBot from scavenging and collect accumulated rewards. Can be called anytime.\n\n**Rewards:**\n• Parts distributed across multiple types (Speed Chips, Power Core Fragments, Thruster Kits, Gyro Modules, Universal Parts)\n• All zones have same 40% Universal / 60% Specialized split (harder zones give MORE total parts)\n• All pending parts awarded to inventory\n• World buff chance: 3.75% per 15-min check, strength scales with time\n• Faction-specific bonuses and specials applied\n\n**RETRIEVE ON DEMAND:**\n• Retrieve anytime - no waiting required\n• Rewards accumulate every 15 minutes automatically\n• Ends mission and stops accumulation\n• Returns total hours elapsed and parts collected";
+    description = ?"Retrieve your PokedBot from scavenging and collect accumulated rewards. Can be called anytime.\n\n**Rewards:**\n• Parts distributed across multiple types (Speed Chips, Power Core Fragments, Thruster Kits, Gyro Modules, Universal Parts)\n• All zones have same 40% Universal / 60% Specialized split (harder zones give MORE total parts)\n• All pending parts awarded to inventory\n• World buff chance: ~8% per hour, strength scales with time\n• Faction-specific bonuses and specials applied\n\n**RETRIEVE ON DEMAND:**\n• Retrieve anytime - no waiting required\n• Rewards accumulate continuously based on time elapsed\n• Ends mission and stops accumulation\n• Returns total hours elapsed and parts collected";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -50,22 +50,17 @@ module {
         case (?idx) { idx };
       };
 
-      // Verify ownership via EXT (source of truth) - check user's wallet
-      let walletAccountId = ExtIntegration.principalToAccountIdentifier(user, null);
-      let ownerResult = try {
-        await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId));
-      } catch (_) {
-        return ToolContext.makeError("Failed to verify ownership", cb);
+      // Get bot stats and verify registration
+      let racingStats = switch (ctx.garageManager.getStats(tokenIndex)) {
+        case (null) {
+          return ToolContext.makeError("This PokedBot is not registered to your account. Use garage_initialize_pokedbot first to register it.", cb);
+        };
+        case (?stats) { stats };
       };
-      switch (ownerResult) {
-        case (#err(_)) {
-          return ToolContext.makeError("This PokedBot does not exist.", cb);
-        };
-        case (#ok(currentOwner)) {
-          if (currentOwner != walletAccountId) {
-            return ToolContext.makeError("You do not own this PokedBot.", cb);
-          };
-        };
+
+      // Verify caller is the registered owner
+      if (not Principal.equal(racingStats.ownerPrincipal, user)) {
+        return ToolContext.makeError("You are not the registered owner of this PokedBot. If you recently purchased it, use garage_initialize_pokedbot to register it to your account.", cb);
       };
 
       // Complete mission (forces final accumulation)

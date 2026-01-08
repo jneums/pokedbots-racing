@@ -63,24 +63,6 @@ module {
         case (?idx) { idx };
       };
 
-      // Verify ownership via EXT (source of truth) - check user's wallet
-      let walletAccountId = ExtIntegration.principalToAccountIdentifier(user, null);
-      let ownerResult = try {
-        await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId));
-      } catch (_) {
-        return ToolContext.makeError("Failed to verify ownership", cb);
-      };
-      switch (ownerResult) {
-        case (#err(_)) {
-          return ToolContext.makeError("This PokedBot does not exist.", cb);
-        };
-        case (#ok(currentOwner)) {
-          if (currentOwner != walletAccountId) {
-            return ToolContext.makeError("You do not own this PokedBot.", cb);
-          };
-        };
-      };
-
       // Get race
       let race = switch (ctx.raceManager.getRace(raceId)) {
         case (null) {
@@ -109,7 +91,20 @@ module {
           if (not Principal.equal(stats.ownerPrincipal, user)) {
             return ToolContext.makeError("This PokedBot is registered to a different owner. Please use garage_initialize_pokedbot to register it to your account.", cb);
           };
-          stats;
+
+          // If bot has active scavenging mission, lazily accumulate rewards to get current condition/battery
+          switch (stats.activeMission) {
+            case (?_mission) {
+              // Accumulate rewards on-demand before checking race eligibility
+              ignore ctx.garageManager.accumulateScavengingRewards(tokenIndex, now);
+              // Re-fetch stats after accumulation
+              switch (ctx.garageManager.getStats(tokenIndex)) {
+                case (?updatedStats) { updatedStats };
+                case (null) { stats }; // Shouldn't happen, but fallback to original
+              };
+            };
+            case (null) { stats };
+          };
         };
       };
 

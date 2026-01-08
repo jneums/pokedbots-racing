@@ -12,9 +12,25 @@ Garage auras are **permanent bonuses** that apply to ALL bots in your collection
 
 **Key Features:**
 - Bonuses apply to **ALL** your bots, not just the faction that grants them
+- **Non-Stacking:** Each stat takes only the HIGHEST bonus from any faction (bonuses don't add together)
+- All stat bonuses are capped at +5 maximum per stat
 - Stat bonuses increase your bots' racing performance
 - Cost bonuses reduce ICP expenses (repairs, recharges, upgrades)
 - Yield bonuses increase earnings (race prizes, scavenging parts)
+
+## HOW NON-STACKING WORKS
+
+Unlike most games where bonuses add together, PokedBots Racing uses a **"highest wins"** system:
+
+- If you have 2 Bee (+3 Speed) and 2 Ultimate (+3 Speed), you get +3 Speed total, NOT +6
+- If you have 6 Bee (+5 Speed) and 1 UltimateMaster (+5 Speed), you get +5 Speed (tied)
+- If you have 6 Master (+4 all stats) and 6 Blackhole (+5 Power Core), you get +4 Speed/Accel/Stability and +5 Power Core
+
+**Why this system?**
+- Prevents overpowered "whale" collections from stacking +20 to stats
+- Encourages diversity - better to mix stat bonuses with economic bonuses
+- Makes the +5 cap meaningful - specialist collections match ultra-rares in their specialty
+- UltimateMaster remains valuable as a compact 1-bot solution for max stats
 
 ## ULTRA-RARE FACTIONS (Strongest Bonuses)
 
@@ -28,16 +44,17 @@ Garage auras are **permanent bonuses** that apply to ALL bots in your collection
 - Second strongest all-around bonus
 - Requires 2 ultra-rare bots
 
-### Ultimate (2/3+ bots)
+### Ultimate (2/4/6+ bots)
 **Stat Bonuses:**
 - 2+ bots: +3 Speed, +3 Acceleration
-- 3+ bots: +5 Speed, +5 Acceleration
+- 4+ bots: +4 Speed, +4 Acceleration
+- 6+ bots: +5 Speed, +5 Acceleration
 
 **Cost Bonus:**
 - 2+ bots: -15% scavenging battery/condition drain
 - 3+ bots: -30% scavenging battery/condition drain
 
-Elite speed demons - pure racing focus with scavenging efficiency
+Elite speed demons - pure racing focus with scavenging efficiency. Shifted up to reach max +5!
 
 ### Golden (2/3+ bots)
 **Yield Bonus:**
@@ -54,15 +71,15 @@ The money makers - significantly boosts ICP earnings from racing
 - 4+ bots: +3 to all stats (+12 total = +3 rating)
 - 6+ bots: +4 to all stats (+16 total = +4 rating)
 
-Balanced and versatile - good for both racing and progression. Rivals Wild at 6 bots!
+Balanced and versatile - good for both racing and progression. Nearly rivals Wild at 6 bots!
 
 ### Blackhole (2/4/6+ bots)
 **Stat Bonuses:**
-- 2+ bots: +5 Power Core
-- 4+ bots: +8 Power Core
-- 6+ bots: +10 Power Core
+- 2+ bots: +3 Power Core
+- 4+ bots: +4 Power Core
+- 6+ bots: +5 Power Core
 
-Energy efficiency specialists - reduces battery drain in races. Strongest single-stat bonus.
+Energy efficiency specialists - reduces battery drain in races. Reaches max +5 at 6 bots!
 
 ### Dead (2/4/6+ bots)
 **Yield Bonus:**
@@ -79,26 +96,26 @@ All rare factions require 2/4/6 bots for maximum effect.
 ### Bee (2/4/6+ bots)
 **Stat Bonuses:**
 - 2+ bots: +3 Speed
-- 4+ bots: +6 Speed
-- 6+ bots: +8 Speed
+- 4+ bots: +4 Speed
+- 6+ bots: +5 Speed
 
-Pure speed focus
+Pure speed focus - reaches max +5 at 6 bots
 
 ### Murder (2/4/6+ bots)
 **Stat Bonuses:**
 - 2+ bots: +3 Acceleration
-- 4+ bots: +6 Acceleration
-- 6+ bots: +8 Acceleration
+- 4+ bots: +4 Acceleration
+- 6+ bots: +5 Acceleration
 
-Launch power specialists
+Launch power specialists - reaches max +5 at 6 bots
 
 ### Box (2/4/6+ bots)
 **Stat Bonuses:**
 - 2+ bots: +3 Stability
-- 4+ bots: +6 Stability
-- 6+ bots: +8 Stability
+- 4+ bots: +4 Stability
+- 6+ bots: +5 Stability
 
-Consistency and durability focus
+Consistency and durability focus - reaches max +5 at 6 bots
 
 ### Food (2/4/6+ bots)
 **Cost Bonus:**
@@ -143,18 +160,26 @@ Balanced progression - requires large collection for meaningful power
 
 ### For Collectors
 - **UltimateMaster** provides instant +5 rating boost from just 1 bot
-- **Golden** (3 bots) gives massive +15% earnings boost - compounds over time
+- **Golden** (3 bots) gives +15% earnings boost - compounds over time
 - **Dead** (4 bots) +30% parts generation makes self-upgrading easier
 
 ### For Competitive Players
-- **Ultimate** (3 bots) +5 Speed/Accel makes your entire garage faster
+- **Ultimate** (6 bots) +5 Speed/Accel makes your entire garage faster - reaches the cap!
 - **Wild** (2 bots) +4 all stats is the most well-rounded ultra-rare bonus
-- **Blackhole** (4 bots) +8 Power Core lets bots race more between recharges
+- **Blackhole** (6 bots) +5 Power Core reaches max bonus for energy efficiency
+- **Remember:** Specialist factions (Bee/Murder/Box/Blackhole) reach +5 at 6 bots, matching UltimateMaster in their specialty
 
 ### Mixed Collections
-- Bonuses stack multiplicatively across different factions
-- Example: 2 Master + 2 Dead = +2 all stats + 15% more parts
-- Example: 1 UltimateMaster + 2 Food = +5 all stats + 15% faster recharges
+**IMPORTANT:** Bonuses DO NOT stack for the same stat! Your garage takes only the HIGHEST bonus for each stat from any faction.
+
+**Examples:**
+- 2 Bee + 2 Murder = +3 Speed (from Bee), +3 Accel (from Murder) ✓ Different stats, both apply
+- 2 Bee + 2 Ultimate = +3 Speed (not +6!) - both give Speed, only highest counts
+- 6 Master + 2 Blackhole = +4 all stats (from Master) + nothing extra for PWR since Master already gives +4
+- 1 UltimateMaster + 6 Bee = +5 Speed (both give +5 Speed, tied for highest), +5 PWR/ACC/STB (from UM only)
+- **Best combo:** 1 UltimateMaster (+5 all) works with any cost/yield bonuses like Food or Dead without overlap
+
+**Strategy:** Combine factions that boost DIFFERENT stats, or mix stat factions with economic factions (cost/yield bonuses still stack).
 
 ## ECONOMIC IMPACT
 
@@ -167,7 +192,7 @@ However, the effective stats in races ARE boosted, which means:
 - **Hidden power** - Bots appear weaker on paper but race stronger
 - **No upgrade pressure** - Less need to upgrade stats, save ICP for other uses
 
-**Example:** A rating 30 bot with +5 from UltimateMaster aura still enters Raider races (30-39), but races with effective 35 stats against true 30-35 opponents.
+**Example:** A rating 30 bot with +5 from UltimateMaster aura still enters Raider races (30-39), but races with effective 35 stats against true 30-35 opponents. Having 6 Bee bots would give the same +5 Speed, not +8!
 
 ### Cost Bonuses
 - **Game** (6 bots): Save 20% on all upgrades (0.5 ICP → 0.4 ICP base)

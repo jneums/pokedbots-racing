@@ -59,7 +59,7 @@ Each bot belongs to a faction with unique bonuses (Dead/Master/Blackhole/etc). T
 2. **Match your bot to races** on their preferred terrain
 3. **Use scavenging** to earn free upgrade parts (no ICP cost!)
 4. **Upgrade carefully** - costs increase as your bot gets stronger
-5. **Manage maintenance costs** - recharge (0.1 ICP) + repair (0.05 ICP) = 0.15 ICP per cycle. To stay profitable, you need to win enough races to cover these costs. Consider using free maintenance zones (ChargingStation/RepairBay) when not racing urgently.
+5. **Manage maintenance costs** - recharge (0.1 ICP) + repair (0.05 ICP) = 0.15 ICP per cycle. To stay profitable, you need to win enough races to cover these costs. Consider using free maintenance zones (ChargingStation ~6-7h for full charge, RepairBay for repairs) when not racing urgently.
 
 ## NEXT STEPS
 

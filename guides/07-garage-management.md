@@ -69,9 +69,9 @@ You CAN register to race while scavenging. When race starts:
 - Fast recovery, can race immediately
 - Best for active players racing frequently
 
-### Free Approach (0 ICP, slow recovery)
-- Use ChargingStation (25h for full charge) + RepairBay (5h for 60+ condition)
-- No ICP cost, but much slower
+### Free Approach (0 ICP, ~6-7h recovery)
+- Use ChargingStation (~6-7h for full charge) + RepairBay (5h for 60+ condition)
+- No ICP cost, no condition penalty on charging
 - Best for casual players or low-priority bots
 
 ### Hybrid Approach (Recommended)

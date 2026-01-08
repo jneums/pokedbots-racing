@@ -177,6 +177,61 @@ export interface McpServer {
     >
   >,
   'debug_regenerate_race_commentary' : ActorMethod<[bigint], Result_1>,
+  'debug_scavenging_calculation' : ActorMethod<
+    [bigint],
+    [] | [
+      {
+        'startTime' : bigint,
+        'hasActiveMission' : boolean,
+        'newValues' : { 'battery' : bigint, 'condition' : bigint },
+        'finalRounded' : {
+          'partsGained' : bigint,
+          'batteryChange' : bigint,
+          'conditionChange' : bigint,
+        },
+        'zoneMultipliers' : {
+          'parts' : number,
+          'battery' : number,
+          'condition' : number,
+        },
+        'zone' : [] | [string],
+        'chargingCurve' : number,
+        'currentTime' : bigint,
+        'lastAccumulation' : bigint,
+        'statBonuses' : {
+          'stabilityBonus' : number,
+          'powerCoreBonus' : number,
+          'speedBonus' : number,
+        },
+        'factionBonus' : {
+          'batteryMultiplier' : number,
+          'partsMultiplier' : number,
+          'conditionMultiplier' : number,
+        },
+        'currentStats' : {
+          'stability' : bigint,
+          'speed' : bigint,
+          'acceleration' : bigint,
+          'powerCore' : bigint,
+        },
+        'battery' : bigint,
+        'totalHoursElapsed' : number,
+        'durationBonus' : number,
+        'calculatedDrain' : {
+          'conditionLoss' : number,
+          'batteryDrain' : number,
+          'partsAccumulation' : number,
+        },
+        'baseRates' : {
+          'parts' : number,
+          'battery' : number,
+          'condition' : number,
+        },
+        'condition' : bigint,
+        'hoursSinceLastAccumulation' : number,
+      }
+    ]
+  >,
   'debug_simulate_race' : ActorMethod<
     [bigint, Array<bigint>, bigint],
     [] | [
@@ -219,9 +274,22 @@ export interface McpServer {
     ]
   >,
   'debug_test_simulation' : ActorMethod<
-    [Array<bigint>, bigint, bigint],
+    [Array<bigint>, bigint, bigint, bigint],
     [] | [
-      { 'results' : Array<{ 'tokenIndex' : bigint, 'finalTime' : number }> }
+      {
+        'results' : Array<
+          {
+            'tokenIndex' : bigint,
+            'stats' : {
+              'stability' : bigint,
+              'speed' : bigint,
+              'acceleration' : bigint,
+              'powerCore' : bigint,
+            },
+            'finalTime' : number,
+          }
+        >,
+      }
     ]
   >,
   'decode_token_identifier' : ActorMethod<[string], bigint>,
@@ -485,6 +553,22 @@ export interface McpServer {
   'upload_nft_stats_batch' : ActorMethod<[Array<[bigint, NFTStats]>], Result_5>,
   'upload_trait_schema' : ActorMethod<[TraitSchema], Result_5>,
   'validate_timer_state' : ActorMethod<[], Array<string>>,
+  'web_batch_complete_scavenging' : ActorMethod<
+    [Array<bigint>],
+    Array<{ 'result' : Result_1, 'tokenIndex' : bigint }>
+  >,
+  'web_batch_recharge_bots' : ActorMethod<
+    [Array<bigint>],
+    Array<{ 'result' : Result_1, 'tokenIndex' : bigint }>
+  >,
+  'web_batch_repair_bots' : ActorMethod<
+    [Array<bigint>],
+    Array<{ 'result' : Result_1, 'tokenIndex' : bigint }>
+  >,
+  'web_batch_start_scavenging' : ActorMethod<
+    [Array<bigint>, string, [] | [bigint]],
+    Array<{ 'result' : Result_1, 'tokenIndex' : bigint }>
+  >,
   'web_betting_get_my_bets' : ActorMethod<
     [bigint],
     {
@@ -581,6 +665,7 @@ export interface McpServer {
   'web_cancel_upgrade' : ActorMethod<[bigint], Result_1>,
   'web_complete_scavenging' : ActorMethod<[bigint], Result_1>,
   'web_convert_parts' : ActorMethod<[string, string, bigint], Result_1>,
+  'web_deregister_bot' : ActorMethod<[bigint], Result_1>,
   'web_enter_race' : ActorMethod<[bigint, bigint], Result_1>,
   'web_get_bot_details' : ActorMethod<[bigint], Result_3>,
   'web_get_bot_details_batch' : ActorMethod<
@@ -768,6 +853,8 @@ export interface PokedBotRacingStats {
       'powerCoreFragments' : bigint,
       'completedAt' : bigint,
       'universalParts' : bigint,
+      'conditionRestored' : bigint,
+      'batteryRestored' : bigint,
       'gyroModules' : bigint,
       'zone' : ScavengingZone,
       'speedChips' : bigint,
@@ -792,6 +879,7 @@ export interface PokedBotRacingStats {
   'powerCoreBonus' : bigint,
   'faction' : FactionType,
   'battery' : bigint,
+  'perfectTuneUp' : boolean,
   'respecCount' : bigint,
   'speedBonus' : bigint,
   'totalScrapEarned' : bigint,
@@ -859,6 +947,8 @@ export type RaceEventType = {
 export interface RaceResult {
   'owner' : Principal,
   'prizeAmount' : bigint,
+  'partType' : string,
+  'partsEarned' : bigint,
   'stats' : [] | [RacingStats],
   'finalTime' : number,
   'nftId' : string,

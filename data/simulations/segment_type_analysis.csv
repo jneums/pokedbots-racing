@@ -1,0 +1,77 @@
+segment_type,length,angle,difficulty,stat,time_saved_per_point
+Very Short (200m),200,0,1.0,speed,1.0247191810341745
+Very Short (200m),200,0,1.0,powerCore,0.5905306146404359
+Very Short (200m),200,0,1.0,acceleration,0.0
+Very Short (200m),200,0,1.0,stability,0.521056424682735
+Short (400m),400,0,1.0,speed,2.049438362068349
+Short (400m),400,0,1.0,powerCore,1.1810612292808718
+Short (400m),400,0,1.0,acceleration,0.0
+Short (400m),400,0,1.0,stability,1.04211284936547
+Medium (800m),800,0,1.0,speed,4.098876724136698
+Medium (800m),800,0,1.0,powerCore,2.3621224585617435
+Medium (800m),800,0,1.0,acceleration,0.0
+Medium (800m),800,0,1.0,stability,2.08422569873094
+Long (1200m),1200,0,1.0,speed,6.148315086205033
+Long (1200m),1200,0,1.0,powerCore,3.5431836878426104
+Long (1200m),1200,0,1.0,acceleration,0.0
+Long (1200m),1200,0,1.0,stability,3.1263385480964176
+Very Long (2000m),2000,0,1.0,speed,10.247191810341736
+Very Long (2000m),2000,0,1.0,powerCore,5.9053061464043735
+Very Long (2000m),2000,0,1.0,acceleration,0.0
+Very Long (2000m),2000,0,1.0,stability,5.210564246827347
+Flat (0°),800,0,1.0,speed,4.098876724136698
+Flat (0°),800,0,1.0,powerCore,2.3621224585617435
+Flat (0°),800,0,1.0,acceleration,0.0
+Flat (0°),800,0,1.0,stability,2.08422569873094
+Slight Uphill (3°),800,3,1.0,speed,6.011685862067142
+Slight Uphill (3°),800,3,1.0,powerCore,5.6690939005481855
+Slight Uphill (3°),800,3,1.0,acceleration,0.0
+Slight Uphill (3°),800,3,1.0,stability,3.0568643581387236
+Moderate Uphill (7°),800,7,1.0,speed,6.107326318963684
+Moderate Uphill (7°),800,7,1.0,powerCore,5.834442472647507
+Moderate Uphill (7°),800,7,1.0,acceleration,0.0
+Moderate Uphill (7°),800,7,1.0,stability,3.1054962911091026
+Steep Uphill (12°),800,12,1.0,speed,7.541933172411516
+Steep Uphill (12°),800,12,1.0,powerCore,8.31467105413731
+Steep Uphill (12°),800,12,1.0,acceleration,0.0
+Steep Uphill (12°),800,12,1.0,stability,3.8349752856649375
+Very Steep (18°),800,18,1.0,speed,9.263461396548887
+Very Steep (18°),800,18,1.0,powerCore,11.290945351925076
+Very Steep (18°),800,18,1.0,acceleration,0.0
+Very Steep (18°),800,18,1.0,stability,4.710350079131928
+Downhill (-5°),800,-5,1.0,speed,2.383587735359192
+Downhill (-5°),800,-5,1.0,powerCore,1.2798580050132842
+Downhill (-5°),800,-5,1.0,acceleration,0.0
+Downhill (-5°),800,-5,1.0,stability,1.129286475011716
+Easy (0.8),800,0,0.8,speed,2.932917435699619
+Easy (0.8),800,0,0.8,powerCore,1.6901972443273525
+Easy (0.8),800,0,0.8,acceleration,0.0
+Easy (0.8),800,0,0.8,stability,1.4913505097006017
+Normal (1.0),800,0,1.0,speed,4.098876724136698
+Normal (1.0),800,0,1.0,powerCore,2.3621224585617435
+Normal (1.0),800,0,1.0,acceleration,0.0
+Normal (1.0),800,0,1.0,stability,2.08422569873094
+Technical (1.2),800,0,1.2,speed,6.645339837037949
+Technical (1.2),800,0,1.2,powerCore,3.829611752265734
+Technical (1.2),800,0,1.2,acceleration,0.0
+Technical (1.2),800,0,1.2,stability,4.840288303738086
+Very Technical (1.5),800,0,1.5,speed,11.92268583508788
+Very Technical (1.5),800,0,1.5,powerCore,6.870868745965683
+Very Technical (1.5),800,0,1.5,acceleration,0.0
+Very Technical (1.5),800,0,1.5,stability,11.16782071712683
+Extreme (2.0),800,0,2.0,speed,25.11897723300124
+Extreme (2.0),800,0,2.0,powerCore,14.47569767316437
+Extreme (2.0),800,0,2.0,acceleration,0.0
+Extreme (2.0),800,0,2.0,stability,28.492889085187848
+Short Technical,300,0,1.5,speed,4.471007188157942
+Short Technical,300,0,1.5,powerCore,2.5765757797371225
+Short Technical,300,0,1.5,acceleration,0.0
+Short Technical,300,0,1.5,stability,4.187932768922565
+Long Uphill,1500,8,1.0,speed,11.989214418099817
+Long Uphill,1500,8,1.0,powerCore,11.869665354272744
+Long Uphill,1500,8,1.0,acceleration,0.0
+Long Uphill,1500,8,1.0,stability,6.09636016878803
+Short Steep,400,15,1.0,speed,4.2013486422401005
+Short Steep,400,15,1.0,powerCore,4.901404101515618
+Short Steep,400,15,1.0,acceleration,0.0
+Short Steep,400,15,1.0,stability,2.136331341199224

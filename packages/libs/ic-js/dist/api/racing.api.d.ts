@@ -102,9 +102,15 @@ export declare const getBotRaceHistory: (tokenIndex: number, limit?: number, aft
  * @param identity Optional identity to use for the actor
  * @returns Simulation results with final times
  */
-export declare const debugTestSimulation: (tokenIndexes: number[], trackId: number, trackSeed: number, identity?: Identity) => Promise<{
+export declare const debugTestSimulation: (tokenIndexes: number[], trackId: number, trackSeed: number, distanceKm: number, identity?: Identity) => Promise<{
     tokenIndex: number;
     finalTime: number;
+    stats: {
+        speed: number;
+        powerCore: number;
+        acceleration: number;
+        stability: number;
+    };
 }[] | null>;
 /**
  * Query races with advanced filtering and pagination

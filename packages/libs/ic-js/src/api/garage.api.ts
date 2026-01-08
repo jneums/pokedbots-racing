@@ -422,6 +422,94 @@ export const repairBot = async (
 };
 
 /**
+ * Batch recharge multiple bots with a single ICRC-2 payment.
+ * Cost: 0.1 ICP per bot + 0.0001 ICP fee (total)
+ * @param tokenIndices Array of token indices to recharge
+ * @param identityOrAgent Required identity for authentication
+ * @returns Array of results for each bot (success message or error)
+ */
+export const batchRechargeBots = async (
+  tokenIndices: number[],
+  identityOrAgent: IdentityOrAgent
+): Promise<Array<{ tokenIndex: number; result: { ok?: string; err?: string } }>> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_batch_recharge_bots(tokenIndices.map(BigInt));
+  
+  return result.map(item => ({
+    tokenIndex: Number(item.tokenIndex),
+    result: 'ok' in item.result ? { ok: item.result.ok } : { err: item.result.err }
+  }));
+};
+
+/**
+ * Batch repair multiple bots with a single ICRC-2 payment.
+ * Cost: 0.05 ICP per bot + 0.0001 ICP fee (total)
+ * @param tokenIndices Array of token indices to repair
+ * @param identityOrAgent Required identity for authentication
+ * @returns Array of results for each bot (success message or error)
+ */
+export const batchRepairBots = async (
+  tokenIndices: number[],
+  identityOrAgent: IdentityOrAgent
+): Promise<Array<{ tokenIndex: number; result: { ok?: string; err?: string } }>> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_batch_repair_bots(tokenIndices.map(BigInt));
+  
+  return result.map(item => ({
+    tokenIndex: Number(item.tokenIndex),
+    result: 'ok' in item.result ? { ok: item.result.ok } : { err: item.result.err }
+  }));
+};
+
+/**
+ * Batch start scavenging missions for multiple bots to the same zone.
+ * No ICP cost - only battery/condition consumption during mission.
+ * @param tokenIndices Array of token indices to send scavenging
+ * @param zone Scavenging zone name (e.g., 'ScrapHeaps', 'AbandonedSettlements')
+ * @param durationMinutes Optional duration in minutes (omit for continuous mission)
+ * @param identityOrAgent Required identity for authentication
+ * @returns Array of results for each bot (success message or error)
+ */
+export const batchStartScavenging = async (
+  tokenIndices: number[],
+  zone: string,
+  durationMinutes: number | undefined,
+  identityOrAgent: IdentityOrAgent
+): Promise<Array<{ tokenIndex: number; result: { ok?: string; err?: string } }>> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_batch_start_scavenging(
+    tokenIndices.map(BigInt),
+    zone,
+    durationMinutes ? [BigInt(durationMinutes)] : []
+  );
+  
+  return result.map(item => ({
+    tokenIndex: Number(item.tokenIndex),
+    result: 'ok' in item.result ? { ok: item.result.ok } : { err: item.result.err }
+  }));
+};
+
+/**
+ * Batch complete scavenging missions for multiple bots.
+ * Retrieves bots and awards accumulated parts/rewards.
+ * @param tokenIndices Array of token indices to retrieve from scavenging
+ * @param identityOrAgent Required identity for authentication
+ * @returns Array of results for each bot (success message with parts collected or error)
+ */
+export const batchCompleteScavenging = async (
+  tokenIndices: number[],
+  identityOrAgent: IdentityOrAgent
+): Promise<Array<{ tokenIndex: number; result: { ok?: string; err?: string } }>> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_batch_complete_scavenging(tokenIndices.map(BigInt));
+  
+  return result.map(item => ({
+    tokenIndex: Number(item.tokenIndex),
+    result: 'ok' in item.result ? { ok: item.result.ok } : { err: item.result.err }
+  }));
+};
+
+/**
  * Upgrade a bot's stat using ICP or parts payment.
  * For ICP: Automatically handles ICRC-2 approval.
  * For parts: Parts are deducted from inventory.

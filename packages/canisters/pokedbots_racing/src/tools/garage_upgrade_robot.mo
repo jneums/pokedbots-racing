@@ -64,30 +64,17 @@ module {
         case (?method) { method };
       };
 
-      // Verify ownership via EXT (source of truth) - check user's wallet
-      let walletAccountId = ExtIntegration.principalToAccountIdentifier(user, null);
-      let ownerResult = try {
-        await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId));
-      } catch (_) {
-        return ToolContext.makeError("Failed to verify ownership", cb);
-      };
-      switch (ownerResult) {
-        case (#err(_)) {
-          return ToolContext.makeError("This PokedBot does not exist.", cb);
-        };
-        case (#ok(currentOwner)) {
-          if (currentOwner != walletAccountId) {
-            return ToolContext.makeError("You do not own this PokedBot.", cb);
-          };
-        };
-      };
-
-      // Get racing stats
+      // Get racing stats and verify registration
       let racingStats = switch (ctx.garageManager.getStats(tokenIndex)) {
         case (null) {
-          return ToolContext.makeError("This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first.", cb);
+          return ToolContext.makeError("This PokedBot is not registered to your account. Use garage_initialize_pokedbot first to register it.", cb);
         };
         case (?stats) { stats };
+      };
+
+      // Verify caller is the registered owner
+      if (not Principal.equal(racingStats.ownerPrincipal, user)) {
+        return ToolContext.makeError("You are not the registered owner of this PokedBot. If you recently purchased it, use garage_initialize_pokedbot to register it to your account.", cb);
       };
 
       // Upgrades can be started at any battery/condition level

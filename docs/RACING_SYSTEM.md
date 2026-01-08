@@ -118,7 +118,7 @@ for each robot in race:
     // ULTRA-RARE FACTIONS (1-45 bots)
     Ultimate-master => 1.12  // Supreme in all conditions
     Wild => 1.0 + random() * 0.20  // Chaotic variance (-10% to +10%)
-    Golden => if (condition >= 90) then 1.15 else 1.05  // Pristine bonus
+    Golden => if (condition >= 90) then 1.07 else 1.05  // Pristine bonus
     Ultimate => 1.10  // Consistent excellence
     
     // SUPER-RARE FACTIONS (244-640 bots)

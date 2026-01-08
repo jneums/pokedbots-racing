@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Shuffle, Play, Loader2 } from "lucide-react";
+import { Shuffle, Play, Loader2, X, Plus, ChevronUp, ChevronDown } from "lucide-react";
 import { RaceVisualizer } from "@/components/RaceVisualizer";
-import { useGetAllTimeLeaderboard } from "@/hooks/useLeaderboard";
 import { useDebugTestSimulation } from "@/hooks/useRacing";
 import { getBotProfile } from "@pokedbots-racing/ic-js";
 
@@ -29,25 +28,56 @@ interface Track {
   name: string;
   terrain: string;
   description: string;
+  distanceKm: number; // Distance in kilometers
 }
 
 // Wrapper component to handle backend query
 const RaceVisualizerWithBackend = ({ raceData }: { raceData: any }) => {
   const botIndexes = raceData.botOrder?.map((id: string) => parseInt(id)) || [];
+  const hasEditedStats = raceData.hasEditedStats || false; // Check if any stats were edited
+  
+  // Only query backend if stats haven't been edited
   const { data: backendResults, isLoading } = useDebugTestSimulation(
     botIndexes,
     raceData.trackId,
     raceData.trackSeed,
-    botIndexes.length > 0
+    raceData.distance,
+    botIndexes.length > 0 && !hasEditedStats // Disable backend query if stats are edited
   );
 
-  // Merge backend results with race data
-  const resultsWithBackend = raceData.results.map((result: any) => {
+  // Debug logging
+  useEffect(() => {
+    if (botIndexes.length > 0) {
+      console.log('[Simulator] Requesting backend simulation:', {
+        botIndexes,
+        trackId: raceData.trackId,
+        trackSeed: raceData.trackSeed,
+        distance: raceData.distance,
+        hasEditedStats,
+        isLoading,
+        hasResults: !!backendResults
+      });
+    }
+  }, [botIndexes, raceData.trackId, raceData.trackSeed, raceData.distance, hasEditedStats, isLoading, backendResults]);
+
+  useEffect(() => {
+    if (backendResults) {
+      console.log('[Simulator] Backend results received:', backendResults);
+    }
+  }, [backendResults]);
+
+  // If stats are edited, use local stats; otherwise merge backend results
+  const resultsWithBackend = hasEditedStats ? raceData.results : raceData.results.map((result: any) => {
     const backendResult = backendResults?.find(
       (br: any) => br.tokenIndex.toString() === result.nftId
     );
     if (backendResult) {
-      return { ...result, finalTime: backendResult.finalTime };
+      return { 
+        ...result, 
+        finalTime: backendResult.finalTime,
+        stats: backendResult.stats, // Use backend stats with all bonuses applied
+        bonusesAlreadyApplied: true,
+      };
     }
     return result;
   });
@@ -62,6 +92,7 @@ const RaceVisualizerWithBackend = ({ raceData }: { raceData: any }) => {
       botOrder={raceData.botOrder}
       isValidating={isLoading}
       startAtEnd={true}
+      bonusesAlreadyApplied={true}
     />
   );
 };
@@ -71,180 +102,250 @@ const TRACKS: Track[] = [
     trackId: 1,
     name: "Scrap Mountain Circuit",
     terrain: "ScrapHeaps",
-    description: "Steep climbs through towering piles of rusted metal and debris"
+    description: "Steep climbs through towering piles of rusted metal and debris",
+    distanceKm: 10 // 10100m = 10.1km
   },
   {
     trackId: 2,
     name: "Highway of the Dead",
     terrain: "MetalRoads",
-    description: "Ancient cracked asphalt highway stretching across the wasteland"
+    description: "Ancient cracked asphalt highway stretching across the wasteland",
+    distanceKm: 7 // 6700m = 6.7km
   },
   {
     trackId: 3,
     name: "Wasteland Gauntlet",
     terrain: "WastelandSand",
-    description: "Endless dunes of radioactive sand under scorching suns"
+    description: "Endless dunes of radioactive sand under scorching suns",
+    distanceKm: 13 // 13300m = 13.3km
   },
   {
     trackId: 4,
     name: "Junkyard Sprint",
     terrain: "ScrapHeaps",
-    description: "Tight corners through collapsed machinery and crushed vehicles"
+    description: "Tight corners through collapsed machinery and crushed vehicles",
+    distanceKm: 4 // 4050m = 4.05km
   },
   {
     trackId: 5,
     name: "Metal Mesa Circuit",
     terrain: "MetalRoads",
-    description: "Elevated metal platforms with treacherous drops"
+    description: "Elevated metal platforms with treacherous drops",
+    distanceKm: 7 // 7400m = 7.4km
+  },
+  {
+    trackId: 6,
+    name: "Dune Runner",
+    terrain: "WastelandSand",
+    description: "Brutal marathon through endless dunes - pure power core test",
+    distanceKm: 17 // 16600m = 16.6km
+  },
+  {
+    trackId: 7,
+    name: "Rust Belt Rally",
+    terrain: "MetalRoads",
+    description: "High-speed highway blast - acceleration and top speed critical",
+    distanceKm: 9 // 9200m = 9.2km
+  },
+  {
+    trackId: 8,
+    name: "Debris Field Dash",
+    terrain: "ScrapHeaps",
+    description: "Treacherous obstacle course favoring stability masters",
+    distanceKm: 7 // 7100m = 7.1km
+  },
+  {
+    trackId: 9,
+    name: "Velocity Viaduct",
+    terrain: "MetalRoads",
+    description: "Lightning-fast elevated highway section - pure acceleration",
+    distanceKm: 5 // 4500m = 4.5km
+  },
+  {
+    trackId: 10,
+    name: "Sandstorm Circuit",
+    terrain: "WastelandSand",
+    description: "Circular desert track with varying dune intensities",
+    distanceKm: 11 // 10800m = 10.8km
   }
 ];
 
 export default function SimulatorPage() {
   const [selectedTrack, setSelectedTrack] = useState<number>(1);
   const [trackSeed, setTrackSeed] = useState<string>("");
-  const [selectedBots, setSelectedBots] = useState<number[]>([]);
-  const [availableBots, setAvailableBots] = useState<Bot[]>([]);
+  const [selectedBots, setSelectedBots] = useState<Bot[]>([]);
+  const [editedStats, setEditedStats] = useState<Record<number, Partial<Bot>>>({});
   const [simulating, setSimulating] = useState(false);
   const [raceData, setRaceData] = useState<any>(null);
-  const [loadingProfiles, setLoadingProfiles] = useState(false);
-
-  // Fetch leaderboard data
-  const { data: leaderboardData, isLoading: loading } = useGetAllTimeLeaderboard(50);
-
-  useEffect(() => {
-    const loadBotProfiles = async () => {
-      if (!leaderboardData || leaderboardData.length === 0) return;
-      
-      setLoadingProfiles(true);
-      try {
-        // Fetch profiles for all available bots in parallel
-        const topEntries = leaderboardData;
-        const profilePromises = topEntries.map(entry => 
-          getBotProfile(Number(entry.tokenIndex))
-        );
-        
-        const profiles = await Promise.all(profilePromises);
-        
-        // Transform profiles to Bot format
-        const bots: Bot[] = profiles
-          .filter(profile => profile !== null)
-          .map((profile: any) => {
-            // Extract faction name from variant object (e.g., [{ Murder: null }] -> "Murder")
-            // Candid variants come as single-element arrays from the JS library
-            let factionName = 'Unknown';
-            if (profile.faction) {
-              if (Array.isArray(profile.faction) && profile.faction.length > 0) {
-                const factionObj = profile.faction[0];
-                if (typeof factionObj === 'object' && factionObj !== null) {
-                  const keys = Object.keys(factionObj);
-                  factionName = keys[0] || 'Unknown';
-                }
-              } else if (typeof profile.faction === 'object' && !Array.isArray(profile.faction)) {
-                const keys = Object.keys(profile.faction);
-                factionName = keys[0] || 'Unknown';
-              } else if (typeof profile.faction === 'string') {
-                factionName = profile.faction;
-              }
-            }
-            
-            // Extract preferred terrain from variant object (e.g., [{ ScrapHeaps: null }] -> "ScrapHeaps")
-            let preferredTerrain = 'ScrapHeaps';
-            if (profile.preferredTerrain) {
-              if (Array.isArray(profile.preferredTerrain) && profile.preferredTerrain.length > 0) {
-                const terrainObj = profile.preferredTerrain[0];
-                if (typeof terrainObj === 'object' && terrainObj !== null) {
-                  const keys = Object.keys(terrainObj);
-                  preferredTerrain = keys[0] || 'ScrapHeaps';
-                }
-              } else if (typeof profile.preferredTerrain === 'object' && !Array.isArray(profile.preferredTerrain)) {
-                const keys = Object.keys(profile.preferredTerrain);
-                preferredTerrain = keys[0] || 'ScrapHeaps';
-              } else if (typeof profile.preferredTerrain === 'string') {
-                preferredTerrain = profile.preferredTerrain;
-              }
-            }
-            
-            return {
-              tokenIndex: Number(profile.tokenIndex),
-              name: profile.name || `Bot #${profile.tokenIndex}`,
-              speed: Number(profile.stats.speed),
-              powerCore: Number(profile.stats.powerCore),
-              acceleration: Number(profile.stats.acceleration),
-              stability: Number(profile.stats.stability),
-              faction: factionName,
-              preferredTerrain: preferredTerrain,
-              eloRating: Number(profile.career?.eloRating || 1200),
-            };
-          });
-        
-        setAvailableBots(bots);
-        
-        // Auto-select first 3 bots and auto-start simulation
-        if (selectedBots.length === 0 && bots.length >= 3) {
-          const firstThree = [bots[0].tokenIndex, bots[1].tokenIndex, bots[2].tokenIndex];
-          setSelectedBots(firstThree);
-          // Auto-start simulation after a brief delay
-          setTimeout(() => {
-            startSimulation(firstThree, bots);
-          }, 100);
-        }
-      } catch (error) {
-        console.error("Failed to load bot profiles:", error);
-      } finally {
-        setLoadingProfiles(false);
-      }
-    };
-
-    loadBotProfiles();
-  }, [leaderboardData]);
+  const [botInput, setBotInput] = useState<string>("");
+  const [loadingBot, setLoadingBot] = useState(false);
+  const [botError, setBotError] = useState<string>("");
 
   useEffect(() => {
     randomizeSeed();
   }, []);
 
-  // Auto-run simulation when selections change
+  // Auto-run simulation when selections or stats change
   useEffect(() => {
-    if (selectedBots.length >= 2 && availableBots.length > 0 && trackSeed) {
+    if (selectedBots.length >= 2 && trackSeed) {
       startSimulation();
     }
-  }, [selectedBots, selectedTrack, trackSeed, availableBots]);
+  }, [selectedBots, selectedTrack, trackSeed, editedStats]);
 
   const randomizeSeed = () => {
     const seed = Math.floor(Math.random() * 1000000);
     setTrackSeed(seed.toString());
   };
 
-  const handleBotToggle = (tokenIndex: number) => {
-    if (selectedBots.includes(tokenIndex)) {
-      setSelectedBots(selectedBots.filter(id => id !== tokenIndex));
-    } else if (selectedBots.length < 20) {
-      setSelectedBots([...selectedBots, tokenIndex]);
+  const addBot = async () => {
+    const input = botInput.trim();
+    if (!input) return;
+
+    // Check if it's a number (token index) or text (name search)
+    const tokenIndex = parseInt(input);
+    
+    if (isNaN(tokenIndex) || tokenIndex < 0 || tokenIndex > 9999) {
+      setBotError("Please enter a valid bot ID (0-9999)");
+      return;
+    }
+
+    // Check if bot already added
+    if (selectedBots.some(b => b.tokenIndex === tokenIndex)) {
+      setBotError("Bot already added to race");
+      return;
+    }
+
+    if (selectedBots.length >= 20) {
+      setBotError("Maximum 20 bots per race");
+      return;
+    }
+
+    setLoadingBot(true);
+    setBotError("");
+
+    try {
+      const profile = await getBotProfile(tokenIndex);
+      
+      if (!profile) {
+        setBotError(`Bot #${tokenIndex} not found`);
+        return;
+      }
+
+      // Extract faction name
+      let factionName = 'Unknown';
+      if (profile.faction) {
+        if (Array.isArray(profile.faction) && profile.faction.length > 0) {
+          const factionObj = profile.faction[0];
+          if (typeof factionObj === 'object' && factionObj !== null) {
+            const keys = Object.keys(factionObj);
+            factionName = keys[0] || 'Unknown';
+          }
+        } else if (typeof profile.faction === 'object' && !Array.isArray(profile.faction)) {
+          const keys = Object.keys(profile.faction);
+          factionName = keys[0] || 'Unknown';
+        } else if (typeof profile.faction === 'string') {
+          factionName = profile.faction;
+        }
+      }
+      
+      // Extract preferred terrain
+      let preferredTerrain = 'ScrapHeaps';
+      if (profile.preferredTerrain) {
+        if (Array.isArray(profile.preferredTerrain) && profile.preferredTerrain.length > 0) {
+          const terrainObj = profile.preferredTerrain[0];
+          if (typeof terrainObj === 'object' && terrainObj !== null) {
+            const keys = Object.keys(terrainObj);
+            preferredTerrain = keys[0] || 'ScrapHeaps';
+          }
+        } else if (typeof profile.preferredTerrain === 'object' && !Array.isArray(profile.preferredTerrain)) {
+          const keys = Object.keys(profile.preferredTerrain);
+          preferredTerrain = keys[0] || 'ScrapHeaps';
+        } else if (typeof profile.preferredTerrain === 'string') {
+          preferredTerrain = profile.preferredTerrain;
+        }
+      }
+
+      const bot: Bot = {
+        tokenIndex: Number(profile.tokenIndex),
+        name: profile.name || `Bot #${profile.tokenIndex}`,
+        speed: Number(profile.stats.speed),
+        powerCore: Number(profile.stats.powerCore),
+        acceleration: Number(profile.stats.acceleration),
+        stability: Number(profile.stats.stability),
+        faction: factionName,
+        preferredTerrain: preferredTerrain,
+        eloRating: Number(profile.career?.eloRating || 1200),
+      };
+
+      setSelectedBots([...selectedBots, bot]);
+      setBotInput("");
+    } catch (error) {
+      console.error("Failed to load bot:", error);
+      setBotError(`Failed to load bot #${tokenIndex}`);
+    } finally {
+      setLoadingBot(false);
     }
   };
 
-  const startSimulation = (botsToRace?: number[], botsArray?: Bot[]) => {
-    const racingBots = botsToRace || selectedBots;
-    const botsList = botsArray || availableBots;
-    
-    if (racingBots.length < 2) {
-      alert("Please select at least 2 bots to race");
+  const removeBot = (tokenIndex: number) => {
+    setSelectedBots(selectedBots.filter(b => b.tokenIndex !== tokenIndex));
+  };
+
+  // Get effective stats (edited or original)
+  const getEffectiveBot = useCallback((bot: Bot): Bot => {
+    const edited = editedStats[bot.tokenIndex];
+    if (!edited) return bot;
+    return { ...bot, ...edited };
+  }, [editedStats]);
+
+  // Update a single stat for a bot
+  const updateBotStat = (tokenIndex: number, stat: 'speed' | 'powerCore' | 'acceleration' | 'stability', delta: number) => {
+    const bot = selectedBots.find(b => b.tokenIndex === tokenIndex);
+    if (!bot) return;
+
+    const currentStats = getEffectiveBot(bot);
+    const currentValue = currentStats[stat];
+    const newValue = Math.max(0, Math.min(100, currentValue + delta)); // Clamp between 0-100
+
+    setEditedStats(prev => ({
+      ...prev,
+      [tokenIndex]: {
+        ...prev[tokenIndex],
+        [stat]: newValue
+      }
+    }));
+  };
+
+  // Reset stats for a bot
+  const resetBotStats = (tokenIndex: number) => {
+    setEditedStats(prev => {
+      const updated = { ...prev };
+      delete updated[tokenIndex];
+      return updated;
+    });
+  };
+
+  const startSimulation = useCallback(() => {
+    if (selectedBots.length < 1) {
       return;
     }
 
     setSimulating(true);
 
     const track = TRACKS.find(t => t.trackId === selectedTrack);
-    const participants = racingBots.map(tokenIndex => {
-      const bot = botsList.find(b => b.tokenIndex === tokenIndex)!;
+    
+    // Use effective stats (edited or original)
+    const participants = selectedBots.map(bot => {
+      const effectiveBot = getEffectiveBot(bot);
       return {
-        tokenIndex: bot.tokenIndex,
-        name: bot.name || `Bot #${bot.tokenIndex}`,
-        speed: bot.speed,
-        powerCore: bot.powerCore,
-        acceleration: bot.acceleration,
-        stability: bot.stability,
-        faction: bot.faction,
-        preferredTerrain: bot.preferredTerrain,
+        tokenIndex: effectiveBot.tokenIndex,
+        name: effectiveBot.name || `Bot #${effectiveBot.tokenIndex}`,
+        speed: effectiveBot.speed,
+        powerCore: effectiveBot.powerCore,
+        acceleration: effectiveBot.acceleration,
+        stability: effectiveBot.stability,
+        faction: effectiveBot.faction,
+        preferredTerrain: effectiveBot.preferredTerrain,
       };
     });
 
@@ -253,16 +354,16 @@ export default function SimulatorPage() {
       .map((p, idx) => {
         const terrain = track?.terrain || "ScrapHeaps";
         
-        // Pass raw stats - RaceVisualizer will apply faction + preferred terrain bonuses
-        const rawStats = { 
+        // Stats from getBotProfile already include faction + terrain bonuses (from backend getStatsAt100WithTerrain)
+        const statsWithBonuses = { 
           speed: p.speed, 
           powerCore: p.powerCore, 
           acceleration: p.acceleration, 
           stability: p.stability 
         };
         
-        // Calculate rating from raw stats
-        const rating = Math.round((rawStats.speed + rawStats.powerCore + rawStats.acceleration + rawStats.stability) / 4);
+        // Calculate rating from stats with bonuses
+        const rating = Math.round((statsWithBonuses.speed + statsWithBonuses.powerCore + statsWithBonuses.acceleration + statsWithBonuses.stability) / 4);
         
         return {
           nftId: p.tokenIndex.toString(),
@@ -271,38 +372,43 @@ export default function SimulatorPage() {
           rating,
           faction: p.faction,
           preferredTerrain: p.preferredTerrain,
-          stats: rawStats,
+          stats: statsWithBonuses,
+          bonusesAlreadyApplied: true, // Stats already include faction/terrain bonuses from backend
         };
       })
       .sort((a, b) => a.finalTime - b.finalTime)
       .map((r, idx) => ({ ...r, position: idx + 1 }));
 
+    // Check if any stats have been edited
+    const hasEditedStats = Object.keys(editedStats).length > 0;
+
     setRaceData({
       results,
       trackSeed: parseInt(trackSeed) || 0,
       trackId: selectedTrack,
-      distance: 15,
+      distance: track?.distanceKm || 15, // Use actual track distance
       terrain: track?.terrain || "ScrapHeaps",
-      botOrder: racingBots.map(tokenIndex => tokenIndex.toString()), // Store original bot order for participant index calculation
+      botOrder: participants.map(p => p.tokenIndex.toString()), // Store original bot order for participant index calculation
+      hasEditedStats, // Flag to indicate stats were manually edited
+      timestamp: Date.now(), // Force re-render when stats change
     });
 
     setTimeout(() => setSimulating(false), 500);
+  }, [selectedBots, selectedTrack, trackSeed, getEffectiveBot, editedStats]);
+
+  const handleBotInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addBot();
+    }
   };
 
-
-
-  if (loading || loadingProfiles) {
-    return (
-      <div className="container mx-auto p-6 flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <p className="text-muted-foreground">
-            {loading ? "Loading leaderboard..." : "Loading bot profiles..."}
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Auto-run simulation when selections or stats change
+  useEffect(() => {
+    if (selectedBots.length >= 1 && trackSeed) {
+      startSimulation();
+    }
+  }, [selectedBots, selectedTrack, trackSeed, editedStats, startSimulation]);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -386,51 +492,185 @@ export default function SimulatorPage() {
           <Card>
             <CardHeader>
               <CardTitle>Participants ({selectedBots.length}/20)</CardTitle>
-              <CardDescription>Select bots from the leaderboard</CardDescription>
+              <CardDescription>Enter bot ID to add to race (0-9999)</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {availableBots.map((bot) => {
-                  const isSelected = selectedBots.includes(bot.tokenIndex);
-                  return (
-                    <div
-                      key={bot.tokenIndex}
-                      onClick={() => handleBotToggle(bot.tokenIndex)}
-                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                        isSelected
-                          ? "bg-primary/10 border-primary"
-                          : "bg-card hover:bg-muted border-border"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <div className="font-medium">
-                            {bot.name || `Bot #${bot.tokenIndex}`}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            #{bot.tokenIndex} • {bot.faction} • {bot.eloRating} ELO
-                          </div>
-                          <div className="text-xs text-muted-foreground flex gap-2">
-                            <span>SPD:{bot.speed}</span>
-                            <span>PWR:{bot.powerCore}</span>
-                            <span>ACC:{bot.acceleration}</span>
-                            <span>STB:{bot.stability}</span>
-                          </div>
-                        </div>
-                        <div className={`h-5 w-5 rounded border ${
-                          isSelected ? "bg-primary border-primary" : "border-muted-foreground"
-                        }`}>
-                          {isSelected && (
-                            <svg className="h-5 w-5 text-primary-foreground" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+            <CardContent className="space-y-4">
+              {/* Input field */}
+              <div className="space-y-2">
+                <Label>Add Bot by ID</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    value={botInput}
+                    onChange={(e) => setBotInput(e.target.value)}
+                    onKeyDown={handleBotInputKeyDown}
+                    placeholder="Enter bot ID (0-9999)"
+                    disabled={loadingBot || selectedBots.length >= 20}
+                  />
+                  <Button
+                    onClick={addBot}
+                    disabled={loadingBot || !botInput.trim() || selectedBots.length >= 20}
+                    size="icon"
+                  >
+                    {loadingBot ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                {botError && (
+                  <p className="text-xs text-destructive">{botError}</p>
+                )}
               </div>
+
+              {/* Selected bots */}
+              {selectedBots.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Selected Bots</Label>
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                    {selectedBots.map((bot) => {
+                      const effectiveBot = getEffectiveBot(bot);
+                      const isEdited = !!editedStats[bot.tokenIndex];
+                      
+                      return (
+                        <div
+                          key={bot.tokenIndex}
+                          className="p-3 rounded-lg border bg-card"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="space-y-1 flex-1 min-w-0">
+                              <div className="font-medium">
+                                {bot.name || `Bot #${bot.tokenIndex}`}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                #{bot.tokenIndex} • {bot.faction}
+                              </div>
+                              
+                              {/* Editable Stats */}
+                              <div className="space-y-1.5 pt-1">
+                                {/* Speed */}
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-muted-foreground w-8">SPD:</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    onClick={() => updateBotStat(bot.tokenIndex, 'speed', -1)}
+                                  >
+                                    <ChevronDown className="h-3 w-3" />
+                                  </Button>
+                                  <span className={`text-xs font-mono w-6 text-center ${isEdited && effectiveBot.speed !== bot.speed ? 'text-blue-500 font-bold' : 'text-foreground'}`}>
+                                    {effectiveBot.speed}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    onClick={() => updateBotStat(bot.tokenIndex, 'speed', 1)}
+                                  >
+                                    <ChevronUp className="h-3 w-3" />
+                                  </Button>
+                                  
+                                  {/* Power Core */}
+                                  <span className="text-xs text-muted-foreground w-8 ml-1">PWR:</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    onClick={() => updateBotStat(bot.tokenIndex, 'powerCore', -1)}
+                                  >
+                                    <ChevronDown className="h-3 w-3" />
+                                  </Button>
+                                  <span className={`text-xs font-mono w-6 text-center ${isEdited && effectiveBot.powerCore !== bot.powerCore ? 'text-blue-500 font-bold' : 'text-foreground'}`}>
+                                    {effectiveBot.powerCore}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    onClick={() => updateBotStat(bot.tokenIndex, 'powerCore', 1)}
+                                  >
+                                    <ChevronUp className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                
+                                {/* Acceleration and Stability */}
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-muted-foreground w-8">ACC:</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    onClick={() => updateBotStat(bot.tokenIndex, 'acceleration', -1)}
+                                  >
+                                    <ChevronDown className="h-3 w-3" />
+                                  </Button>
+                                  <span className={`text-xs font-mono w-6 text-center ${isEdited && effectiveBot.acceleration !== bot.acceleration ? 'text-blue-500 font-bold' : 'text-foreground'}`}>
+                                    {effectiveBot.acceleration}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    onClick={() => updateBotStat(bot.tokenIndex, 'acceleration', 1)}
+                                  >
+                                    <ChevronUp className="h-3 w-3" />
+                                  </Button>
+                                  
+                                  {/* Stability */}
+                                  <span className="text-xs text-muted-foreground w-8 ml-1">STB:</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    onClick={() => updateBotStat(bot.tokenIndex, 'stability', -1)}
+                                  >
+                                    <ChevronDown className="h-3 w-3" />
+                                  </Button>
+                                  <span className={`text-xs font-mono w-6 text-center ${isEdited && effectiveBot.stability !== bot.stability ? 'text-blue-500 font-bold' : 'text-foreground'}`}>
+                                    {effectiveBot.stability}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5"
+                                    onClick={() => updateBotStat(bot.tokenIndex, 'stability', 1)}
+                                  >
+                                    <ChevronUp className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                              
+                              {/* Reset button if edited */}
+                              {isEdited && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-xs mt-1"
+                                  onClick={() => resetBotStats(bot.tokenIndex)}
+                                >
+                                  Reset Stats
+                                </Button>
+                              )}
+                            </div>
+                            
+                            {/* Remove button */}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeBot(bot.tokenIndex)}
+                              className="shrink-0"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -280,6 +280,8 @@ type RaceResult =
    finalTime: float64;
    nftId: text;
    owner: principal;
+   partType: text;
+   partsEarned: nat;
    position: nat;
    prizeAmount: nat;
    stats: opt RacingStats;
@@ -389,7 +391,9 @@ type PokedBotRacingStats =
    lastMissionRewards:
     opt
      record {
+       batteryRestored: nat;
        completedAt: int;
+       conditionRestored: nat;
        gyroModules: nat;
        hoursOut: nat;
        powerCoreFragments: nat;
@@ -406,6 +410,7 @@ type PokedBotRacingStats =
    name: opt text;
    overcharge: nat;
    ownerPrincipal: principal;
+   perfectTuneUp: bool;
    places: nat;
    powerCoreBonus: nat;
    powerCoreUpgrades: nat;
@@ -469,6 +474,70 @@ type McpServer =
         trackId: nat;
       }) query;
    debug_regenerate_race_commentary: (raceId: nat) -> (Result_1);
+   /// Debug: Get detailed scavenging calculations for a bot
+   /// Shows all intermediate values for battery/condition accumulation
+   debug_scavenging_calculation: (tokenIndex: nat) ->
+    (opt
+      record {
+        baseRates:
+         record {
+           battery: float64;
+           condition: float64;
+           parts: float64;
+         };
+        battery: nat;
+        calculatedDrain:
+         record {
+           batteryDrain: float64;
+           conditionLoss: float64;
+           partsAccumulation: float64;
+         };
+        chargingCurve: float64;
+        condition: nat;
+        currentStats:
+         record {
+           acceleration: nat;
+           powerCore: nat;
+           speed: nat;
+           stability: nat;
+         };
+        currentTime: int;
+        durationBonus: float64;
+        factionBonus:
+         record {
+           batteryMultiplier: float64;
+           conditionMultiplier: float64;
+           partsMultiplier: float64;
+         };
+        finalRounded:
+         record {
+           batteryChange: int;
+           conditionChange: int;
+           partsGained: nat;
+         };
+        hasActiveMission: bool;
+        hoursSinceLastAccumulation: float64;
+        lastAccumulation: int;
+        newValues: record {
+                     battery: nat;
+                     condition: nat;
+                   };
+        startTime: int;
+        statBonuses:
+         record {
+           powerCoreBonus: float64;
+           speedBonus: float64;
+           stabilityBonus: float64;
+         };
+        totalHoursElapsed: float64;
+        zone: opt text;
+        zoneMultipliers:
+         record {
+           battery: float64;
+           condition: float64;
+           parts: float64;
+         };
+      }) query;
    /// Test/debug: Simulate a race with specific bots on a specific track
    /// Returns detailed results for balance testing
    debug_simulate_race: (trackId: nat, tokenIndices: vec nat, seed: nat) ->
@@ -515,11 +584,22 @@ type McpServer =
    /// Debug: Test simulate a race with specific bots and track
    /// Returns backend-calculated times for validation
    debug_test_simulation: (tokenIndexes: vec nat, trackId: nat, trackSeed:
-    nat) ->
-    (opt record {results: vec record {
-                                finalTime: float64;
-                                tokenIndex: nat;
-                              };}) query;
+    nat, distanceKm: nat) ->
+    (opt
+      record {
+        results:
+         vec
+          record {
+            finalTime: float64;
+            stats:
+             record {
+               acceleration: nat;
+               powerCore: nat;
+               speed: nat;
+               stability: nat;
+             };
+            tokenIndex: nat;
+          };}) query;
    /// Decode EXT token identifier to get token index (public query)
    decode_token_identifier: (tokenIdentifier: text) -> (nat) query;
    delete_events_and_races: (eventIds: vec nat) -> (text);
@@ -801,6 +881,31 @@ type McpServer =
    /// Upload trait schema (owner only, done once)
    upload_trait_schema: (schemaData: TraitSchema) -> (Result_5);
    validate_timer_state: () -> (vec text) query;
+   /// Batch complete scavenging missions for multiple bots
+   web_batch_complete_scavenging: (tokenIndices: vec nat) ->
+    (vec record {
+           result: Result_1;
+           tokenIndex: nat;
+         });
+   /// Batch recharge multiple bots (0.1 ICP each + fees via ICRC-2)
+   web_batch_recharge_bots: (tokenIndices: vec nat) ->
+    (vec record {
+           result: Result_1;
+           tokenIndex: nat;
+         });
+   /// Batch repair multiple bots (0.05 ICP each + fees via ICRC-2)
+   web_batch_repair_bots: (tokenIndices: vec nat) ->
+    (vec record {
+           result: Result_1;
+           tokenIndex: nat;
+         });
+   /// Batch start scavenging missions for multiple bots
+   web_batch_start_scavenging: (tokenIndices: vec nat, zone: text,
+    durationMinutes: opt nat) ->
+    (vec record {
+           result: Result_1;
+           tokenIndex: nat;
+         });
    /// Get user's betting history for UI
    web_betting_get_my_bets: (limit: nat) ->
     (record {
@@ -896,6 +1001,8 @@ type McpServer =
    /// Convert parts from one type to another (25% conversion cost)
    web_convert_parts: (fromType: text, toType: text, amount: nat) ->
     (Result_1);
+   /// De-register a bot (removes control, preserves stats)
+   web_deregister_bot: (tokenIndex: nat) -> (Result_1);
    /// Enter a race (with ICRC-2 payment for entry fee)
    web_enter_race: (raceId: nat, tokenIndex: nat) -> (Result_1);
    /// Get detailed stats for a specific bot

@@ -1,21 +1,27 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useMyBots, useUserInventory, useCollectionBonuses, useUserWalletNFTs } from '../../hooks/useGarage';
+import { useMyBots, useUserInventory, useCollectionBonuses, useUserWalletNFTs, useRechargeBot, useRepairBot, useBatchRechargeBots, useBatchRepairBots, useBatchCompleteScavenging, useBatchStartScavenging } from '../../hooks/useGarage';
 import { useBackgrounds } from '../../hooks/useBackgrounds';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { WalletConnect } from '../../components/WalletConnect';
 import { BotCard } from '../../components/BotCard';
 import { PartsConverter } from '../../components/PartsConverter';
-import { Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical, Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical, Plus, ChevronDown, ChevronRight, Search, CheckSquare, Square, Filter, X, MapPin } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { BotListItem } from '@pokedbots-racing/ic-js';
 import { Progress } from '../../components/ui/progress';
 import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
 import { generatetokenIdentifier, completeScavenging } from '@pokedbots-racing/ic-js';
 import { toast } from 'sonner';
+import { getTerrainIcon } from '../../lib/utils';
+import { Input } from '../../components/ui/input';
+import { Checkbox } from '../../components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 
 // Helper to format time remaining
 function formatTimeRemaining(timestampNanos: bigint): string {
@@ -51,6 +57,37 @@ function getUpgradeDisplayName(upgradeType: string): string {
   return nameMap[upgradeType] || upgradeType;
 }
 
+// Format scavenging zone name
+function formatScavengingZone(zone: string): string {
+  const zoneMap: Record<string, string> = {
+    'ScrapHeaps': 'Scrap Heaps',
+    'AbandonedSettlements': 'Settlements',
+    'DeadMachineFields': 'Machine Fields',
+    'RepairBay': 'Repair Bay',
+    'ChargingStation': 'Charging Station',
+  };
+  return zoneMap[zone] || zone;
+}
+
+// Get scavenging time remaining text
+function getScavengingTimeRemaining(bot: BotListItem): string | null {
+  if (!bot.activeMission || !bot.activeMission.durationMinutes || bot.activeMission.durationMinutes.length === 0) {
+    return null;
+  }
+  
+  const duration = Number(bot.activeMission.durationMinutes[0]);
+  const startTimeMs = Number(bot.activeMission.startTime) / 1_000_000;
+  const endTime = startTimeMs + (duration * 60 * 1000);
+  const remaining = Math.max(0, endTime - Date.now());
+  const remainingMinutes = Math.floor(remaining / 60000);
+  const remainingHours = Math.floor(remainingMinutes / 60);
+  const remainingMins = remainingMinutes % 60;
+  
+  if (remaining <= 0) return 'Complete!';
+  if (remainingHours > 0) return `${remainingHours}h ${remainingMins}m`;
+  return `${remainingMins}m`;
+}
+
 export default function GaragePage() {
   const { isAuthenticated, user } = useAuth();
   const queryClient = useQueryClient();
@@ -61,7 +98,32 @@ export default function GaragePage() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(null);
-  const [recallingAll, setRecallingAll] = useState(false);
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  
+  // Filter and selection state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedBots, setSelectedBots] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set());
+  const [classFilter, setClassFilter] = useState<string>('all');
+  const [factionFilter, setFactionFilter] = useState<string>('all');
+  const [terrainFilter, setTerrainFilter] = useState<string>('all');
+  const [batteryRange, setBatteryRange] = useState<[number, number]>([0, 100]);
+  const [conditionRange, setConditionRange] = useState<[number, number]>([0, 100]);
+  
+  // Bulk scavenging state
+  const [bulkScavengeZone, setBulkScavengeZone] = useState<string>('ScrapHeaps');
+  const [bulkScavengeDuration, setBulkScavengeDuration] = useState<number | undefined>(undefined);
+  
+  // Bulk action mutations
+  const rechargeMutation = useRechargeBot();
+  const repairMutation = useRepairBot();
+  const batchRechargeMutation = useBatchRechargeBots();
+  const batchRepairMutation = useBatchRepairBots();
+  const batchRecallMutation = useBatchCompleteScavenging();
+  const batchScavengeMutation = useBatchStartScavenging();
   
   // UI state for new features - initialize from localStorage or defaults
   const [collapsedBots, setCollapsedBots] = useState<Set<string>>(() => {
@@ -73,10 +135,10 @@ export default function GaragePage() {
     const saved = localStorage.getItem('garage_collapsed_brackets');
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
-  const [groupByBracket, setGroupByBracket] = useState(() => {
-    const saved = localStorage.getItem('garage_group_by_bracket');
-    // Default: true (grouped by bracket)
-    return saved ? JSON.parse(saved) : true;
+  const [groupBy, setGroupBy] = useState<'none' | 'class' | 'terrain' | 'faction'>(() => {
+    const saved = localStorage.getItem('garage_group_by');
+    // Default: 'class' (grouped by race class)
+    return saved ? JSON.parse(saved) : 'class';
   });
   
   // Per-bot loading states (keyed by tokenIndex) - only tracking entering races now
@@ -129,8 +191,8 @@ export default function GaragePage() {
   }, [collapsedBrackets]);
 
   useEffect(() => {
-    localStorage.setItem('garage_group_by_bracket', JSON.stringify(groupByBracket));
-  }, [groupByBracket]);
+    localStorage.setItem('garage_group_by', JSON.stringify(groupBy));
+  }, [groupBy]);
 
   // Save favorites to localStorage
   const toggleFavorite = (tokenIndex: string) => {
@@ -212,6 +274,277 @@ export default function GaragePage() {
       return 0;
     });
   }, [bots, walletNFTs, favorites, customOrder]);
+
+  // Apply filters to sorted bots
+  const filteredBots = useMemo(() => {
+    let filtered = [...sortedBots];
+    
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter(bot => {
+        const name = bot.name?.toLowerCase() || '';
+        const index = bot.tokenIndex.toString();
+        return name.includes(searchQuery.toLowerCase()) || index.includes(searchQuery);
+      });
+    }
+    
+    // Quick filters
+    if (activeQuickFilters.has('lowBattery')) {
+      filtered = filtered.filter(bot => 
+        bot.stats && Number(bot.stats.battery) < 40
+      );
+    }
+    if (activeQuickFilters.has('lowCondition')) {
+      filtered = filtered.filter(bot => 
+        bot.stats && Number(bot.stats.condition) < 50
+      );
+    }
+    if (activeQuickFilters.has('fullBattery')) {
+      filtered = filtered.filter(bot => 
+        bot.stats && Number(bot.stats.battery) === 100
+      );
+    }
+    if (activeQuickFilters.has('fullCondition')) {
+      filtered = filtered.filter(bot => 
+        bot.stats && Number(bot.stats.condition) === 100
+      );
+    }
+    if (activeQuickFilters.has('readyToRace')) {
+      filtered = filtered.filter(bot => 
+        bot.isInitialized && 
+        bot.stats && 
+        Number(bot.stats.battery) >= 20 && 
+        Number(bot.stats.condition) >= 20 &&
+        !bot.activeMission
+      );
+    }
+    if (activeQuickFilters.has('inRaces')) {
+      filtered = filtered.filter(bot => 
+        bot.upcomingRaces && bot.upcomingRaces.length > 0
+      );
+    }
+    if (activeQuickFilters.has('inNextRace')) {
+      // Find the next race (earliest start time across all bots)
+      let nextRaceId: number | null = null;
+      let earliestStartTime: bigint | null = null;
+      
+      for (const bot of sortedBots) {
+        if (bot.upcomingRaces && bot.upcomingRaces.length > 0) {
+          for (const race of bot.upcomingRaces) {
+            if (earliestStartTime === null || race.startTime < earliestStartTime) {
+              earliestStartTime = race.startTime;
+              nextRaceId = race.raceId;
+            }
+          }
+        }
+      }
+      
+      // Filter bots that are in the next race
+      if (nextRaceId !== null) {
+        filtered = filtered.filter(bot => 
+          bot.upcomingRaces && bot.upcomingRaces.some(race => race.raceId === nextRaceId)
+        );
+      } else {
+        // If no next race found, show no bots
+        filtered = [];
+      }
+    }
+    if (activeQuickFilters.has('scavenging')) {
+      filtered = filtered.filter(bot => !!bot.activeMission);
+    }
+    if (activeQuickFilters.has('needsUpgrade')) {
+      filtered = filtered.filter(bot => 
+        bot.isInitialized && !bot.activeUpgrade
+      );
+    }
+    
+    // Class filter
+    if (classFilter !== 'all') {
+      filtered = filtered.filter(bot => getBotBracket(bot) === classFilter);
+    }
+    
+    // Faction filter
+    if (factionFilter !== 'all') {
+      filtered = filtered.filter(bot => {
+        if (!bot.stats?.faction) return false;
+        const factionKey = Object.keys(bot.stats.faction)[0];
+        return factionKey === factionFilter;
+      });
+    }
+    
+    // Terrain filter (based on background preference)
+    if (terrainFilter !== 'all') {
+      filtered = filtered.filter(bot => {
+        const bg = backgroundData?.backgrounds[bot.tokenIndex.toString()];
+        if (!bg || !bot.stats?.faction) return false;
+        const factionKey = Object.keys(bot.stats.faction)[0];
+        const terrain = getTerrainPreference(bg, factionKey);
+        return terrain === terrainFilter;
+      });
+    }
+    
+    // Battery range filter (only if not default)
+    if (batteryRange[0] !== 0 || batteryRange[1] !== 100) {
+      filtered = filtered.filter(bot => {
+        if (!bot.stats) return false;
+        const battery = Number(bot.stats.battery);
+        return battery >= batteryRange[0] && battery <= batteryRange[1];
+      });
+    }
+    
+    // Condition range filter (only if not default)
+    if (conditionRange[0] !== 0 || conditionRange[1] !== 100) {
+      filtered = filtered.filter(bot => {
+        if (!bot.stats) return false;
+        const condition = Number(bot.stats.condition);
+        return condition >= conditionRange[0] && condition <= conditionRange[1];
+      });
+    }
+    
+    return filtered;
+  }, [sortedBots, searchQuery, activeQuickFilters, classFilter, factionFilter, terrainFilter, batteryRange, conditionRange, backgroundData]);
+
+  // Get terrain preference helper
+  const getTerrainPreference = (background: string | undefined, faction: string): string => {
+    // Implementation depends on your getTerrainPreference function
+    // This is a placeholder - use your actual implementation
+    if (!background) return 'Unknown';
+    // Your actual terrain logic here
+    return 'ScrapHeaps'; // placeholder
+  };
+
+  // Selection handlers
+  const toggleBotSelection = (tokenIndex: string) => {
+    setSelectedBots(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tokenIndex)) {
+        newSet.delete(tokenIndex);
+      } else {
+        newSet.add(tokenIndex);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllVisible = () => {
+    const visibleIndices = filteredBots.map(bot => bot.tokenIndex.toString());
+    setSelectedBots(new Set(visibleIndices));
+  };
+
+  const deselectAll = () => {
+    setSelectedBots(new Set());
+  };
+
+  const toggleQuickFilter = (filter: string) => {
+    setActiveQuickFilters(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(filter)) {
+        newSet.delete(filter);
+      } else {
+        newSet.add(filter);
+      }
+      return newSet;
+    });
+  };
+
+  // Bulk actions
+  const handleBulkRecharge = async () => {
+    const botsToRecharge = filteredBots.filter(bot => 
+      selectedBots.has(bot.tokenIndex.toString()) &&
+      bot.isInitialized &&
+      bot.stats &&
+      Number(bot.stats.battery) < 100
+    );
+    
+    if (botsToRecharge.length === 0) {
+      toast.info('No bots selected that need recharging');
+      return;
+    }
+
+    try {
+      const tokenIndices = botsToRecharge.map(bot => Number(bot.tokenIndex));
+      const results = await batchRechargeMutation.mutateAsync(tokenIndices);
+      
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+      
+      results.forEach(item => {
+        if (item.result.ok) {
+          successCount++;
+        } else {
+          errorCount++;
+          errors.push(`#${item.tokenIndex}: ${item.result.err}`);
+        }
+      });
+      
+      refetchBots();
+      
+      if (errorCount === 0) {
+        toast.success(`Successfully recharged ${successCount} bot${successCount > 1 ? 's' : ''}`);
+      } else if (successCount > 0) {
+        toast.warning(`Recharged ${successCount} bot${successCount > 1 ? 's' : ''}, ${errorCount} failed`, {
+          description: errors.slice(0, 3).join(', ')
+        });
+      } else {
+        toast.error(`Failed to recharge bots`, {
+          description: errors.slice(0, 3).join(', ')
+        });
+      }
+    } catch (err: any) {
+      console.error('Batch recharge failed:', err);
+      toast.error(`Failed to recharge bots: ${err.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleBulkRepair = async () => {
+    const botsToRepair = filteredBots.filter(bot => 
+      selectedBots.has(bot.tokenIndex.toString()) &&
+      bot.isInitialized &&
+      bot.stats &&
+      Number(bot.stats.condition) < 100
+    );
+    
+    if (botsToRepair.length === 0) {
+      toast.info('No bots selected that need repair');
+      return;
+    }
+
+    try {
+      const tokenIndices = botsToRepair.map(bot => Number(bot.tokenIndex));
+      const results = await batchRepairMutation.mutateAsync(tokenIndices);
+      
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+      
+      results.forEach(item => {
+        if (item.result.ok) {
+          successCount++;
+        } else {
+          errorCount++;
+          errors.push(`#${item.tokenIndex}: ${item.result.err}`);
+        }
+      });
+      
+      refetchBots();
+      
+      if (errorCount === 0) {
+        toast.success(`Successfully repaired ${successCount} bot${successCount > 1 ? 's' : ''}`);
+      } else if (successCount > 0) {
+        toast.warning(`Repaired ${successCount} bot${successCount > 1 ? 's' : ''}, ${errorCount} failed`, {
+          description: errors.slice(0, 3).join(', ')
+        });
+      } else {
+        toast.error(`Failed to repair bots`, {
+          description: errors.slice(0, 3).join(', ')
+        });
+      }
+    } catch (err: any) {
+      console.error('Batch repair failed:', err);
+      toast.error(`Failed to repair bots: ${err.message || 'Unknown error'}`);
+    }
+  };
 
   // Handle drag and drop
   const handleDragStart = (index: number) => {
@@ -296,39 +629,105 @@ export default function GaragePage() {
     queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
   };
 
-  // Recall all scavengers
-  const handleRecallAll = async () => {
-    if (!user?.agent) return;
+  // Recall selected scavengers
+  const handleBulkRecall = async () => {
+    const botsToRecall = filteredBots.filter(bot => 
+      selectedBots.has(bot.tokenIndex.toString()) &&
+      bot.activeMission
+    );
     
-    const scavengingBots = bots.filter(bot => bot.activeMission);
-    if (scavengingBots.length === 0) {
-      toast.info('No bots are currently scavenging');
+    if (botsToRecall.length === 0) {
+      toast.info('No scavenging bots selected');
+      return;
+    }
+    
+    try {
+      const tokenIndices = botsToRecall.map(bot => Number(bot.tokenIndex));
+      const results = await batchRecallMutation.mutateAsync(tokenIndices);
+      
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+      
+      results.forEach(item => {
+        if (item.result.ok) {
+          successCount++;
+        } else {
+          errorCount++;
+          errors.push(`#${item.tokenIndex}: ${item.result.err}`);
+        }
+      });
+      
+      refetchBots();
+      
+      if (errorCount === 0) {
+        toast.success(`Successfully recalled ${successCount} bot${successCount > 1 ? 's' : ''}`);
+      } else if (successCount > 0) {
+        toast.warning(`Recalled ${successCount} bot${successCount > 1 ? 's' : ''}, ${errorCount} failed`, {
+          description: errors.slice(0, 3).join(', ')
+        });
+      } else {
+        toast.error(`Failed to recall bots`, {
+          description: errors.slice(0, 3).join(', ')
+        });
+      }
+    } catch (err: any) {
+      console.error('Batch recall failed:', err);
+      toast.error(`Failed to recall bots: ${err.message || 'Unknown error'}`);
+    }
+  };
+
+  // Bulk send bots to scavenge
+  const handleBulkScavenge = async () => {
+    const botsToScavenge = filteredBots.filter(bot => 
+      selectedBots.has(bot.tokenIndex.toString()) &&
+      bot.isInitialized &&
+      bot.stats &&
+      !bot.activeMission
+    );
+    
+    if (botsToScavenge.length === 0) {
+      toast.info('No bots selected that can scavenge');
       return;
     }
 
-    setRecallingAll(true);
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const bot of scavengingBots) {
-      try {
-        await completeScavenging(Number(bot.tokenIndex), user.agent as any);
-        successCount++;
-      } catch (err) {
-        console.error(`Failed to recall bot #${bot.tokenIndex}:`, err);
-        errorCount++;
+    try {
+      const tokenIndices = botsToScavenge.map(bot => Number(bot.tokenIndex));
+      const results = await batchScavengeMutation.mutateAsync({
+        tokenIndices,
+        zone: bulkScavengeZone,
+        durationMinutes: bulkScavengeDuration
+      });
+      
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+      
+      results.forEach(item => {
+        if (item.result.ok) {
+          successCount++;
+        } else {
+          errorCount++;
+          errors.push(`#${item.tokenIndex}: ${item.result.err}`);
+        }
+      });
+      
+      refetchBots();
+      
+      if (errorCount === 0) {
+        toast.success(`Successfully sent ${successCount} bot${successCount > 1 ? 's' : ''} to ${formatScavengingZone(bulkScavengeZone)}`);
+      } else if (successCount > 0) {
+        toast.warning(`Sent ${successCount} bot${successCount > 1 ? 's' : ''} to scavenge, ${errorCount} failed`, {
+          description: errors.slice(0, 3).join(', ')
+        });
+      } else {
+        toast.error(`Failed to send bots to scavenge`, {
+          description: errors.slice(0, 3).join(', ')
+        });
       }
-    }
-
-    setRecallingAll(false);
-    refetchBots();
-
-    if (errorCount === 0) {
-      toast.success(`Successfully recalled ${successCount} bot${successCount > 1 ? 's' : ''}`);
-    } else if (successCount > 0) {
-      toast.warning(`Recalled ${successCount} bot${successCount > 1 ? 's' : ''}, ${errorCount} failed`);
-    } else {
-      toast.error(`Failed to recall bots`);
+    } catch (err: any) {
+      console.error('Batch scavenge failed:', err);
+      toast.error(`Failed to send bots to scavenge: ${err.message || 'Unknown error'}`);
     }
   };
 
@@ -348,8 +747,8 @@ export default function GaragePage() {
            rating >= 20 ? 'Junker' : 'Scrap';
   };
 
-  // Helper: Get next race start time as relative string
-  const getNextRaceStartTime = (bot: BotListItem): string | null => {
+  // Helper: Get next race info including time and terrain
+  const getNextRaceInfo = (bot: BotListItem): { time: string; terrain: any } | null => {
     if (!bot.upcomingRaces || bot.upcomingRaces.length === 0) return null;
     
     const nextRace = bot.upcomingRaces.reduce((closest, race) => {
@@ -359,31 +758,83 @@ export default function GaragePage() {
     });
     
     const timeUntil = (Number(nextRace.startTime) / 1_000_000) - Date.now();
-    if (timeUntil < 0) return 'Starting now';
+    let timeStr: string;
+    if (timeUntil < 0) {
+      timeStr = 'Now';
+    } else {
+      const hours = Math.floor(timeUntil / (1000 * 60 * 60));
+      const minutes = Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60));
+      
+      if (hours > 24) timeStr = `${Math.floor(hours / 24)}d`;
+      else if (hours > 0) timeStr = `${hours}h ${minutes}m`;
+      else timeStr = `${minutes}m`;
+    }
     
-    const hours = Math.floor(timeUntil / (1000 * 60 * 60));
-    const minutes = Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (hours > 24) return `${Math.floor(hours / 24)}d`;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
+    return { time: timeStr, terrain: nextRace.terrain };
   };
 
-  // Group bots by bracket
+  // Helper: Get next race start time as relative string (for backwards compatibility)
+  const getNextRaceStartTime = (bot: BotListItem): string | null => {
+    const info = getNextRaceInfo(bot);
+    return info ? info.time : null;
+  };
+
+  // Group bots by selected criteria
   const groupedBots = useMemo(() => {
-    if (!groupByBracket) return null;
+    if (groupBy === 'none') return null;
     
-    const groups: Record<string, BotListItem[]> = {
-      'SilentKlan': [], 'Elite': [], 'Raider': [], 'Junker': [], 'Scrap': [], 'Unregistered': []
-    };
+    const groups: Record<string, BotListItem[]> = {};
     
-    sortedBots.forEach(bot => {
-      const bracket = getBotBracket(bot);
-      groups[bracket].push(bot);
-    });
+    if (groupBy === 'class') {
+      // Group by race class
+      groups['SilentKlan'] = [];
+      groups['Elite'] = [];
+      groups['Raider'] = [];
+      groups['Junker'] = [];
+      groups['Scrap'] = [];
+      groups['Unregistered'] = [];
+      
+      filteredBots.forEach(bot => {
+        const bracket = getBotBracket(bot);
+        groups[bracket].push(bot);
+      });
+    } else if (groupBy === 'terrain') {
+      // Group by terrain bonus
+      groups['ScrapHeaps'] = [];
+      groups['WastelandSand'] = [];
+      groups['MetalRoads'] = [];
+      groups['None'] = [];
+      
+      filteredBots.forEach(bot => {
+        if (bot.stats?.terrainBonus) {
+          const terrain = Object.keys(bot.stats.terrainBonus)[0];
+          if (groups[terrain]) {
+            groups[terrain].push(bot);
+          }
+        } else {
+          groups['None'].push(bot);
+        }
+      });
+    } else if (groupBy === 'faction') {
+      // Group by faction
+      filteredBots.forEach(bot => {
+        if (bot.stats?.faction) {
+          const faction = Object.keys(bot.stats.faction)[0];
+          if (!groups[faction]) {
+            groups[faction] = [];
+          }
+          groups[faction].push(bot);
+        } else {
+          if (!groups['None']) {
+            groups['None'] = [];
+          }
+          groups['None'].push(bot);
+        }
+      });
+    }
     
     return groups;
-  }, [sortedBots, groupByBracket]);
+  }, [filteredBots, groupBy]);
 
   // Get the selected bot
   const selectedBot = selectedBotIndex !== null 
@@ -398,18 +849,12 @@ export default function GaragePage() {
       const botExists = sortedBots.some(b => b.tokenIndex === botIndex);
       if (botExists && selectedBotIndex !== botIndex) {
         setSelectedBotIndex(botIndex);
-      } else if (!botExists && sortedBots.length > 0 && selectedBotIndex === null) {
-        // Bot from URL doesn't exist, select first bot
-        setSelectedBotIndex(sortedBots[0].tokenIndex);
       }
-    } else if (!botParam && sortedBots.length > 0 && selectedBotIndex === null) {
-      // No URL param, auto-select first bot
-      setSelectedBotIndex(sortedBots[0].tokenIndex);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, sortedBots]);
 
-  // Update URL when selected bot changes (user clicks a bot)
+  // Update URL when selected bot changes
   useEffect(() => {
     if (selectedBotIndex !== null) {
       const currentBot = searchParams.get('bot');
@@ -418,7 +863,9 @@ export default function GaragePage() {
         setSearchParams({ bot: newBot }, { replace: true });
       }
     }
-  }, [selectedBotIndex, searchParams, setSearchParams]);
+    // Remove searchParams from deps to prevent circular loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBotIndex, setSearchParams]);
 
   if (!isAuthenticated) {
     return (
@@ -439,7 +886,7 @@ export default function GaragePage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="mb-6">
         <h1 className="text-4xl font-bold mb-2">Wasteland Garage</h1>
         <p className="text-muted-foreground">
@@ -447,142 +894,370 @@ export default function GaragePage() {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6 mb-6">
-        {/* Parts Inventory */}
-        <Card className="border-2 border-primary/20 bg-card/80 backdrop-blur">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Parts Inventory</CardTitle>
-              <PartsConverter 
-                inventory={inventory}
-                identityOrAgent={user?.agent}
-                onConversionComplete={() => {
-                  queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
-                }}
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4 text-sm">
-              <div className="flex items-center gap-1">
-                <span className="font-semibold">{inventory ? Number(inventory.speedChips) : '—'}</span>
-                <span className="text-muted-foreground">SPD</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="font-semibold">{inventory ? Number(inventory.powerCoreFragments) : '—'}</span>
-                <span className="text-muted-foreground">PWR</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="font-semibold">{inventory ? Number(inventory.thrusterKits) : '—'}</span>
-                <span className="text-muted-foreground">ACC</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="font-semibold">{inventory ? Number(inventory.gyroModules) : '—'}</span>
-                <span className="text-muted-foreground">STB</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="font-semibold text-primary">{inventory ? Number(inventory.universalParts) : '—'}</span>
-                <span className="text-primary">Universal</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Collection Bonuses (Faction Synergies) */}
-        <Card className="border-2 border-amber-500/20 bg-card/80 backdrop-blur">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Star className="h-4 w-4 text-amber-500" />
-              Collection Bonuses
-            </CardTitle>
-            <CardDescription className="text-xs">Apply to all your bots</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {bonusesLoading ? (
-              <p className="text-sm text-muted-foreground">Loading bonuses...</p>
-            ) : !bonuses || bots.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Collect faction bots for bonuses</p>
-            ) : (
-              <div className="space-y-2 text-sm">
-                {/* Stat Bonuses */}
-                {(bonuses.statBonuses.speed !== 0 || bonuses.statBonuses.powerCore !== 0 || 
-                  bonuses.statBonuses.acceleration !== 0 || bonuses.statBonuses.stability !== 0) && (
-                  <div className="flex flex-wrap gap-2">
-                    {bonuses.statBonuses.speed !== 0 && (
-                      <Badge variant="secondary" className="text-xs font-semibold">
-                        🏎️ +{bonuses.statBonuses.speed} SPD
-                      </Badge>
-                    )}
-                    {bonuses.statBonuses.powerCore !== 0 && (
-                      <Badge variant="secondary" className="text-xs font-semibold">
-                        ⚡ +{bonuses.statBonuses.powerCore} PWR
-                      </Badge>
-                    )}
-                    {bonuses.statBonuses.acceleration !== 0 && (
-                      <Badge variant="secondary" className="text-xs font-semibold">
-                        🚀 +{bonuses.statBonuses.acceleration} ACC
-                      </Badge>
-                    )}
-                    {bonuses.statBonuses.stability !== 0 && (
-                      <Badge variant="secondary" className="text-xs font-semibold">
-                        🎯 +{bonuses.statBonuses.stability} STB
-                      </Badge>
-                    )}
-                  </div>
-                )}
-
-                {/* Economic Bonuses */}
+      {/* Collection Bonuses - Mobile/Tablet View (< xl screens) */}
+      <Card className="xl:hidden border-2 border-amber-500/20 bg-card/80 backdrop-blur mb-6">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Star className="h-4 w-4 text-amber-500" />
+            Collection Bonuses
+          </CardTitle>
+          <CardDescription className="text-xs">Apply to all your bots</CardDescription>
+        </CardHeader>
+        <CardContent className="text-sm">
+          {bonusesLoading ? (
+            <p className="text-muted-foreground">Loading bonuses...</p>
+          ) : !bonuses || bots.length === 0 ? (
+            <p className="text-muted-foreground">Collect faction bots for bonuses</p>
+          ) : (
+            <div className="space-y-3">
+              {/* Stat Bonuses */}
+              {(bonuses.statBonuses.speed !== 0 || bonuses.statBonuses.powerCore !== 0 || 
+                bonuses.statBonuses.acceleration !== 0 || bonuses.statBonuses.stability !== 0) && (
                 <div className="flex flex-wrap gap-2">
-                  {bonuses.costMultipliers.repair < 1 && (
-                    <Badge variant="outline" className="text-xs">
-                      🔧 -{Math.round((1 - bonuses.costMultipliers.repair) * 100)}% Repairs
+                  {bonuses.statBonuses.speed !== 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      🏎️ +{bonuses.statBonuses.speed} SPD
                     </Badge>
                   )}
-                  {bonuses.costMultipliers.upgrade < 1 && (
-                    <Badge variant="outline" className="text-xs">
-                      💰 -{Math.round((1 - bonuses.costMultipliers.upgrade) * 100)}% Upgrades
+                  {bonuses.statBonuses.powerCore !== 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      ⚡ +{bonuses.statBonuses.powerCore} PWR
                     </Badge>
                   )}
-                  {bonuses.costMultipliers.rechargeCooldown < 1 && (
-                    <Badge variant="outline" className="text-xs">
-                      ⏱️ -{Math.round((1 - bonuses.costMultipliers.rechargeCooldown) * 100)}% Cooldown
+                  {bonuses.statBonuses.acceleration !== 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      🚀 +{bonuses.statBonuses.acceleration} ACC
                     </Badge>
                   )}
-                  {bonuses.yieldMultipliers.parts > 1 && (
-                    <Badge variant="outline" className="text-xs text-green-600">
-                      📦 +{Math.round((bonuses.yieldMultipliers.parts - 1) * 100)}% Parts
-                    </Badge>
-                  )}
-                  {bonuses.yieldMultipliers.prizes > 1 && (
-                    <Badge variant="outline" className="text-xs text-green-600">
-                      🏆 +{Math.round((bonuses.yieldMultipliers.prizes - 1) * 100)}% Prizes
-                    </Badge>
-                  )}
-                  {bonuses.drainMultipliers.scavenging < 1 && (
-                    <Badge variant="outline" className="text-xs text-green-600">
-                      🛡️ -{Math.round((1 - bonuses.drainMultipliers.scavenging) * 100)}% Drain
+                  {bonuses.statBonuses.stability !== 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      🎯 +{bonuses.statBonuses.stability} STB
                     </Badge>
                   )}
                 </div>
+              )}
 
-                {/* No bonuses message */}
-                {bonuses.statBonuses.speed === 0 &&
-                 bonuses.statBonuses.powerCore === 0 &&
-                 bonuses.statBonuses.acceleration === 0 &&
-                 bonuses.statBonuses.stability === 0 &&
-                 bonuses.costMultipliers.repair >= 1 &&
-                 bonuses.costMultipliers.upgrade >= 1 &&
-                 bonuses.costMultipliers.rechargeCooldown >= 1 &&
-                 bonuses.yieldMultipliers.parts <= 1 &&
-                 bonuses.yieldMultipliers.prizes <= 1 &&
-                 bonuses.drainMultipliers.scavenging >= 1 && (
-                  <p className="text-xs text-muted-foreground">Collect more faction bots to unlock bonuses</p>
+              {/* Economic Bonuses */}
+              <div className="flex flex-wrap gap-2">
+                {bonuses.costMultipliers.repair < 1 && (
+                  <Badge variant="outline" className="text-xs">
+                    🔧 -{Math.round((1 - bonuses.costMultipliers.repair) * 100)}% Repair
+                  </Badge>
+                )}
+                {bonuses.yieldMultipliers.parts > 1 && (
+                  <Badge variant="outline" className="text-xs text-green-600">
+                    📦 +{Math.round((bonuses.yieldMultipliers.parts - 1) * 100)}% Parts
+                  </Badge>
+                )}
+                {bonuses.yieldMultipliers.prizes > 1 && (
+                  <Badge variant="outline" className="text-xs text-green-600">
+                    🏆 +{Math.round((bonuses.yieldMultipliers.prizes - 1) * 100)}% Prizes
+                  </Badge>
                 )}
               </div>
-            )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Two-column layout: Main content + Sticky sidebar */}
+      <div className="flex gap-6">
+        {/* Main Content Column */}
+        <div className="flex-1 min-w-0">
+
+      {/* Filter and Selection Toolbar */}
+      {bots.length > 0 && (
+        <Card className="border-2 border-primary/20 bg-card/80 backdrop-blur mb-6">
+          <CardContent className="pt-6">
+            {/* Search and Selection Mode */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name or token number..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              
+              {/* Group By Dropdown */}
+              <select
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value as 'none' | 'class' | 'terrain' | 'faction')}
+                className="px-3 py-2 bg-background border border-input rounded-md text-sm min-w-[160px]"
+              >
+                <option value="none">No Grouping</option>
+                <option value="class">Group by Class</option>
+                <option value="terrain">Group by Terrain</option>
+                <option value="faction">Group by Faction</option>
+              </select>
+              
+              <Button
+                variant={selectionMode ? "default" : "outline"}
+                onClick={() => {
+                  setSelectionMode(!selectionMode);
+                  if (selectionMode) {
+                    deselectAll();
+                  }
+                }}
+                className="sm:w-auto w-full"
+              >
+                {selectionMode ? <CheckSquare className="h-4 w-4 mr-2" /> : <Square className="h-4 w-4 mr-2" />}
+                {selectionMode ? 'Exit Selection' : 'Select Mode'}
+              </Button>
+            </div>
+
+            {/* Quick Filters */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold text-muted-foreground">Quick Filters:</span>
+                <Badge
+                  variant={activeQuickFilters.has('lowBattery') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('lowBattery')}
+                >
+                  🔋 Low Battery (&lt;40%)
+                </Badge>
+                <Badge
+                  variant={activeQuickFilters.has('lowCondition') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('lowCondition')}
+                >
+                  🔧 Low Condition (&lt;50%)
+                </Badge>
+                <Badge
+                  variant={activeQuickFilters.has('readyToRace') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('readyToRace')}
+                >
+                  ✅ Ready to Race
+                </Badge>
+                <Badge
+                  variant={activeQuickFilters.has('inRaces') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('inRaces')}
+                >
+                  🏁 In Races
+                </Badge>
+                <Badge
+                  variant={activeQuickFilters.has('scavenging') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('scavenging')}
+                >
+                  🔍 Scavenging
+                </Badge>
+                <Badge
+                  variant={activeQuickFilters.has('fullBattery') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('fullBattery')}
+                >
+                  🔋 100% Battery
+                </Badge>
+                <Badge
+                  variant={activeQuickFilters.has('fullCondition') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('fullCondition')}
+                >
+                  🔧 100% Condition
+                </Badge>
+                <Badge
+                  variant={activeQuickFilters.has('inNextRace') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('inNextRace')}
+                >
+                  🏁 In Next Race
+                </Badge>
+                {activeQuickFilters.size > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setActiveQuickFilters(new Set())}
+                    className="h-6 px-2"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+
+              {/* Advanced Filters Toggle */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className="text-sm"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Advanced Filters
+                <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
+              </Button>
+
+              {/* Advanced Filters - Collapsible */}
+              {showAdvancedFilters && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
+                  {/* Class Filter */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Class</label>
+                    <select
+                      value={classFilter}
+                      onChange={(e) => setClassFilter(e.target.value)}
+                      className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm"
+                    >
+                      <option value="all">All Classes</option>
+                      <option value="SilentKlan">SilentKlan (50+)</option>
+                      <option value="Elite">Elite (40-49)</option>
+                      <option value="Raider">Raider (30-39)</option>
+                      <option value="Junker">Junker (20-29)</option>
+                      <option value="Scrap">Scrap (0-19)</option>
+                      <option value="Unregistered">Unregistered</option>
+                    </select>
+                  </div>
+
+                  {/* Terrain Filter */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Terrain Bonus</label>
+                    <select
+                      value={terrainFilter}
+                      onChange={(e) => setTerrainFilter(e.target.value)}
+                      className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm"
+                    >
+                      <option value="all">All Terrains</option>
+                      <option value="ScrapHeaps">Scrap Heaps</option>
+                      <option value="WastelandSand">Wasteland Sand</option>
+                      <option value="MetalRoads">Metal Roads</option>
+                    </select>
+                  </div>
+
+                  {/* Clear Advanced Filters */}
+                  <div className="flex items-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setClassFilter('all');
+                        setFactionFilter('all');
+                        setTerrainFilter('all');
+                        setBatteryRange([0, 100]);
+                        setConditionRange([0, 100]);
+                      }}
+                      className="w-full"
+                    >
+                      Clear Advanced Filters
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Results Summary */}
+            <div className="mt-4 text-sm text-muted-foreground">
+              Showing {filteredBots.length} of {bots.length} bots
+            </div>
           </CardContent>
         </Card>
-      </div>
+      )}
+
+      {/* Bulk Action Toolbar - Sticky when bots selected */}
+      {selectionMode && selectedBots.size > 0 && (
+        <div className="sticky top-4 z-40 mb-6">
+          <Card className="border-2 border-primary bg-card/95 backdrop-blur shadow-lg">
+            <CardContent className="py-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Badge variant="secondary" className="text-sm font-bold">
+                    {selectedBots.size} bot{selectedBots.size > 1 ? 's' : ''} selected
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={selectAllVisible}
+                  >
+                    Select All Visible
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={deselectAll}
+                  >
+                    Deselect All
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    onClick={handleBulkRecharge}
+                    disabled={batchRechargeMutation.isPending}
+                  >
+                    <Battery className="h-4 w-4 mr-2" />
+                    Recharge Selected
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleBulkRepair}
+                    disabled={batchRepairMutation.isPending}
+                  >
+                    <Wrench className="h-4 w-4 mr-2" />
+                    Repair Selected
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={handleBulkRecall}
+                    disabled={batchRecallMutation.isPending}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Recall Selected
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Scavenging Controls */}
+              <div className="mt-3 pt-3 border-t flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <div className="flex items-center gap-2 flex-wrap flex-1">
+                  <span className="text-sm font-medium">Send to Scavenge:</span>
+                  <Select value={bulkScavengeZone} onValueChange={setBulkScavengeZone}>
+                    <SelectTrigger className="w-[180px] h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ScrapHeaps">Scrap Heaps (Safe)</SelectItem>
+                      <SelectItem value="AbandonedSettlements">Settlements (Moderate)</SelectItem>
+                      <SelectItem value="DeadMachineFields">Machine Fields (Dangerous)</SelectItem>
+                      <SelectItem value="RepairBay">Repair Bay</SelectItem>
+                      <SelectItem value="ChargingStation">Charging Station</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select 
+                    value={bulkScavengeDuration?.toString() || "continuous"} 
+                    onValueChange={(v) => setBulkScavengeDuration(v === "continuous" ? undefined : parseInt(v))}
+                  >
+                    <SelectTrigger className="w-[140px] h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="continuous">Continuous</SelectItem>
+                      <SelectItem value="60">1 hour</SelectItem>
+                      <SelectItem value="120">2 hours</SelectItem>
+                      <SelectItem value="180">3 hours</SelectItem>
+                      <SelectItem value="360">6 hours</SelectItem>
+                      <SelectItem value="720">12 hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    onClick={handleBulkScavenge}
+                    disabled={batchScavengeMutation.isPending}
+                  >
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Send Selected
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {error && (
         <Card className="mb-6 border-2 border-destructive bg-card/80 backdrop-blur">
@@ -633,59 +1308,74 @@ export default function GaragePage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Bot List - Responsive */}
-          <Card className="w-full lg:w-[480px] shrink-0 border-2 border-primary/20 bg-card/80 backdrop-blur">
+        <div className="flex flex-col gap-6">
+          {/* Bot List */}
+          <Card className="w-full border-2 border-primary/20 bg-card/80 backdrop-blur">
+            {/* Compact Parts Inventory Bar - Hidden on xl+ screens (moved to sidebar) */}
+            <div className="xl:hidden px-4 py-3 border-b border-primary/20 bg-card/50">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3 text-sm flex-wrap">
+                  <span className="font-semibold text-muted-foreground">Parts:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold">{inventory ? Number(inventory.speedChips) : '—'}</span>
+                    <span className="text-xs text-muted-foreground">SPD</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold">{inventory ? Number(inventory.powerCoreFragments) : '—'}</span>
+                    <span className="text-xs text-muted-foreground">PWR</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold">{inventory ? Number(inventory.thrusterKits) : '—'}</span>
+                    <span className="text-xs text-muted-foreground">ACC</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold">{inventory ? Number(inventory.gyroModules) : '—'}</span>
+                    <span className="text-xs text-muted-foreground">STB</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold text-primary">{inventory ? Number(inventory.universalParts) : '—'}</span>
+                    <span className="text-xs text-primary">Universal</span>
+                  </div>
+                </div>
+                <PartsConverter 
+                  inventory={inventory}
+                  identityOrAgent={user?.agent}
+                  onConversionComplete={() => {
+                    queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+                  }}
+                />
+              </div>
+            </div>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-lg">Your Bots ({bots.length})</CardTitle>
-                <div className="flex items-center gap-2">
-                  {bots.some(bot => bot.activeMission) && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleRecallAll}
-                      disabled={recallingAll}
-                    >
-                      {recallingAll ? 'Recalling...' : 'Recall All'}
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setGroupByBracket(!groupByBracket)}
-                  >
-                    {groupByBracket ? 'Ungroup' : 'Group by Bracket'}
-                  </Button>
-                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
               <div 
-                className="overflow-y-auto"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => e.preventDefault()}
               >
-                {groupByBracket && groupedBots ? (
-                  // Grouped view by bracket
+                {groupedBots ? (
+                  // Grouped view
                   <>
                     {(() => {
-                      let globalIndex = 0; // Track global index across all brackets
-                      return Object.entries(groupedBots).map(([bracket, botsInBracket]) => {
-                        if (botsInBracket.length === 0) return null;
-                        const isBracketCollapsed = collapsedBrackets.has(bracket);
+                      let globalIndex = 0; // Track global index across all groups
+                      return Object.entries(groupedBots).map(([groupName, botsInGroup]) => {
+                        if (botsInGroup.length === 0) return null;
+                        const isGroupCollapsed = collapsedBrackets.has(groupName);
                         
                         return (
-                          <div key={bracket}>
-                            {/* Bracket Header */}
+                          <div key={groupName}>
+                            {/* Group Header */}
                             <button
                               onClick={() => {
                                 setCollapsedBrackets(prev => {
                                   const newSet = new Set(prev);
-                                  if (newSet.has(bracket)) {
-                                    newSet.delete(bracket);
+                                  if (newSet.has(groupName)) {
+                                    newSet.delete(groupName);
                                   } else {
-                                    newSet.add(bracket);
+                                    newSet.add(groupName);
                                   }
                                   return newSet;
                                 });
@@ -693,16 +1383,16 @@ export default function GaragePage() {
                               className="w-full flex items-center justify-between px-4 py-2 bg-muted/30 hover:bg-muted/50 border-b border-border transition-colors"
                             >
                               <div className="flex items-center gap-2">
-                                {isBracketCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                <span className="font-semibold">{bracket}</span>
-                                <Badge variant="secondary" className="text-xs">{botsInBracket.length}</Badge>
+                                {isGroupCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                <span className="font-semibold">{groupName}</span>
+                                <Badge variant="secondary" className="text-xs">{botsInGroup.length}</Badge>
                               </div>
                             </button>
                             
-                            {/* Bots in Bracket */}
-                            {botsInBracket.map((bot) => {
+                            {/* Bots in Group */}
+                            {botsInGroup.map((bot) => {
                               const currentIndex = globalIndex++;
-                              if (isBracketCollapsed) return null; // Skip rendering but still increment index
+                              if (isGroupCollapsed) return null; // Skip rendering but still increment index
                               const isUnregistered = !bot.isInitialized;
                             const faction = bot.stats?.faction;
                             const factionName = faction ? Object.keys(faction)[0] : 'Unknown';
@@ -717,7 +1407,15 @@ export default function GaragePage() {
                               return (
                                 <button
                                   key={bot.tokenIndex.toString()}
-                                  onClick={() => setSelectedBotIndex(bot.tokenIndex)}
+                                  onClick={() => {
+                                    setSelectedBotIndex(bot.tokenIndex);
+                                    // Open sheet on mobile, dialog on desktop
+                                    if (window.innerWidth < 1024) {
+                                      setMobileSheetOpen(true);
+                                    } else {
+                                      setDialogOpen(true);
+                                    }
+                                  }}
                                   className={`w-full text-left border-b border-dashed border-muted-foreground/20 hover:bg-muted/30 transition-colors ${
                                     isSelected ? 'bg-muted/50 border-l-4 border-l-amber-500' : ''
                                   }`}
@@ -760,24 +1458,46 @@ export default function GaragePage() {
                             return (
                               <div
                                 key={bot.tokenIndex.toString()}
-                                draggable
-                                onDragStart={() => handleDragStart(currentIndex)}
+                                draggable={!selectionMode}
+                                onDragStart={() => !selectionMode && handleDragStart(currentIndex)}
                                 onDragEnd={handleDragEnd}
                                 onDragOver={handleDragOver}
-                                onDrop={(e) => handleDrop(e, currentIndex)}
-                                className={`flex items-center border-b transition-colors cursor-grab active:cursor-grabbing ${
+                                onDrop={(e) => !selectionMode && handleDrop(e, currentIndex)}
+                                className={`flex items-center border-b transition-colors ${
+                                  !selectionMode ? 'cursor-grab active:cursor-grabbing' : ''
+                                } ${
                                   selectedBotIndex === bot.tokenIndex
                                     ? 'bg-primary/10 border-l-4 border-l-primary'
                                     : 'hover:bg-muted/50 border-l-4 border-l-transparent'
                                 } ${draggedIndex === currentIndex ? 'opacity-50' : ''} relative`}
                               >
-                                <div className="px-2 text-muted-foreground hover:text-foreground flex items-center">
-                                  <GripVertical className="h-4 w-4" />
-                                </div>
+                                {/* Selection Checkbox (when in selection mode) */}
+                                {selectionMode && (
+                                  <div className="px-3" onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={selectedBots.has(bot.tokenIndex.toString())}
+                                      onCheckedChange={() => toggleBotSelection(bot.tokenIndex.toString())}
+                                    />
+                                  </div>
+                                )}
+                                
+                                {/* Drag Handle (when not in selection mode) */}
+                                {!selectionMode && (
+                                  <div className="px-2 text-muted-foreground hover:text-foreground flex items-center">
+                                    <GripVertical className="h-4 w-4" />
+                                  </div>
+                                )}
+                                
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setSelectedBotIndex(bot.tokenIndex);
+                                    // Open sheet on mobile, dialog on desktop
+                                    if (window.innerWidth < 1024) {
+                                      setMobileSheetOpen(true);
+                                    } else {
+                                      setDialogOpen(true);
+                                    }
                                   }}
                                   onMouseDown={(e) => e.stopPropagation()}
                                   className="flex-1 text-left px-2 py-3"
@@ -785,22 +1505,38 @@ export default function GaragePage() {
                                   <div className="space-y-2">
                                     {/* Header with Avatar and Name */}
                                     <div className="flex items-center gap-3">
-                                      <Avatar className="h-12 w-12">
-                                        <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
-                                        <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
-                                      </Avatar>
+                                      <div className="relative">
+                                        <Avatar className="h-12 w-12">
+                                          <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
+                                          <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
+                                        </Avatar>
+                                        {(() => {
+                                          const raceInfo = getNextRaceInfo(bot);
+                                          return raceInfo && (
+                                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-[9px] font-bold shadow-md border border-primary-foreground/20 flex items-center gap-0.5 whitespace-nowrap leading-none">
+                                              {getTerrainIcon(raceInfo.terrain)}{raceInfo.time}
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
                                       <div className="flex-1 min-w-0">
                                         <div className="font-semibold truncate text-sm text-foreground">
                                           #{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}
                                         </div>
                                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                                           <span>{factionName}</span>
+                                          {bot.currentStats && bot.maxStats && (
+                                            <>
+                                              <span>|</span>
+                                              <span className="font-mono">{Math.floor((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4)}/{Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4)}</span>
+                                            </>
+                                          )}
                                         </div>
                                         
                                         {!isCollapsed && bot.stats && (
                                           <>
                                             {/* Stats Row */}
-                                            <div className="flex items-center gap-2 text-xs mb-1">
+                                            <div className="flex flex-wrap items-center gap-2 text-xs mb-1">
                                               <div className="flex items-center gap-0.5">
                                                 <span className="text-yellow-500">⚡</span>
                                                 <span className="font-mono text-yellow-500">{Number(bot.currentStats?.speed || bot.stats.baseStats.speed)}</span>
@@ -841,63 +1577,59 @@ export default function GaragePage() {
                                   {!isCollapsed && bot.isInitialized && bot.stats ? (
                                     <>      
                                       {/* Cooldowns and Status */}
-                                      <div className="flex flex-wrap gap-1">
-                                        {(() => {
-                                          const now = Date.now();
-                                          const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
-                                          const rechargeReady = bot.stats.lastRecharged 
-                                            ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
-                                            : 0;
-                                          const repairReady = bot.stats.lastRepaired
-                                            ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
-                                            : 0;
-                                          
-                                          const rechargeTime = bot.stats.lastRecharged 
-                                            ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + BigInt(Math.round(rechargeCooldownMs * 1_000_000)))
-                                            : null;
-                                          const repairTime = bot.stats.lastRepaired
-                                            ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)
-                                            : null;
-                                          
-                                          return (
-                                            <>
-                                              {(() => {
-                                                const nextRaceTime = getNextRaceStartTime(bot);
-                                                return nextRaceTime && (
+                                      <div className="flex flex-col gap-1">
+                                          {(() => {
+                                            const now = Date.now();
+                                            const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
+                                            const rechargeReady = bot.stats.lastRecharged 
+                                              ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
+                                              : 0;
+                                            const repairReady = bot.stats.lastRepaired
+                                              ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
+                                              : 0;
+                                            
+                                            const rechargeTime = bot.stats.lastRecharged 
+                                              ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + BigInt(Math.round(rechargeCooldownMs * 1_000_000)))
+                                              : null;
+                                            const repairTime = bot.stats.lastRepaired
+                                              ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)
+                                              : null;
+                                            
+                                            return (
+                                              <>
+                                                {rechargeReady > now && rechargeTime && (
                                                   <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                                    🏁 {nextRaceTime}
+                                                    <Zap className="h-3 w-3" />
+                                                    Recharge: {rechargeTime}
                                                   </Badge>
-                                                );
-                                              })()}
-                                              {rechargeReady > now && rechargeTime && (
-                                                <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                                  <Zap className="h-3 w-3" />
-                                                  {rechargeTime}
-                                                </Badge>
-                                              )}
-                                              {repairReady > now && repairTime && (
-                                                <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                                  <Hammer className="h-3 w-3" />
-                                                  {repairTime}
-                                                </Badge>
-                                              )}
-                                              {bot.activeUpgrade && (
-                                                <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                                                  <Clock className="h-3 w-3" />
-                                                  {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])} {formatTimeRemaining(bot.activeUpgrade.endsAt)}
-                                                </Badge>
-                                              )}
-                                              {bot.activeMission && (
-                                                <Badge 
-                                                  variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
-                                                  className="text-xs"
-                                                >
-                                                  {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}Scavenging
-                                                </Badge>
-                                              )}
-                                            </>
-                                          );
-                                        })()}
+                                                )}
+                                                {repairReady > now && repairTime && (
+                                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                                    <Hammer className="h-3 w-3" />
+                                                    Repair: {repairTime}
+                                                  </Badge>
+                                                )}
+                                                {bot.activeUpgrade && (
+                                                  <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                                                    <Clock className="h-3 w-3" />
+                                                    {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])} Upgrade: {formatTimeRemaining(bot.activeUpgrade.endsAt)}
+                                                  </Badge>
+                                                )}
+                                                {bot.activeMission && (() => {
+                                                  const zone = Object.keys(bot.activeMission.zone)[0];
+                                                  const timeRemaining = getScavengingTimeRemaining(bot);
+                                                  return (
+                                                    <Badge 
+                                                      variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
+                                                      className="text-xs"
+                                                    >
+                                                      {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}🔍 {formatScavengingZone(zone)}{timeRemaining ? ` • ${timeRemaining}` : ''}
+                                                    </Badge>
+                                                  );
+                                                })()}
+                                              </>
+                                            );
+                                          })()}
                                       </div>
                                     </>
                                   ) : !bot.isInitialized ? (
@@ -937,15 +1669,15 @@ export default function GaragePage() {
                             </div>
                             );
                           })}
-                        </div>
-                      );
-                    });
+                          </div>
+                        );
+                      });
                     })()}
                   </>
                 ) : (
                   // Flat view (original rendering)
                   <>
-                {sortedBots.map((bot, index) => {
+                {filteredBots.map((bot, index) => {
                   const isUnregistered = !bot.isInitialized;
                   const faction = bot.stats?.faction;
                   const factionName = faction ? Object.keys(faction)[0] : 'Unknown';
@@ -959,7 +1691,15 @@ export default function GaragePage() {
                     return (
                       <button
                         key={bot.tokenIndex.toString()}
-                        onClick={() => setSelectedBotIndex(bot.tokenIndex)}
+                        onClick={() => {
+                          setSelectedBotIndex(bot.tokenIndex);
+                          // Open sheet on mobile, dialog on desktop
+                          if (window.innerWidth < 1024) {
+                            setMobileSheetOpen(true);
+                          } else {
+                            setDialogOpen(true);
+                          }
+                        }}
                         className={`w-full text-left border-b border-dashed border-muted-foreground/20 hover:bg-muted/30 transition-colors ${
                           isSelected ? 'bg-muted/50 border-l-4 border-l-amber-500' : ''
                         }`}
@@ -1004,24 +1744,46 @@ export default function GaragePage() {
                   return (
                     <div
                       key={bot.tokenIndex.toString()}
-                      draggable
-                      onDragStart={() => handleDragStart(index)}
+                      draggable={!selectionMode}
+                      onDragStart={() => !selectionMode && handleDragStart(index)}
                       onDragEnd={handleDragEnd}
                       onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, index)}
-                      className={`flex items-center border-b transition-colors cursor-grab active:cursor-grabbing ${
+                      onDrop={(e) => !selectionMode && handleDrop(e, index)}
+                      className={`flex items-center border-b transition-colors ${
+                        !selectionMode ? 'cursor-grab active:cursor-grabbing' : ''
+                      } ${
                         selectedBotIndex === bot.tokenIndex
                           ? 'bg-primary/10 border-l-4 border-l-primary'
                           : 'hover:bg-muted/50 border-l-4 border-l-transparent'
                       } ${draggedIndex === index ? 'opacity-50' : ''} relative`}
                     >
-                      <div className="px-2 text-muted-foreground hover:text-foreground flex items-center">
-                        <GripVertical className="h-4 w-4" />
-                      </div>
+                      {/* Selection Checkbox (when in selection mode) */}
+                      {selectionMode && (
+                        <div className="px-3" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedBots.has(bot.tokenIndex.toString())}
+                            onCheckedChange={() => toggleBotSelection(bot.tokenIndex.toString())}
+                          />
+                        </div>
+                      )}
+                      
+                      {/* Drag Handle (when not in selection mode) */}
+                      {!selectionMode && (
+                        <div className="px-2 text-muted-foreground hover:text-foreground flex items-center">
+                          <GripVertical className="h-4 w-4" />
+                        </div>
+                      )}
+                      
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedBotIndex(bot.tokenIndex);
+                          // Open sheet on mobile, dialog on desktop
+                          if (window.innerWidth < 1024) {
+                            setMobileSheetOpen(true);
+                          } else {
+                            setDialogOpen(true);
+                          }
                         }}
                         onMouseDown={(e) => e.stopPropagation()}
                         className="flex-1 text-left px-2 py-3"
@@ -1029,10 +1791,20 @@ export default function GaragePage() {
                         <div className="space-y-2">
                           {/* Header with Avatar and Name */}
                           <div className="flex items-center gap-3">
-                            <Avatar className="h-12 w-12">
-                              <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
-                              <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
-                            </Avatar>
+                            <div className="relative">
+                              <Avatar className="h-12 w-12">
+                                <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
+                                <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
+                              </Avatar>
+                              {(() => {
+                                const raceInfo = getNextRaceInfo(bot);
+                                return raceInfo && (
+                                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-[9px] font-bold shadow-md border border-primary-foreground/20 flex items-center gap-0.5 whitespace-nowrap leading-none">
+                                    {getTerrainIcon(raceInfo.terrain)}{raceInfo.time}
+                                  </div>
+                                );
+                              })()}
+                            </div>
                             <div className="flex-1 min-w-0">
                               <div className="font-semibold truncate text-sm text-foreground">
                                 #{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}
@@ -1068,7 +1840,7 @@ export default function GaragePage() {
                               {!isCollapsed && bot.stats && (
                                 <>
                                   {/* Stats Row */}
-                                  <div className="flex items-center gap-2 text-xs mb-1">
+                                  <div className="flex flex-wrap items-center gap-2 text-xs mb-1">
                                     <div className="flex items-center gap-0.5">
                                       <span className="text-yellow-500">⚡</span>
                                       <span className="font-mono text-yellow-500">{Number(bot.currentStats?.speed || bot.stats.baseStats.speed)}</span>
@@ -1110,63 +1882,59 @@ export default function GaragePage() {
                           <>
                             
                             {/* Cooldowns and Status */}
-                            <div className="flex flex-wrap gap-1">
-                              {(() => {
-                                const now = Date.now();
-                                const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
-                                const rechargeReady = bot.stats.lastRecharged 
-                                  ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
-                                  : 0;
-                                const repairReady = bot.stats.lastRepaired
-                                  ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
-                                  : 0;
-                                
-                                const rechargeTime = bot.stats.lastRecharged 
-                                  ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + BigInt(Math.round(rechargeCooldownMs * 1_000_000)))
-                                  : null;
-                                const repairTime = bot.stats.lastRepaired
-                                  ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)
-                                  : null;
-                                
-                                return (
-                                  <>
-                                    {(() => {
-                                      const nextRaceTime = getNextRaceStartTime(bot);
-                                      return nextRaceTime && (
+                            <div className="flex flex-col gap-1">
+                                {(() => {
+                                  const now = Date.now();
+                                  const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
+                                  const rechargeReady = bot.stats.lastRecharged 
+                                    ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
+                                    : 0;
+                                  const repairReady = bot.stats.lastRepaired
+                                    ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
+                                    : 0;
+                                  
+                                  const rechargeTime = bot.stats.lastRecharged 
+                                    ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + BigInt(Math.round(rechargeCooldownMs * 1_000_000)))
+                                    : null;
+                                  const repairTime = bot.stats.lastRepaired
+                                    ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)
+                                    : null;
+                                  
+                                  return (
+                                    <>
+                                      {rechargeReady > now && rechargeTime && (
                                         <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                          🏁 {nextRaceTime}
+                                          <Zap className="h-3 w-3" />
+                                          Recharge: {rechargeTime}
                                         </Badge>
-                                      );
-                                    })()}
-                                    {rechargeReady > now && rechargeTime && (
-                                      <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                        <Zap className="h-3 w-3" />
-                                        {rechargeTime}
-                                      </Badge>
-                                    )}
-                                    {repairReady > now && repairTime && (
-                                      <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                        <Hammer className="h-3 w-3" />
-                                        {repairTime}
-                                      </Badge>
-                                    )}
-                                    {bot.activeUpgrade && (
-                                      <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                                        <Clock className="h-3 w-3" />
-                                        {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])} {formatTimeRemaining(bot.activeUpgrade.endsAt)}
-                                      </Badge>
-                                    )}
-                                    {bot.activeMission && (
-                                      <Badge 
-                                        variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
-                                        className="text-xs"
-                                      >
-                                        {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}Scavenging
-                                      </Badge>
-                                    )}
-                                  </>
-                                );
-                              })()}
+                                      )}
+                                      {repairReady > now && repairTime && (
+                                        <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                          <Hammer className="h-3 w-3" />
+                                          Repair: {repairTime}
+                                        </Badge>
+                                      )}
+                                      {bot.activeUpgrade && (
+                                        <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                                          <Clock className="h-3 w-3" />
+                                          {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])} Upgrade: {formatTimeRemaining(bot.activeUpgrade.endsAt)}
+                                        </Badge>
+                                      )}
+                                      {bot.activeMission && (() => {
+                                        const zone = Object.keys(bot.activeMission.zone)[0];
+                                        const timeRemaining = getScavengingTimeRemaining(bot);
+                                        return (
+                                          <Badge 
+                                            variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
+                                            className="text-xs"
+                                          >
+                                            {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}🔍 {formatScavengingZone(zone)}{timeRemaining ? ` • ${timeRemaining}` : ''}
+                                          </Badge>
+                                        );
+                                      })()}
+                                    </>
+                                  );
+                                })()}
                             </div>
                           </>
                         ) : !bot.isInitialized ? (
@@ -1182,10 +1950,10 @@ export default function GaragePage() {
                           const key = bot.tokenIndex.toString();
                           if (newSet.has(key)) {
                             newSet.delete(key);
-                          } else {
-                            newSet.add(key);
-                          }
-                          return newSet;
+                            } else {
+                              newSet.add(key);
+                            }
+                            return newSet;
                         });
                       }}
                       className="px-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -1212,31 +1980,262 @@ export default function GaragePage() {
             </CardContent>
           </Card>
 
-          {/* Right Panel - Bot Details */}
-          <div className="flex-1 min-w-0">
-            {selectedBot ? (
-              <BotCard 
-                key={selectedBot.tokenIndex.toString()}
-                bot={selectedBot} 
-                onUpdate={() => refetchBots()}
-                enteringRaces={botEnteringRacesStates.get(selectedBot.tokenIndex.toString()) || false}
-                setEnteringRaces={(val) => setBotEnteringRacesStates(new Map(botEnteringRacesStates.set(selectedBot.tokenIndex.toString(), val)))}
-                rechargeCooldownMultiplier={bonuses?.costMultipliers.rechargeCooldown}
-                backgroundColor={backgroundData?.backgrounds[selectedBot.tokenIndex.toString()]}
-                inventory={inventory}
-              />
-            ) : (
-              <Card className="border-2 border-primary/20 bg-card/80 backdrop-blur">
-                <CardContent className="py-12 text-center">
-                  <p className="text-muted-foreground">
+          {/* Desktop Dialog - Bot Details */}
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>
+                  {selectedBot ? `${selectedBot.name || `Bot #${selectedBot.tokenIndex}`}` : 'Bot Details'}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="mt-2">
+                {selectedBot ? (
+                  <BotCard 
+                    key={selectedBot.tokenIndex.toString()}
+                    bot={selectedBot} 
+                    onUpdate={() => refetchBots()}
+                    enteringRaces={botEnteringRacesStates.get(selectedBot.tokenIndex.toString()) || false}
+                    setEnteringRaces={(val) => setBotEnteringRacesStates(new Map(botEnteringRacesStates.set(selectedBot.tokenIndex.toString(), val)))}
+                    rechargeCooldownMultiplier={bonuses?.costMultipliers.rechargeCooldown}
+                    backgroundColor={backgroundData?.backgrounds[selectedBot.tokenIndex.toString()]}
+                    inventory={inventory}
+                  />
+                ) : (
+                  <p className="text-muted-foreground text-center py-12">
                     Select a bot from the list to view details
                   </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Mobile Sheet - Bot Details */}
+          <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
+            <SheetContent side="bottom" className="h-[90vh] overflow-y-auto lg:hidden">
+              <SheetHeader>
+                <SheetTitle>
+                  {selectedBot ? `${selectedBot.name || `Bot #${selectedBot.tokenIndex}`}` : 'Bot Details'}
+                </SheetTitle>
+              </SheetHeader>
+              <div className="mt-4">
+                {selectedBot ? (
+                  <BotCard 
+                    key={selectedBot.tokenIndex.toString()}
+                    bot={selectedBot} 
+                    onUpdate={() => refetchBots()}
+                    enteringRaces={botEnteringRacesStates.get(selectedBot.tokenIndex.toString()) || false}
+                    setEnteringRaces={(val) => setBotEnteringRacesStates(new Map(botEnteringRacesStates.set(selectedBot.tokenIndex.toString(), val)))}
+                    rechargeCooldownMultiplier={bonuses?.costMultipliers.rechargeCooldown}
+                    backgroundColor={backgroundData?.backgrounds[selectedBot.tokenIndex.toString()]}
+                    inventory={inventory}
+                  />
+                ) : (
+                  <p className="text-muted-foreground text-center py-12">
+                    Select a bot from the list to view details
+                  </p>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       )}
+
+        </div>
+        {/* End Main Content Column */}
+
+        {/* Sticky Sidebar */}
+        <div className="hidden xl:block w-80 flex-shrink-0">
+          <div className="sticky top-20">
+            <Card className="border-2 border-amber-500/20 bg-card/80 backdrop-blur">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Star className="h-4 w-4 text-amber-500" />
+                  Garage Overview
+                </CardTitle>
+                <CardDescription className="text-xs">Your inventory and collection bonuses</CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm space-y-3">
+                {bonusesLoading ? (
+                  <p className="text-muted-foreground">Loading...</p>
+                ) : !bonuses || bots.length === 0 ? (
+                  <p className="text-muted-foreground">Collect faction bots for bonuses</p>
+                ) : (
+                  <>
+                    {/* Parts Inventory */}
+                    <div className="pb-3 border-b border-border">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase">Parts Inventory</h4>
+                        <PartsConverter 
+                          inventory={inventory}
+                          identityOrAgent={user?.agent}
+                          onConversionComplete={() => {
+                            queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+                          }}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="flex items-center justify-between p-1.5 bg-muted/30 rounded">
+                          <span className="text-muted-foreground">SPD</span>
+                          <span className="font-bold">{inventory ? Number(inventory.speedChips) : '—'}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-1.5 bg-muted/30 rounded">
+                          <span className="text-muted-foreground">PWR</span>
+                          <span className="font-bold">{inventory ? Number(inventory.powerCoreFragments) : '—'}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-1.5 bg-muted/30 rounded">
+                          <span className="text-muted-foreground">ACC</span>
+                          <span className="font-bold">{inventory ? Number(inventory.thrusterKits) : '—'}</span>
+                        </div>
+                        <div className="flex items-center justify-between p-1.5 bg-muted/30 rounded">
+                          <span className="text-muted-foreground">STB</span>
+                          <span className="font-bold">{inventory ? Number(inventory.gyroModules) : '—'}</span>
+                        </div>
+                        <div className="col-span-2 flex items-center justify-between p-1.5 bg-primary/10 border border-primary/30 rounded">
+                          <span className="text-primary font-medium">Universal</span>
+                          <span className="font-bold text-primary">{inventory ? Number(inventory.universalParts) : '—'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stat Bonuses */}
+                    <div className="pb-3 border-b border-border space-y-2">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase">Stat Bonuses</h4>
+                      {(bonuses.statBonuses.speed !== 0 || bonuses.statBonuses.powerCore !== 0 || 
+                        bonuses.statBonuses.acceleration !== 0 || bonuses.statBonuses.stability !== 0) ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {bonuses.statBonuses.speed !== 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              🏎️ +{bonuses.statBonuses.speed} SPD
+                            </Badge>
+                          )}
+                          {bonuses.statBonuses.powerCore !== 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              ⚡ +{bonuses.statBonuses.powerCore} PWR
+                            </Badge>
+                          )}
+                          {bonuses.statBonuses.acceleration !== 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              🚀 +{bonuses.statBonuses.acceleration} ACC
+                            </Badge>
+                          )}
+                          {bonuses.statBonuses.stability !== 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              🎯 +{bonuses.statBonuses.stability} STB
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">None</p>
+                      )}
+                    </div>
+
+                    {/* Economic Bonuses */}
+                    <div className="pb-3 border-b border-border space-y-2">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase">Economic Bonuses</h4>
+                      {(bonuses.costMultipliers.repair < 1 || bonuses.yieldMultipliers.parts > 1 || 
+                        bonuses.yieldMultipliers.prizes > 1) ? (
+                        <div className="flex flex-wrap gap-1.5 text-xs">
+                          {bonuses.costMultipliers.repair < 1 && (
+                            <Badge variant="outline" className="text-xs">
+                              🔧 -{Math.round((1 - bonuses.costMultipliers.repair) * 100)}%
+                            </Badge>
+                          )}
+                          {bonuses.yieldMultipliers.parts > 1 && (
+                            <Badge variant="outline" className="text-xs text-green-600">
+                              📦 +{Math.round((bonuses.yieldMultipliers.parts - 1) * 100)}%
+                            </Badge>
+                          )}
+                          {bonuses.yieldMultipliers.prizes > 1 && (
+                            <Badge variant="outline" className="text-xs text-green-600">
+                              🏆 +{Math.round((bonuses.yieldMultipliers.prizes - 1) * 100)}%
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">None</p>
+                      )}
+                    </div>
+
+                    {/* Faction Breakdown */}
+                    {(() => {
+                      const factionCounts = new Map<string, number>();
+                      bots.forEach(bot => {
+                        if (bot.stats?.faction) {
+                          const factionKey = Object.keys(bot.stats.faction)[0];
+                          factionCounts.set(factionKey, (factionCounts.get(factionKey) || 0) + 1);
+                        }
+                      });
+
+                      const factionInfo: Record<string, { thresholds: number[], emoji: string }> = {
+                        'UltimateMaster': { thresholds: [1], emoji: '👑' },
+                        'Wild': { thresholds: [2], emoji: '🌪️' },
+                        'Golden': { thresholds: [2, 3], emoji: '🌟' },
+                        'Ultimate': { thresholds: [2, 4, 6], emoji: '⚡' },
+                        'Master': { thresholds: [2, 4, 6], emoji: '🎖️' },
+                        'Blackhole': { thresholds: [2, 4, 6], emoji: '🌑' },
+                        'Dead': { thresholds: [2, 4, 6], emoji: '💀' },
+                        'Bee': { thresholds: [2, 4, 6], emoji: '🐝' },
+                        'Murder': { thresholds: [2, 4, 6], emoji: '🗡️' },
+                        'Box': { thresholds: [2, 4, 6], emoji: '📦' },
+                        'Food': { thresholds: [2, 4, 6], emoji: '🍔' },
+                        'Game': { thresholds: [2, 4, 6], emoji: '🎮' },
+                        'Industrial': { thresholds: [2, 4, 6], emoji: '🏭' },
+                        'Animal': { thresholds: [4, 8, 16], emoji: '🦁' }
+                      };
+
+                      // Only show owned factions
+                      const ownedFactions = Array.from(factionCounts.entries())
+                        .sort((a, b) => b[1] - a[1]); // Sort by count descending
+
+                      return (
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-semibold text-muted-foreground uppercase">
+                            Factions ({factionCounts.size}/14)
+                          </h4>
+                          {ownedFactions.length > 0 ? (
+                            <div className="grid grid-cols-2 gap-2">
+                              {ownedFactions.map(([faction, count]) => {
+                                const info = factionInfo[faction];
+                                if (!info) return null;
+                                const maxThreshold = Math.max(...info.thresholds);
+                                const isMaxed = count >= maxThreshold;
+
+                                return (
+                                  <Link
+                                    key={faction}
+                                    to={`/marketplace?faction=${faction}`}
+                                    className={`block p-1.5 rounded border text-xs transition-all hover:scale-105 ${
+                                      isMaxed 
+                                        ? 'bg-amber-500/10 border-amber-500/30' 
+                                        : 'bg-muted/30 border-border'
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="flex items-center gap-1">
+                                        {info.emoji} {faction}
+                                      </span>
+                                      <span className={`font-bold ${isMaxed ? 'text-amber-500' : ''}`}>{count}</span>
+                                    </div>
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground italic">None</p>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+        {/* End Sidebar */}
+
+      </div>
+      {/* End Two-column layout */}
     </div>
   );
 }

@@ -159,13 +159,14 @@ export const useDebugTestSimulation = (
   tokenIndexes: number[],
   trackId: number,
   trackSeed: number,
+  distanceKm: number,
   enabled: boolean = true
 ) => {
   return useQuery({
-    queryKey: ['debugTestSimulation', tokenIndexes, trackId, trackSeed],
+    queryKey: ['debugTestSimulation', tokenIndexes, trackId, trackSeed, distanceKm],
     queryFn: async () => {
       if (tokenIndexes.length === 0) return null;
-      return debugTestSimulation(tokenIndexes, trackId, trackSeed);
+      return debugTestSimulation(tokenIndexes, trackId, trackSeed, distanceKm);
     },
     enabled: enabled && tokenIndexes.length > 0,
   });

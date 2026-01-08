@@ -10,12 +10,10 @@ order: 3
 
 Send your bots into the wasteland to gather upgrade parts. **No ICP cost** - only battery and condition consumption. You can register to race while scavenging - your bot will be pulled from the mission when the race starts (with penalties applied).
 
-**⚠️ Minimum Requirement:** Your bot needs at least 10 battery to start any scavenging mission (including ChargingStation and RepairBay).
-
 ## 2 Mission Modes
 
 ### Continuous Mode (Default - No duration specified)
-- Accumulates rewards every 15 minutes automatically
+- Accumulates rewards proportionally to time spent (calculated hourly)
 - Retrieve bot anytime from the UI
 - Most flexible - run as long as you want
 - **WARNING:** Bot dies if battery OR condition reaches 0 → **lose ALL pending rewards!**
@@ -50,19 +48,22 @@ Send your bots into the wasteland to gather upgrade parts. **No ICP cost** - onl
 
 ### Maintenance Zones (Free Repairs - No Parts)
 
-⚠️ **Minimum Requirement:** Your bot needs at least 10 battery to start any scavenging mission (including ChargingStation and RepairBay).
-
 **RepairBay - Free Condition Restore**
 - 0x parts, 2.0x battery drain, **RESTORES +12-18 condition/hour**
 - Bypasses 12h repair cooldown and 0.05 ICP cost
 - ~40 battery/hour, +12-18 condition/hour (with stat bonuses)
-- Best for: Free repairs, damaged bots under 50% condition
+- **✅ NEW: No battery depletion penalty!** Safe zone for dead bots (0 battery)
+- Best for: Free repairs, damaged bots under 50% condition, dead bots (0% battery/condition)
 
 **ChargingStation - Free Battery Restore**
-- 0x parts, **RESTORES +1 battery per 15min** (4/hour)
+- 0x parts, **RESTORES battery** (stepped charging curve - faster at low battery)
+- **NO condition penalty** - completely free!
 - Bypasses 6h recharge cooldown and 0.1 ICP cost
-- Takes 25 hours to fully charge from 0% (slow but FREE!)
-- Best for: Patient players, saving ICP, low-priority bots
+- **Charging speeds:** 4x at <25% → 3x at <50% → 2x at <75% → 1x at 75-100%
+- ~16/hour at 0%, ~12/hour at 30%, ~8/hour at 60%, ~4/hour at 80%
+- **0% to 100% takes ~6-7 hours** (much faster than before!)
+- **✅ NEW: No battery depletion penalty!** Safe zone for reviving dead bots
+- Best for: Patient players, saving ICP, low-priority bots, dead bots
 
 **💡 Pro Tip: Overcharge Strategy**
 - Use **RepairBay** to spend battery while getting free condition repairs
@@ -115,8 +116,8 @@ Each faction excels at finding specific parts:
 ## World Buffs (Bonus Stats)
 
 **How It Works:**
-- 2.0% base chance per 15-minute tick (~8% per hour)
-- Up to 3.2% with 100 Acceleration stat (+60% boost)
+- ~8% chance per hour spent scavenging
+- Up to ~12.8% per hour with 100 Acceleration stat (+60% boost)
 - Grants 2-4 bonus stat points for your next race
 - Expires in 48 hours if unused
 - **Blackhole faction:** Gets +3 Speed/Accel BONUS on top of regular buff
@@ -140,7 +141,7 @@ Each faction excels at finding specific parts:
 - **High Stability = durability** - Survive dangerous zones longer
 - **Monitor your bot!** - Check condition/battery regularly to avoid death
 - **Use RepairBay** - Free alternative to 0.05 ICP repairs (slow but FREE)
-- **Use ChargingStation** - Free alternative to 0.1 ICP recharge (25h for full charge, requires 10+ battery to start)
+- **Use ChargingStation** - Free alternative to 0.1 ICP recharge (~6-7h for full charge, no condition penalty!)
 - **Faction matters** - Dead/Master/Murder = best for Universal Parts
 - **Racing while scavenging** - Bot pulled when race starts, partial rewards + penalties applied
 

@@ -21,10 +21,10 @@ module {
 
   /// Core racing statistics - the only data needed to simulate a race
   public type RacingStats = {
-    speed : Nat; // 30-100
-    powerCore : Nat; // 30-100 (endurance)
-    acceleration : Nat; // 30-100
-    stability : Nat; // 30-100
+    speed : Nat; // Base: 10-68, max with upgrades: 100+
+    powerCore : Nat; // Base: 6-74, max with upgrades: 100+ (endurance)
+    acceleration : Nat; // Base: 11-73, max with upgrades: 100+
+    stability : Nat; // Base: 6-69, max with upgrades: 100+
   };
 
   /// A participant in a race - collection-agnostic
@@ -100,6 +100,8 @@ module {
     position : Nat;
     finalTime : Float;
     prizeAmount : Nat;
+    partsEarned : Nat; // Parts awarded based on position
+    partType : Text; // Type of part ("SpeedChip", "PowerCoreFragment", etc.)
     stats : ?RacingStats; // Stats used in the race (for accurate replay)
   };
 
@@ -477,141 +479,143 @@ module {
       Int.abs(Float.toInt(uncompressedDuration / 10.0));
     };
 
-    /// Calculate race time for a participant
-    public func calculateRaceTime(
-      race : Race,
-      participant : RacingParticipant,
-      seed : Nat,
-    ) : Float {
-      let distance = Float.fromInt(race.distance);
-      let stats = participant.stats;
-
-      // Convert stats to floats
-      let speed = Float.fromInt(stats.speed);
-      let powerCore = Float.fromInt(stats.powerCore);
-      let stability = Float.fromInt(stats.stability);
-      let acceleration = Float.fromInt(stats.acceleration);
-
-      // Base time calculation (inverse of speed)
-      let baseTime = distance * (100.0 / speed) * 30.0;
-
-      // Terrain modifier - MORE IMPACTFUL (20-50% variation)
-      let terrainMod = switch (race.terrain) {
-        case (#ScrapHeaps) {
-          1.0 + ((100.0 - stability) / 150.0); // Stability matters most (up to +67%)
-        };
-        case (#WastelandSand) {
-          1.0 + ((100.0 - powerCore) / 200.0); // Endurance matters (up to +50%)
-        };
-        case (#MetalRoads) {
-          1.0 + ((100.0 - acceleration) / 250.0); // Quick acceleration helps (up to +40%)
-        };
-      };
-
-      // Distance modifier - MORE PRONOUNCED STAT INTERACTIONS
-      let distanceMod = if (race.distance < 10) {
-        // Short sprint: acceleration + speed dominate
-        1.0 - ((acceleration + speed - 60.0) / 350.0);
-      } else if (race.distance > 20) {
-        // Long trek: powerCore + stability critical
-        1.0 - ((powerCore + stability - 60.0) / 350.0);
-      } else {
-        // Medium: all stats matter
-        1.0 - ((speed + powerCore + acceleration + stability - 160.0) / 700.0);
-      };
-
-      // Better pseudo-random using multiple hash-like operations
-      // Mix race ID, participant stats, and position for uniqueness
-      let raceSeed = (race.raceId * 31337 + 12345) % 100000;
-      let statMix = (stats.speed * 7 + stats.powerCore * 11 + stats.acceleration * 13 + stats.stability * 17) % 10000;
-      let mixedSeed = (seed * 2654435761 + raceSeed + statMix) % 1000000;
-
-      // Race-specific chaos factor (±15%) - varies by race
-      let raceChaosValue = (mixedSeed / 7) % 1000;
-      let raceChaos = 0.85 + (Float.fromInt(raceChaosValue) / 3333.0); // 0.85 to 1.15
-
-      // Per-bot randomness (±20%) - varies by bot AND position
-      let botRandomValue = (mixedSeed / 11) % 1000;
-      let botRandom = 0.80 + (Float.fromInt(botRandomValue) / 2500.0); // 0.80 to 1.20
-
-      // Position-based variance (±10%) - starting position luck
-      let positionValue = (mixedSeed / 13) % 1000;
-      let positionBonus = 0.90 + (Float.fromInt(positionValue) / 5000.0); // 0.90 to 1.10
-
-      // Final time with all modifiers
-      let finalTime = baseTime * terrainMod * distanceMod * raceChaos * botRandom * positionBonus;
-      Float.max(1.0, finalTime);
-    };
-
     /// Calculate time for a single segment
     private func calculateSegmentTime(
       segment : TrackSegment,
       stats : RacingStats,
       seed : Nat,
       previousDifficulty : Float, // Difficulty of previous segment (1.0 for first segment)
+      raceDistance : Nat, // Total race distance for distance-based scaling
     ) : Float {
       let speed = Float.fromInt(stats.speed);
       let powerCore = Float.fromInt(stats.powerCore);
       let stability = Float.fromInt(stats.stability);
       let acceleration = Float.fromInt(stats.acceleration);
 
-      // Base time for segment (length in meters / effective speed)
-      let segmentLength = Float.fromInt(segment.length);
-      let baseSpeed = Float.sqrt(speed) * 7.5; // Square root to reduce speed dominance
+      // === PART 1: UNIVERSAL STAT COMPONENTS (70% always active) ===
 
-      // Terrain modifier based on segment terrain
-      let terrainMod = switch (segment.terrain) {
-        case (#ScrapHeaps) {
-          1.0 + ((100.0 - stability) / 150.0); // Stability critical - up to 67% penalty
-        };
-        case (#WastelandSand) {
-          1.0 + ((100.0 - powerCore) / 200.0); // Endurance critical - up to 50% penalty
-        };
-        case (#MetalRoads) {
-          1.0 + ((100.0 - acceleration) / 160.0); // Acceleration helps - up to 62% penalty
-        };
-      };
+      // Speed: 70% universal base, 30% conditional bonus
+      let speedUniversal = Float.sqrt(speed) * 5.25; // 70% of original 7.5
+      let speedBonus = if (segment.angle == 0 and segment.terrain == #MetalRoads) {
+        Float.sqrt(speed) * 2.25; // +30% bonus on ideal conditions
+      } else if (segment.angle < 0) {
+        Float.sqrt(speed) * 1.125; // +15% bonus on downhills
+      } else { 0.0 };
 
-      // Angle modifier (uphill slows, downhill has no bonus)
-      let angleMod = if (segment.angle > 0) {
-        // Uphill - powerCore matters more
-        1.0 + (Float.fromInt(segment.angle) * (100.0 - powerCore) / 3000.0);
+      // === PART 2: STAT SYNERGIES ===
+
+      // Speed + Acceleration synergy (high speed needs good accel to maintain)
+      let speedAccelRatio = (speed + acceleration) / 200.0; // 0.30 to 1.0
+      let speedSynergyMod = 0.80 + (speedAccelRatio * 0.20); // 0.80x to 1.0x
+      let synergisticSpeed = (speedUniversal + speedBonus) * speedSynergyMod;
+
+      // Power + Stability synergy (endurance needs stability)
+      let powerStabilityRatio = (powerCore + stability) / 200.0; // 0.30 to 1.0
+      let powerSynergyMod = 0.85 + (powerStabilityRatio * 0.15); // 0.85x to 1.0x
+
+      // === PART 3: UNIVERSAL PENALTIES (all stats matter everywhere) ===
+
+      // Power Core: Universal endurance (25% penalty range)
+      let powerUniversal = 1.0 + ((100.0 - powerCore) / 400.0);
+
+      // Acceleration: Universal responsiveness (20% penalty range)
+      let accelUniversal = 1.0 + ((100.0 - acceleration) / 350.0);
+
+      // Stability: Universal consistency (17% penalty range)
+      let stabilityUniversal = 1.0 + ((100.0 - stability) / 400.0);
+
+      // === PART 4: SITUATIONAL MODIFIERS ===
+
+      // Power: Additional penalty in demanding conditions
+      let powerSituational = if (segment.terrain == #WastelandSand) {
+        1.0 + ((100.0 - powerCore) / 200.0); // +50% penalty on sand
+      } else if (segment.angle > 5) {
+        let steepness = Float.fromInt(segment.angle) / 20.0;
+        1.0 + ((100.0 - powerCore) / 250.0) * steepness; // Scaled uphill penalty
+      } else if (segment.angle > 0) {
+        1.0 + ((100.0 - powerCore) / 400.0); // Small uphill penalty
       } else {
-        // Downhill/flat - no bonus (speed already in base speed)
         1.0;
       };
 
-      // Momentum system: acceleration affects speed buildup after difficult sections
-      // Higher previous difficulty = more momentum lost, acceleration helps recovery
-      let momentumLoss = if (previousDifficulty > 1.0) {
-        // Lost momentum from technical section, need to rebuild speed
-        (previousDifficulty - 1.0) * 0.15; // Up to 15% slower per 1.0 difficulty
-      } else {
-        0.0;
+      // Acceleration: Bonus on roads, momentum recovery
+      let accelSituational = switch (segment.terrain) {
+        case (#MetalRoads) {
+          1.0 + ((100.0 - acceleration) / 160.0); // +44% penalty on roads
+        };
+        case _ { 1.0 };
       };
 
-      // Acceleration determines recovery: high accel = faster recovery
-      let accelerationRecovery = acceleration / 140.0; // 0.0 to 0.71 (71% recovery at 100 accel)
+      let momentumLoss = if (previousDifficulty > 1.0) {
+        (previousDifficulty - 1.0) * 0.20; // Increased from 0.15
+      } else { 0.0 };
+      let accelerationRecovery = acceleration / 140.0;
       let momentumMod = 1.0 + (momentumLoss * (1.0 - accelerationRecovery));
 
-      // Segment difficulty - scales with stability (low stability = worse on technical sections)
+      // Stability: Technical sections and difficulty
+      let stabilitySituational = if (segment.terrain == #ScrapHeaps) {
+        1.0 + ((100.0 - stability) / 150.0); // +47% penalty on heaps
+      } else {
+        1.0;
+      };
+
       let difficultyMod = if (segment.difficulty > 1.0) {
-        // Technical sections (difficulty > 1.0) penalize low stability
-        let stabilityFactor = 1.0 + ((100.0 - stability) / 300.0); // Up to +33% penalty at 0 stability
+        let techLevel = segment.difficulty - 1.0;
+        let stabilityFactor = 1.0 + ((100.0 - stability) / 300.0) * techLevel;
         segment.difficulty * stabilityFactor;
       } else {
-        // Fast/easy sections don't penalize as much
         segment.difficulty;
       };
 
+      // === PART 5: DISTANCE-BASED STAT SCALING ===
+
+      let raceDistanceFloat = Float.fromInt(raceDistance);
+
+      // Short sprints (<10km) - Acceleration & Speed matter more
+      let sprintFactor : Float = if (raceDistance < 10) {
+        let accelWeight = 1.0 + ((acceleration - 50.0) / 200.0); // 0.75x to 1.25x
+        let speedWeight = 1.0 - ((speed - 50.0) / 400.0); // 1.125x to 0.875x
+        accelWeight / speedWeight; // High accel gets bonus, high speed gets slight penalty
+      } else { 1.0 };
+
+      // Long treks (>20km) - Power & Stability matter more
+      let trekFactor : Float = if (raceDistance > 20) {
+        let powerWeight = 0.80 + ((powerCore - 50.0) / 200.0); // 0.55x to 1.05x
+        let stabilityWeight = 0.85 + ((stability - 50.0) / 250.0); // 0.65x to 1.05x
+        (powerWeight + stabilityWeight) / 2.0; // Average of both
+      } else { 1.0 };
+
+      // === PART 6: COMBINE ALL MODIFIERS ===
+
+      // Apply synergy to power effectiveness
+      let totalPowerMod = (powerUniversal * powerSituational) / powerSynergyMod;
+      let totalAccelMod = accelUniversal * accelSituational * momentumMod;
+      let totalStabilityMod = stabilityUniversal * stabilitySituational;
+
+      // Apply distance-based scaling
+      let distanceAdjustedSpeed = synergisticSpeed / (sprintFactor * trekFactor);
+
       // Randomness for this segment (±10% per segment)
-      // Use simple modulo - seed varies per segment already via caller
       let segmentSeed = seed % 1000;
       let randomMod = 0.90 + (Float.fromInt(segmentSeed) / 5000.0); // 0.90 to 1.10
 
-      // Calculate segment time with momentum
-      let effectiveSpeed = baseSpeed / (terrainMod * angleMod * difficultyMod * momentumMod);
+      // Calculate segment time
+      let segmentLength = Float.fromInt(segment.length);
+      let effectiveSpeed = distanceAdjustedSpeed / (totalPowerMod * totalAccelMod * totalStabilityMod * difficultyMod);
       let segmentTime = (segmentLength / effectiveSpeed) * randomMod;
+
+      // Debug logging for first segment
+      if (previousDifficulty == 1.0) {
+        Debug.print("=== BACKEND SEGMENT 0 CALCULATION ===");
+        Debug.print("Race Distance (km): " # Nat.toText(raceDistance));
+        Debug.print("Segment length: " # Int.toText(segment.length) # ", terrain: " # debug_show (segment.terrain) # ", angle: " # Int.toText(segment.angle) # ", difficulty: " # Float.toText(segment.difficulty));
+        Debug.print("Stats: speed=" # Float.toText(speed) # ", powerCore=" # Float.toText(powerCore) # ", accel=" # Float.toText(acceleration) # ", stability=" # Float.toText(stability));
+        Debug.print("Speed Components: universal=" # Float.toText(speedUniversal) # ", bonus=" # Float.toText(speedBonus) # ", synergistic=" # Float.toText(synergisticSpeed));
+        Debug.print("Distance Scaling: sprint=" # Float.toText(sprintFactor) # ", trek=" # Float.toText(trekFactor));
+        Debug.print("Modifiers: power=" # Float.toText(totalPowerMod) # ", accel=" # Float.toText(totalAccelMod) # ", stability=" # Float.toText(totalStabilityMod) # ", difficulty=" # Float.toText(difficultyMod));
+        Debug.print("Results: distanceAdjustedSpeed=" # Float.toText(distanceAdjustedSpeed) # ", effectiveSpeed=" # Float.toText(effectiveSpeed) # ", randomMod=" # Float.toText(randomMod));
+        Debug.print("segmentTime=" # Float.toText(segmentTime) # ", finalTime=" # Float.toText(segmentTime / 10.0));
+      };
 
       // 10x speed multiplier to reduce race times for better UX
       Float.max(0.1, segmentTime / 10.0);
@@ -632,12 +636,9 @@ module {
       let track = switch (trackOpt) {
         case (?t) { t };
         case (null) {
-          // Fallback to old simulation if track not found
-          let resultsOpt = simulateRace(race, participants);
-          return switch (resultsOpt) {
-            case (?results) { ?(results, []) }; // No events for old simulation
-            case (null) { null };
-          };
+          // Track not found - this shouldn't happen with proper race creation
+          Debug.print("ERROR: Track " # debug_show (race.trackId) # " not found");
+          return null;
         };
       };
 
@@ -711,18 +712,19 @@ module {
           let racer = racerProgress[i];
           let segmentSeed = race.trackSeed + (i * 1000) + segmentIdx;
 
-          // Calculate base segment time
+          // Calculate base segment time (convert distance from meters to km)
           let baseSegmentTime = calculateSegmentTime(
             segment,
             racer.participant.stats,
             segmentSeed,
             racer.previousDifficulty,
+            race.distance / 1000, // Convert meters to km
           );
 
           // Per-segment performance variation
           let lap = segmentIdx / track.segments.size();
           let segmentConditionSeed = ((segmentSeed * 31337 + i * 7919 + lap * 12345) % 1000);
-          let segmentPerformance = 0.94 + (Float.fromInt(segmentConditionSeed) / 1666.67); // 0.94 to 1.06
+          let segmentPerformance = 0.94 + (Float.fromInt(segmentConditionSeed) / 8325.0); // 0.94 to 1.06
 
           let segmentTime = baseSegmentTime * segmentPerformance;
           racer.cumulativeTime += segmentTime;
@@ -1091,6 +1093,35 @@ module {
           0;
         };
 
+        // Calculate parts earned (same logic as in handleRaceFinish)
+        let partType : Text = switch (race.terrain) {
+          case (#MetalRoads) { "SpeedChip" };
+          case (#ScrapHeaps) { "PowerCoreFragment" };
+          case (#WastelandSand) {
+            if (race.raceId % 2 == 0) { "ThrusterKit" } else { "GyroModule" };
+          };
+        };
+
+        let baseParts : Nat = switch (race.raceClass) {
+          case (#Scrap) { 2 };
+          case (#Junker) { 5 };
+          case (#Raider) { 12 };
+          case (#Elite) { 25 };
+          case (#SilentKlan) { 50 };
+        };
+
+        let positionMultiplier : Float = if (position == 1) {
+          3.0;
+        } else if (position == 2) {
+          2.0;
+        } else if (position == 3) {
+          1.5;
+        } else {
+          1.0; // Everyone else: 1.0x (participation)
+        };
+
+        let partsEarned = Int.abs(Float.toInt(Float.fromInt(baseParts) * positionMultiplier));
+
         results := Array.append(
           results,
           [{
@@ -1099,6 +1130,8 @@ module {
             position = position;
             finalTime = racer.cumulativeTime;
             prizeAmount = prize;
+            partsEarned = partsEarned;
+            partType = partType;
             stats = ?racer.participant.stats;
           }],
         );
@@ -1164,103 +1197,6 @@ module {
       };
 
       ?(results, Buffer.toArray(filteredEvents));
-    };
-
-    /// Simulate a race and return results (OLD METHOD - kept for backward compatibility)
-    public func simulateRace(
-      race : Race,
-      participants : [RacingParticipant],
-    ) : ?[RaceResult] {
-      if (participants.size() < 2) {
-        return null;
-      };
-
-      // Use race start time as additional entropy for race-specific variance
-      let raceTimeSeed = Int.abs(race.startTime / 1_000_000_000); // Convert to seconds
-      let combinedSeed = race.raceId + raceTimeSeed;
-
-      // Calculate times - DNF (Did Not Finish) if stats too low from battery/condition
-      var racerTimes : [(RacingParticipant, Float)] = [];
-      var dnfParticipants : [RacingParticipant] = [];
-
-      for (i in Iter.range(0, participants.size() - 1)) {
-        let participant = participants[i];
-
-        // Check if bot has critical stats failure (below 10 in any stat = DNF)
-        // This happens when battery is 0% or condition is 0%
-        if (
-          participant.stats.speed < 10 or participant.stats.acceleration < 10 or
-          participant.stats.powerCore < 10 or participant.stats.stability < 10
-        ) {
-          dnfParticipants := Array.append(dnfParticipants, [participant]);
-        } else {
-          let seed = combinedSeed * 1000 + i;
-          let time = calculateRaceTime(race, participant, seed);
-          racerTimes := Array.append(racerTimes, [(participant, time)]);
-        };
-      };
-
-      // Sort by time
-      let sorted = Array.sort<(RacingParticipant, Float)>(
-        racerTimes,
-        func(a, b) { Float.compare(a.1, b.1) },
-      );
-
-      // Calculate prizes (include platform bonus + entry fees + sponsorships - tax)
-      var totalSponsorships : Nat = 0;
-      for (sponsor in race.sponsors.vals()) {
-        totalSponsorships += sponsor.amount;
-      };
-      let totalPool = race.prizePool + race.platformBonus + totalSponsorships;
-      let netPrizePool = Nat.sub(totalPool, race.platformTax);
-      var results : [RaceResult] = [];
-
-      // Add finishers with prizes
-      // Prize distribution curve: ensures top 3 profit, 4th breaks even
-      // Linear progression from 1st (45%) to 4th (9%)
-      for (i in Iter.range(0, sorted.size() - 1)) {
-        let (participant, time) = sorted[i];
-        let position = i + 1;
-
-        let prize = if (position == 1) {
-          (netPrizePool * 45) / 100; // 45%
-        } else if (position == 2) {
-          (netPrizePool * 28) / 100; // 28%
-        } else if (position == 3) {
-          (netPrizePool * 18) / 100; // 18%
-        } else if (position == 4) {
-          (netPrizePool * 9) / 100; // 9%
-        } else {
-          0;
-        };
-
-        let result : RaceResult = {
-          nftId = participant.nftId;
-          owner = participant.owner;
-          position = position;
-          finalTime = time;
-          prizeAmount = prize;
-          stats = ?participant.stats; // Store stats used in the race
-        };
-
-        results := Array.append(results, [result]);
-      };
-
-      // Add DNF (Did Not Finish) participants at the end
-      // They get no prize and a special DNF marker time (999999.0)
-      for (participant in dnfParticipants.vals()) {
-        let dnfResult : RaceResult = {
-          nftId = participant.nftId;
-          owner = participant.owner;
-          position = results.size() + 1; // Last place + 1, 2, 3...
-          finalTime = 999999.0; // DNF marker
-          prizeAmount = 0;
-          stats = ?participant.stats; // Store stats even for DNF
-        };
-        results := Array.append(results, [dnfResult]);
-      };
-
-      ?results;
     };
   };
 

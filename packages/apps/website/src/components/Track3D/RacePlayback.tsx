@@ -30,68 +30,132 @@ interface RacePlaybackProps {
   results: RaceResult[];
   botColors: Record<number, string>; // nftId -> color
   botLabels: Record<number, string>; // nftId -> label
+  raceDistance?: number; // Total race distance in km
 }
 
-// Helper function to calculate segment time - matches backend/RaceVisualizer logic
+// Helper function to calculate segment time - matches backend RacingSimulator.mo
 function calculateSegmentTime(
   segment: { length: number; terrain: string; angle: number; difficulty: number },
   seed: bigint,
   stats: { speed: number; stability: number; powerCore: number; acceleration: number },
-  previousDifficulty: number = 1.0
+  previousDifficulty: number = 1.0,
+  raceDistance: number = 10 // Total race distance for distance-based scaling
 ): number {
-  const avgSpeed = stats.speed;
-  const avgStability = stats.stability;
-  const avgPowerCore = stats.powerCore;
-  const avgAccel = stats.acceleration;
+  const speed = stats.speed;
+  const powerCore = stats.powerCore;
+  const stability = stats.stability;
+  const acceleration = stats.acceleration;
+
+  // === PART 1: UNIVERSAL STAT COMPONENTS (70% always active) ===
   
-  const segmentLength = segment.length;
-  
-  // Base speed calculation - use square root to reduce speed dominance
-  const baseSpeed = Math.sqrt(avgSpeed) * 7.5;
-  
-  // Terrain modifier - MATCH BACKEND EXACTLY
-  let terrainMod = 1.0;
-  if (segment.terrain === 'ScrapHeaps') {
-    terrainMod = 1.0 + ((100 - avgStability) / 150.0); // Stability critical (up to +67%)
-  } else if (segment.terrain === 'WastelandSand') {
-    terrainMod = 1.0 + ((100 - avgPowerCore) / 200.0); // Endurance critical (up to +50%)
-  } else if (segment.terrain === 'MetalRoads') {
-    terrainMod = 1.0 + ((100 - avgAccel) / 160.0); // Acceleration helps (up to +62%)
+  // Speed: 70% universal base, 30% conditional bonus
+  const speedUniversal = Math.sqrt(speed) * 5.25; // 70% of original 7.5
+  let speedBonus = 0.0;
+  if (segment.angle === 0 && segment.terrain === 'MetalRoads') {
+    speedBonus = Math.sqrt(speed) * 2.25; // +30% bonus on ideal conditions
+  } else if (segment.angle < 0) {
+    speedBonus = Math.sqrt(speed) * 1.125; // +15% bonus on downhills
   }
   
-  // Angle modifier - match backend segment calculation
-  let angleMod = 1.0;
-  if (segment.angle > 0) {
-    // Uphill - powerCore matters more
-    angleMod = 1.0 + (segment.angle * (100.0 - avgPowerCore) / 3000.0);
+  // === PART 2: STAT SYNERGIES ===
+  
+  // Speed + Acceleration synergy (high speed needs good accel to maintain)
+  const speedAccelRatio = (speed + acceleration) / 200.0; // 0.30 to 1.0
+  const speedSynergyMod = 0.80 + (speedAccelRatio * 0.20); // 0.80x to 1.0x
+  const synergisticSpeed = (speedUniversal + speedBonus) * speedSynergyMod;
+  
+  // Power + Stability synergy (endurance needs stability)
+  const powerStabilityRatio = (powerCore + stability) / 200.0; // 0.30 to 1.0
+  const powerSynergyMod = 0.85 + (powerStabilityRatio * 0.15); // 0.85x to 1.0x
+  
+  // === PART 3: UNIVERSAL PENALTIES (all stats matter everywhere) ===
+  
+  // Power Core: Universal endurance (25% penalty range)
+  const powerUniversal = 1.0 + ((100.0 - powerCore) / 400.0);
+  
+  // Acceleration: Universal responsiveness (20% penalty range)
+  const accelUniversal = 1.0 + ((100.0 - acceleration) / 350.0);
+  
+  // Stability: Universal consistency (17% penalty range)
+  const stabilityUniversal = 1.0 + ((100.0 - stability) / 400.0);
+  
+  // === PART 4: SITUATIONAL MODIFIERS ===
+  
+  // Power: Additional penalty in demanding conditions
+  let powerSituational = 1.0;
+  if (segment.terrain === 'WastelandSand') {
+    powerSituational = 1.0 + ((100.0 - powerCore) / 200.0); // +50% penalty on sand
+  } else if (segment.angle > 5) {
+    const steepness = segment.angle / 20.0;
+    powerSituational = 1.0 + ((100.0 - powerCore) / 250.0) * steepness; // Scaled uphill penalty
+  } else if (segment.angle > 0) {
+    powerSituational = 1.0 + ((100.0 - powerCore) / 400.0); // Small uphill penalty
   }
   
-  // Momentum system: acceleration affects speed buildup after difficult sections
+  // Acceleration: Bonus on roads, momentum recovery
+  let accelSituational = 1.0;
+  if (segment.terrain === 'MetalRoads') {
+    accelSituational = 1.0 + ((100.0 - acceleration) / 160.0); // +44% penalty on roads
+  }
+  
   const momentumLoss = previousDifficulty > 1.0 
-    ? (previousDifficulty - 1.0) * 0.15
+    ? (previousDifficulty - 1.0) * 0.20 // Increased from 0.15
     : 0.0;
-  
-  const accelerationRecovery = avgAccel / 140.0;
+  const accelerationRecovery = acceleration / 140.0;
   const momentumMod = 1.0 + (momentumLoss * (1.0 - accelerationRecovery));
   
-  // Difficulty from track - scales with stability for technical sections
+  // Stability: Technical sections and difficulty
+  let stabilitySituational = 1.0;
+  if (segment.terrain === 'ScrapHeaps') {
+    stabilitySituational = 1.0 + ((100.0 - stability) / 150.0); // +47% penalty on heaps
+  }
+  
   const difficultyMod = segment.difficulty > 1.0
-    ? segment.difficulty * (1.0 + ((100 - avgStability) / 300.0))
+    ? segment.difficulty * (1.0 + ((100.0 - stability) / 300.0) * (segment.difficulty - 1.0))
     : segment.difficulty;
   
-  // Randomness - match backend (±10% per segment)
+  // === PART 5: DISTANCE-BASED STAT SCALING ===
+  
+  // Short sprints (<10km) - Acceleration & Speed matter more
+  let sprintFactor = 1.0;
+  if (raceDistance < 10) {
+    const accelWeight = 1.0 + ((acceleration - 50.0) / 200.0); // 0.75x to 1.25x
+    const speedWeight = 1.0 - ((speed - 50.0) / 400.0); // 1.125x to 0.875x
+    sprintFactor = accelWeight / speedWeight; // High accel gets bonus, high speed gets slight penalty
+  }
+  
+  // Long treks (>20km) - Power & Stability matter more  
+  let trekFactor = 1.0;
+  if (raceDistance > 20) {
+    const powerWeight = 0.80 + ((powerCore - 50.0) / 200.0); // 0.55x to 1.05x
+    const stabilityWeight = 0.85 + ((stability - 50.0) / 250.0); // 0.65x to 1.05x
+    trekFactor = (powerWeight + stabilityWeight) / 2.0; // Average of both
+  }
+  
+  // === PART 6: COMBINE ALL MODIFIERS ===
+  
+  // Apply synergy to power effectiveness
+  const totalPowerMod = (powerUniversal * powerSituational) / powerSynergyMod;
+  const totalAccelMod = accelUniversal * accelSituational * momentumMod;
+  const totalStabilityMod = stabilityUniversal * stabilitySituational;
+  
+  // Apply distance-based scaling
+  const distanceAdjustedSpeed = synergisticSpeed / (sprintFactor * trekFactor);
+  
+  // Randomness for this segment (±10% per segment)
   const segmentSeed = Number(seed % 1000n);
   const randomMod = 0.90 + (segmentSeed / 5000.0); // 0.90 to 1.10
   
-  // Calculate time - match backend formula with momentum
-  const effectiveSpeed = baseSpeed / (terrainMod * angleMod * difficultyMod * momentumMod);
+  // Calculate segment time
+  const segmentLength = segment.length;
+  const effectiveSpeed = distanceAdjustedSpeed / (totalPowerMod * totalAccelMod * totalStabilityMod * difficultyMod);
   const segmentTime = (segmentLength / effectiveSpeed) * randomMod;
   
-  // Apply 10x speed multiplier to match backend
+  // 10x speed multiplier to reduce race times for better UX
   return Math.max(0.1, segmentTime / 10.0);
 }
 
-export function RacePlayback({ track, results, botColors, botLabels }: RacePlaybackProps) {
+export function RacePlayback({ track, results, botColors, botLabels, raceDistance }: RacePlaybackProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
@@ -166,6 +230,9 @@ export function RacePlayback({ track, results, botColors, botLabels }: RacePlayb
   const botSegmentTimes = useMemo(() => {
     const timesMap: Record<number, number[]> = {};
     
+    // Use provided race distance or calculate from track segments
+    const distanceKm = raceDistance || ((track.segments.reduce((sum, seg) => sum + seg.length, 0) * track.laps) / 1000);
+    
     results.forEach((result, participantIndex) => {
       if (result.segmentTimes && result.segmentTimes.length > 0) {
         // Use backend-provided segment times if available
@@ -185,12 +252,12 @@ export function RacePlayback({ track, results, botColors, botLabels }: RacePlayb
             const trackSeed = BigInt(track.trackId); // Using trackId as seed proxy
             const seed = trackSeed + BigInt(participantIndex * 1000 + globalSegmentIdx);
             
-            // Calculate base segment time
-            const baseSegmentTime = calculateSegmentTime(segment, seed, result.stats, previousDifficulty);
+            // Calculate base segment time with race distance for scaling
+            const baseSegmentTime = calculateSegmentTime(segment, seed, result.stats, previousDifficulty, distanceKm);
             
             // Per-segment performance variation (±6%)
             const segmentConditionSeed = Number((seed * 31337n + BigInt(participantIndex * 7919) + BigInt(lap * 12345)) % 1000n);
-            const segmentPerformance = 0.94 + (segmentConditionSeed / 1666.67);
+            const segmentPerformance = 0.94 + (segmentConditionSeed / 8325);
             
             const segmentTime = baseSegmentTime * segmentPerformance;
             segmentTimes.push(segmentTime);
@@ -221,7 +288,7 @@ export function RacePlayback({ track, results, botColors, botLabels }: RacePlayb
     });
     
     return timesMap;
-  }, [results, track]);
+  }, [results, track, raceDistance]);
   
   // Calculate bot positions for current time
   const botPositions = useMemo(() => {

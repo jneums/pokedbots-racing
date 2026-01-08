@@ -102,7 +102,7 @@ export function getFactionBonus(faction: string): string {
     case 'Wild':
       return '+20% Accel, -10% Stab';
     case 'Golden':
-      return '+15% (90%+ condition)';
+      return '+7% (90%+ condition)';
     case 'Ultimate':
       return '⚔️ +12% Speed/Accel';
     case 'Blackhole':
@@ -122,7 +122,7 @@ export function getFactionBonus(faction: string): string {
     case 'Game':
       return '🎮 +10 parts every 5th';
     case 'Animal':
-      return '⚡ +6% balanced all stats';
+      return '⚡ +3% all stats';
     case 'Industrial':
       return '💪 +5% Power/Stab';
     default:

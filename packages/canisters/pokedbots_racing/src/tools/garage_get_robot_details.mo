@@ -77,6 +77,21 @@ module {
       // Get base stats - these are always available
       let baseStats = ctx.garageManager.getBaseStats(tokenIndex);
 
+      // If bot is initialized and has an active scavenging mission, lazily accumulate rewards
+      switch (racingStatsOpt) {
+        case (?stats) {
+          switch (stats.activeMission) {
+            case (?_mission) {
+              // Accumulate rewards on-demand (lazy evaluation)
+              let now = Time.now();
+              ignore ctx.garageManager.accumulateScavengingRewards(tokenIndex, now);
+            };
+            case (null) {};
+          };
+        };
+        case (null) {};
+      };
+
       // If not initialized, show base stats only
       switch (racingStatsOpt) {
         case (null) {

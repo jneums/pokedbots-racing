@@ -144,9 +144,9 @@ export const getBotRaceHistory = async (tokenIndex, limit = 10, afterRaceId, ide
  * @param identity Optional identity to use for the actor
  * @returns Simulation results with final times
  */
-export const debugTestSimulation = async (tokenIndexes, trackId, trackSeed, identity) => {
+export const debugTestSimulation = async (tokenIndexes, trackId, trackSeed, distanceKm, identity) => {
     const racingActor = await getActor(identity);
-    const result = await racingActor.debug_test_simulation(tokenIndexes.map(BigInt), BigInt(trackId), BigInt(trackSeed));
+    const result = await racingActor.debug_test_simulation(tokenIndexes.map(BigInt), BigInt(trackId), BigInt(trackSeed), BigInt(distanceKm));
     if (result.length === 0 || !result[0]) {
         return null;
     }
@@ -154,6 +154,12 @@ export const debugTestSimulation = async (tokenIndexes, trackId, trackSeed, iden
     return data.results.map((r) => ({
         tokenIndex: Number(r.tokenIndex),
         finalTime: Number(r.finalTime),
+        stats: {
+            speed: Number(r.stats.speed),
+            powerCore: Number(r.stats.powerCore),
+            acceleration: Number(r.stats.acceleration),
+            stability: Number(r.stats.stability),
+        },
     }));
 };
 /**

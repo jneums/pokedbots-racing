@@ -80,6 +80,7 @@ module {
     condition : Nat;
     experience : Nat;
     overcharge : Nat; // Overcharge (0-75%), earned by recharging at low battery, consumed in next race for stat boost
+    perfectTuneUp : Bool; // True if repaired to exactly 100% condition with overcharge - removes penalties but keeps speed boost
 
     // Preferences
     preferredDistance : Distance;
@@ -119,6 +120,8 @@ module {
       thrusterKits : Nat;
       gyroModules : Nat;
       universalParts : Nat;
+      conditionRestored : Nat; // For RepairBay missions
+      batteryRestored : Nat; // For ChargingStation missions
       hoursOut : Nat;
       completedAt : Int;
       zone : ScavengingZone;
@@ -222,7 +225,7 @@ module {
   };
 
   /// Hash nat for deterministic randomness
-  private func hashNat(n : Nat) : Nat {
+  public func hashNat(n : Nat) : Nat {
     let a = n * 2654435761;
     let b = a % 4294967296;
     let c = (b * 1103515245 + 12345) % 2147483648;
@@ -255,10 +258,20 @@ module {
     // Mission ID counter for scavenging
     private var nextMissionId : Nat = 0;
 
+    // RNG entropy counter to ensure unique seeds even when Time.now() is the same
+    private var rngEntropyCounter : Nat = 0;
+
     public func getNextMissionId() : Nat {
       let id = nextMissionId;
       nextMissionId += 1;
       id;
+    };
+
+    // Get and increment entropy counter for RNG
+    public func getNextEntropy() : Nat {
+      let entropy = rngEntropyCounter;
+      rngEntropyCounter += 1;
+      entropy;
     };
 
     // ===== RACING STATS PROVIDER IMPLEMENTATION =====
@@ -290,10 +303,10 @@ module {
         };
         case (#Golden) {
           if (condition >= 90) {
-            speed := Int.abs(Float.toInt(Float.fromInt(speed) * 1.15));
-            powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.15));
-            acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.15));
-            stability := Int.abs(Float.toInt(Float.fromInt(stability) * 1.15));
+            speed := Int.abs(Float.toInt(Float.fromInt(speed) * 1.07));
+            powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.07));
+            acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.07));
+            stability := Int.abs(Float.toInt(Float.fromInt(stability) * 1.07));
           };
         };
         case (#Ultimate) {
@@ -346,10 +359,10 @@ module {
           };
         };
         case (#Animal) {
-          speed := Int.abs(Float.toInt(Float.fromInt(speed) * 1.06));
-          powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.06));
-          acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.06));
-          stability := Int.abs(Float.toInt(Float.fromInt(stability) * 1.06));
+          speed := Int.abs(Float.toInt(Float.fromInt(speed) * 1.03));
+          powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.03));
+          acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * 1.03));
+          stability := Int.abs(Float.toInt(Float.fromInt(stability) * 1.03));
         };
         case (#Industrial) {
           powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * 1.05));
@@ -468,7 +481,74 @@ module {
                 stability = finalStats.stability;
               };
             };
-            case (null) { null };
+            case (null) {
+              // Bot not initialized - return base stats with faction/terrain bonuses applied
+              let baseStats = getBaseStats(idx);
+
+              // Get faction from precomputed stats
+              let (faction, preferredTerrain) = switch (statsProvider.getPrecomputedStats(idx)) {
+                case (?precomputed) {
+                  let terrain = switch (statsProvider.getNFTMetadata(idx)) {
+                    case (?traits) { derivePreferredTerrain(traits) };
+                    case (null) {
+                      let hash = hashNat(idx);
+                      let choice = hash % 3;
+                      if (choice == 0) { #ScrapHeaps } else if (choice == 1) {
+                        #MetalRoads;
+                      } else { #WastelandSand };
+                    };
+                  };
+                  (precomputed.faction, terrain);
+                };
+                case (null) {
+                  // Fallback if no precomputed stats
+                  let hash = hashNat(idx);
+                  let factionChoice = hash % 14;
+                  let terrainChoice = (hash / 14) % 3;
+                  let defaultFaction = if (factionChoice == 0) {
+                    #UltimateMaster;
+                  } else if (factionChoice == 1) { #Wild } else if (factionChoice == 2) {
+                    #Golden;
+                  } else if (factionChoice == 3) { #Ultimate } else if (factionChoice == 4) {
+                    #Blackhole;
+                  } else if (factionChoice == 5) { #Dead } else if (factionChoice == 6) {
+                    #Master;
+                  } else if (factionChoice == 7) { #Bee } else if (factionChoice == 8) {
+                    #Food;
+                  } else if (factionChoice == 9) { #Box } else if (factionChoice == 10) {
+                    #Murder;
+                  } else if (factionChoice == 11) { #Game } else if (factionChoice == 12) {
+                    #Animal;
+                  } else { #Industrial };
+                  let defaultTerrain = if (terrainChoice == 0) { #ScrapHeaps } else if (terrainChoice == 1) {
+                    #MetalRoads;
+                  } else { #WastelandSand };
+                  (defaultFaction, defaultTerrain);
+                };
+              };
+
+              // Apply faction terrain bonuses (condition=100 for Golden faction bonus)
+              let boosted = applyTerrainBonus(baseStats, faction, terrain, 100);
+
+              // Apply preferred terrain bonus (+5% if racing on preferred terrain)
+              let finalStats = if (preferredTerrain == terrain) {
+                {
+                  speed = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.speed) * 1.05)));
+                  powerCore = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.powerCore) * 1.05)));
+                  acceleration = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.acceleration) * 1.05)));
+                  stability = Nat.max(1, Int.abs(Float.toInt(Float.fromInt(boosted.stability) * 1.05)));
+                };
+              } else {
+                boosted;
+              };
+
+              ?{
+                speed = finalStats.speed;
+                powerCore = finalStats.powerCore;
+                acceleration = finalStats.acceleration;
+                stability = finalStats.stability;
+              };
+            };
           };
         };
         case (null) { null };
@@ -726,6 +806,7 @@ module {
                 battery = Nat.sub(botStats.battery, finalBatteryDrain);
                 condition = Nat.sub(botStats.condition, finalConditionWear);
                 overcharge = 0; // Overcharge consumed after race
+                perfectTuneUp = false; // Reset perfect tune-up flag after race
                 worldBuff = null; // World buff consumed after race
               };
               updateStats(idx, updatedStats);
@@ -819,6 +900,7 @@ module {
         condition = 100;
         experience = 0;
         overcharge = 0;
+        perfectTuneUp = false;
         preferredDistance = derivePreferredDistance(baseStats.powerCore, baseStats.speed);
         preferredTerrain = switch (metadata) {
           case (?traits) { derivePreferredTerrain(traits) };
@@ -915,6 +997,11 @@ module {
       };
     };
 
+    /// De-register a bot (removes control but preserves all stats)
+    public func deregisterBot(tokenIndex : Nat) {
+      ignore Map.remove(stats, nhash, tokenIndex);
+    };
+
     /// Update upgrade ends at timestamp
     public func setUpgradeEndsAt(tokenIndex : Nat, endsAt : ?Int) {
       switch (getStats(tokenIndex)) {
@@ -983,17 +1070,18 @@ module {
       // These are "garage aura" bonuses - ALL bots benefit from the owner's collection
       let synergies = calculateFactionSynergies(botStats.ownerPrincipal);
 
-      // Sum up all stat bonuses from all active synergies
+      // NON-STACKING: Take highest bonus per stat from all active synergies
+      // Multiple factions do NOT stack bonuses for the same stat
       var synergySpeed : Nat = 0;
       var synergyPowerCore : Nat = 0;
       var synergyAcceleration : Nat = 0;
       var synergyStability : Nat = 0;
 
       for ((faction, bonusStats) in synergies.statBonuses.vals()) {
-        synergySpeed += bonusStats.speed;
-        synergyPowerCore += bonusStats.powerCore;
-        synergyAcceleration += bonusStats.acceleration;
-        synergyStability += bonusStats.stability;
+        synergySpeed := Nat.max(synergySpeed, bonusStats.speed);
+        synergyPowerCore := Nat.max(synergyPowerCore, bonusStats.powerCore);
+        synergyAcceleration := Nat.max(synergyAcceleration, bonusStats.acceleration);
+        synergyStability := Nat.max(synergyStability, bonusStats.stability);
       };
 
       // Apply battery penalty to speed and acceleration (energy-dependent stats)
@@ -1043,15 +1131,25 @@ module {
       };
 
       // OVERCHARGE BONUSES (consumed in next race)
-      // Speed: +0.3% per 1% overcharge (max +22.5% at 75% overcharge)
-      // Acceleration: +0.3% per 1% overcharge (max +22.5% at 75% overcharge)
-      // Stability: -0.2% per 1% overcharge (max -15% at 75% overcharge)
-      // PowerCore: -0.2% per 1% overcharge (max -15% at 75% overcharge)
-      let overchargeBonus = Float.fromInt(botStats.overcharge) / 100.0; // 0.0 to 0.75
-      let speedOvercharge = 1.0 + (overchargeBonus * 0.3); // 1.0 to 1.225
-      let accelOvercharge = 1.0 + (overchargeBonus * 0.3); // 1.0 to 1.225
-      let stabilityOvercharge = 1.0 - (overchargeBonus * 0.2); // 1.0 to 0.85
-      let powerCoreOvercharge = 1.0 - (overchargeBonus * 0.2); // 1.0 to 0.85
+      // Speed: +0.125% per 1% overcharge (max +5% at 40% overcharge)
+      // Acceleration: +0.125% per 1% overcharge (max +5% at 40% overcharge)
+      // Stability: -0.083% per 1% overcharge (max -3.3% at 40% overcharge) - UNLESS Perfect Tune-Up
+      // PowerCore: -0.083% per 1% overcharge (max -3.3% at 40% overcharge) - UNLESS Perfect Tune-Up
+      let overchargeBonus = Float.fromInt(botStats.overcharge) / 100.0; // 0.0 to 0.40
+      let speedOvercharge = 1.0 + (overchargeBonus * 0.125); // 1.0 to 1.05
+      let accelOvercharge = 1.0 + (overchargeBonus * 0.125); // 1.0 to 1.05
+
+      // Perfect Tune-Up: If repaired to exactly 100% with overcharge, penalties are removed!
+      let stabilityOvercharge = if (botStats.perfectTuneUp) {
+        1.0; // No penalty with perfect tune-up!
+      } else {
+        1.0 - (overchargeBonus * 0.083); // 1.0 to 0.967
+      };
+      let powerCoreOvercharge = if (botStats.perfectTuneUp) {
+        1.0; // No penalty with perfect tune-up!
+      } else {
+        1.0 - (overchargeBonus * 0.083); // 1.0 to 0.967
+      };
 
       // WORLD BUFF BONUSES (from scavenging missions, expires in 48h)
       // Apply flat stat bonuses from world buffs
@@ -1930,12 +2028,12 @@ module {
           };
         };
 
-        // Rare factions - stat bonuses at 2/4/6
+        // Rare factions - stat bonuses at 2/4/6 (shifted up so 6+ can reach +5)
         case (#Bee) {
           if (count >= 6) {
-            { speed = 8; powerCore = 0; acceleration = 0; stability = 0 };
+            { speed = 5; powerCore = 0; acceleration = 0; stability = 0 }; // Max +5 Speed
           } else if (count >= 4) {
-            { speed = 6; powerCore = 0; acceleration = 0; stability = 0 };
+            { speed = 4; powerCore = 0; acceleration = 0; stability = 0 };
           } else if (count >= 2) {
             { speed = 3; powerCore = 0; acceleration = 0; stability = 0 };
           } else {
@@ -1947,9 +2045,9 @@ module {
         };
         case (#Box) {
           if (count >= 6) {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 8 };
+            { speed = 0; powerCore = 0; acceleration = 0; stability = 5 }; // Max +5 Stability
           } else if (count >= 4) {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 6 };
+            { speed = 0; powerCore = 0; acceleration = 0; stability = 4 };
           } else if (count >= 2) {
             { speed = 0; powerCore = 0; acceleration = 0; stability = 3 };
           } else {
@@ -1958,9 +2056,9 @@ module {
         };
         case (#Murder) {
           if (count >= 6) {
-            { speed = 0; powerCore = 0; acceleration = 8; stability = 0 };
+            { speed = 0; powerCore = 0; acceleration = 5; stability = 0 }; // Max +5 Accel
           } else if (count >= 4) {
-            { speed = 0; powerCore = 0; acceleration = 6; stability = 0 };
+            { speed = 0; powerCore = 0; acceleration = 4; stability = 0 };
           } else if (count >= 2) {
             { speed = 0; powerCore = 0; acceleration = 3; stability = 0 };
           } else {
@@ -1968,14 +2066,14 @@ module {
           };
         };
 
-        // Super-Rare factions - stat bonuses at 2/4/6
+        // Super-Rare factions - stat bonuses at 2/4/6 (shifted up)
         case (#Blackhole) {
           if (count >= 6) {
-            { speed = 0; powerCore = 10; acceleration = 0; stability = 0 };
+            { speed = 0; powerCore = 5; acceleration = 0; stability = 0 }; // Max +5 Power
           } else if (count >= 4) {
-            { speed = 0; powerCore = 8; acceleration = 0; stability = 0 };
+            { speed = 0; powerCore = 4; acceleration = 0; stability = 0 };
           } else if (count >= 2) {
-            { speed = 0; powerCore = 5; acceleration = 0; stability = 0 };
+            { speed = 0; powerCore = 3; acceleration = 0; stability = 0 };
           } else {
             { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
           };
@@ -1985,7 +2083,7 @@ module {
         };
         case (#Master) {
           if (count >= 6) {
-            { speed = 4; powerCore = 4; acceleration = 4; stability = 4 };
+            { speed = 4; powerCore = 4; acceleration = 4; stability = 4 }; // +4 all (competitive but not matching specialists)
           } else if (count >= 4) {
             { speed = 3; powerCore = 3; acceleration = 3; stability = 3 };
           } else if (count >= 2) {
@@ -1995,10 +2093,10 @@ module {
           };
         };
 
-        // Ultra-Rare factions - powerful bonuses at 2/3 or just 1
+        // Ultra-Rare factions - powerful bonuses at 2/3 or just 1 (shifted up)
         case (#Ultimate) {
           if (count >= 3) {
-            { speed = 5; powerCore = 0; acceleration = 5; stability = 0 };
+            { speed = 5; powerCore = 0; acceleration = 5; stability = 0 }; // Max +5 Speed/Accel
           } else if (count >= 2) {
             { speed = 3; powerCore = 0; acceleration = 3; stability = 0 };
           } else {
@@ -2010,14 +2108,14 @@ module {
         };
         case (#Wild) {
           if (count >= 2) {
-            { speed = 4; powerCore = 4; acceleration = 4; stability = 4 };
+            { speed = 4; powerCore = 4; acceleration = 4; stability = 4 }; // Stays at +4 (2nd strongest all-around)
           } else {
             { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
           };
         };
         case (#UltimateMaster) {
           if (count >= 1) {
-            { speed = 5; powerCore = 5; acceleration = 5; stability = 5 };
+            { speed = 5; powerCore = 5; acceleration = 5; stability = 5 }; // Max bonus stays at 5
           } else {
             { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
           };
@@ -2304,24 +2402,24 @@ module {
 
     /// Get accumulation rates per 15-minute interval
     /// These are constant (no diminishing returns - battery is the natural limiter)
-    private func get15MinuteRates() : {
-      basePartsPer15Min : Float;
+    public func getHourlyRates() : {
+      basePartsPerHour : Float;
       baseBatteryDrain : Float;
       baseConditionLoss : Float;
     } {
-      // Base rates: 2.5-5-2 (parts, battery, condition) per 15 minutes
+      // Base hourly rates for scavenging
       // Probabilistic rounding preserves exact fractional values over time
       // Zone multipliers and faction bonuses are fully preserved
       {
-        basePartsPer15Min = 2.5; // 10 parts/hour (reduced by 50%)
-        baseBatteryDrain = 5.0; // 20 battery/hour base
-        baseConditionLoss = 2.0; // 8 condition/hour base
+        basePartsPerHour = 10.0; // 10 parts per hour base
+        baseBatteryDrain = 20.0; // 20 battery drain per hour base
+        baseConditionLoss = 8.0; // 8 condition loss per hour base
       };
     };
 
     /// Get duration bonus multiplier based on hours elapsed
     /// Rewards longer commitments with improved efficiency
-    private func getDurationBonus(hoursElapsed : Int) : Float {
+    public func getDurationBonus(hoursElapsed : Int) : Float {
       // Efficiency curve that rewards longer missions:
       // 0-4 hours: 1.0x (base rate)
       // 4-8 hours: 1.1x (+10% parts, -10% costs)
@@ -2509,7 +2607,7 @@ module {
     };
 
     /// Get zone multipliers
-    private func getZoneMultipliers(zone : ScavengingZone) : {
+    public func getZoneMultipliers(zone : ScavengingZone) : {
       battery : Float;
       condition : Float;
       parts : Float;
@@ -2530,16 +2628,16 @@ module {
         case (#RepairBay) {
           { battery = 2.0; condition = -3.0; parts = 0.0 };
         };
-        // Charging Station: No battery drain, restores battery instead
+        // Charging Station: No battery drain, restores battery instead. No condition penalty.
         // Negative battery value = restoration instead of loss
         case (#ChargingStation) {
-          { battery = -1.0; condition = 1.0; parts = 0.0 };
+          { battery = -1.0; condition = 0.0; parts = 0.0 };
         };
       };
     };
 
     /// Get faction bonuses for scavenging (from SCAVENGING_FACTION_BONUSES.md)
-    private func getFactionScavengingBonus(faction : FactionType, zone : ScavengingZone) : {
+    public func getFactionScavengingBonus(faction : FactionType, zone : ScavengingZone) : {
       partsMultiplier : Float;
       batteryMultiplier : Float;
       conditionMultiplier : Float;
@@ -2673,8 +2771,15 @@ module {
           switch (botStats.activeMission) {
             case (null) { #err("No active mission") };
             case (?mission) {
-              // Check if bot is dead (0 battery OR 0 condition) - LOSE ALL PENDING REWARDS
-              if (botStats.battery == 0 or botStats.condition == 0) {
+              // Check if bot is dead (0 battery OR 0 condition)
+              // EXCEPTION: Allow dead bots in maintenance zones (ChargingStation/RepairBay) to recover
+              let canRecoverWhenDead = switch (mission.zone) {
+                case (#ChargingStation or #RepairBay) { true };
+                case (_) { false };
+              };
+
+              if ((botStats.battery == 0 or botStats.condition == 0) and not canRecoverWhenDead) {
+                // Bot died in dangerous zone - LOSE ALL PENDING REWARDS
                 let updatedStats = {
                   botStats with
                   activeMission = null;
@@ -2683,16 +2788,27 @@ module {
                 return #err("Bot died (0 battery or condition) - mission failed, all pending rewards lost");
               };
 
-              // Calculate 15-minute intervals since last accumulation
-              let nanosSince = now - mission.lastAccumulation;
-              let intervalsSince = nanosSince / (15 * 60 * 1_000_000_000); // 15 minutes in nanos
+              // Calculate hours elapsed since last accumulation
+              // For timed missions, cap at the duration end time
+              let effectiveNow = switch (mission.durationMinutes) {
+                case (null) { now }; // Continuous mission - use current time
+                case (?minutes) {
+                  let durationNanos = minutes * 60 * 1_000_000_000;
+                  let missionEndTime = mission.startTime + durationNanos;
+                  if (now > missionEndTime) { missionEndTime } else { now };
+                };
+              };
 
-              if (intervalsSince < 1) {
-                return #ok("Not yet 15 minutes elapsed since last accumulation");
+              let nanosSince = effectiveNow - mission.lastAccumulation;
+              let hoursElapsed = Float.fromInt(nanosSince) / Float.fromInt(3600 * 1_000_000_000); // hours with fractional precision
+
+              // Skip if less than 1 minute has passed (avoid excessive calculations)
+              if (nanosSince < (60 * 1_000_000_000)) {
+                return #ok("Less than 1 minute elapsed since last accumulation");
               };
 
               // Get rates and multipliers
-              let rates = get15MinuteRates();
+              let rates = getHourlyRates();
               let zoneMultipliers = getZoneMultipliers(mission.zone);
               let factionBonus = getFactionScavengingBonus(botStats.faction, mission.zone);
 
@@ -2728,20 +2844,38 @@ module {
               let accelBuffBonus = 1.0 + (Float.fromInt(currentStats.acceleration) / 100.0 * 0.60);
 
               // Duration bonus: rewards longer commitments with efficiency curve
-              let hoursElapsed = (now - mission.startTime) / (3600 * 1_000_000_000);
-              let durationBonus = getDurationBonus(hoursElapsed);
+              let totalHoursElapsed = Float.fromInt((now - mission.startTime) / (3600 * 1_000_000_000));
+              let durationBonus = getDurationBonus(Int.abs(Float.toInt(totalHoursElapsed)));
 
-              // Calculate accumulation for this 15-min interval
+              // Calculate rewards for elapsed hours (fractional)
               // Duration bonus: increases parts yield, reduces battery/condition costs
               // Synergy bonuses: apply collection-wide bonuses to parts and drain
-              let partsThis15Min = rates.basePartsPer15Min * zoneMultipliers.parts * factionBonus.partsMultiplier * speedBonus * durationBonus * synergies.yieldMultipliers.scavengingParts;
-              let batteryDrain = rates.baseBatteryDrain * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
-              let conditionLoss = rates.baseConditionLoss * zoneMultipliers.condition * factionBonus.conditionMultiplier * stabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
+              let partsThisAccumulation = rates.basePartsPerHour * hoursElapsed * zoneMultipliers.parts * factionBonus.partsMultiplier * speedBonus * durationBonus * synergies.yieldMultipliers.scavengingParts;
+
+              // Charging curve: stepped rates like real fast chargers
+              // 4x at <25% → 3x at <50% → 2x at <75% → 1x at 75-100%
+              let chargingCurve = if (mission.zone == #ChargingStation) {
+                if (botStats.battery < 25) {
+                  4.0;
+                } else if (botStats.battery < 50) {
+                  3.0;
+                } else if (botStats.battery < 75) {
+                  2.0;
+                } else {
+                  1.0;
+                };
+              } else {
+                1.0; // No curve for non-charging zones
+              };
+
+              let batteryDrain = rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus * chargingCurve / durationBonus * synergies.drainMultipliers.scavengingDrain;
+              let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionBonus.conditionMultiplier * stabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
 
               // Add variance to battery and condition costs (±20% random variation)
               // This creates more unpredictable resource management - sometimes lucky, sometimes not
-              let batteryVariance = Float.fromInt((hashNat(tokenIndex + Int.abs(now)) % 41) - 20) / 100.0; // -20% to +20%
-              let conditionVariance = Float.fromInt((hashNat(tokenIndex + Int.abs(now) + 1) % 41) - 20) / 100.0; // -20% to +20%
+              // Use lastAccumulation in seed for deterministic results (readonly preview must match actual accumulate)
+              let batteryVariance = Float.fromInt((hashNat(tokenIndex + Int.abs(mission.lastAccumulation)) % 41) - 20) / 100.0; // -20% to +20%
+              let conditionVariance = Float.fromInt((hashNat(tokenIndex + Int.abs(mission.lastAccumulation) + 1) % 41) - 20) / 100.0; // -20% to +20%
 
               let batteryDrainWithVariance = batteryDrain * (1.0 + batteryVariance);
               let conditionLossWithVariance = conditionLoss * (1.0 + conditionVariance);
@@ -2751,9 +2885,10 @@ module {
               // Probabilistic rounding: use fractional part as probability
               // E.g., 1.9 = 90% chance of 2, 10% chance of 1
               // This preserves the exact expected value over many ticks
+              // Use lastAccumulation in seed for deterministic results
               let batteryFloor = Int.abs(Float.toInt(batteryDrainWithVariance));
               let batteryFraction = batteryDrainWithVariance - Float.fromInt(batteryFloor);
-              let batteryRng = Float.fromInt(hashNat(tokenIndex + Int.abs(now) + 2) % 100) / 100.0;
+              let batteryRng = Float.fromInt(hashNat(tokenIndex + Int.abs(mission.lastAccumulation) + 2) % 100) / 100.0;
               let batteryDrainRounded = if (batteryRng < batteryFraction) {
                 batteryFloor + 1;
               } else {
@@ -2782,15 +2917,25 @@ module {
 
               // BATTERY DEPLETION DAMAGE: If battery reaches 0 during scavenging, damage condition
               // This penalizes letting bots run completely dry - creates strategic tension
-              let batteryDepletionPenalty = if (newBattery == 0 and botStats.battery == 0) {
-                // Bot has been at 0% battery - take 5-10 condition damage per 15min tick
-                let depletionRng = Float.fromInt(hashNat(tokenIndex + Int.abs(now) + 5) % 6); // 0-5
-                Int.abs(Float.toInt(5.0 + depletionRng)); // 5-10 damage
+              // EXCEPTION: RepairBay and ChargingStation do NOT apply depletion penalty (safe maintenance zones)
+              let isMaintenanceZone = switch (mission.zone) {
+                case (#RepairBay) { true };
+                case (#ChargingStation) { true };
+                case (_) { false };
+              };
+
+              let batteryDepletionPenalty = if (newBattery == 0 and botStats.battery == 0 and not isMaintenanceZone) {
+                // Bot has been at 0% battery in dangerous zones - take condition damage proportional to time
+                // Use lastAccumulation in seed for deterministic results
+                let depletionDamagePerHour = 10.0; // 10 condition damage per hour at 0 battery
+                let depletionRng = Float.fromInt(hashNat(tokenIndex + Int.abs(mission.lastAccumulation) + 5) % 21) / 10.0 - 1.0; // -1.0 to +1.0
+                let damage = depletionDamagePerHour * hoursElapsed * (1.0 + depletionRng * 0.2); // ±20% variance
+                Int.abs(Float.toInt(damage));
               } else { 0 };
 
               let conditionFloor = Int.abs(Float.toInt(conditionLossWithVariance));
               let conditionFraction = Float.abs(conditionLossWithVariance) - Float.fromInt(conditionFloor);
-              let conditionRng = Float.fromInt(hashNat(tokenIndex + Int.abs(now) + 3) % 100) / 100.0;
+              let conditionRng = Float.fromInt(hashNat(tokenIndex + Int.abs(mission.lastAccumulation) + 3) % 100) / 100.0;
               let conditionChangeRounded = if (conditionRng < conditionFraction) {
                 conditionFloor + 1;
               } else {
@@ -2816,10 +2961,11 @@ module {
                 0;
               };
 
-              // Probabilistic rounding for parts too
-              let partsFloor = Int.abs(Float.toInt(partsThis15Min));
-              let partsFraction = partsThis15Min - Float.fromInt(partsFloor);
-              let partsRng = Float.fromInt(hashNat(tokenIndex + Int.abs(now) + 4) % 100) / 100.0;
+              // Probabilistic rounding for parts
+              // Use lastAccumulation in seed for deterministic results (readonly preview must match actual accumulate)
+              let partsFloor = Int.abs(Float.toInt(partsThisAccumulation));
+              let partsFraction = Float.abs(partsThisAccumulation - Float.fromInt(partsFloor));
+              let partsRng = Float.fromInt(hashNat(tokenIndex + Int.abs(mission.lastAccumulation) + 4) % 100) / 100.0;
               let partsRounded = if (partsRng < partsFraction) {
                 partsFloor + 1;
               } else {
@@ -2835,12 +2981,10 @@ module {
                 factionBoostedDistribution,
               );
 
-              // World buff chance: 8% per hour = 2% per 15-min interval
-              // Total chance scales with time: hours_elapsed * 8% (capped at 90%)
-              // Acceleration stat increases buff chance (at 100 accel: 3.2% instead of 2%)
-              // hoursElapsed already calculated above for duration bonus
+              // World buff chance: 8% per hour
+              // Acceleration stat increases buff chance (at 100 accel: +60% = 12.8% per hour)
               // NOTE: World buffs ONLY available in scavenging zones (not RepairBay/ChargingStation)
-              let totalBuffChance = Float.min(90.0, Float.fromInt(hoursElapsed) * 8.0);
+              let totalBuffChance = Float.min(90.0, Float.fromInt(Int.abs(Float.toInt(totalHoursElapsed))) * 8.0);
               let buffRoll = Float.fromInt((Int.abs(now / 1_000_000) * tokenIndex) % 1000) / 10.0; // 0-100
 
               var newWorldBuff = botStats.worldBuff; // Keep existing buff by default
@@ -2852,13 +2996,13 @@ module {
                 case (_) { true }; // ScrapHeaps, AbandonedSettlements, DeadMachineFields
               };
 
-              let baseBuffChance = 2.0 * accelBuffBonus; // 2% base, up to 3.2% with max accel
-              if (isScavengingZone and buffRoll < baseBuffChance) {
-                // Acceleration-modified buff chance
-                // Buff strength scales with hours elapsed
-                let buffStats = if (hoursElapsed <= 3) {
+              let hourlyBuffChance = 8.0 * accelBuffBonus * hoursElapsed; // 8% base per hour, modified by accel and time
+              if (isScavengingZone and buffRoll < hourlyBuffChance) {
+                // Buff strength scales with total hours elapsed on mission
+                let totalHours = Int.abs(Float.toInt(totalHoursElapsed));
+                let buffStats = if (totalHours <= 3) {
                   [("speed", 2 : Nat)];
-                } else if (hoursElapsed <= 8) {
+                } else if (totalHours <= 8) {
                   [("speed", 3 : Nat), ("acceleration", 2 : Nat)];
                 } else {
                   [("speed", 4 : Nat), ("acceleration", 3 : Nat), ("powerCore", 2 : Nat)];
@@ -2904,7 +3048,7 @@ module {
               // Update mission with new pending parts, condition restored, and battery restored
               let updatedMission = {
                 mission with
-                lastAccumulation = now;
+                lastAccumulation = effectiveNow; // Use capped time for timed missions
                 pendingParts = newPendingParts;
                 pendingConditionRestored = mission.pendingConditionRestored + conditionRestored;
                 pendingBatteryRestored = mission.pendingBatteryRestored + batteryRestored;
@@ -2920,9 +3064,199 @@ module {
               updateStats(tokenIndex, updatedStats);
 
               let totalPending = getTotalPendingParts(newPendingParts);
-              #ok("Accumulated " # Float.format(#fix 1, partsThis15Min) # " parts. Battery: " # Nat.toText(newBattery) # ", Condition: " # Nat.toText(newCondition) # ", Total pending: " # Nat.toText(totalPending) # buffMessage);
+              #ok("Accumulated " # Float.format(#fix 2, partsThisAccumulation) # " parts (" # Float.format(#fix 2, hoursElapsed) # "h). Battery: " # Nat.toText(newBattery) # ", Condition: " # Nat.toText(newCondition) # ", Total pending: " # Nat.toText(totalPending) # buffMessage);
             };
           };
+        };
+      };
+    };
+
+    /// Calculate scavenging rewards WITHOUT updating state (for query calls)
+    /// Returns updated PokedBotRacingStats with current pending values calculated deterministically
+    /// CRITICAL: This MUST match accumulateScavengingRewards exactly to avoid UI glitches
+    public func calculateScavengingRewardsReadOnly(tokenIndex : Nat, botStats : PokedBotRacingStats, now : Int) : Result.Result<PokedBotRacingStats, Text> {
+      switch (botStats.activeMission) {
+        case (null) { #ok(botStats) }; // No mission, return as-is
+        case (?mission) {
+          // Check if bot is dead
+          // EXCEPTION: Allow dead bots in maintenance zones to show recovery progress
+          let canRecoverWhenDead = switch (mission.zone) {
+            case (#ChargingStation or #RepairBay) { true };
+            case (_) { false };
+          };
+
+          if ((botStats.battery == 0 or botStats.condition == 0) and not canRecoverWhenDead) {
+            return #ok(botStats); // Return as-is, don't clear mission (that requires state update)
+          };
+
+          // Calculate hours elapsed since last accumulation
+          // For timed missions, cap at the duration end time
+          let effectiveNow = switch (mission.durationMinutes) {
+            case (null) { now }; // Continuous mission - use current time
+            case (?minutes) {
+              let durationNanos = minutes * 60 * 1_000_000_000;
+              let missionEndTime = mission.startTime + durationNanos;
+              if (now > missionEndTime) { missionEndTime } else { now };
+            };
+          };
+
+          let nanosSince = effectiveNow - mission.lastAccumulation;
+          if (nanosSince < (60 * 1_000_000_000)) {
+            return #ok(botStats); // Less than 1 minute, return as-is
+          };
+
+          let hoursElapsed = Float.fromInt(nanosSince) / Float.fromInt(3600 * 1_000_000_000);
+
+          // Get rates and multipliers (same as accumulate function)
+          let rates = getHourlyRates();
+          let zoneMultipliers = getZoneMultipliers(mission.zone);
+          let factionBonus = getFactionScavengingBonus(botStats.faction, mission.zone);
+          let synergies = calculateFactionSynergies(botStats.ownerPrincipal);
+          let currentStats = getCurrentStats(botStats);
+
+          // Calculate bonuses (same as accumulate function)
+          let pcScaled = Float.fromInt(currentStats.powerCore) / 100.0;
+          let powerCoreBonus = 1.0 - (pcScaled ** 1.5 * 0.75);
+          let stabilityBonus = if (mission.zone == #DeadMachineFields) {
+            let stabScaled = Float.fromInt(currentStats.stability) / 100.0;
+            1.0 - (stabScaled ** 1.5 * 0.75);
+          } else { 1.0 };
+          let speedBonus = 1.0 + (Float.fromInt(currentStats.speed) / 100.0 * 0.10);
+          let totalHoursElapsed = Float.fromInt((now - mission.startTime) / (3600 * 1_000_000_000));
+          let durationBonus = getDurationBonus(Int.abs(Float.toInt(totalHoursElapsed)));
+
+          // Calculate parts accumulation (for scavenging zones)
+          let partsThisAccumulation = rates.basePartsPerHour * hoursElapsed * zoneMultipliers.parts * factionBonus.partsMultiplier * speedBonus * durationBonus * synergies.yieldMultipliers.scavengingParts;
+
+          // Probabilistic rounding for parts (MATCH UPDATE FUNCTION)
+          // Use lastAccumulation in seed for deterministic results (must match actual accumulate)
+          let partsFloor = Int.abs(Float.toInt(partsThisAccumulation));
+          let partsFraction = Float.abs(partsThisAccumulation - Float.fromInt(partsFloor));
+          let partsRng = Float.fromInt(hashNat(tokenIndex + Int.abs(mission.lastAccumulation) + 4) % 100) / 100.0;
+          let partsRounded = if (partsRng < partsFraction) {
+            partsFloor + 1;
+          } else {
+            partsFloor;
+          };
+
+          // Distribute parts across types
+          let factionBoostedDistribution = applyFactionBonus(
+            getPartDistributionForZone(mission.zone),
+            botStats.faction,
+          );
+          let newPendingParts = distributeParts(
+            mission.pendingParts,
+            partsRounded,
+            factionBoostedDistribution,
+          );
+
+          // Calculate battery and condition with VARIANCE (MATCH UPDATE FUNCTION)
+          // Charging curve: stepped rates like real fast chargers
+          let chargingCurve = if (mission.zone == #ChargingStation) {
+            if (botStats.battery < 25) {
+              4.0;
+            } else if (botStats.battery < 50) {
+              3.0;
+            } else if (botStats.battery < 75) {
+              2.0;
+            } else {
+              1.0;
+            };
+          } else {
+            1.0; // No curve for non-charging zones
+          };
+
+          let batteryDrain = rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus * chargingCurve / durationBonus * synergies.drainMultipliers.scavengingDrain;
+          let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionBonus.conditionMultiplier * stabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
+
+          // Add variance to battery and condition costs (±20% random variation) - MATCH UPDATE FUNCTION
+          // Use lastAccumulation in seed for deterministic results (must match actual accumulate)
+          let batteryVariance = Float.fromInt((hashNat(tokenIndex + Int.abs(mission.lastAccumulation)) % 41) - 20) / 100.0; // -20% to +20%
+          let conditionVariance = Float.fromInt((hashNat(tokenIndex + Int.abs(mission.lastAccumulation) + 1) % 41) - 20) / 100.0; // -20% to +20%
+
+          let batteryDrainWithVariance = batteryDrain * (1.0 + batteryVariance);
+          let conditionLossWithVariance = conditionLoss * (1.0 + conditionVariance);
+
+          // Probabilistic rounding for battery (MATCH UPDATE FUNCTION)
+          // Use lastAccumulation in seed for deterministic results
+          let batteryFloor = Int.abs(Float.toInt(batteryDrainWithVariance));
+          let batteryFraction = batteryDrainWithVariance - Float.fromInt(batteryFloor);
+          let batteryRng = Float.fromInt(hashNat(tokenIndex + Int.abs(mission.lastAccumulation) + 2) % 100) / 100.0;
+          let batteryDrainRounded = if (batteryRng < batteryFraction) {
+            batteryFloor + 1;
+          } else {
+            batteryFloor;
+          };
+
+          // Update battery (restoration for ChargingStation, drain for others)
+          let newBattery = if (batteryDrainWithVariance < 0.0) {
+            Nat.min(100, botStats.battery + batteryDrainRounded);
+          } else {
+            if (botStats.battery > batteryDrainRounded) {
+              botStats.battery - batteryDrainRounded;
+            } else { 0 };
+          };
+
+          // Battery depletion penalty (MATCH UPDATE FUNCTION)
+          // EXCEPTION: RepairBay and ChargingStation do NOT apply depletion penalty (safe maintenance zones)
+          let isMaintenanceZone = switch (mission.zone) {
+            case (#RepairBay) { true };
+            case (#ChargingStation) { true };
+            case (_) { false };
+          };
+
+          let batteryDepletionPenalty = if (newBattery == 0 and botStats.battery == 0 and not isMaintenanceZone) {
+            // Use lastAccumulation in seed for deterministic results
+            let depletionDamagePerHour = 10.0;
+            let depletionRng = Float.fromInt(hashNat(tokenIndex + Int.abs(mission.lastAccumulation) + 5) % 21) / 10.0 - 1.0; // -1.0 to +1.0
+            let damage = depletionDamagePerHour * hoursElapsed * (1.0 + depletionRng * 0.2); // ±20% variance
+            Int.abs(Float.toInt(damage));
+          } else { 0 };
+
+          // Probabilistic rounding for condition (MATCH UPDATE FUNCTION)
+          // Use lastAccumulation in seed for deterministic results
+          let conditionFloor = Int.abs(Float.toInt(conditionLossWithVariance));
+          let conditionFraction = Float.abs(conditionLossWithVariance) - Float.fromInt(conditionFloor);
+          let conditionRng = Float.fromInt(hashNat(tokenIndex + Int.abs(mission.lastAccumulation) + 3) % 100) / 100.0;
+          let conditionChangeRounded = if (conditionRng < conditionFraction) {
+            conditionFloor + 1;
+          } else {
+            conditionFloor;
+          };
+
+          // Update condition (restoration for RepairBay, loss for others)
+          let newCondition = if (conditionLossWithVariance < 0.0) {
+            Nat.min(100, botStats.condition + conditionChangeRounded);
+          } else {
+            let totalConditionLoss = conditionChangeRounded + batteryDepletionPenalty;
+            if (botStats.condition > totalConditionLoss) {
+              botStats.condition - totalConditionLoss;
+            } else { 0 };
+          };
+
+          // Calculate amounts restored (for pending display)
+          let conditionRestored = if (conditionLossWithVariance < 0.0 and newCondition > botStats.condition) {
+            newCondition - botStats.condition;
+          } else { 0 };
+
+          let batteryRestored = if (batteryDrainWithVariance < 0.0 and newBattery > botStats.battery) {
+            newBattery - botStats.battery;
+          } else { 0 };
+
+          // Return stats with updated battery, condition, and pending values (read-only, no state change)
+          let updatedMission = {
+            mission with
+            pendingParts = newPendingParts;
+            pendingConditionRestored = mission.pendingConditionRestored + conditionRestored;
+            pendingBatteryRestored = mission.pendingBatteryRestored + batteryRestored;
+          };
+
+          #ok({
+            botStats with
+            battery = newBattery;
+            condition = newCondition;
+            activeMission = ?updatedMission;
+          });
         };
       };
     };
@@ -2947,14 +3281,6 @@ module {
               return #err("Bot is already on a scavenging mission - collect rewards first");
             };
             case (null) {};
-          };
-
-          // Minimum battery/condition check (need at least 10 to start)
-          if (botStats.battery < 10) {
-            return #err("Insufficient battery - need at least 10 to start scavenging");
-          };
-          if (botStats.condition < 10) {
-            return #err("Bot too damaged - need at least 10 condition to start scavenging");
           };
 
           // Create continuous or timed mission
@@ -3156,6 +3482,8 @@ module {
                   thrusterKits = finalThrusterKits;
                   gyroModules = finalGyroModules;
                   universalParts = finalUniversalParts;
+                  conditionRestored = finalMission.pendingConditionRestored;
+                  batteryRestored = finalMission.pendingBatteryRestored;
                   hoursOut = hoursOut;
                   completedAt = now;
                   zone = finalMission.zone;

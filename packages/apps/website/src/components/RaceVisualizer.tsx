@@ -28,16 +28,34 @@ function useBotName(tokenIndex: number): string {
   return `Bot #${tokenIndex}`;
 }
 
-// Replace bot references in event descriptions with actual names
-const EventDescription = ({ event, allBotIds }: { event: RaceEvent; allBotIds: string[] }) => {
-  // Call hooks unconditionally for ALL bots (required by React rules)
-  const botNames = new Map<string, string>();
-  allBotIds.forEach(id => {
+// Component to fetch all bot names at once
+function BotNamesFetcher({ botIds, children }: { botIds: string[]; children: (botNames: Map<string, string>) => React.ReactNode }) {
+  // Call useGetBotProfile for each bot exactly once
+  const botNames = useMemo(() => {
+    const names = new Map<string, string>();
+    botIds.forEach(id => {
+      const tokenIndex = Number(id);
+      // This will be called once per bot when botIds change
+      names.set(id, `Bot #${tokenIndex}`);
+    });
+    return names;
+  }, [botIds]);
+
+  // Fetch profiles and update names
+  botIds.forEach(id => {
+    const tokenIndex = Number(id);
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    const name = useBotName(Number(id));
-    botNames.set(id, name);
+    const { data: botProfile } = useGetBotProfile(tokenIndex);
+    if (botProfile?.name && botProfile.name.length > 0 && botProfile.name[0]) {
+      botNames.set(id, botProfile.name[0]);
+    }
   });
 
+  return children(botNames);
+}
+
+// Replace bot references in event descriptions with actual names
+const EventDescription = ({ event, botNames }: { event: RaceEvent; botNames: Map<string, string> }) => {
   // Replace bot references in description
   let description = event.description;
   botNames.forEach((name, id) => {
@@ -93,6 +111,7 @@ interface RaceVisualizerProps {
   startAtEnd?: boolean; // Start visualization at the end (for simulator mode)
   onRaceWatched?: () => void; // Callback when user watches race to completion
   events?: RaceEvent[]; // Race commentary events
+  disableAutoplay?: boolean; // Disable autoplay even for live races
 }
 
 // Helper to extract terrain from variant object or string
@@ -143,7 +162,8 @@ const TRACK_NAMES = [
   "Rust Belt Rally",
   "Debris Field Dash",
   "Velocity Viaduct",
-  "Sandstorm Circuit"
+  "Sandstorm Circuit",
+  "Desert Sprint"
 ];
 
 // Track definitions matching backend RacingSimulator.mo
@@ -325,6 +345,18 @@ const TRACK_TEMPLATES: Record<number, { segments: TrackSegment[]; laps: number }
       { length: 600, terrain: 'WastelandSand', angle: -11, difficulty: 1.15 }
     ],
     laps: 2
+  },
+  11: { // Desert Sprint - Quick dash across packed sand flats
+    segments: [
+      { length: 350, terrain: 'WastelandSand', angle: 0, difficulty: 1.1 },
+      { length: 300, terrain: 'WastelandSand', angle: 4, difficulty: 1.15 },
+      { length: 250, terrain: 'WastelandSand', angle: 8, difficulty: 1.2 },
+      { length: 280, terrain: 'WastelandSand', angle: -6, difficulty: 1.12 },
+      { length: 320, terrain: 'WastelandSand', angle: 0, difficulty: 1.18 },
+      { length: 300, terrain: 'WastelandSand', angle: -5, difficulty: 1.08 },
+      { length: 300, terrain: 'WastelandSand', angle: -1, difficulty: 1.15 }
+    ],
+    laps: 3
   }
 };
 
@@ -448,65 +480,142 @@ function applyFactionBonuses(
   return boosted;
 }
 
-// Replicate backend segment time calculation
+// Replicate backend segment time calculation - matches RacingSimulator.mo
 function calculateSegmentTimeEstimate(
   segment: TrackSegment, 
   seed: bigint,
   stats: { speed: number; stability: number; powerCore: number; acceleration: number },
-  previousDifficulty: number = 1.0 // Difficulty of previous segment
+  previousDifficulty: number = 1.0, // Difficulty of previous segment
+  raceDistance: number = 10 // Total race distance for distance-based scaling (in km)
 ): number {
-  const avgSpeed = stats.speed;
-  const avgStability = stats.stability;
-  const avgPowerCore = stats.powerCore;
-  const avgAccel = stats.acceleration;
+  const speed = stats.speed;
+  const powerCore = stats.powerCore;
+  const stability = stats.stability;
+  const acceleration = stats.acceleration;
+
+  const DEBUG = segment.length === 500 && previousDifficulty === 1.0; // Debug first segment only
+
+  // === PART 1: UNIVERSAL STAT COMPONENTS (70% always active) ===
   
-  const segmentLength = segment.length;
-  
-  // Base speed calculation - use square root to reduce speed dominance
-  const baseSpeed = Math.sqrt(avgSpeed) * 7.5;
-  
-  // Terrain modifier - MATCH BACKEND EXACTLY
-  let terrainMod = 1.0;
-  if (segment.terrain === 'ScrapHeaps') {
-    terrainMod = 1.0 + ((100 - avgStability) / 150.0); // Stability critical (up to +67%)
-  } else if (segment.terrain === 'WastelandSand') {
-    terrainMod = 1.0 + ((100 - avgPowerCore) / 200.0); // Endurance critical (up to +50%)
-  } else if (segment.terrain === 'MetalRoads') {
-    terrainMod = 1.0 + ((100 - avgAccel) / 160.0); // Acceleration helps (up to +62%)
+  // Speed: 70% universal base, 30% conditional bonus
+  const speedUniversal = Math.sqrt(speed) * 5.25; // 70% of original 7.5
+  let speedBonus = 0.0;
+  if (segment.angle === 0 && segment.terrain === 'MetalRoads') {
+    speedBonus = Math.sqrt(speed) * 2.25; // +30% bonus on ideal conditions
+  } else if (segment.angle < 0) {
+    speedBonus = Math.sqrt(speed) * 1.125; // +15% bonus on downhills
   }
   
-  // Angle modifier - match backend segment calculation
-  let angleMod = 1.0;
-  if (segment.angle > 0) {
-    // Uphill - powerCore matters more
-    angleMod = 1.0 + (segment.angle * (100.0 - avgPowerCore) / 3000.0);
-  }
-  // Downhill/flat - no bonus (speed already in base speed)
+  // === PART 2: STAT SYNERGIES ===
   
-  // Momentum system: acceleration affects speed buildup after difficult sections
+  // Speed + Acceleration synergy (high speed needs good accel to maintain)
+  const speedAccelRatio = (speed + acceleration) / 200.0; // 0.30 to 1.0
+  const speedSynergyMod = 0.80 + (speedAccelRatio * 0.20); // 0.80x to 1.0x
+  const synergisticSpeed = (speedUniversal + speedBonus) * speedSynergyMod;
+  
+  // Power + Stability synergy (endurance needs stability)
+  const powerStabilityRatio = (powerCore + stability) / 200.0; // 0.30 to 1.0
+  const powerSynergyMod = 0.85 + (powerStabilityRatio * 0.15); // 0.85x to 1.0x
+  
+  // === PART 3: UNIVERSAL PENALTIES (all stats matter everywhere) ===
+  
+  // Power Core: Universal endurance (25% penalty range)
+  const powerUniversal = 1.0 + ((100.0 - powerCore) / 400.0);
+  
+  // Acceleration: Universal responsiveness (20% penalty range)
+  const accelUniversal = 1.0 + ((100.0 - acceleration) / 350.0);
+  
+  // Stability: Universal consistency (17% penalty range)
+  const stabilityUniversal = 1.0 + ((100.0 - stability) / 400.0);
+  
+  // === PART 4: SITUATIONAL MODIFIERS ===
+  
+  // Power: Additional penalty in demanding conditions
+  let powerSituational = 1.0;
+  if (segment.terrain === 'WastelandSand') {
+    powerSituational = 1.0 + ((100.0 - powerCore) / 200.0); // +50% penalty on sand
+  } else if (segment.angle > 5) {
+    const steepness = segment.angle / 20.0;
+    powerSituational = 1.0 + ((100.0 - powerCore) / 250.0) * steepness; // Scaled uphill penalty
+  } else if (segment.angle > 0) {
+    powerSituational = 1.0 + ((100.0 - powerCore) / 400.0); // Small uphill penalty
+  }
+  
+  // Acceleration: Bonus on roads, momentum recovery
+  let accelSituational = 1.0;
+  if (segment.terrain === 'MetalRoads') {
+    accelSituational = 1.0 + ((100.0 - acceleration) / 160.0); // +44% penalty on roads
+  }
+  
   const momentumLoss = previousDifficulty > 1.0 
-    ? (previousDifficulty - 1.0) * 0.15 // Up to 15% slower per 1.0 difficulty
+    ? (previousDifficulty - 1.0) * 0.20 // Increased from 0.15
     : 0.0;
-  
-  // Acceleration determines recovery: high accel = faster recovery  
-  const accelerationRecovery = avgAccel / 140.0; // 0.0 to 0.71 (71% recovery at 100 accel)
+  const accelerationRecovery = acceleration / 140.0;
   const momentumMod = 1.0 + (momentumLoss * (1.0 - accelerationRecovery));
   
-  // Difficulty from track - scales with stability for technical sections
-  const difficultyMod = segment.difficulty > 1.0
-    ? segment.difficulty * (1.0 + ((100 - avgStability) / 300.0)) // Technical sections penalize low stability
-    : segment.difficulty; // Fast sections don't penalize as much
+  // Stability: Technical sections and difficulty
+  let stabilitySituational = 1.0;
+  if (segment.terrain === 'ScrapHeaps') {
+    stabilitySituational = 1.0 + ((100.0 - stability) / 150.0); // +47% penalty on heaps
+  }
   
-  // Randomness - match backend (±10% per segment)
+  const difficultyMod = segment.difficulty > 1.0
+    ? segment.difficulty * (1.0 + ((100.0 - stability) / 300.0) * (segment.difficulty - 1.0))
+    : segment.difficulty;
+  
+  // === PART 5: DISTANCE-BASED STAT SCALING ===
+  
+  // Short sprints (<10km) - Acceleration & Speed matter more
+  let sprintFactor = 1.0;
+  if (raceDistance < 10) {
+    const accelWeight = 1.0 + ((acceleration - 50.0) / 200.0); // 0.75x to 1.25x
+    const speedWeight = 1.0 - ((speed - 50.0) / 400.0); // 1.125x to 0.875x
+    sprintFactor = accelWeight / speedWeight; // High accel gets bonus, high speed gets slight penalty
+  }
+  
+  // Long treks (>20km) - Power & Stability matter more  
+  let trekFactor = 1.0;
+  if (raceDistance > 20) {
+    const powerWeight = 0.80 + ((powerCore - 50.0) / 200.0); // 0.55x to 1.05x
+    const stabilityWeight = 0.85 + ((stability - 50.0) / 250.0); // 0.65x to 1.05x
+    trekFactor = (powerWeight + stabilityWeight) / 2.0; // Average of both
+  }
+  
+  // === PART 6: COMBINE ALL MODIFIERS ===
+  
+  // Apply synergy to power effectiveness
+  const totalPowerMod = (powerUniversal * powerSituational) / powerSynergyMod;
+  const totalAccelMod = accelUniversal * accelSituational * momentumMod;
+  const totalStabilityMod = stabilityUniversal * stabilitySituational;
+  
+  // Apply distance-based scaling
+  const distanceAdjustedSpeed = synergisticSpeed / (sprintFactor * trekFactor);
+  
+  // Randomness for this segment (±10% per segment)
   const segmentSeed = Number(seed % 1000n);
   const randomMod = 0.90 + (segmentSeed / 5000.0); // 0.90 to 1.10
   
-  // Calculate time - match backend formula with momentum
-  const effectiveSpeed = baseSpeed / (terrainMod * angleMod * difficultyMod * momentumMod);
+  // Calculate segment time
+  const segmentLength = segment.length;
+  const effectiveSpeed = distanceAdjustedSpeed / (totalPowerMod * totalAccelMod * totalStabilityMod * difficultyMod);
   const segmentTime = (segmentLength / effectiveSpeed) * randomMod;
   
-  // Apply 10x speed multiplier to match backend
-  return Math.max(0.1, segmentTime / 10.0);
+  // 10x speed multiplier to reduce race times for better UX
+  const finalTime = Math.max(0.1, segmentTime / 10.0);
+  
+  // Debug logging for common first segment lengths
+  if (segment.length >= 990 && segment.length <= 1010) {
+    console.log('=== SEGMENT TIME CALCULATION ===');
+    console.log('Race Distance (km):', raceDistance);
+    console.log('Segment:', segment);
+    console.log('Stats:', { speed, powerCore, acceleration, stability });
+    console.log('Speed Components:', { speedUniversal, speedBonus, synergisticSpeed });
+    console.log('Distance Scaling:', { sprintFactor, trekFactor });
+    console.log('Modifiers:', { totalPowerMod, totalAccelMod, totalStabilityMod, difficultyMod });
+    console.log('Results:', { distanceAdjustedSpeed, effectiveSpeed, segmentLength, randomMod, segmentTime, finalTime });
+  }
+  
+  return finalTime;
 }
 
 // Calculate segment-by-segment times for a bot
@@ -520,14 +629,18 @@ function calculateBotSegmentTimes(
   preferredTerrain?: string,
   terrain?: string,
   nftId?: string,
-  bonusesAlreadyApplied?: boolean
+  bonusesAlreadyApplied?: boolean,
+  raceDistance?: number // Race distance in km
 ): SegmentTime[] {
-  const track = TRACK_TEMPLATES[trackId];
-  if (!track) return [];
-  
   // Require valid stats - if undefined/invalid, return empty to prevent NaN
   if (!stats || typeof stats.speed !== 'number' || isNaN(stats.speed)) {
     console.warn('calculateBotSegmentTimes: Invalid stats for bot', nftId, stats);
+    return [];
+  }
+  
+  const track = TRACK_TEMPLATES[trackId];
+  if (!track) {
+    console.warn(`No track template for ID ${trackId}`);
     return [];
   }
   
@@ -536,6 +649,22 @@ function calculateBotSegmentTimes(
   // Apply faction + preferred terrain bonuses (only if not already applied by backend)
   const terrainType = terrain || getTerrainString(track.segments[0]?.terrain);
   const botStats = bonusesAlreadyApplied ? rawStats : applyFactionBonuses(rawStats, faction, terrainType, preferredTerrain);
+  
+  // Debug: log if we applied bonuses
+  if (nftId && Number(nftId) < 10000) {
+    console.log(`[Bot ${nftId}] Raw stats:`, rawStats);
+    console.log(`[Bot ${nftId}] Bonused stats:`, botStats);
+    console.log(`[Bot ${nftId}] Faction: ${faction}, Terrain: ${terrainType}, Preferred: ${preferredTerrain}, BonusesAlready: ${bonusesAlreadyApplied}`);
+  }
+  
+  // Calculate distance from track segments (matches backend track.totalDistance)
+  const segmentDistance = (track.segments.reduce((sum, seg) => sum + seg.length, 0) * track.laps) / 1000;
+  
+  // Backend uses 0 for simulator due to integer division bug (15m / 1000 = 0km)
+  // So we use segment distance when raceDistance is 0 or not provided
+  const distanceKm = (raceDistance && raceDistance > 0) ? raceDistance : segmentDistance;
+  
+  console.log(`[Bot ${nftId}] Race Distance: ${distanceKm}km (segments=${segmentDistance}km), Stats:`, botStats);
   
   const segmentTimes: SegmentTime[] = [];
   let cumulativeTime = 0;
@@ -554,13 +683,17 @@ function calculateBotSegmentTimes(
       const seedBase = typeof trackSeed === 'bigint' ? trackSeed : BigInt(trackSeed);
       const segmentSeed = seedBase + BigInt(participantIndex * 1000 + globalSegmentIdx);
       
-      // Per-segment performance variation (driver errors, debris, wind, etc.)
+          // Per-segment performance variation (driver errors, debris, wind, etc.)
       // Each bot experiences different micro-conditions on each segment
       // CRITICAL: Must match backend exactly - use participantIndex in both places
       const segmentConditionSeed = Number((segmentSeed * 31337n + BigInt(participantIndex * 7919) + BigInt(lap * 12345)) % 1000n);
-      const segmentPerformance = 0.94 + (segmentConditionSeed / 1666.67); // 0.94 to 1.06 (±6%)
+      const segmentPerformance = 0.94 + (segmentConditionSeed / 8325.0); // 0.94 to 1.06 (±6%)
       
-      const time = calculateSegmentTimeEstimate(segment, segmentSeed, botStats, previousDifficulty) * segmentPerformance;
+      const time = calculateSegmentTimeEstimate(segment, segmentSeed, botStats, previousDifficulty, distanceKm) * segmentPerformance;
+      
+      if (globalSegmentIdx === 0) {
+        console.log(`[Bot ${nftId}] Segment 0: baseTime=${calculateSegmentTimeEstimate(segment, segmentSeed, botStats, previousDifficulty, distanceKm)}, performance=${segmentPerformance}, finalTime=${time}`);
+      }
       
       cumulativeTime += time;
       cumulativeDistance += segment.length;
@@ -688,14 +821,8 @@ function simulateRaceProgression(
     const totalDistance = segmentTimes[segmentTimes.length - 1].cumulativeDistance;
     const progress = (totalDistanceCovered / totalDistance) * 100;
     
-    // Calculate current speed (m/s) based on current segment with micro-fluctuations
-    let currentSpeed = currentSegment ? currentSegment.distance / currentSegment.time : 0;
-    if (currentSpeed > 0) {
-      // Add very subtle fluctuation based on position within segment
-      // Moderate frequency and small amplitude for realistic variation
-      const fluctuation = Math.sin(segmentProgress * Math.PI * 1.5 + currentSegmentIdx) * 0.02; // ±2% variation, 1.5x frequency
-      currentSpeed = currentSpeed * (1 + fluctuation);
-    }
+    // Calculate current speed (m/s) based on current segment
+    const currentSpeed = currentSegment ? currentSegment.distance / currentSegment.time : 0;
     
     return {
       nftId: result.nftId,
@@ -742,7 +869,7 @@ function simulateRaceProgression(
   return positions;
 }
 
-export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain, botOrder, isValidating = false, raceStartTime, raceStatus, bonusesAlreadyApplied = false, startAtEnd = false, onRaceWatched, events = [] }: RaceVisualizerProps) {
+export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain, botOrder, isValidating = false, raceStartTime, raceStatus, bonusesAlreadyApplied = false, startAtEnd = false, onRaceWatched, events = [], disableAutoplay = false }: RaceVisualizerProps) {
   // Determine if race is currently in progress (live mode)
   // Race is live if status is InProgress
   const isLive = useMemo(() => {
@@ -787,8 +914,8 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     return saved ? parseFloat(saved) : 0;
   }, [raceTimeKey]);
   
-  // Autoplay if within live window and never watched before
-  const shouldAutoplay = isLive && !hasWatchedBefore.current;
+  // Autoplay if within live window and never watched before (unless disabled)
+  const shouldAutoplay = isLive && !hasWatchedBefore.current && !disableAutoplay;
   
   const [isPlaying, setIsPlaying] = useState(shouldAutoplay);
   const [currentTime, setCurrentTime] = useState(savedTime); // Resume from saved position
@@ -811,6 +938,9 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
       .slice(0, 20);
   }, [visibleEvents]);
   
+  // Memoize bot IDs for name fetching
+  const botIds = useMemo(() => results.map(r => r.nftId), [results]);
+  
   // Pre-calculate segment times for all bots (memoized)
   const segmentTimesMap = useMemo(() => {
     const map = new Map<string, SegmentTime[]>();
@@ -822,19 +952,21 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
       const segmentTimes = calculateBotSegmentTimes(
         trackId, 
         trackSeed, 
-        participantIndex, 
+        participantIndex,
         result.stats, 
         result.finalTime,
         result.faction,
         result.preferredTerrain,
         getTerrainString(terrain),
         result.nftId,
-        bonusesAlreadyApplied
+        bonusesAlreadyApplied,
+        distance // Distance in km - used as fallback for unknown tracks
       );
       map.set(result.nftId, segmentTimes);
     });
+    
     return map;
-  }, [results, trackId, trackSeed, bonusesAlreadyApplied, botOrder, terrain]);
+  }, [results, trackId, trackSeed, bonusesAlreadyApplied, botOrder, terrain, distance]);
   
   // Find the slowest finisher based on actual segment-calculated times
   const maxTime = useMemo(() => {
@@ -851,13 +983,14 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
   }, [segmentTimesMap, results]);
   
   // Calculate actual track distance from segments (more accurate than distance prop)
+  // Returns distance in meters for position calculations
   const actualTrackDistance = useMemo(() => {
     const track = TRACK_TEMPLATES[trackId];
     if (!track) {
-      return distance * 1000;
+      return distance * 1000; // Distance is in km, convert to meters
     }
     const dist = track.segments.reduce((sum, seg) => sum + seg.length, 0) * track.laps;
-    return dist;
+    return dist; // Already in meters from segment lengths
   }, [trackId, distance]);
   
   // Sort results by botOrder to maintain registration order for stable lanes
@@ -870,14 +1003,18 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     });
   }, [results, botOrder]);
   
-  // Calculate current positions using segment-based simulation (memoized)
-  const positions = useMemo(() => 
-    simulateRaceProgression(sortedResults, trackSeed, trackId, currentTime, segmentTimesMap),
-    [sortedResults, trackSeed, trackId, currentTime, segmentTimesMap]
-  );
+  // Calculate current positions using segment-based simulation
+  // Don't memoize since currentTime changes every frame - memoization adds overhead without benefit
+  const positions = simulateRaceProgression(sortedResults, trackSeed, trackId, currentTime, segmentTimesMap);
   
   // Use positions directly - they're already in registration order from sortedResults
   const stablePositions = positions;
+  
+  // Sort positions for leaderboard (don't memoize - positions change every frame)
+  const sortedPositions = [...stablePositions].sort((a, b) => a.position - b.position);
+  
+  // Calculate leader time (don't memoize - changes every frame)
+  const leaderTime = Math.min(...stablePositions.map(b => b.finalTime));
   
   // For simulator mode with startAtEnd, set to final position on mount
   useEffect(() => {
@@ -964,6 +1101,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
       setCurrentTime(prev => {
         const deltaTime = (frameInterval / 1000) * playbackSpeed; // Use fixed frame interval
         const newTime = prev + deltaTime;
+        
         if (newTime >= maxTime) {
           setIsPlaying(false);
           // Trigger callback when race finishes
@@ -1036,8 +1174,8 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
   const timeValidation = useMemo(() => {
     const validations = results.map(result => {
       const localBot = positions.find(p => p.nftId === result.nftId);
-      // Skip if: DNF, no result yet (null finalTime), or no local bot data
-      if (!localBot || result.finalTime === null || result.finalTime > 100000) return null;
+      // Skip if: DNF, no result yet (null finalTime), zero finalTime (not calculated yet), or no local bot data
+      if (!localBot || result.finalTime === null || result.finalTime === 0 || result.finalTime > 100000) return null;
       const serverTime = result.finalTime;
       const localTime = localBot.finalTime;
       const diff = Math.abs(serverTime - localTime);
@@ -1433,13 +1571,12 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
             </h3>
             <div className="space-y-1.5">
               {/* Sort by current race position (live standings) */}
-              {[...stablePositions].sort((a, b) => a.position - b.position).map((bot) => {
+              {sortedPositions.map((bot) => {
                 const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.nftId));
                 const imageUrl = generateExtThumbnailLink(tokenId);
                 const isFinished = bot.progress >= 99.9 || currentTime >= bot.finalTime;
                 const isDNF = bot.finalTime > 100000;
                 const livePosition = bot.position;
-                const leaderTime = Math.min(...stablePositions.map(b => b.finalTime));
                 const timeBehind = bot.finalTime - leaderTime;
                 const result = results.find(r => r.nftId === bot.nftId);
                 const rating = result?.rating || (result?.stats ? 
@@ -1515,11 +1652,13 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                 <Radio className="w-4 h-4" />
                 Race Commentary
               </h3>
-              <div className="space-y-2">
-                {visibleEvents.length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">Race starting...</p>
-                ) : (
-                  sortedEvents.map((event, idx) => {
+              <BotNamesFetcher botIds={botIds}>
+                {(botNames) => (
+                  <div className="space-y-2">
+                    {visibleEvents.length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">Race starting...</p>
+                    ) : (
+                      sortedEvents.map((event, idx) => {
                     const eventKey = Object.keys(event.eventType)[0];
                     const eventData = event.eventType[eventKey as keyof typeof event.eventType] as any;
                     
@@ -1562,14 +1701,16 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                             </span>
                           </div>
                           <p className="text-xs leading-tight">
-                            <EventDescription event={event} allBotIds={results.map(r => r.nftId)} />
+                            <EventDescription event={event} botNames={botNames} />
                           </p>
                         </div>
                       </div>
                     );
                   })
                 )}
-              </div>
+                  </div>
+                )}
+              </BotNamesFetcher>
             </div>
           )}
         </div>

@@ -64,7 +64,8 @@ function getTrackName(trackId: number): string {
     "Rust Belt Rally",
     "Debris Field Dash",
     "Velocity Viaduct",
-    "Sandstorm Circuit"
+    "Sandstorm Circuit",
+    "Desert Sprint"
   ];
   return trackNames[trackId] || trackNames[0];
 }
@@ -154,6 +155,7 @@ function RacePlayback3DWrapper({ race }: { race: any }) {
         results={raceResults}
         botColors={botColors}
         botLabels={botLabels}
+        raceDistance={Number(race.distance)}
       />
     );
   }
@@ -622,13 +624,18 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
                                   Time: {result.finalTime.toFixed(2)}s
                                 </p>
                               </div>
-                              {hasPrize && (
-                                <div className="text-right">
+                              <div className="text-right space-y-1">
+                                {hasPrize && (
                                   <p className="text-lg text-green-500 font-bold">
                                     +{formatICP(result.prizeAmount)}
                                   </p>
-                                </div>
-                              )}
+                                )}
+                                {result.partsEarned && Number(result.partsEarned) > 0 && (
+                                  <p className="text-sm text-cyan-500 font-semibold">
+                                    +{result.partsEarned} {result.partType}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </Link>
                         );

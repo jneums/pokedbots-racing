@@ -132,23 +132,38 @@ module {
           };
           case (#Ok(blockIndex)) {
             let conditionRestored = Nat.min(25, 100 - racingStats.condition);
+            let newCondition = Nat.min(100, racingStats.condition + 25);
+
+            // Perfect Tune-Up: If repair lands on exactly 100% with active overcharge, mark it penalty-free
+            // Check the UNCAPPED value (before min) to ensure it's exactly 100, not just capped at 100
+            let perfectTuneUp = (racingStats.condition + 25 == 100 and racingStats.overcharge > 0);
 
             let updatedStats = {
               racingStats with
-              condition = Nat.min(100, racingStats.condition + 25);
+              condition = newCondition;
               lastRepaired = ?now;
+              perfectTuneUp = perfectTuneUp;
             };
 
             ctx.garageManager.updateStats(tokenIndex, updatedStats);
 
             let costIcp = Float.fromInt(repairCostWithSynergy) / 100_000_000.0;
+
+            let message = if (perfectTuneUp) {
+              "🔧✨ Perfect Tune-Up! Condition at 100% - overcharge penalties removed! Your bot keeps the " # Nat.toText(racingStats.overcharge) # "% speed boost without stability/power penalties for the next race!";
+            } else {
+              "🔧 Repairs complete. Condition at " # Nat.toText(updatedStats.condition) # "%";
+            };
+
             let response = Json.obj([
               ("token_index", Json.int(tokenIndex)),
               ("action", Json.str("Repair Condition")),
               ("condition_restored", Json.int(conditionRestored)),
               ("new_condition", Json.int(updatedStats.condition)),
+              ("perfect_tuneup", Json.bool(perfectTuneUp)),
+              ("overcharge", Json.int(updatedStats.overcharge)),
               ("cost_icp", Json.str(Float.toText(costIcp))),
-              ("message", Json.str("🔧 Repairs complete. Condition at " # Nat.toText(updatedStats.condition) # "%")),
+              ("message", Json.str(message)),
             ]);
 
             ToolContext.makeSuccess(response, cb);

@@ -82,6 +82,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
 
   
   const [showInitialize, setShowInitialize] = useState(false);
+  const [showRename, setShowRename] = useState(false);
   const [showListForSale, setShowListForSale] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -443,71 +444,46 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
 
   if (needsRegistration) {
     return (
-      <>
-        <Card className="border-dashed border-2 border-primary/20 bg-card/80 backdrop-blur">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3">
-              <Avatar className="h-12 w-12">
-                <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
-                <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 flex items-center justify-between">
-                <span>Bot #{bot.tokenIndex.toString()}</span>
-                <Badge variant="secondary">{!bot.isInitialized ? 'Uninitialized' : 'Needs Re-registration'}</Badge>
-              </div>
-            </CardTitle>
-            <CardDescription>
-              {!bot.isInitialized 
-                ? 'This bot needs to be registered for racing. Costs 0.1 ICP.' 
-                : 'Register this transferred bot to your account. Costs 0.1 ICP.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => setShowInitialize(true)} className="w-full">
-              Initialize Bot (0.1 ICP)
+      <Card className="border-dashed border-2 border-primary/20 bg-card/80 backdrop-blur">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3">
+            <Avatar className="h-16 w-16">
+              <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
+              <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 flex flex-col gap-1">
+              <span className="text-xl">Bot #{bot.tokenIndex.toString()}</span>
+              <Badge variant="secondary" className="w-fit">{!bot.isInitialized ? 'Uninitialized' : 'Needs Re-registration'}</Badge>
+            </div>
+          </CardTitle>
+          <CardDescription>
+            {!bot.isInitialized 
+              ? 'This bot needs to be registered for racing. Registration reveals faction and stats based on NFT traits.' 
+              : 'Register this transferred bot to your account. Costs 0.1 ICP.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="bot-name">Bot Name (Optional)</Label>
+            <Input
+              id="bot-name"
+              placeholder="Enter a custom name"
+              value={botName}
+              onChange={(e) => setBotName(e.target.value)}
+              maxLength={30}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleInitialize}
+              disabled={initializeMutation.isPending}
+              className="flex-1"
+            >
+              {initializeMutation.isPending ? 'Processing Payment...' : 'Initialize (0.1 ICP + 0.0001 fee)'}
             </Button>
-          </CardContent>
-        </Card>
-
-        <Dialog open={showInitialize} onOpenChange={setShowInitialize}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{!bot.isInitialized ? 'Initialize' : 'Register'} Bot #{bot.tokenIndex.toString()}</DialogTitle>
-              <DialogDescription>
-                Register this bot for wasteland racing. Costs 0.1 ICP + 0.0001 ICP fee.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="bot-name">Bot Name (Optional)</Label>
-                <Input
-                  id="bot-name"
-                  placeholder="Enter a custom name"
-                  value={botName}
-                  onChange={(e) => setBotName(e.target.value)}
-                  maxLength={30}
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={handleInitialize}
-                disabled={initializeMutation.isPending}
-                className="flex-1"
-              >
-                {initializeMutation.isPending ? 'Processing Payment...' : 'Initialize (0.1 ICP)'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowInitialize(false)}
-                disabled={initializeMutation.isPending}
-              >
-                Cancel
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -524,14 +500,12 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           <div className="flex-1 flex flex-col gap-1">
             <div className="flex items-center justify-between">
               <span className="text-xl">{bot.name || `Bot #${bot.tokenIndex.toString()}`}</span>
-              <Button
-                variant="link"
-                size="sm"
-                className="text-xs text-primary p-0 h-auto"
-                onClick={() => window.location.href = `/bot/${bot.tokenIndex}`}
+              <Link
+                to={`/bot/${bot.tokenIndex}`}
+                className="text-xs text-primary hover:underline"
               >
                 View Racing Details →
-              </Button>
+              </Link>
             </div>
             <Badge variant={getFactionColor(stats.faction)} className="w-fit">
               {getFactionName(stats.faction)}
@@ -575,22 +549,27 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
         {/* Overcharge Status - Always visible to encourage usage */}
         {(() => {
           const overcharge = Number(stats.overcharge);
-          const maxOvercharge = 60;
+          const maxOvercharge = 40; // Max overcharge is 40 (capped in recharge logic)
           const percentOfMax = Math.round((overcharge / maxOvercharge) * 100);
+          const perfectTuneUp = stats.perfectTuneUp === true;
           
           return (
             <div className={`p-3 rounded-lg space-y-2 ${
-              overcharge > 0 
-                ? 'bg-cyan-500/10 border border-cyan-500/30' 
-                : 'bg-muted/50 border border-muted'
+              perfectTuneUp
+                ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-2 border-yellow-500/50 shadow-lg'
+                : overcharge > 0 
+                  ? 'bg-cyan-500/10 border border-cyan-500/30' 
+                  : 'bg-muted/50 border border-muted'
             }`}>
               <div className="flex justify-between items-center">
                 <span className={`text-sm font-semibold ${
-                  overcharge > 0 
-                    ? 'text-cyan-600 dark:text-cyan-400' 
-                    : 'text-muted-foreground'
+                  perfectTuneUp
+                    ? 'text-yellow-600 dark:text-yellow-400'
+                    : overcharge > 0 
+                      ? 'text-cyan-600 dark:text-cyan-400' 
+                      : 'text-muted-foreground'
                 }`}>
-                  ⚡ Overcharge
+                  {perfectTuneUp ? '⚡ PERFECT TUNE-UP! ⚡' : '⚡ Overcharge'}
                 </span>
                 <span className={`text-sm font-bold ${
                   overcharge > 0 
@@ -602,16 +581,29 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
               </div>
               <div className="w-full bg-cyan-900/20 rounded-full h-2">
                 <div
-                  className="h-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all"
+                  className={`h-2 rounded-full transition-all ${
+                    perfectTuneUp 
+                      ? 'bg-gradient-to-r from-yellow-400 to-orange-500' 
+                      : 'bg-gradient-to-r from-cyan-500 to-blue-500'
+                  }`}
                   style={{ width: `${percentOfMax}%` }}
                 />
               </div>
-              {overcharge > 0 ? (
+              {perfectTuneUp ? (
+                <div className="text-xs space-y-0.5">
+                  <p className="font-semibold text-yellow-700 dark:text-yellow-400">🎯 Jackpot! Next race boost:</p>
+                  <div className="flex justify-between">
+                    <span className="text-green-600 font-semibold">+{(overcharge * 0.125).toFixed(1)}% Speed</span>
+                    <span className="text-green-600 font-semibold">+{(overcharge * 0.125).toFixed(1)}% Accel</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground italic">No penalties! Perfect timing on repair.</p>
+                </div>
+              ) : overcharge > 0 ? (
                 <div className="text-xs space-y-0.5">
                   <p className="text-muted-foreground">Next race boost:</p>
                   <div className="flex justify-between">
-                    <span className="text-green-600">+{(overcharge * 0.15).toFixed(1)}% Speed/Accel</span>
-                    <span className="text-red-600">-{(overcharge * 0.1).toFixed(1)}% Power/Stab</span>
+                    <span className="text-green-600">+{(overcharge * 0.125).toFixed(1)}% Speed/Accel</span>
+                    <span className="text-red-600">-{(overcharge * 0.083).toFixed(1)}% Power/Stab</span>
                   </div>
                 </div>
               ) : (
@@ -720,6 +712,11 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
             ? 'bg-destructive/10 border-destructive/30' 
             : 'bg-card/80 border-muted'
         }`}>
+          {bot.activeMission && (Number(stats.battery) === 0 || Number(stats.condition) === 0) && (
+            <div className="p-2 bg-red-500/20 border border-red-500/50 rounded text-xs text-red-600 dark:text-red-400">
+              ⚠️ <strong>BOT DEAD:</strong> Retrieve now to collect remaining rewards before mission fails!
+            </div>
+          )}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -730,12 +727,18 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 {formatBigInt(stats.battery)}%
               </span>
             </div>
-            <div className="w-full bg-secondary rounded-full h-2">
+            <div className="w-full bg-secondary rounded-full h-2 relative">
               <div
                 className={`h-2 rounded-full transition-all ${
                   Number(stats.battery) < 30 ? 'bg-destructive' : 'bg-blue-500'
                 }`}
                 style={{ width: `${Number(stats.battery)}%` }}
+              />
+              {/* Optimal recharge marker at 35% */}
+              <div 
+                className="absolute top-0 bottom-0 w-[2px] bg-cyan-400/60"
+                style={{ left: '35%' }}
+                title="Optimal recharge point (35%)"
               />
             </div>
           </div>
@@ -750,12 +753,18 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 {formatBigInt(stats.condition)}%
               </span>
             </div>
-            <div className="w-full bg-secondary rounded-full h-2">
+            <div className="w-full bg-secondary rounded-full h-2 relative">
               <div
                 className={`h-2 rounded-full transition-all ${
                   Number(stats.condition) < 30 ? 'bg-destructive' : 'bg-green-500'
                 }`}
                 style={{ width: `${Number(stats.condition)}%` }}
+              />
+              {/* Optimal repair marker at 70% */}
+              <div 
+                className="absolute top-0 bottom-0 w-[2px] bg-yellow-400/60"
+                style={{ left: '70%' }}
+                title="Optimal repair point (70%)"
               />
             </div>
           </div>
@@ -1015,6 +1024,10 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                     <span className="text-muted-foreground">Zone:</span>
                     <span className="font-medium">{Object.keys(mission.zone)[0]}</span>
                   </div>
+                  {(() => {
+                    console.log('[SCAVENGE DEBUG] Bot', bot.tokenIndex, 'Zone:', Object.keys(mission.zone)[0], 'Start:', new Date(Number(mission.startTime) / 1_000_000), 'LastAccum:', new Date(Number(mission.lastAccumulation) / 1_000_000), 'PendingCondition:', Number(mission.pendingConditionRestored), 'PendingBattery:', Number(mission.pendingBatteryRestored), 'Elapsed mins:', Math.floor((Date.now() - Number(mission.startTime) / 1_000_000) / 60000), 'Since last accum mins:', Math.floor((Date.now() - Number(mission.lastAccumulation) / 1_000_000) / 60000));
+                    return null;
+                  })()}
                   {mission.durationMinutes && mission.durationMinutes.length > 0 && (() => {
                     const duration = Number(mission.durationMinutes[0]);
                     const endTime = Number(mission.startTime) / 1_000_000 + (duration * 60 * 1000);
@@ -1047,18 +1060,18 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                     </span>
                   </div>
                   {Object.keys(mission.zone)[0] === 'RepairBay' ? (
-                    // RepairBay shows condition restored instead of parts
+                    // RepairBay shows condition restored from backend
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Condition Restored:</span>
-                      <span className={`font-bold ${Number(mission.pendingConditionRestored) > 0 ? 'text-green-600' : ''}` }>
+                      <span className={`font-bold ${Number(mission.pendingConditionRestored) > 0 ? 'text-green-600' : ''}`}>
                         +{Number(mission.pendingConditionRestored)}
                       </span>
                     </div>
                   ) : Object.keys(mission.zone)[0] === 'ChargingStation' ? (
-                    // ChargingStation shows battery restored instead of parts
+                    // ChargingStation shows battery restored from backend
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Battery Restored:</span>
-                      <span className={`font-bold ${Number(mission.pendingBatteryRestored) > 0 ? 'text-cyan-600' : ''}` }>
+                      <span className={`font-bold ${Number(mission.pendingBatteryRestored) > 0 ? 'text-cyan-600' : ''}`}>
                         +{Number(mission.pendingBatteryRestored)}
                       </span>
                     </div>
@@ -1094,10 +1107,10 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
                   {Object.keys(mission.zone)[0] === 'RepairBay' 
-                    ? '💡 Condition restores every 15 minutes. Retrieve anytime!'
+                    ? '💡 Condition restores continuously. Retrieve anytime!'
                     : Object.keys(mission.zone)[0] === 'ChargingStation'
-                      ? '💡 Battery restores every 15 minutes. Retrieve anytime!'
-                      : '💡 Parts accumulate every 15 minutes. Retrieve anytime!'}
+                      ? '💡 Battery restores continuously. Retrieve anytime!'
+                      : '💡 Parts accumulate continuously. Retrieve anytime!'}
                 </p>
               </div>
             );
@@ -1107,7 +1120,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
               <div className="p-3 bg-muted/30 border border-muted rounded-lg space-y-2">
                 <p className="text-sm font-semibold text-muted-foreground">🔍 Scavenging</p>
                 <p className="text-xs text-muted-foreground">
-                  Send your bot to scavenge for parts. Parts accumulate every 15 minutes!
+                  Send your bot to scavenge for parts. Parts accumulate continuously over time!
                 </p>
                 <Button
                   onClick={() => setShowScavenging(true)}
@@ -1131,6 +1144,16 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           const timeAgo = Math.floor((Date.now() - completedAt.getTime()) / (1000 * 60));
           const zoneName = Object.keys(reward.zone)[0];
           
+          // Determine what to display based on zone type
+          const isRepairBay = zoneName === 'RepairBay';
+          const isChargingStation = zoneName === 'ChargingStation';
+          
+          // Format duration - show minutes if less than 1 hour
+          const hoursOut = Number(reward.hoursOut);
+          const durationText = hoursOut === 0 ? 
+            '<1h' : 
+            hoursOut === 1 ? '1h' : `${hoursOut}h`;
+          
           return (
             <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg space-y-2">
               <div className="flex items-center justify-between">
@@ -1146,13 +1169,19 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Duration:</span>
-                  <span className="font-medium">{Number(reward.hoursOut)}h</span>
+                  <span className="font-medium">{durationText}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Collected:</span>
-                  <span className="font-bold text-green-600">{totalParts} parts</span>
+                  <span className="text-muted-foreground">
+                    {isRepairBay ? 'Condition Restored:' : isChargingStation ? 'Battery Restored:' : 'Total Collected:'}
+                  </span>
+                  <span className="font-bold text-green-600">
+                    {isRepairBay ? `${Number(reward.conditionRestored || 0)} condition` : 
+                     isChargingStation ? `${Number(reward.batteryRestored || 0)} battery` : 
+                     `${totalParts} parts`}
+                  </span>
                 </div>
-                {totalParts > 0 && (
+                {!isRepairBay && !isChargingStation && totalParts > 0 && (
                   <div className="text-xs text-muted-foreground pt-1 space-y-0.5 border-t border-muted/50 mt-2">
                     {Number(reward.speedChips) > 0 && <div>⚡ {Number(reward.speedChips)} Speed Chips</div>}
                     {Number(reward.powerCoreFragments) > 0 && <div>💪 {Number(reward.powerCoreFragments)} Power Fragments</div>}
@@ -1374,6 +1403,17 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           </Button>
         </div>
 
+        {/* Rename Bot Button */}
+        <Button
+          onClick={() => setShowRename(true)}
+          disabled={initializeMutation.isPending}
+          size="sm"
+          variant="secondary"
+          className="w-full"
+        >
+          ✏️ Rename Bot (0.1 ICP)
+        </Button>
+
         {/* Strip Bot Button - Advanced/Dangerous Action */}
         <Button
           onClick={() => setShowRespec(true)}
@@ -1434,6 +1474,55 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
         </DialogContent>
       </Dialog>
 
+      {/* Rename Bot Dialog */}
+      <Dialog open={showRename} onOpenChange={setShowRename}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename {bot.name || `Bot #${bot.tokenIndex}`}</DialogTitle>
+            <DialogDescription>
+              Give your bot a new name. This is a re-registration that costs 0.1 ICP + 0.0001 ICP fee.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="rename-bot-name">New Bot Name</Label>
+              <Input
+                id="rename-bot-name"
+                placeholder="Enter a new name"
+                value={botName}
+                onChange={(e) => setBotName(e.target.value)}
+                maxLength={30}
+              />
+              <p className="text-xs text-muted-foreground">
+                {bot.name ? `Current name: ${bot.name}` : 'Bot currently has no custom name'}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => {
+                handleInitialize();
+                setShowRename(false);
+              }}
+              disabled={initializeMutation.isPending || !botName.trim()}
+              className="flex-1"
+            >
+              {initializeMutation.isPending ? 'Processing Payment...' : 'Rename (0.1 ICP)'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRename(false);
+                setBotName('');
+              }}
+              disabled={initializeMutation.isPending}
+            >
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Transfer Dialog */}
       <Dialog open={showTransfer} onOpenChange={setShowTransfer}>
         <DialogContent>
@@ -1483,7 +1572,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           <DialogHeader>
             <DialogTitle>Send Bot Scavenging</DialogTitle>
             <DialogDescription>
-              Continuous scavenging: parts accumulate every 15 minutes. Retrieve your bot anytime! No ICP cost - only battery consumption.
+              Continuous scavenging: rewards accumulate proportionally to time spent. Retrieve your bot anytime! No ICP cost - only battery consumption.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1561,7 +1650,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
               <div className="text-xs space-y-1">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Accumulation Rate:</span>
-                  <span className="font-medium">Every 15 minutes</span>
+                  <span className="font-medium">Per Hour</span>
                 </div>
                 {scavengingZone !== 'RepairBay' && scavengingZone !== 'ChargingStation' ? (
                   <>
@@ -1615,9 +1704,29 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                       <span className="text-muted-foreground">Parts per Hour:</span>
                       <span className="font-medium text-muted-foreground">0 (No parts)</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Battery per Hour:</span>
-                      <span className="font-semibold text-cyan-600">+4 (Restored!)</span>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Battery per Hour:</span>
+                        <span className="font-semibold text-cyan-600">Stepped Charging</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground pl-4 space-y-0.5">
+                        <div className="flex justify-between">
+                          <span>0-24% battery:</span>
+                          <span className="text-cyan-600 font-medium">~16/hr (4x)</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>25-49% battery:</span>
+                          <span className="text-cyan-600 font-medium">~12/hr (3x)</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>50-74% battery:</span>
+                          <span className="text-cyan-600 font-medium">~8/hr (2x)</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>75-100% battery:</span>
+                          <span className="text-cyan-600 font-medium">~4/hr (1x)</span>
+                        </div>
+                      </div>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Condition per Hour:</span>
@@ -1627,11 +1736,14 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                       <span className="text-muted-foreground">Cost:</span>
                       <span className="font-medium text-primary">FREE (vs 0.1 ICP instant)</span>
                     </div>
+                    <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                      ⚡ <strong>Fast charging when low!</strong> 0% → 100% in ~6-7 hours
+                    </div>
                   </>
                 )}
               </div>
               <p className="text-xs text-muted-foreground pt-2">
-                💡 <strong>Continuous Scavenging:</strong> {scavengingZone === 'RepairBay' ? 'Condition restores every 15 min. Retrieve when ready!' : scavengingZone === 'ChargingStation' ? 'Battery restores every 15 min (4/hr). Retrieve anytime!' : 'Parts accumulate every 15 min. Retrieve anytime to collect!'} <strong>Rates shown are base values</strong> - your bot's faction and stats provide bonuses.
+                💡 <strong>Continuous Scavenging:</strong> {scavengingZone === 'RepairBay' ? 'Condition restores continuously. Retrieve when ready!' : scavengingZone === 'ChargingStation' ? 'Battery restores continuously. Retrieve anytime!' : 'Parts accumulate continuously. Retrieve anytime to collect!'} <strong>Rates shown are per hour</strong> - your bot's faction and stats provide bonuses.
               </p>
             </div>
           </div>
@@ -1656,7 +1768,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
 
       {/* Upgrade Dialog */}
       <Dialog open={showUpgrade} onOpenChange={setShowUpgrade}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Upgrade {bot.name || `Bot #${bot.tokenIndex}`}</DialogTitle>
             <DialogDescription>
@@ -1830,7 +1942,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
 
       {/* Strip Bot Confirmation Dialog */}
       <AlertDialog open={showRespec} onOpenChange={setShowRespec}>
-        <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
+        <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>⚠️ Strip Bot?</AlertDialogTitle>
             <AlertDialogDescription>

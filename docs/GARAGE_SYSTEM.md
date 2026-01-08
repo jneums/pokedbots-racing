@@ -77,7 +77,7 @@ let stability = applyFactionBonus(((seed / 1000000) % 100) * 0.7 + 30, faction, 
 *Ultra-Rare Factions (0.5% each):*
 - **Ultimate-Master** 👑: +15% to all stats, 2x upgrade bonus chance
 - **Wild** 🦾: +20% Acceleration, -10% Stability, 30% faster decay
-- **Golden** ✨: +15% all stats when condition ≥90%, elite performance  
+- **Golden** ✨: +7% all stats when condition ≥90%, elite performance  
 - **Ultimate** ⚡: +12% Speed, +12% Acceleration, peak performance
 
 *Super-Rare Factions (1.5% each):*
@@ -93,7 +93,7 @@ let stability = applyFactionBonus(((seed / 1000000) % 100) * 0.7 + 30, faction, 
 
 *Common Factions (20% each):*
 - **Game** 🎮: +8% on WastelandSand, entertainment tech
-- **Animal** 🦎: +6% balanced stats, organic-synthetic hybrid  
+- **Animal** 🦎: +3% balanced stats, organic-synthetic hybrid  
 - **Industrial** ⚙️: +5% Power Core, +5% Stability, reliable workhorse
 
 **This ensures:**

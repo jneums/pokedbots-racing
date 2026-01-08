@@ -71,26 +71,21 @@ module {
       // Parse optional duration
       let durationMinutes = Result.toOption(Json.getAsNat(_args, "duration_minutes"));
 
-      // Verify ownership via EXT (source of truth) - check user's wallet
-      let walletAccountId = ExtIntegration.principalToAccountIdentifier(user, null);
-      let ownerResult = try {
-        await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId));
-      } catch (_) {
-        return ToolContext.makeError("Failed to verify ownership", cb);
-      };
-      switch (ownerResult) {
-        case (#err(_)) {
-          return ToolContext.makeError("This PokedBot does not exist.", cb);
+      // Get bot stats and verify registration
+      let garage = ctx.garageManager;
+      let botStats = switch (garage.getStats(tokenIndex)) {
+        case (null) {
+          return ToolContext.makeError("This PokedBot is not registered to your account. Use garage_initialize_pokedbot first to register it.", cb);
         };
-        case (#ok(currentOwner)) {
-          if (currentOwner != walletAccountId) {
-            return ToolContext.makeError("You do not own this PokedBot.", cb);
-          };
-        };
+        case (?stats) { stats };
       };
 
-      // Get bot stats
-      let garage = ctx.garageManager;
+      // Verify caller is the registered owner
+      if (not Principal.equal(botStats.ownerPrincipal, user)) {
+        return ToolContext.makeError("You are not the registered owner of this PokedBot. If you recently purchased it, use garage_initialize_pokedbot to register it to your account.", cb);
+      };
+
+      // Continue with existing logic
       switch (garage.getStats(tokenIndex)) {
         case (null) {
           return ToolContext.makeError("Bot not initialized for racing. Use garage_initialize_pokedbot first.", cb);
@@ -111,15 +106,24 @@ module {
               return ToolContext.makeError(e, cb);
             };
             case (#ok(_)) {
-              // Schedule first accumulation in 15 minutes
-              let next15Min = now + (15 * 60 * 1_000_000_000);
-              ignore ctx.timerTool.setActionSync<system>(
-                Int.abs(next15Min),
-                {
-                  actionType = "scavenge_accumulate";
-                  params = to_candid (tokenIndex);
-                },
-              );
+              // Schedule auto-complete timer if duration is specified
+              switch (durationMinutes) {
+                case (?duration) {
+                  let durationNanos = duration * 60 * 1_000_000_000;
+                  let executeAt = now + durationNanos;
+
+                  ignore ctx.timerTool.setActionSync<system>(
+                    Int.abs(executeAt),
+                    {
+                      actionType = "scavenge_auto_complete";
+                      params = to_candid (tokenIndex);
+                    },
+                  );
+                };
+                case (null) {
+                  // Continuous mode - no auto-complete timer needed
+                };
+              };
 
               let zoneDesc = switch (zone) {
                 case (#ScrapHeaps) { "Scrap Heaps (Safe)" };
@@ -148,7 +152,7 @@ module {
                 ("base_rates", Json.str("5.0 parts (randomized distribution), 2.0 battery, 1.0 condition per 15min")),
                 ("stat_bonuses", Json.str("Speed: up to +10% parts | Power Core: up to -20% battery | Stability: up to -25% condition | Accel: up to +60% buff chance")),
                 ("world_buff_chance", Json.str("2%-3.2% per check (scales with Acceleration stat)")),
-                ("message", Json.str("🔧 Bot sent out to scavenge in " # zoneDesc # ". Rewards accumulate every 15 minutes with randomized part distribution. " # modeMsg # " WARNING: Bot dies at 0 battery OR condition = lose ALL pending rewards!")),
+                ("message", Json.str("🔧 Bot sent out to scavenge in " # zoneDesc # ". Rewards accumulate continuously based on time elapsed. " # modeMsg # " WARNING: Bot dies at 0 battery OR condition = lose ALL pending rewards!")),
               ]);
 
               ToolContext.makeSuccess(response, cb);

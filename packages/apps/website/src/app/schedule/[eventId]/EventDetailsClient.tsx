@@ -59,7 +59,8 @@ function getTrackName(trackId: number): string {
     "Rust Belt Rally",
     "Debris Field Dash",
     "Velocity Viaduct",
-    "Sandstorm Circuit"
+    "Sandstorm Circuit",
+    "Desert Sprint"
   ];
   return trackNames[trackId] || trackNames[0];
 }
@@ -74,7 +75,7 @@ function BotName({ tokenIndex }: { tokenIndex: number }) {
   return <>PokedBot #{tokenIndex}</>;
 }
 
-function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrain, botOrder, raceStartTime, raceStatus, events }: {
+function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrain, botOrder, raceStartTime, raceStatus, events, startAtEnd, disableAutoplay }: {
   results: any[];
   trackSeed: bigint;
   trackId: number;
@@ -84,6 +85,8 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
   raceStartTime?: bigint;
   raceStatus?: any;
   events?: any[];
+  startAtEnd?: boolean;
+  disableAutoplay?: boolean;
 }) {
   // Fetch bot profiles for faction and preferredTerrain (not in stats snapshot)
   const botProfiles = results.map(r => {
@@ -137,12 +140,14 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
       raceStatus={raceStatus}
       bonusesAlreadyApplied={true}
       events={events}
+      startAtEnd={startAtEnd}
+      disableAutoplay={disableAutoplay}
     />
   );
 }
 
 
-function RaceCard({ raceId }: { raceId: bigint }) {
+function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolean }) {
   const { user } = useAuth();
   const { data: myBots, isLoading: botsLoading } = useMyBots();
   const enterRaceMutation = useEnterRace();
@@ -474,6 +479,7 @@ function RaceCard({ raceId }: { raceId: bigint }) {
               raceStartTime={race.startTime}
               raceStatus={race.status}
               events={(race as any).events || []}
+              disableAutoplay={!isFirstRace}
             />
           </div>
         )}
@@ -519,13 +525,18 @@ function RaceCard({ raceId }: { raceId: bigint }) {
                           {result.finalTime.toFixed(2)}s
                         </p>
                       </div>
-                      {hasPrize && (
-                        <div className="text-right">
+                      <div className="text-right space-y-0.5">
+                        {hasPrize && (
                           <p className="text-sm text-green-500 font-bold">
-                            +{formatICP(result.prizeAmount)}
+                            +{formatICP(result.prizeAmount)} ICP
                           </p>
-                        </div>
-                      )}
+                        )}
+                        {result.partsEarned && result.partsEarned > 0 && (
+                          <p className="text-xs text-cyan-500 font-semibold">
+                            +{result.partsEarned} {result.partType}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </Link>
                 );
@@ -752,8 +763,12 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
                 </CardContent>
               </Card>
             ) : (
-              event.raceIds.map((raceId: bigint) => (
-                <RaceCard key={raceId.toString()} raceId={raceId} />
+              event.raceIds.map((raceId: bigint, idx: number) => (
+                <RaceCard 
+                  key={raceId.toString()} 
+                  raceId={raceId}
+                  isFirstRace={idx === 0}
+                />
               ))
             )}
           </div>

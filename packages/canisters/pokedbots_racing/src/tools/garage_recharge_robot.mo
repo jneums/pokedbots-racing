@@ -25,7 +25,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_recharge_robot";
     title = ?"Recharge Robot Battery";
-    description = ?"Recharge robot battery. Costs 0.1 ICP + 0.0001 fee. Restores 50-90 battery (RNG-based). Does NOT restore condition (use garage_repair_robot). 6hr cooldown. Requires ICRC-2 approval.\n\n**BATTERY RECHARGE:**\n• Base recharge: 70 battery\n• RNG variance: ±20 battery (50-90 range)\n• Cannot predict exact amount - waiting for 0% is risky!\n\n**OVERCHARGE MECHANIC:**\n• Base overcharge: (100 - battery) × 0.4, max 40%\n• Efficiency affected by CONDITION + HIGH RNG: 0.4 + (condition/200) + random(-0.35, +0.35)\n  - 100% condition: 55-135% efficiency (volatile!)\n  - 50% condition: 30-110% efficiency (very risky)\n  - 0% condition: 5-75% efficiency (wildcard)\n• Examples at 100% condition:\n  - 10% battery → 22-54% overcharge (highly variable, capped at 40%)\n  - 50% battery → 11-27% overcharge (unpredictable)\n• Overcharge consumed in next race for one-time stat boost:\n  - Speed: +0.15% per 1% overcharge (max +6% at 40%)\n  - Acceleration: +0.15% per 1% overcharge (max +6% at 40%)\n  - Stability: -0.1% per 1% overcharge (max -4% at 40%)\n  - Power Core: -0.1% per 1% overcharge (max -4% at 40%)\n• ⚠️ REPAIR RESETS OVERCHARGE: Repairing clears overcharge to prevent exploit cycles\n• Strategic: High variance makes optimization unpredictable";
+    description = ?"Recharge robot battery. Costs 0.1 ICP + 0.0001 fee. Restores 50-90 battery (RNG-based). Does NOT restore condition (use garage_repair_robot). 6hr cooldown. Requires ICRC-2 approval.\n\n**BATTERY RECHARGE:**\n• Base recharge: 70 battery\n• RNG variance: ±20 battery (50-90 range)\n• Cannot predict exact amount - waiting for 0% is risky!\n\n**OVERCHARGE MECHANIC:**\n• Base overcharge: (100 - battery) × 0.4, max 40%\n• Efficiency affected by CONDITION + HIGH RNG: 0.4 + (condition/200) + random(-0.35, +0.35)\n  - 100% condition: 55-135% efficiency (volatile!)\n  - 50% condition: 30-110% efficiency (very risky)\n  - 0% condition: 5-75% efficiency (wildcard)\n• Examples at 100% condition:\n  - 10% battery → 22-54% overcharge (highly variable, capped at 40%)\n  - 50% battery → 11-27% overcharge (unpredictable)\n• Overcharge consumed in next race for one-time stat boost:\n  - Speed: +0.125% per 1% overcharge (max +5% at 40%)\n  - Acceleration: +0.125% per 1% overcharge (max +5% at 40%)\n  - Stability: -0.083% per 1% overcharge (max -3.3% at 40%)\n  - Power Core: -0.083% per 1% overcharge (max -3.3% at 40%)\n• ⚠️ REPAIR RESETS OVERCHARGE: Repairing clears overcharge to prevent exploit cycles\n• Strategic: High variance makes optimization unpredictable";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -154,8 +154,10 @@ module {
             let currentCondition = racingStats.condition;
             let maxBattery = 100;
 
-            // Generate pseudo-random values based on timestamp and token index
-            let seed = Int.abs(now) + tokenIndex;
+            // Generate pseudo-random values based on timestamp, token index, and entropy
+            // CRITICAL FIX: Use entropy counter to ensure unique seeds even when Time.now() is identical
+            let entropy = ctx.garageManager.getNextEntropy();
+            let seed = Int.abs(now) + tokenIndex + (entropy * 7919);
             let randomHash1 = seed % 1000; // 0-999
             let randomHash2 = (seed * 7919) % 1000; // Different seed for battery RNG
 
@@ -205,8 +207,8 @@ module {
             ctx.garageManager.updateStats(tokenIndex, updatedStats);
 
             let overchargeMsg = if (overchargeAdded > 0) {
-              let speedBoost = Int.abs(Float.toInt(Float.fromInt(overchargeAdded) * 0.15));
-              let stabilityPenalty = Int.abs(Float.toInt(Float.fromInt(overchargeAdded) * 0.1));
+              let speedBoost = Int.abs(Float.toInt(Float.fromInt(overchargeAdded) * 0.125));
+              let stabilityPenalty = Int.abs(Float.toInt(Float.fromInt(overchargeAdded) * 0.083));
               " ⚡ OVERCHARGE: +" # Nat.toText(overchargeAdded) # "% (+" # Nat.toText(speedBoost) # "% Speed/Accel, -" # Nat.toText(stabilityPenalty) # "% Stability/PowerCore for next race)";
             } else {
               "";

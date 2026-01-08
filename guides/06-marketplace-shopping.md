@@ -59,7 +59,7 @@ Different factions excel at different aspects:
 
 **Best for Racing:**
 - **UltimateMaster**: +15% all stats, -25% to -40% decay rates
-- **Golden**: +15% all stats when condition ≥90% (pristine maintenance required)
+- **Golden**: +7% all stats when condition ≥90% (pristine maintenance required)
 - **Ultimate**: +12% Speed/Accel
 - **Blackhole**: +12% on MetalRoads terrain, world buffs grant +3 Speed/Accel BONUS on top of regular buff
 - **Wild**: +20% Accel, -10% Stability
