@@ -1,6 +1,6 @@
 // packages/apps/website/hooks/useLeaderboard.ts
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import {
   getLeaderboard,
   getMyRanking,
@@ -10,69 +10,80 @@ import {
   getFactionLeaderboard,
   type LeaderboardEntry,
   type LeaderboardType,
+  type LeaderboardResponse,
 } from '@pokedbots-racing/ic-js';
 import { PokedBotsRacing } from '@pokedbots-racing/declarations';
 
-export type { LeaderboardEntry, LeaderboardType };
+export type { LeaderboardEntry, LeaderboardType, LeaderboardResponse };
 export type FactionType = PokedBotsRacing.FactionType;
 
+const PAGE_SIZE = 25;
+
 /**
- * React Query hook to fetch a specific leaderboard.
+ * React Query hook to fetch the monthly leaderboard with infinite scrolling.
  */
-export const useGetLeaderboard = (lbType: LeaderboardType, limit?: number, bracket?: PokedBotsRacing.RaceClass) => {
-  return useQuery<LeaderboardEntry[]>({
-    queryKey: ['leaderboard', lbType, limit, bracket],
-    queryFn: async () => {
-      return getLeaderboard(lbType, limit, bracket);
+export const useGetMonthlyLeaderboard = (bracket?: PokedBotsRacing.RaceClass) => {
+  return useInfiniteQuery<LeaderboardResponse>({
+    queryKey: ['leaderboard', 'monthly', bracket],
+    queryFn: async ({ pageParam = 0 }) => {
+      return getMonthlyLeaderboard(PAGE_SIZE, pageParam as number, bracket);
     },
+    getNextPageParam: (lastPage, allPages) => {
+      const loadedCount = allPages.reduce((sum, page) => sum + page.entries.length, 0);
+      return lastPage.hasMore ? loadedCount : undefined;
+    },
+    initialPageParam: 0,
   });
 };
 
 /**
- * React Query hook to fetch the monthly leaderboard.
+ * React Query hook to fetch the season leaderboard with infinite scrolling.
  */
-export const useGetMonthlyLeaderboard = (limit?: number, bracket?: PokedBotsRacing.RaceClass) => {
-  return useQuery<LeaderboardEntry[]>({
-    queryKey: ['leaderboard', 'monthly', limit, bracket],
-    queryFn: async () => {
-      return getMonthlyLeaderboard(limit, bracket);
+export const useGetSeasonLeaderboard = (bracket?: PokedBotsRacing.RaceClass) => {
+  return useInfiniteQuery<LeaderboardResponse>({
+    queryKey: ['leaderboard', 'season', bracket],
+    queryFn: async ({ pageParam = 0 }) => {
+      return getSeasonLeaderboard(PAGE_SIZE, pageParam as number, bracket);
     },
+    getNextPageParam: (lastPage, allPages) => {
+      const loadedCount = allPages.reduce((sum, page) => sum + page.entries.length, 0);
+      return lastPage.hasMore ? loadedCount : undefined;
+    },
+    initialPageParam: 0,
   });
 };
 
 /**
- * React Query hook to fetch the season leaderboard.
+ * React Query hook to fetch the all-time leaderboard with infinite scrolling.
  */
-export const useGetSeasonLeaderboard = (limit?: number, bracket?: PokedBotsRacing.RaceClass) => {
-  return useQuery<LeaderboardEntry[]>({
-    queryKey: ['leaderboard', 'season', limit, bracket],
-    queryFn: async () => {
-      return getSeasonLeaderboard(limit, bracket);
+export const useGetAllTimeLeaderboard = (bracket?: PokedBotsRacing.RaceClass) => {
+  return useInfiniteQuery<LeaderboardResponse>({
+    queryKey: ['leaderboard', 'alltime', bracket],
+    queryFn: async ({ pageParam = 0 }) => {
+      return getAllTimeLeaderboard(PAGE_SIZE, pageParam as number, bracket);
     },
+    getNextPageParam: (lastPage, allPages) => {
+      const loadedCount = allPages.reduce((sum, page) => sum + page.entries.length, 0);
+      return lastPage.hasMore ? loadedCount : undefined;
+    },
+    initialPageParam: 0,
   });
 };
 
 /**
- * React Query hook to fetch the all-time leaderboard.
+ * React Query hook to fetch a faction leaderboard with infinite scrolling.
  */
-export const useGetAllTimeLeaderboard = (limit?: number, bracket?: PokedBotsRacing.RaceClass) => {
-  return useQuery<LeaderboardEntry[]>({
-    queryKey: ['leaderboard', 'alltime', limit, bracket],
-    queryFn: async () => {
-      return getAllTimeLeaderboard(limit, bracket);
+export const useGetFactionLeaderboard = (faction: FactionType, bracket?: PokedBotsRacing.RaceClass) => {
+  return useInfiniteQuery<LeaderboardResponse>({
+    queryKey: ['leaderboard', 'faction', faction, bracket],
+    queryFn: async ({ pageParam = 0 }) => {
+      return getFactionLeaderboard(faction, PAGE_SIZE, pageParam as number, bracket);
     },
-  });
-};
-
-/**
- * React Query hook to fetch a faction leaderboard.
- */
-export const useGetFactionLeaderboard = (faction: FactionType, limit?: number, bracket?: PokedBotsRacing.RaceClass) => {
-  return useQuery<LeaderboardEntry[]>({
-    queryKey: ['leaderboard', 'faction', faction, limit, bracket],
-    queryFn: async () => {
-      return getFactionLeaderboard(faction, limit, bracket);
+    getNextPageParam: (lastPage, allPages) => {
+      const loadedCount = allPages.reduce((sum, page) => sum + page.entries.length, 0);
+      return lastPage.hasMore ? loadedCount : undefined;
     },
+    initialPageParam: 0,
   });
 };
 

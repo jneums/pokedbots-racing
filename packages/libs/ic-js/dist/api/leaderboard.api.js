@@ -1,17 +1,37 @@
 // packages/libs/ic-js/src/api/leaderboard.api.ts
 import { getRacingActor } from '../actors.js';
 /**
- * Fetches the leaderboard for a specific type (Monthly, Season, AllTime, Faction, or Division).
+ * Gets platform-wide statistics from the all-time leaderboard.
+ * @param identity Optional identity to use for the actor
+ * @returns Platform statistics including total racers, races, wins, and earnings
+ */
+export const getPlatformStats = async (identity) => {
+    const racingActor = await getRacingActor(identity);
+    const result = await racingActor.get_platform_stats();
+    return {
+        totalRacers: Number(result.totalRacers),
+        totalRaces: Number(result.totalRaces),
+        totalWins: Number(result.totalWins),
+        totalEarnings: Number(result.totalEarnings),
+    };
+};
+/**
+ * Fetches the leaderboard for a specific type (Monthly, Season, AllTime, Faction, or Division) with pagination.
  * @param lbType The type of leaderboard to fetch
- * @param limit Maximum number of entries to return
+ * @param limit Maximum number of entries to return (default: 50)
+ * @param offset Starting position for pagination (default: 0)
  * @param bracket Optional race class/bracket filter
  * @param identity Optional identity to use for the actor
- * @returns An array of LeaderboardEntry objects, sorted by rank
+ * @returns LeaderboardResponse with entries, total count, and hasMore flag
  */
-export const getLeaderboard = async (lbType, limit = 100, bracket, identity) => {
+export const getLeaderboard = async (lbType, limit = 50, offset = 0, bracket, identity) => {
     const racingActor = await getRacingActor(identity);
-    const result = await racingActor.get_leaderboard(lbType, BigInt(limit), bracket ? [bracket] : []);
-    return result;
+    const result = await racingActor.get_leaderboard(lbType, BigInt(limit), BigInt(offset), bracket ? [bracket] : []);
+    return {
+        entries: result.entries,
+        total: Number(result.total),
+        hasMore: result.hasMore,
+    };
 };
 /**
  * Fetches the ranking for a specific bot on a given leaderboard.
@@ -36,39 +56,43 @@ export const getCurrentPeriods = async (identity) => {
 /**
  * Gets the monthly leaderboard (current month).
  * @param limit Maximum number of entries to return
+ * @param offset Starting position for pagination
  * @param bracket Optional race class/bracket filter
  * @param identity Optional identity to use for the actor
  */
-export const getMonthlyLeaderboard = async (limit = 50, bracket, identity) => {
+export const getMonthlyLeaderboard = async (limit = 50, offset = 0, bracket, identity) => {
     const { monthId } = await getCurrentPeriods(identity);
-    return getLeaderboard({ Monthly: monthId }, limit, bracket, identity);
+    return getLeaderboard({ Monthly: monthId }, limit, offset, bracket, identity);
 };
 /**
  * Gets the season leaderboard (current season).
  * @param limit Maximum number of entries to return
+ * @param offset Starting position for pagination
  * @param bracket Optional race class/bracket filter
  * @param identity Optional identity to use for the actor
  */
-export const getSeasonLeaderboard = async (limit = 50, bracket, identity) => {
+export const getSeasonLeaderboard = async (limit = 50, offset = 0, bracket, identity) => {
     const { seasonId } = await getCurrentPeriods(identity);
-    return getLeaderboard({ Season: seasonId }, limit, bracket, identity);
+    return getLeaderboard({ Season: seasonId }, limit, offset, bracket, identity);
 };
 /**
  * Gets the all-time leaderboard.
  * @param limit Maximum number of entries to return
+ * @param offset Starting position for pagination
  * @param bracket Optional race class/bracket filter
  * @param identity Optional identity to use for the actor
  */
-export const getAllTimeLeaderboard = async (limit = 100, bracket, identity) => {
-    return getLeaderboard({ AllTime: null }, limit, bracket, identity);
+export const getAllTimeLeaderboard = async (limit = 100, offset = 0, bracket, identity) => {
+    return getLeaderboard({ AllTime: null }, limit, offset, bracket, identity);
 };
 /**
  * Gets the faction leaderboard for a specific faction.
  * @param faction The faction to get the leaderboard for
  * @param limit Maximum number of entries to return
+ * @param offset Starting position for pagination
  * @param bracket Optional race class/bracket filter
  * @param identity Optional identity to use for the actor
  */
-export const getFactionLeaderboard = async (faction, limit = 50, bracket, identity) => {
-    return getLeaderboard({ Faction: faction }, limit, bracket, identity);
+export const getFactionLeaderboard = async (faction, limit = 50, offset = 0, bracket, identity) => {
+    return getLeaderboard({ Faction: faction }, limit, offset, bracket, identity);
 };

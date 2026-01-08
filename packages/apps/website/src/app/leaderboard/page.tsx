@@ -13,8 +13,9 @@ import {
   type LeaderboardEntry,
 } from "@/hooks/useLeaderboard";
 import { useGetBotProfile } from "@/hooks/useRacing";
-import { generatetokenIdentifier, generateExtThumbnailLink } from "@pokedbots-racing/ic-js";
+import { generatetokenIdentifier, generateExtThumbnailLink, getPlatformStats } from "@pokedbots-racing/ic-js";
 import { PokedBotsRacing } from '@pokedbots-racing/declarations';
+import { useQuery } from '@tanstack/react-query';
 
 type BracketType = 'All' | 'SilentKlan' | 'Elite' | 'Raider' | 'Junker' | 'Scrap';
 type RaceClass = PokedBotsRacing.RaceClass;
@@ -190,23 +191,54 @@ export default function LeaderboardPage() {
   
   const bracket = bracketToRaceClass(selectedBracket);
   
-  const { data: monthlyLeaderboard, isLoading: monthlyLoading } = useGetMonthlyLeaderboard(50, bracket);
-  const { data: seasonLeaderboard, isLoading: seasonLoading } = useGetSeasonLeaderboard(50, bracket);
-  const { data: allTimeLeaderboard, isLoading: allTimeLoading } = useGetAllTimeLeaderboard(100, bracket);
+  const { 
+    data: monthlyData, 
+    isLoading: monthlyLoading, 
+    fetchNextPage: fetchNextMonthly,
+    hasNextPage: hasNextMonthly,
+    isFetchingNextPage: isFetchingNextMonthly,
+  } = useGetMonthlyLeaderboard(bracket);
+  
+  const { 
+    data: seasonData, 
+    isLoading: seasonLoading,
+    fetchNextPage: fetchNextSeason,
+    hasNextPage: hasNextSeason,
+    isFetchingNextPage: isFetchingNextSeason,
+  } = useGetSeasonLeaderboard(bracket);
+  
+  const { 
+    data: allTimeData, 
+    isLoading: allTimeLoading,
+    fetchNextPage: fetchNextAllTime,
+    hasNextPage: hasNextAllTime,
+    isFetchingNextPage: isFetchingNextAllTime,
+  } = useGetAllTimeLeaderboard(bracket);
+  
+  // Get platform-wide statistics
+  const { data: platformStats, isLoading: statsLoading } = useQuery({
+    queryKey: ['platformStats'],
+    queryFn: () => getPlatformStats(),
+  });
+
+  // Flatten paginated data into single arrays
+  const monthlyLeaderboard = monthlyData?.pages.flatMap(page => page.entries) ?? [];
+  const seasonLeaderboard = seasonData?.pages.flatMap(page => page.entries) ?? [];
+  const allTimeLeaderboard = allTimeData?.pages.flatMap(page => page.entries) ?? [];
 
   // Sort leaderboard by wins
-  const winsSortedLeaderboard = allTimeLeaderboard ? [...allTimeLeaderboard].sort((a, b) => {
+  const winsSortedLeaderboard = [...allTimeLeaderboard].sort((a, b) => {
     const winsA = Number(a.wins);
     const winsB = Number(b.wins);
     if (winsB !== winsA) return winsB - winsA; // Sort by wins descending
     return Number(b.points) - Number(a.points); // Tie-breaker: points
-  }) : [];
+  });
 
-  // Calculate platform stats from all-time leaderboard
-  const totalRacers = allTimeLeaderboard?.length || 0;
-  const totalRaces = allTimeLeaderboard?.reduce((sum, entry) => sum + Number(entry.races), 0) || 0;
-  const totalWins = allTimeLeaderboard?.reduce((sum, entry) => sum + Number(entry.wins), 0) || 0;
-  const totalEarnings = allTimeLeaderboard?.reduce((sum, entry) => sum + Number(entry.totalEarnings), 0) || 0;
+  // Use platform-wide statistics
+  const totalRacers = platformStats?.totalRacers ?? 0;
+  const totalRaces = platformStats?.totalRaces ?? 0;
+  const totalWins = platformStats?.totalWins ?? 0;
+  const totalEarnings = platformStats?.totalEarnings ?? 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -324,7 +356,21 @@ export default function LeaderboardPage() {
                       <p className="text-muted-foreground">Loading...</p>
                     </div>
                   ) : (
-                    <LeaderboardTable entries={allTimeLeaderboard || []} type="points" />
+                    <>
+                      <LeaderboardTable entries={allTimeLeaderboard} type="points" />
+                      {hasNextAllTime && (
+                        <div className="text-center mt-6">
+                          <Button 
+                            onClick={() => fetchNextAllTime()} 
+                            disabled={isFetchingNextAllTime}
+                            variant="outline"
+                            size="lg"
+                          >
+                            {isFetchingNextAllTime ? 'Loading...' : 'Load More'}
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -344,7 +390,21 @@ export default function LeaderboardPage() {
                       <p className="text-muted-foreground">Loading...</p>
                     </div>
                   ) : (
-                    <LeaderboardTable entries={winsSortedLeaderboard} type="wins" />
+                    <>
+                      <LeaderboardTable entries={winsSortedLeaderboard} type="wins" />
+                      {hasNextAllTime && (
+                        <div className="text-center mt-6">
+                          <Button 
+                            onClick={() => fetchNextAllTime()} 
+                            disabled={isFetchingNextAllTime}
+                            variant="outline"
+                            size="lg"
+                          >
+                            {isFetchingNextAllTime ? 'Loading...' : 'Load More'}
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -364,7 +424,21 @@ export default function LeaderboardPage() {
                       <p className="text-muted-foreground">Loading...</p>
                     </div>
                   ) : (
-                    <LeaderboardTable entries={seasonLeaderboard || []} type="points" />
+                    <>
+                      <LeaderboardTable entries={seasonLeaderboard} type="points" />
+                      {hasNextSeason && (
+                        <div className="text-center mt-6">
+                          <Button 
+                            onClick={() => fetchNextSeason()} 
+                            disabled={isFetchingNextSeason}
+                            variant="outline"
+                            size="lg"
+                          >
+                            {isFetchingNextSeason ? 'Loading...' : 'Load More'}
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -384,7 +458,21 @@ export default function LeaderboardPage() {
                       <p className="text-muted-foreground">Loading...</p>
                     </div>
                   ) : (
-                    <LeaderboardTable entries={monthlyLeaderboard || []} type="points" />
+                    <>
+                      <LeaderboardTable entries={monthlyLeaderboard} type="points" />
+                      {hasNextMonthly && (
+                        <div className="text-center mt-6">
+                          <Button 
+                            onClick={() => fetchNextMonthly()} 
+                            disabled={isFetchingNextMonthly}
+                            variant="outline"
+                            size="lg"
+                          >
+                            {isFetchingNextMonthly ? 'Loading...' : 'Load More'}
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>

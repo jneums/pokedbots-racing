@@ -37,6 +37,7 @@ function getCanisterIds() {
 export default defineConfig(({ mode }) => {
   const canisterEnvVariables = getCanisterIds();
   const isDevelopment = mode !== 'production';
+  const newsApiUrl = process.env.NEWS_API_URL || (isDevelopment ? 'http://localhost:3001/api' : 'https://your-render-app.onrender.com/api');
 
   console.log(`[VITE] Network: ${network}, Mode: ${mode}`);
   console.log('[VITE] Canister IDs:', canisterEnvVariables);
@@ -47,6 +48,7 @@ export default defineConfig(({ mode }) => {
       environment({
         NODE_ENV: isDevelopment ? 'development' : 'production',
         DFX_NETWORK: network,
+        NEWS_API_URL: newsApiUrl,
         ...canisterEnvVariables,
       }),
     ],

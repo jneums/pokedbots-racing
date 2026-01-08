@@ -402,8 +402,12 @@ export interface McpServer {
     [] | [ReconstitutionTrace]
   >,
   'get_leaderboard' : ActorMethod<
-    [LeaderboardType, bigint, [] | [RaceClass]],
-    Array<LeaderboardEntry>
+    [LeaderboardType, bigint, bigint, [] | [RaceClass]],
+    {
+      'total' : bigint,
+      'hasMore' : boolean,
+      'entries' : Array<LeaderboardEntry>,
+    }
   >,
   'get_marketplace_bots_enriched' : ActorMethod<
     [Uint32Array | number[]],
@@ -463,6 +467,15 @@ export interface McpServer {
   'get_nft_trait_value' : ActorMethod<[bigint, bigint], [] | [bigint]>,
   'get_owner' : ActorMethod<[], Principal>,
   'get_past_events' : ActorMethod<[bigint, bigint], Array<ScheduledEvent>>,
+  'get_platform_stats' : ActorMethod<
+    [],
+    {
+      'totalWins' : bigint,
+      'totalRacers' : bigint,
+      'totalEarnings' : bigint,
+      'totalRaces' : bigint,
+    }
+  >,
   'get_race_by_id' : ActorMethod<[bigint], [] | [Race]>,
   'get_reconstitution_traces' : ActorMethod<[], Array<ReconstitutionTrace>>,
   'get_timer_diagnostics' : ActorMethod<[], TimerDiagnostics>,

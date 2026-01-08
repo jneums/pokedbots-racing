@@ -3328,13 +3328,35 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   // ===== LEADERBOARD QUERY FUNCTIONS =====
 
-  // Get leaderboard by type
+  // Get platform-wide statistics
+  public query func get_platform_stats() : async {
+    totalRacers : Nat;
+    totalRaces : Nat;
+    totalWins : Nat;
+    totalEarnings : Nat;
+  } {
+    leaderboardManager.getPlatformStats();
+  };
+
+  // Get leaderboard by type with pagination
   public query func get_leaderboard(
     lbType : Leaderboard.LeaderboardType,
     limit : Nat,
+    offset : Nat,
     bracket : ?RacingSimulator.RaceClass,
-  ) : async [Leaderboard.LeaderboardEntry] {
-    leaderboardManager.getLeaderboard(lbType, ?limit, bracket);
+  ) : async {
+    entries : [Leaderboard.LeaderboardEntry];
+    total : Nat;
+    hasMore : Bool;
+  } {
+    let entries = leaderboardManager.getLeaderboard(lbType, ?limit, ?offset, bracket);
+    let total = leaderboardManager.getTotalCount(lbType, bracket);
+    let hasMore = offset + limit < total;
+    {
+      entries = entries;
+      total = total;
+      hasMore = hasMore;
+    };
   };
 
   // Get leaderboard entry for a specific bot
@@ -6730,7 +6752,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       case (null) {
         // Fail all if ledger not configured
         for (tokenIndex in tokenIndices.vals()) {
-          results.add({ tokenIndex = tokenIndex; result = #err("Ledger not configured") });
+          results.add({
+            tokenIndex = tokenIndex;
+            result = #err("Ledger not configured");
+          });
         };
         return Buffer.toArray(results);
       };
@@ -6763,7 +6788,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       case (#Err(transferError)) {
         let errorMsg = switch (transferError) {
           case (#InsufficientFunds { balance }) { "Insufficient ICP" };
-          case (#InsufficientAllowance { allowance }) { "Insufficient allowance" };
+          case (#InsufficientAllowance { allowance }) {
+            "Insufficient allowance";
+          };
           case _ { "Payment failed" };
         };
         for (tokenIndex in tokenIndices.vals()) {
@@ -6793,7 +6820,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   // Recharge - manually update stats
                   let totalRecharge = 75;
                   let newBattery = Nat.min(100, stats.battery + totalRecharge);
-                  let batteryDeficit = if (stats.battery >= 100) { 0 } else { 100 - stats.battery };
+                  let batteryDeficit = if (stats.battery >= 100) { 0 } else {
+                    100 - stats.battery;
+                  };
                   let baseOvercharge = Float.fromInt(batteryDeficit) * 0.4;
                   let conditionBonus = Float.fromInt(stats.condition) / 200.0;
                   let seed = Int.abs(now) + tokenIndex;
@@ -6802,7 +6831,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   let efficiency = 0.5 + conditionBonus + randomVariance;
                   let finalOvercharge = baseOvercharge * efficiency;
                   let newOvercharge = Nat.min(40, Int.abs(Float.toInt(finalOvercharge)));
-                  
+
                   let updatedStats = {
                     stats with
                     battery = newBattery;
@@ -6831,7 +6860,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     let results = Buffer.Buffer<{ tokenIndex : Nat; result : Result.Result<Text, Text> }>(tokenIndices.size());
     let BASE_REPAIR_COST : Nat = 5_000_000; // 0.05 ICP
     let REPAIR_COOLDOWN : Int = 10800000000000; // 3 hours
-    
+
     // Apply Industrial faction synergy
     let synergies = garageManager.calculateFactionSynergies(caller);
     let REPAIR_COST = Nat.max(1_000_000, Int.abs(Float.toInt(Float.fromInt(BASE_REPAIR_COST) * synergies.costMultipliers.repairCost)));
@@ -6844,7 +6873,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       case (?id) { id };
       case (null) {
         for (tokenIndex in tokenIndices.vals()) {
-          results.add({ tokenIndex = tokenIndex; result = #err("Ledger not configured") });
+          results.add({
+            tokenIndex = tokenIndex;
+            result = #err("Ledger not configured");
+          });
         };
         return Buffer.toArray(results);
       };
@@ -6876,7 +6908,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       case (#Err(transferError)) {
         let errorMsg = switch (transferError) {
           case (#InsufficientFunds { balance }) { "Insufficient ICP" };
-          case (#InsufficientAllowance { allowance }) { "Insufficient allowance" };
+          case (#InsufficientAllowance { allowance }) {
+            "Insufficient allowance";
+          };
           case _ { "Payment failed" };
         };
         for (tokenIndex in tokenIndices.vals()) {
@@ -6906,7 +6940,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   // Repair - manually update stats
                   let newCondition = Nat.min(100, stats.condition + 30);
                   let perfectTuneUp = (stats.condition < 100 and newCondition == 100 and stats.overcharge > 0);
-                  
+
                   let updatedStats = {
                     stats with
                     condition = newCondition;

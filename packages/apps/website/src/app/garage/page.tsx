@@ -886,8 +886,8 @@ export default function GaragePage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="mb-6">
+    <div className="container mx-auto p-6 space-y-6">
+      <div>
         <h1 className="text-4xl font-bold mb-2">Wasteland Garage</h1>
         <p className="text-muted-foreground">
           Manage your racing machines. Repair, recharge, and upgrade your bots.
@@ -1158,9 +1158,9 @@ export default function GaragePage() {
         </Card>
       )}
 
-      {/* Bulk Action Toolbar - Sticky when bots selected */}
-      {selectionMode && selectedBots.size > 0 && (
-        <div className="sticky top-4 z-40 mb-6">
+      {/* Bulk Action Toolbar - Sticky when in selection mode */}
+      {selectionMode && (
+        <div className="sticky top-20 z-40 mb-6">
           <Card className="border-2 border-primary bg-card/95 backdrop-blur shadow-lg">
             <CardContent className="py-4">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -1268,34 +1268,61 @@ export default function GaragePage() {
       )}
 
       {loading && bots.length === 0 ? (
-        <div className="flex flex-col lg:flex-row gap-6">
-          <Card className="w-full lg:w-[480px] shrink-0 animate-pulse border-2 border-primary/20 bg-card/80 backdrop-blur">
-            <CardHeader>
-              <div className="h-6 bg-muted rounded w-3/4"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-16 bg-muted rounded"></div>
-                ))}
+        <Card className="w-full border-2 border-primary/20 bg-card/80 backdrop-blur">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="animate-pulse">
+                <div className="h-6 bg-muted rounded w-32"></div>
+                <div className="h-4 bg-muted rounded w-48 mt-1"></div>
               </div>
-            </CardContent>
-          </Card>
-          <div className="flex-1">
-            <Card className="animate-pulse">
-              <CardHeader>
-                <div className="h-6 bg-muted rounded w-1/3"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="h-4 bg-muted rounded"></div>
-                  <div className="h-4 bg-muted rounded w-5/6"></div>
-                  <div className="h-4 bg-muted rounded w-4/6"></div>
+            </div>
+          </CardHeader>
+
+          <CardContent>
+            {/* Skeleton for grouped bot brackets */}
+            {[1, 2, 3].map((bracketIndex) => (
+              <div key={bracketIndex} className="mb-4">
+                {/* Bracket header skeleton */}
+                <div className="flex items-center justify-between p-3 bg-card rounded-lg border border-primary/20 mb-2 animate-pulse">
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 bg-muted rounded w-24"></div>
+                    <div className="h-5 bg-muted rounded-full w-8"></div>
+                  </div>
+                  <div className="h-4 w-4 bg-muted rounded"></div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                
+                {/* Bot items skeleton */}
+                <div className="space-y-2">
+                  {[1, 2].map((botIndex) => (
+                    <div 
+                      key={botIndex}
+                      className="flex items-center gap-2 p-3 bg-card/50 rounded-lg border border-primary/10 animate-pulse"
+                    >
+                      {/* Avatar skeleton */}
+                      <div className="h-12 w-12 rounded-full bg-muted shrink-0"></div>
+                      
+                      <div className="flex-1 space-y-2">
+                        {/* Name skeleton */}
+                        <div className="h-4 bg-muted rounded w-32"></div>
+                        {/* Info skeleton */}
+                        <div className="flex gap-2">
+                          <div className="h-3 bg-muted rounded w-16"></div>
+                          <div className="h-3 bg-muted rounded w-20"></div>
+                        </div>
+                      </div>
+                      
+                      {/* Buttons skeleton */}
+                      <div className="flex gap-1">
+                        <div className="h-8 w-8 bg-muted rounded"></div>
+                        <div className="h-8 w-8 bg-muted rounded"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       ) : bots.length === 0 && walletNFTs.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">

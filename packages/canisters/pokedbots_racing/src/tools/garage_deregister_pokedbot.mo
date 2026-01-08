@@ -95,4 +95,4 @@ module {
       return ToolContext.makeTextSuccess(responseText, cb);
     };
   };
-}
+};

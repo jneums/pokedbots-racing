@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: pokedbots-news
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: packages/apps/news
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000

@@ -709,8 +709,13 @@ type McpServer =
    /// Get the currently configured ICP ledger canister ID.
    get_icp_ledger: () -> (opt principal) query;
    get_latest_reconstitution_trace: () -> (opt ReconstitutionTrace) query;
-   get_leaderboard: (lbType: LeaderboardType, limit: nat, bracket:
-    opt RaceClass) -> (vec LeaderboardEntry) query;
+   get_leaderboard: (lbType: LeaderboardType, limit: nat, offset: nat,
+    bracket: opt RaceClass) ->
+    (record {
+       entries: vec LeaderboardEntry;
+       hasMore: bool;
+       total: nat;
+     }) query;
    /// Get enriched marketplace listings with racing stats (public query)
    /// Takes a list of token indices to enrich (no inter-canister calls in queries)
    get_marketplace_bots_enriched: (tokenIndices: vec nat32) ->
@@ -780,6 +785,13 @@ type McpServer =
    /// Get the current owner of the canister.
    get_owner: () -> (principal) query;
    get_past_events: (offset: nat, limit: nat) -> (vec ScheduledEvent) query;
+   get_platform_stats: () ->
+    (record {
+       totalEarnings: nat;
+       totalRacers: nat;
+       totalRaces: nat;
+       totalWins: nat;
+     }) query;
    get_race_by_id: (raceId: nat) -> (opt Race) query;
    get_reconstitution_traces: () -> (vec ReconstitutionTrace) query;
    get_timer_diagnostics: () -> (TimerDiagnostics) query;

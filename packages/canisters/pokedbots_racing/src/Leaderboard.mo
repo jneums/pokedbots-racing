@@ -406,10 +406,56 @@ module {
       ignore Map.put(board, nhash, tokenIndex, entry);
     };
 
-    // Get leaderboard (sorted and ranked)
+    // Get platform-wide statistics from all-time leaderboard
+    public func getPlatformStats() : {
+      totalRacers : Nat;
+      totalRaces : Nat;
+      totalWins : Nat;
+      totalEarnings : Nat;
+    } {
+      let entries = Iter.toArray(Map.vals(allTimeBoard));
+      var totalRaces : Nat = 0;
+      var totalWins : Nat = 0;
+      var totalEarnings : Nat = 0;
+
+      for (entry in entries.vals()) {
+        totalRaces := totalRaces + entry.races;
+        totalWins := totalWins + entry.wins;
+        totalEarnings := totalEarnings + entry.totalEarnings;
+      };
+
+      {
+        totalRacers = entries.size();
+        totalRaces = totalRaces;
+        totalWins = totalWins;
+        totalEarnings = totalEarnings;
+      };
+    };
+
+    // Get total count of entries in a leaderboard (with optional bracket filter)
+    public func getTotalCount(
+      lbType : LeaderboardType,
+      bracket : ?RaceClass,
+    ) : Nat {
+      let board = getOrCreateBoard(lbType);
+      var entries = Iter.toArray(Map.vals(board));
+
+      // Filter by bracket if specified
+      entries := switch (bracket) {
+        case (?b) {
+          Array.filter<LeaderboardEntry>(entries, func(e) { getRaceClassCallback(e.tokenIndex) == b });
+        };
+        case (null) { entries };
+      };
+
+      entries.size();
+    };
+
+    // Get leaderboard (sorted and ranked) with pagination
     public func getLeaderboard(
       lbType : LeaderboardType,
       limit : ?Nat,
+      offset : ?Nat,
       bracket : ?RaceClass,
     ) : [LeaderboardEntry] {
       let board = getOrCreateBoard(lbType);
@@ -468,17 +514,25 @@ module {
         ignore Map.put(board, nhash, entry.tokenIndex, entry);
       };
 
-      // Apply limit if specified
-      switch (limit) {
-        case (?l) {
-          if (l < entries.size()) {
-            Array.tabulate<LeaderboardEntry>(l, func(i) { entries[i] });
-          } else {
-            entries;
-          };
-        };
-        case (null) { entries };
+      // Apply offset and limit for pagination
+      let startIdx = switch (offset) {
+        case (?o) { o };
+        case (null) { 0 };
       };
+
+      if (startIdx >= entries.size()) {
+        return [];
+      };
+
+      let endIdx = switch (limit) {
+        case (?l) {
+          let end = startIdx + l;
+          if (end > entries.size()) { entries.size() } else { end };
+        };
+        case (null) { entries.size() };
+      };
+
+      Array.tabulate<LeaderboardEntry>(endIdx - startIdx, func(i) { entries[startIdx + i] });
     };
 
     // Get entry for specific bot
@@ -489,7 +543,7 @@ module {
 
     // Get rank for specific bot
     public func getRankForBot(lbType : LeaderboardType, tokenIndex : Nat) : ?Nat {
-      let leaderboard = getLeaderboard(lbType, null, null);
+      let leaderboard = getLeaderboard(lbType, null, null, null);
       let found = Array.find<LeaderboardEntry>(
         leaderboard,
         func(e) { e.tokenIndex == tokenIndex },
@@ -502,7 +556,7 @@ module {
 
     // Get top N qualifiers for championship
     public func getTopQualifiers(seasonId : Nat, division : RaceClass, count : Nat) : [Nat] {
-      let leaderboard = getLeaderboard(#Season(seasonId), ?count, ?division);
+      let leaderboard = getLeaderboard(#Season(seasonId), ?count, null, ?division);
       Array.map<LeaderboardEntry, Nat>(
         leaderboard,
         func(e) { e.tokenIndex },

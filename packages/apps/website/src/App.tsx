@@ -15,6 +15,8 @@ import DocsListPage from './app/docs/page';
 import DocPage from './app/docs/[slug]/page';
 import GuidesListPage from './app/guides/page';
 import GuidePage from './app/guides/[slug]/page';
+import NewsPage from './app/news/page';
+import NewsArticlePage from './app/news/[slug]/page';
 import BotDetailsPage from './app/bot/[tokenIndex]/page';
 import Track3DTestPage from './app/track3d-test/page';
 import { WalletDrawerProvider } from './contexts/WalletDrawerContext';
@@ -155,6 +157,8 @@ export default function App() {
           <Route path="/docs/:slug" element={<DocPage />} />
           <Route path="/guides" element={<GuidesListPage />} />
           <Route path="/guides/:slug" element={<GuidePage />} />
+          <Route path="/news" element={<NewsPage />} />
+          <Route path="/news/:slug" element={<NewsArticlePage />} />
           <Route path="/track3d-test" element={<Track3DTestPage />} />
         </Routes>
       </main>

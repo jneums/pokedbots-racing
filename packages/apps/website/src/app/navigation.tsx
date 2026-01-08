@@ -3,11 +3,14 @@ import { useState } from "react";
 import { useAuth } from '../hooks/useAuth';
 import WalletButton from '../components/WalletButton';
 import EventsHub from '../components/EventsHub';
+import { ChevronDown } from 'lucide-react';
 
 export default function Navigation() {
   const location = useLocation();
   const pathname = location.pathname;
   const [isOpen, setIsOpen] = useState(false);
+  const [raceMenuOpen, setRaceMenuOpen] = useState(false);
+  const [myBotsMenuOpen, setMyBotsMenuOpen] = useState(false);
   const { isAuthenticated, logout } = useAuth();
   
   const isActive = (path: string) => {
@@ -30,6 +33,9 @@ export default function Navigation() {
     }
     return `${base} text-muted-foreground hover:text-foreground hover:bg-primary/5 border-transparent`;
   };
+
+  const isRaceActive = ['/schedule', '/leaderboard', '/betting', '/simulator'].some(p => isActive(p));
+  const isMyBotsActive = ['/garage', '/marketplace'].some(p => isActive(p));
   
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -40,28 +46,78 @@ export default function Navigation() {
           </Link>
           
           {/* Desktop Navigation */}
-          <nav className="hidden sm:flex items-center gap-6">
+          <nav className="hidden lg:flex items-center gap-6">
             <EventsHub />
-            <Link to="/leaderboard" className={linkClass('/leaderboard')}>
-              Leaderboard
-            </Link>
-            <Link to="/betting" className={linkClass('/betting')}>
-              Betting
-            </Link>
-            <Link to="/garage" className={linkClass('/garage')}>
-              Garage
-            </Link>
-            <Link to="/schedule" className={linkClass('/schedule')}>
-              Schedule
-            </Link>
-            <Link to="/simulator" className={linkClass('/simulator')}>
-              Simulator
-            </Link>
-            <Link to="/marketplace" className={linkClass('/marketplace')}>
-              Marketplace
-            </Link>
+            
+            {/* Racing Dropdown */}
+            <div 
+              className="relative"
+              onMouseEnter={() => setRaceMenuOpen(true)}
+              onMouseLeave={() => setRaceMenuOpen(false)}
+            >
+              <button
+                className={`${linkClass('/schedule')} flex items-center gap-1 ${isRaceActive ? 'text-primary drop-shadow-[0_0_8px_hsl(var(--primary))]' : ''}`}
+              >
+                Racing
+                <ChevronDown className="h-3 w-3" />
+              </button>
+              {raceMenuOpen && (
+                <div className="absolute top-full left-0 pt-2">
+                  <div className="w-48 bg-card border border-border rounded-lg shadow-xl py-2">
+                  <Link to="/schedule" className="block px-4 py-2 text-sm hover:bg-muted transition-colors">
+                    <div className="font-medium">Schedule</div>
+                    <div className="text-xs text-muted-foreground">View upcoming races</div>
+                  </Link>
+                  <Link to="/leaderboard" className="block px-4 py-2 text-sm hover:bg-muted transition-colors">
+                    <div className="font-medium">Leaderboard</div>
+                    <div className="text-xs text-muted-foreground">Top racers & stats</div>
+                  </Link>
+                  <Link to="/betting" className="block px-4 py-2 text-sm hover:bg-muted transition-colors">
+                    <div className="font-medium">Betting</div>
+                    <div className="text-xs text-muted-foreground">Place bets on races</div>
+                  </Link>
+                  <Link to="/simulator" className="block px-4 py-2 text-sm hover:bg-muted transition-colors">
+                    <div className="font-medium">Simulator</div>
+                    <div className="text-xs text-muted-foreground">Test matchups</div>
+                  </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* My Bots Dropdown */}
+            <div 
+              className="relative"
+              onMouseEnter={() => setMyBotsMenuOpen(true)}
+              onMouseLeave={() => setMyBotsMenuOpen(false)}
+            >
+              <button
+                className={`${linkClass('/garage')} flex items-center gap-1 ${isMyBotsActive ? 'text-primary drop-shadow-[0_0_8px_hsl(var(--primary))]' : ''}`}
+              >
+                My Bots
+                <ChevronDown className="h-3 w-3" />
+              </button>
+              {myBotsMenuOpen && (
+                <div className="absolute top-full left-0 pt-2">
+                  <div className="w-48 bg-card border border-border rounded-lg shadow-xl py-2">
+                  <Link to="/garage" className="block px-4 py-2 text-sm hover:bg-muted transition-colors">
+                    <div className="font-medium">Garage</div>
+                    <div className="text-xs text-muted-foreground">Manage your bots</div>
+                  </Link>
+                  <Link to="/marketplace" className="block px-4 py-2 text-sm hover:bg-muted transition-colors">
+                    <div className="font-medium">Marketplace</div>
+                    <div className="text-xs text-muted-foreground">Buy & sell bots</div>
+                  </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <Link to="/guides" className={linkClass('/guides')}>
               Guides
+            </Link>
+            <Link to="/news" className={linkClass('/news')}>
+              News
             </Link>
             <WalletButton />
           </nav>
@@ -69,7 +125,7 @@ export default function Navigation() {
           {/* Mobile Hamburger Button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="sm:hidden p-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="lg:hidden p-2 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Toggle menu"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -86,59 +142,95 @@ export default function Navigation() {
             <>
               {/* Backdrop */}
               <div 
-                className="fixed inset-0 bg-black/50 z-40 sm:hidden"
+                className="fixed inset-0 bg-black/50 z-40 lg:hidden"
                 onClick={() => setIsOpen(false)}
               />
               
               {/* Drawer */}
-              <div className="fixed top-[80px] right-0 bottom-0 w-64 border-l-2 border-primary/40 z-40 sm:hidden shadow-2xl">
+              <div className="fixed top-[80px] right-0 bottom-0 w-72 border-l-2 border-primary/40 z-40 lg:hidden shadow-2xl overflow-y-auto">
                 <nav className="flex flex-col py-4 bg-card">
                   <div className="px-4 pb-4 space-y-3">
                     <EventsHub />
                     <WalletButton />
                   </div>
-                  <div className="h-px bg-border mb-2" />
+                  <div className="h-px bg-border my-2" />
+                  
+                  {/* Racing Section */}
+                  <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Racing
+                  </div>
+                  <Link 
+                    to="/schedule" 
+                    className={mobileLinkClass('/schedule')}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className="font-medium">Schedule</div>
+                    <div className="text-xs text-muted-foreground">View upcoming races</div>
+                  </Link>
                   <Link 
                     to="/leaderboard" 
                     className={mobileLinkClass('/leaderboard')}
                     onClick={() => setIsOpen(false)}
                   >
-                    Leaderboard
+                    <div className="font-medium">Leaderboard</div>
+                    <div className="text-xs text-muted-foreground">Top racers & stats</div>
                   </Link>
                   <Link 
                     to="/betting" 
                     className={mobileLinkClass('/betting')}
                     onClick={() => setIsOpen(false)}
                   >
-                    Betting
-                  </Link>
-                  <Link 
-                    to="/garage" 
-                    className={mobileLinkClass('/garage')}
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Garage
-                  </Link>
-                  <Link 
-                    to="/schedule" 
-                    className={mobileLinkClass('/schedule')}
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Schedule
+                    <div className="font-medium">Betting</div>
+                    <div className="text-xs text-muted-foreground">Place bets on races</div>
                   </Link>
                   <Link 
                     to="/simulator" 
                     className={mobileLinkClass('/simulator')}
                     onClick={() => setIsOpen(false)}
                   >
-                    Simulator
+                    <div className="font-medium">Simulator</div>
+                    <div className="text-xs text-muted-foreground">Test matchups</div>
+                  </Link>
+
+                  <div className="h-px bg-border my-2" />
+
+                  {/* My Bots Section */}
+                  <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    My Bots
+                  </div>
+                  <Link 
+                    to="/garage" 
+                    className={mobileLinkClass('/garage')}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className="font-medium">Garage</div>
+                    <div className="text-xs text-muted-foreground">Manage your bots</div>
                   </Link>
                   <Link 
                     to="/marketplace" 
                     className={mobileLinkClass('/marketplace')}
                     onClick={() => setIsOpen(false)}
                   >
-                    Marketplace
+                    <div className="font-medium">Marketplace</div>
+                    <div className="text-xs text-muted-foreground">Buy & sell bots</div>
+                  </Link>
+
+                  <div className="h-px bg-border my-2" />
+
+                  {/* Other */}
+                  <Link 
+                    to="/guides" 
+                    className={mobileLinkClass('/guides')}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Guides
+                  </Link>
+                  <Link 
+                    to="/news" 
+                    className={mobileLinkClass('/news')}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    News
                   </Link>
                   {isAuthenticated && (
                     <button
@@ -152,13 +244,6 @@ export default function Navigation() {
                     </button>
                   )}
                   <div className="h-px bg-border my-2" />
-                  <Link 
-                    to="/guides" 
-                    className={mobileLinkClass('/guides')}
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Guides
-                  </Link>
                   <a 
                     href="https://github.com/jneums/pokedbots-racing" 
                     target="_blank"

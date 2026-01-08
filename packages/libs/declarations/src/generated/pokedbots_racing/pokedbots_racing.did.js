@@ -843,8 +843,14 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_leaderboard' : IDL.Func(
-        [LeaderboardType, IDL.Nat, IDL.Opt(RaceClass)],
-        [IDL.Vec(LeaderboardEntry)],
+        [LeaderboardType, IDL.Nat, IDL.Nat, IDL.Opt(RaceClass)],
+        [
+          IDL.Record({
+            'total' : IDL.Nat,
+            'hasMore' : IDL.Bool,
+            'entries' : IDL.Vec(LeaderboardEntry),
+          }),
+        ],
         ['query'],
       ),
     'get_marketplace_bots_enriched' : IDL.Func(
@@ -929,6 +935,18 @@ export const idlFactory = ({ IDL }) => {
     'get_past_events' : IDL.Func(
         [IDL.Nat, IDL.Nat],
         [IDL.Vec(ScheduledEvent)],
+        ['query'],
+      ),
+    'get_platform_stats' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'totalWins' : IDL.Nat,
+            'totalRacers' : IDL.Nat,
+            'totalEarnings' : IDL.Nat,
+            'totalRaces' : IDL.Nat,
+          }),
+        ],
         ['query'],
       ),
     'get_race_by_id' : IDL.Func([IDL.Nat], [IDL.Opt(Race)], ['query']),
