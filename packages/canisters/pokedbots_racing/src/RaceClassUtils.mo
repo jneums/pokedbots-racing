@@ -2,7 +2,7 @@ import RacingSimulator "RacingSimulator";
 
 module {
   /// Centralized race class bracket definitions and utilities
-  /// 
+  ///
   /// RACE CLASS BRACKETS (by overall rating):
   /// - Scrap: 0-19
   /// - Junker: 20-29

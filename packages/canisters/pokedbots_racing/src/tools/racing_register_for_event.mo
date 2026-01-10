@@ -16,7 +16,6 @@ import Json "mo:json";
 import ToolContext "ToolContext";
 import RaceCalendar "../RaceCalendar";
 import IcpLedger "../IcpLedger";
-import RaceClassUtils "../RaceClassUtils";
 
 module {
   let TRANSFER_FEE = 10000 : Nat;
@@ -28,16 +27,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([
-        ("event_id", Json.obj([
-          ("type", Json.str("number")),
-          ("description", Json.str("The event ID to register for")),
-        ])),
-        ("token_index", Json.obj([
-          ("type", Json.str("number")),
-          ("description", Json.str("Your PokedBot's token index")),
-        ])),
-      ])),
+      ("properties", Json.obj([("event_id", Json.obj([("type", Json.str("number")), ("description", Json.str("The event ID to register for"))])), ("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Your PokedBot's token index"))]))])),
       ("required", Json.arr([Json.str("event_id"), Json.str("token_index")])),
     ]);
     outputSchema = null;
@@ -98,8 +88,18 @@ module {
       let currentStats = ctx.garageManager.getCurrentStats(botStats);
       let overallRating = (currentStats.speed + currentStats.powerCore + currentStats.acceleration + currentStats.stability) / 4;
 
-      // Determine race class from overall rating using centralized utility
-      let raceClass : RaceCalendar.RaceClass = RaceClassUtils.getRaceClassFromRating(overallRating);
+      // Determine race class from overall rating (bracket system)
+      let raceClass : RaceCalendar.RaceClass = if (overallRating < 30) {
+        #Scrap;
+      } else if (overallRating < 50) {
+        #Junker;
+      } else if (overallRating < 70) {
+        #Raider;
+      } else if (overallRating < 90) {
+        #Elite;
+      } else {
+        #SilentKlan;
+      };
 
       // Calculate class-based entry fee
       let classFeeMultiplier : Float = switch (raceClass) {
@@ -174,7 +174,7 @@ module {
 
                 let stats = switch (ctx.eventCalendar.getEventRegistrationStats(eventId)) {
                   case (?s) { s };
-                  case (null) { 
+                  case (null) {
                     return ToolContext.makeError("Failed to get registration stats", cb);
                   };
                 };
@@ -187,10 +187,14 @@ module {
                 let quarterRefundHours = (event.cancellationDeadlines.quarterRefund - now) / 3_600_000_000_000;
 
                 // Find registrations for this class
-                let classRegistrations = switch (Array.find<(RaceCalendar.RaceClass, Nat)>(
-                  stats.byClass,
-                  func((c, _) : (RaceCalendar.RaceClass, Nat)) : Bool { c == raceClass }
-                )) {
+                let classRegistrations = switch (
+                  Array.find<(RaceCalendar.RaceClass, Nat)>(
+                    stats.byClass,
+                    func((c, _) : (RaceCalendar.RaceClass, Nat)) : Bool {
+                      c == raceClass;
+                    },
+                  )
+                ) {
                   case (?(_, count)) { count };
                   case (null) { 0 };
                 };

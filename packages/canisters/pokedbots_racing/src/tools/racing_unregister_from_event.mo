@@ -24,16 +24,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([
-        ("event_id", Json.obj([
-          ("type", Json.str("number")),
-          ("description", Json.str("The event ID to unregister from")),
-        ])),
-        ("token_index", Json.obj([
-          ("type", Json.str("number")),
-          ("description", Json.str("Your PokedBot's token index")),
-        ])),
-      ])),
+      ("properties", Json.obj([("event_id", Json.obj([("type", Json.str("number")), ("description", Json.str("The event ID to unregister from"))])), ("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Your PokedBot's token index"))]))])),
       ("required", Json.arr([Json.str("event_id"), Json.str("token_index")])),
     ]);
     outputSchema = null;

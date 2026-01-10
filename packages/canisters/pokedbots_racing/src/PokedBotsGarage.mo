@@ -169,7 +169,7 @@ module {
     #ChargingStation; // No battery drain, restores +1 battery per tick (free charging)
   };
 
-  // Continuous scavenging mission - toggle on/off, accumulate rewards every 15 minutes
+  // Continuous scavenging mission - rewards calculated on-demand based on elapsed time
   public type ScavengingMission = {
     missionId : Nat;
     tokenIndex : Nat;
@@ -2783,7 +2783,7 @@ module {
 
     // ===== NEW CONTINUOUS SCAVENGING FUNCTIONS =====
 
-    /// Accumulate rewards for a bot on scavenging mission (called every 15 minutes by timer)
+    /// Accumulate rewards for a bot on scavenging mission (called on-demand, calculates based on elapsed time)
     public func accumulateScavengingRewards(tokenIndex : Nat, now : Int) : Result.Result<Text, Text> {
       switch (getStats(tokenIndex)) {
         case (null) { #err("Bot not found") };

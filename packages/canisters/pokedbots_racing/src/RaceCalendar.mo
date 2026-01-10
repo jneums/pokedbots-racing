@@ -56,32 +56,33 @@ module {
 
   // Heat allocation strategies for splitting players into races
   public type HeatAllocationStrategy = {
-    #SnakeDraft;     // Balanced: 1,4,5,8,9... | 2,3,6,7,10...
-    #SkillTiered;    // Group by ELO: Top heat, mid heat, low heat
-    #Random;         // Pure random distribution
-    #TopBottom;      // Segregate extremes: Heat 1 = highest ELO, Heat 2 = lowest ELO
+    #SnakeDraft; // Balanced: 1,4,5,8,9... | 2,3,6,7,10...
+    #SkillTiered; // Group by ELO: Top heat, mid heat, low heat
+    #Random; // Pure random distribution
+    #TopBottom; // Segregate extremes: Heat 1 = highest ELO, Heat 2 = lowest ELO
   };
 
   // Race template for manual event configuration
   public type RaceTemplate = {
-    stageName : ?Text;       // Optional: "Qualifying", "Finals", etc.
-    raceClass : RaceClass;   // Which division
-    terrain : Terrain;       // Specific terrain
-    distance : Nat;          // Exact distance in km
-    trackId : ?Nat;          // Optional: Specific track for consistency
-    startOffset : Int;       // Nanoseconds after event scheduledTime
+    stageName : ?Text; // Optional: "Qualifying", "Finals", etc.
+    raceClass : RaceClass; // Which division
+    terrain : Terrain; // Specific terrain
+    distance : Nat; // Exact distance in km
+    trackId : ?Nat; // Optional: Specific track for consistency
+    startOffset : Int; // Nanoseconds after event scheduledTime
   };
 
   // Race creation modes
   public type RaceCreationMode = {
     // Automatic: System creates races based on registrations
     #Automatic : {
-      terrains : [Terrain];  // Pool of terrains to use
-      distanceRange : {      // Random distance per race
+      terrains : [Terrain]; // Pool of terrains to use
+      distanceRange : {
+        // Random distance per race
         min : Nat;
         max : Nat;
       };
-      racesPerClass : ?Nat;  // Optional: Force specific number of races
+      racesPerClass : ?Nat; // Optional: Force specific number of races
       heatAllocation : HeatAllocationStrategy;
     };
     // Manual: Pre-defined exact race schedule
@@ -93,9 +94,10 @@ module {
 
   // Visibility modes for events
   public type EventVisibility = {
-    #Public;           // Anyone can register
-    #Private;          // Only invited players
-    #Restricted : {    // Conditional restrictions
+    #Public; // Anyone can register
+    #Private; // Only invited players
+    #Restricted : {
+      // Conditional restrictions
       minElo : ?Nat;
       maxElo : ?Nat;
       requiredFaction : ?Text;
@@ -125,7 +127,7 @@ module {
     metadata : EventMetadata;
     raceIds : [Nat]; // Associated race IDs
     createdAt : Int;
-    
+
     // EVENT REGISTRATION
     registrations : [EventRegistration]; // Who signed up (hidden until close)
     registrationCounts : {
@@ -134,18 +136,18 @@ module {
     };
     maxRegistrationsPerClass : Nat;
     cancellationDeadlines : {
-      fullRefund : Int;    // >48h before close
-      halfRefund : Int;    // 24-48h before close
+      fullRefund : Int; // >48h before close
+      halfRefund : Int; // 24-48h before close
       quarterRefund : Int; // <24h before close
     };
-    
+
     // RACE CONFIGURATION
     raceCreationMode : RaceCreationMode;
-    
+
     // USER-CREATED EVENTS (optional fields)
-    creator : ?Principal;        // null for platform events
+    creator : ?Principal; // null for platform events
     creatorName : ?Text;
-    creationFee : Nat;           // 0 for platform events
+    creationFee : Nat; // 0 for platform events
     visibility : EventVisibility;
     invitedParticipants : ?[Principal];
     sponsorships : [Sponsorship];
@@ -253,23 +255,23 @@ module {
     let SECONDS_PER_HOUR : Int = 3600;
 
     let currentSeconds = fromTime / NANOS_PER_SECOND;
-    
+
     // Simplified monthly calculation - finds next occurrence of target day
     // For first/second/third week, we scan forward from fromTime
     // For last week (-1), we find last occurrence in month
-    
+
     var searchTime = currentSeconds;
     let maxSearchDays = 60; // Search up to 2 months ahead
-    
+
     for (i in Iter.range(1, maxSearchDays)) {
       searchTime += SECONDS_PER_DAY;
-      
+
       let dayOfWeek = Int.abs(((searchTime / SECONDS_PER_DAY) + 4) % 7);
-      
+
       if (dayOfWeek == targetDayOfWeek) {
         // Found a matching day of week - check if it's the right week of month
         let dayOfMonth = Int.abs(((searchTime / SECONDS_PER_DAY) % 30) + 1); // Simplified
-        
+
         let isCorrectWeek = if (weekOfMonth == 1) {
           dayOfMonth >= 1 and dayOfMonth <= 7;
         } else if (weekOfMonth == 2) {
@@ -281,7 +283,7 @@ module {
         } else {
           false;
         };
-        
+
         if (isCorrectWeek) {
           // Found it! Set to target time
           let secondsIntoDay = Int.abs(searchTime % SECONDS_PER_DAY);
@@ -290,7 +292,7 @@ module {
         };
       };
     };
-    
+
     // Fallback: just return something reasonable
     (currentSeconds + (30 * SECONDS_PER_DAY)) * NANOS_PER_SECOND;
   };
@@ -315,25 +317,18 @@ module {
       registrationOpens : Int,
       registrationCloses : Int,
       metadata : EventMetadata,
+      raceCreationMode : RaceCreationMode,
+      cancellationDeadlines : {
+        fullRefund : Int;
+        halfRefund : Int;
+        quarterRefund : Int;
+      },
       now : Int,
     ) : ScheduledEvent {
       // Always create a new event - duplicate detection was causing race orphaning issues
       // when existing events were reused after being rescheduled
       let eventId = nextEventId;
       nextEventId += 1;
-
-      // Calculate cancellation deadlines
-      let fullRefundDeadline = registrationCloses - (48 * 3600 * 1_000_000_000); // 48h before close
-      let halfRefundDeadline = registrationCloses - (24 * 3600 * 1_000_000_000); // 24h before close
-      let quarterRefundDeadline = registrationCloses - (12 * 3600 * 1_000_000_000); // 12h before close
-
-      // Default race creation mode (Automatic with reasonable defaults)
-      let defaultRaceMode : RaceCreationMode = #Automatic({
-        terrains = [#ScrapHeaps, #WastelandSand, #MetalRoads];
-        distanceRange = { min = 10; max = 30 };
-        racesPerClass = null;
-        heatAllocation = #SnakeDraft;
-      });
 
       let event : ScheduledEvent = {
         eventId = eventId;
@@ -347,7 +342,7 @@ module {
         metadata = metadata;
         raceIds = [];
         createdAt = now;
-        
+
         // EVENT REGISTRATION (defaults for platform events)
         registrations = [];
         registrationCounts = {
@@ -355,15 +350,11 @@ module {
           byClass = [];
         };
         maxRegistrationsPerClass = metadata.maxEntries; // Use metadata maxEntries
-        cancellationDeadlines = {
-          fullRefund = fullRefundDeadline;
-          halfRefund = halfRefundDeadline;
-          quarterRefund = quarterRefundDeadline;
-        };
-        
+        cancellationDeadlines = cancellationDeadlines;
+
         // RACE CONFIGURATION
-        raceCreationMode = defaultRaceMode;
-        
+        raceCreationMode = raceCreationMode;
+
         // USER-CREATED EVENTS (defaults for platform events)
         creator = null; // Platform event
         creatorName = null;
@@ -580,12 +571,28 @@ module {
         divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan]; // All divisions
       };
 
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = [#ScrapHeaps, #WastelandSand, #MetalRoads];
+        distanceRange = { min = 9; max = 17 };
+        racesPerClass = null;
+        heatAllocation = #SnakeDraft;
+      });
+
+      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Friday
+      let regCloses = scheduledTime - (30 * 60 * 1_000_000_000); // 30min before
+
       scheduleEvent(
         #WeeklyLeague,
         scheduledTime,
-        scheduledTime - (48 * 3600 * 1_000_000_000), // Opens Friday (48h before)
-        scheduledTime - (60 * 60 * 1_000_000_000), // Closes 1 hour before
+        regOpens,
+        regCloses,
         metadata,
+        raceMode,
+        {
+          fullRefund = regOpens + (2 * 3600 * 1_000_000_000); // Friday + 2h
+          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // Saturday 8pm
+          quarterRefund = scheduledTime - (12 * 3600 * 1_000_000_000); // Sunday 8am
+        },
         now,
       );
     };
@@ -603,12 +610,27 @@ module {
         divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan]; // All tiers
       };
 
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = [#ScrapHeaps, #WastelandSand, #MetalRoads];
+        distanceRange = { min = 5; max = 10 };
+        racesPerClass = null;
+        heatAllocation = #Random;
+      });
+
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // 15min before
+
       scheduleEvent(
         #DailySprint,
         scheduledTime,
         now, // Opens immediately
-        scheduledTime - (60 * 60 * 1_000_000_000), // Closes 1 hour before
+        regCloses,
         metadata,
+        raceMode,
+        {
+          fullRefund = scheduledTime - (2 * 3600 * 1_000_000_000); // 2h before
+          halfRefund = scheduledTime - (1 * 3600 * 1_000_000_000); // 1h before
+          quarterRefund = scheduledTime - (30 * 60 * 1_000_000_000); // 30min before
+        },
         now,
       );
     };
@@ -620,18 +642,34 @@ module {
         description = "The wasteland's most prestigious tournament - only the strongest survive. Elite and Silent Klan racers compete for glory and massive prize pools in this monthly showdown.";
         entryFee = 200_000_000; // 2.0 ICP base (Elite)
         maxEntries = 64; // Top 64 qualify
-        minEntries = 16; // At least 16 for bracket
+        minEntries = 8; // At least 8 for bracket
         prizePoolBonus = 500_000_000; // Platform adds 5 ICP
         pointsMultiplier = 3.0; // Triple points
-        divisions = [#Elite, #SilentKlan]; // Top tier only
+        divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan]; // Top tier only
       };
+
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = [#MetalRoads, #WastelandSand];
+        distanceRange = { min = 13; max = 17 };
+        racesPerClass = null;
+        heatAllocation = #SkillTiered;
+      });
+
+      let regOpens = scheduledTime - (7 * 86400 * 1_000_000_000); // 1 week before
+      let regCloses = scheduledTime - (24 * 3600 * 1_000_000_000); // 24h before
 
       scheduleEvent(
         #MonthlyCup,
         scheduledTime,
-        scheduledTime - (7 * 86400 * 1_000_000_000), // Opens 1 week before
-        scheduledTime - (24 * 3600 * 1_000_000_000), // Closes 24h before
+        regOpens,
+        regCloses,
         metadata,
+        raceMode,
+        {
+          fullRefund = regOpens + (72 * 3600 * 1_000_000_000); // 3 days after opens
+          halfRefund = scheduledTime - (48 * 3600 * 1_000_000_000); // 2 days before
+          quarterRefund = regCloses; // At close
+        },
         now,
       );
     };
@@ -641,14 +679,24 @@ module {
       theme : Text,
       scheduledTime : Int,
       customMetadata : EventMetadata,
+      customRaceMode : RaceCreationMode,
       now : Int,
     ) : ScheduledEvent {
+      let regOpens = scheduledTime - (72 * 3600 * 1_000_000_000); // Opens 72h before
+      let regCloses = scheduledTime - (1 * 3600 * 1_000_000_000); // Closes 1h before
+
       scheduleEvent(
         #SpecialEvent(theme),
         scheduledTime,
-        scheduledTime - (72 * 3600 * 1_000_000_000), // Opens 72h before (advance notice)
-        scheduledTime - (1 * 3600 * 1_000_000_000), // Closes 1h before
+        regOpens,
+        regCloses,
         customMetadata,
+        customRaceMode,
+        {
+          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // 1 day after opens
+          halfRefund = scheduledTime - (12 * 3600 * 1_000_000_000); // 12h before
+          quarterRefund = regCloses; // At close
+        },
         now,
       );
     };
@@ -665,14 +713,31 @@ module {
         minEntries = 8;
         prizePoolBonus = 300_000_000; // 3 ICP bonus
         pointsMultiplier = 2.5;
-        divisions = [#Junker, #Raider, #Elite];
+        divisions = [#Scrap, #Junker, #Raider, #Elite];
       };
+
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = [#ScrapHeaps, #WastelandSand, #MetalRoads];
+        distanceRange = { min = 9; max = 17 };
+        racesPerClass = null;
+        heatAllocation = #SnakeDraft;
+      });
+
+      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Opens Wednesday
+      let regCloses = scheduledTime - (2 * 3600 * 1_000_000_000); // Closes 2h before
+
       scheduleEvent(
         #SpecialEvent("Weekend Warrior"),
         scheduledTime,
-        scheduledTime - (48 * 3600 * 1_000_000_000), // Opens Wednesday (48h before)
-        scheduledTime - (2 * 3600 * 1_000_000_000), // Closes 2h before Friday start
+        regOpens,
+        regCloses,
         metadata,
+        raceMode,
+        {
+          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Thursday noon
+          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // Thursday 8pm
+          quarterRefund = regCloses; // At close
+        },
         now,
       );
     };
@@ -687,14 +752,38 @@ module {
         minEntries = 8;
         prizePoolBonus = 150_000_000; // 1.5 ICP bonus
         pointsMultiplier = 1.5;
-        divisions = [#Junker, #Raider, #Elite];
+        divisions = [#Scrap, #Junker, #Raider, #Elite];
       };
+
+      // Determine terrain enum from text
+      let terrainType : Terrain = if (terrain == "ScrapHeaps") {
+        #ScrapHeaps;
+      } else if (terrain == "WastelandSand") { #WastelandSand } else {
+        #MetalRoads;
+      };
+
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = [terrainType]; // Single terrain specialization
+        distanceRange = { min = 9; max = 17 };
+        racesPerClass = null;
+        heatAllocation = #SkillTiered;
+      });
+
+      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Opens Thursday
+      let regCloses = scheduledTime - (1 * 3600 * 1_000_000_000); // Closes 1h before
+
       scheduleEvent(
         #SpecialEvent(terrain # " Master"),
         scheduledTime,
-        scheduledTime - (48 * 3600 * 1_000_000_000), // Opens Thursday (48h before)
-        scheduledTime - (1 * 3600 * 1_000_000_000), // Closes 1h before
+        regOpens,
+        regCloses,
         metadata,
+        raceMode,
+        {
+          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Friday 2pm
+          halfRefund = scheduledTime - (12 * 3600 * 1_000_000_000); // Saturday 2am
+          quarterRefund = regCloses; // At close
+        },
         now,
       );
     };
@@ -711,12 +800,29 @@ module {
         pointsMultiplier = 2.0;
         divisions = [#Elite, #SilentKlan];
       };
+
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = [#MetalRoads]; // High-speed showcase
+        distanceRange = { min = 9; max = 17 };
+        racesPerClass = null;
+        heatAllocation = #SkillTiered;
+      });
+
+      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Opens Friday
+      let regCloses = scheduledTime - (1 * 3600 * 1_000_000_000); // Closes 1h before
+
       scheduleEvent(
         #SpecialEvent("Elite Showcase"),
         scheduledTime,
-        scheduledTime - (48 * 3600 * 1_000_000_000), // Opens Friday (48h before)
-        scheduledTime - (1 * 3600 * 1_000_000_000), // Closes 1h before
+        regOpens,
+        regCloses,
         metadata,
+        raceMode,
+        {
+          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Saturday 6pm
+          halfRefund = scheduledTime - (12 * 3600 * 1_000_000_000); // Sunday 6am
+          quarterRefund = regCloses; // At close
+        },
         now,
       );
     };
@@ -733,12 +839,29 @@ module {
         pointsMultiplier = 1.0;
         divisions = [#Scrap, #Junker];
       };
+
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = [#ScrapHeaps]; // Easiest terrain for beginners
+        distanceRange = { min = 5; max = 10 };
+        racesPerClass = null;
+        heatAllocation = #TopBottom; // Separate skill levels
+      });
+
+      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Opens Thursday
+      let regCloses = scheduledTime - (1 * 3600 * 1_000_000_000); // Closes 1h before
+
       scheduleEvent(
         #SpecialEvent("Beginner Bootcamp"),
         scheduledTime,
-        scheduledTime - (48 * 3600 * 1_000_000_000), // Opens Thursday (48h before)
-        scheduledTime - (1 * 3600 * 1_000_000_000), // Closes 1h before
+        regOpens,
+        regCloses,
         metadata,
+        raceMode,
+        {
+          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Friday 10am
+          halfRefund = scheduledTime - (12 * 3600 * 1_000_000_000); // Friday 10pm
+          quarterRefund = regCloses; // At close
+        },
         now,
       );
     };
@@ -755,12 +878,29 @@ module {
         pointsMultiplier = 1.5;
         divisions = [#Junker, #Raider, #Elite];
       };
+
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = [#ScrapHeaps, #WastelandSand, #MetalRoads];
+        distanceRange = { min = 9; max = 17 };
+        racesPerClass = null;
+        heatAllocation = #Random; // Mixed faction matchups
+      });
+
+      let regOpens = scheduledTime - (72 * 3600 * 1_000_000_000); // Opens Thursday
+      let regCloses = scheduledTime - (1 * 3600 * 1_000_000_000); // Closes 1h before
+
       scheduleEvent(
         #SpecialEvent("Faction Wars"),
         scheduledTime,
-        scheduledTime - (72 * 3600 * 1_000_000_000), // Opens Thursday (72h before)
-        scheduledTime - (1 * 3600 * 1_000_000_000), // Closes 1h before
+        regOpens,
+        regCloses,
         metadata,
+        raceMode,
+        {
+          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Friday 4pm
+          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // Saturday 4pm
+          quarterRefund = regCloses; // At close
+        },
         now,
       );
     };
@@ -777,12 +917,29 @@ module {
         pointsMultiplier = 2.0;
         divisions = [#Raider, #Elite];
       };
+
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = [#WastelandSand, #MetalRoads];
+        distanceRange = { min = 20; max = 30 }; // Long endurance tracks (12-13)
+        racesPerClass = null;
+        heatAllocation = #SnakeDraft;
+      });
+
+      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Opens Thursday
+      let regCloses = scheduledTime - (1 * 3600 * 1_000_000_000); // Closes 1h before
+
       scheduleEvent(
         #SpecialEvent("Distance Challenge"),
         scheduledTime,
-        scheduledTime - (48 * 3600 * 1_000_000_000), // Opens Thursday (48h before)
-        scheduledTime - (1 * 3600 * 1_000_000_000), // Closes 1h before
+        regOpens,
+        regCloses,
         metadata,
+        raceMode,
+        {
+          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Friday noon
+          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // Friday noon
+          quarterRefund = regCloses; // At close
+        },
         now,
       );
     };
@@ -799,12 +956,29 @@ module {
         pointsMultiplier = 1.2;
         divisions = [#Junker, #Raider, #Elite];
       };
+
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = [#ScrapHeaps, #WastelandSand, #MetalRoads];
+        distanceRange = { min = 5; max = 12 }; // Short, fast races
+        racesPerClass = null;
+        heatAllocation = #Random; // Maximum chaos!
+      });
+
+      let regOpens = scheduledTime - (7 * 3600 * 1_000_000_000); // Opens at noon same day
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
+
       scheduleEvent(
         #SpecialEvent("Rush Hour"),
         scheduledTime,
-        scheduledTime - (7 * 3600 * 1_000_000_000), // Opens at noon same day
-        scheduledTime - (15 * 60 * 1_000_000_000), // Closes 15min before
+        regOpens,
+        regCloses,
         metadata,
+        raceMode,
+        {
+          fullRefund = regOpens + (3 * 3600 * 1_000_000_000); // 3pm same day
+          halfRefund = scheduledTime - (2 * 3600 * 1_000_000_000); // 5pm
+          quarterRefund = regCloses; // At close
+        },
         now,
       );
     };
@@ -813,7 +987,7 @@ module {
     public func createUltraMarathonEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Wasteland Ultra Marathon";
-        description = "One race. All terrains. 60km of pure survival.";
+        description = "One race. All terrains. 50+ km of pure survival.";
         entryFee = 200_000_000; // 2.0 ICP
         maxEntries = 20;
         minEntries = 5;
@@ -821,12 +995,29 @@ module {
         pointsMultiplier = 3.0;
         divisions = [#Elite, #SilentKlan];
       };
+
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = [#ScrapHeaps, #WastelandSand, #MetalRoads];
+        distanceRange = { min = 45; max = 60 }; // Ultra marathon tracks (14-15)
+        racesPerClass = null;
+        heatAllocation = #SkillTiered;
+      });
+
+      let regOpens = scheduledTime - (120 * 3600 * 1_000_000_000); // Opens Monday (5 days)
+      let regCloses = scheduledTime - (2 * 3600 * 1_000_000_000); // Closes 2h before
+
       scheduleEvent(
         #SpecialEvent("Ultra Marathon"),
         scheduledTime,
-        scheduledTime - (120 * 3600 * 1_000_000_000), // Opens Monday (5 days before)
-        scheduledTime - (2 * 3600 * 1_000_000_000), // Closes 2h before
+        regOpens,
+        regCloses,
         metadata,
+        raceMode,
+        {
+          fullRefund = regOpens + (48 * 3600 * 1_000_000_000); // Wednesday noon
+          halfRefund = scheduledTime - (48 * 3600 * 1_000_000_000); // Thursday noon
+          quarterRefund = regCloses; // At close
+        },
         now,
       );
     };
@@ -843,12 +1034,29 @@ module {
         pointsMultiplier = 1.0;
         divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan];
       };
+
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = [#ScrapHeaps, #WastelandSand, #MetalRoads];
+        distanceRange = { min = 7; max = 13 };
+        racesPerClass = null;
+        heatAllocation = #Random; // Chaos!
+      });
+
+      let regOpens = scheduledTime - (6 * 3600 * 1_000_000_000); // Opens 6pm same day
+      let regCloses = scheduledTime - (30 * 60 * 1_000_000_000); // Closes 30min before
+
       scheduleEvent(
         #SpecialEvent("Midnight Madness"),
         scheduledTime,
-        scheduledTime - (6 * 3600 * 1_000_000_000), // Opens 6pm same day
-        scheduledTime - (30 * 60 * 1_000_000_000), // Closes 30min before
+        regOpens,
+        regCloses,
         metadata,
+        raceMode,
+        {
+          fullRefund = regOpens + (2 * 3600 * 1_000_000_000); // 8pm
+          halfRefund = scheduledTime - (2 * 3600 * 1_000_000_000); // 10pm
+          quarterRefund = regCloses; // At close
+        },
         now,
       );
     };
@@ -865,12 +1073,29 @@ module {
         pointsMultiplier = 5.0;
         divisions = [#Elite, #SilentKlan];
       };
+
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = [#MetalRoads];
+        distanceRange = { min = 9; max = 17 };
+        racesPerClass = null;
+        heatAllocation = #SkillTiered; // Best vs best
+      });
+
+      let regOpens = scheduledTime - (7 * 86400 * 1_000_000_000); // Opens 1 week before
+      let regCloses = scheduledTime - (24 * 3600 * 1_000_000_000); // Closes 1 day before
+
       scheduleEvent(
         #SpecialEvent("Champions Cup"),
         scheduledTime,
-        scheduledTime - (7 * 86400 * 1_000_000_000), // Opens 1 week before
-        scheduledTime - (24 * 3600 * 1_000_000_000), // Closes 1 day before
+        regOpens,
+        regCloses,
         metadata,
+        raceMode,
+        {
+          fullRefund = regOpens + (72 * 3600 * 1_000_000_000); // 3 days after opens
+          halfRefund = scheduledTime - (72 * 3600 * 1_000_000_000); // 3 days before
+          quarterRefund = regCloses; // At close
+        },
         now,
       );
     };
@@ -908,7 +1133,9 @@ module {
             func(r) { r.tokenIndex == tokenIndex },
           );
           switch (alreadyRegistered) {
-            case (?_) { return #err("Bot is already registered for this event") };
+            case (?_) {
+              return #err("Bot is already registered for this event");
+            };
             case (null) {};
           };
 
@@ -928,11 +1155,15 @@ module {
             case (#Private) {
               // Check if owner is invited
               switch (event.invitedParticipants) {
-                case (null) { return #err("Event is private but has no invite list") };
+                case (null) {
+                  return #err("Event is private but has no invite list");
+                };
                 case (?invited) {
                   let isInvited = Array.find<Principal>(invited, func(p) { p == owner });
                   switch (isInvited) {
-                    case (null) { return #err("You are not invited to this private event") };
+                    case (null) {
+                      return #err("You are not invited to this private event");
+                    };
                     case (?_) {};
                   };
                 };
@@ -941,13 +1172,15 @@ module {
             case (#Restricted(rules)) {
               // Note: ELO/faction/achievement checks would need to be done by caller
               // before calling this function, as we don't have access to garage data here
-              
+
               // Check allowed bots
               switch (rules.allowedBots) {
                 case (?allowed) {
                   let isAllowed = Array.find<Nat>(allowed, func(i) { i == tokenIndex });
                   switch (isAllowed) {
-                    case (null) { return #err("This bot is not allowed in this restricted event") };
+                    case (null) {
+                      return #err("This bot is not allowed in this restricted event");
+                    };
                     case (?_) {};
                   };
                 };
@@ -959,7 +1192,9 @@ module {
                 case (?allowed) {
                   let isAllowed = Array.find<Principal>(allowed, func(p) { p == owner });
                   switch (isAllowed) {
-                    case (null) { return #err("You are not allowed in this restricted event") };
+                    case (null) {
+                      return #err("You are not allowed in this restricted event");
+                    };
                     case (?_) {};
                   };
                 };
@@ -980,7 +1215,7 @@ module {
 
           // Update event
           let newRegistrations = Array.append(event.registrations, [registration]);
-          
+
           // Update class counts
           let newByClass = updateClassCount(event.registrationCounts.byClass, raceClass, 1);
 
@@ -1170,7 +1405,9 @@ module {
           // Sort by ELO (highest to lowest)
           let sorted = Array.sort<EventRegistration>(
             registrations,
-            func(a, b) { Nat.compare(getElo(b.tokenIndex), getElo(a.tokenIndex)) },
+            func(a, b) {
+              Nat.compare(getElo(b.tokenIndex), getElo(a.tokenIndex));
+            },
           );
 
           // Snake draft: 1→4→5→8, 2→3→6→7
@@ -1196,17 +1433,21 @@ module {
             };
           };
 
-          Buffer.toArray(Buffer.map<Buffer.Buffer<EventRegistration>, [EventRegistration]>(
-            heats,
-            func(h) { Buffer.toArray(h) },
-          ));
+          Buffer.toArray(
+            Buffer.map<Buffer.Buffer<EventRegistration>, [EventRegistration]>(
+              heats,
+              func(h) { Buffer.toArray(h) },
+            )
+          );
         };
 
         case (#SkillTiered) {
           // Sort by ELO
           let sorted = Array.sort<EventRegistration>(
             registrations,
-            func(a, b) { Nat.compare(getElo(b.tokenIndex), getElo(a.tokenIndex)) },
+            func(a, b) {
+              Nat.compare(getElo(b.tokenIndex), getElo(a.tokenIndex));
+            },
           );
 
           // Group into skill tiers
@@ -1220,17 +1461,21 @@ module {
             heats.get(heatIndex).add(sorted[i]);
           };
 
-          Buffer.toArray(Buffer.map<Buffer.Buffer<EventRegistration>, [EventRegistration]>(
-            heats,
-            func(h) { Buffer.toArray(h) },
-          ));
+          Buffer.toArray(
+            Buffer.map<Buffer.Buffer<EventRegistration>, [EventRegistration]>(
+              heats,
+              func(h) { Buffer.toArray(h) },
+            )
+          );
         };
 
         case (#TopBottom) {
           // Sort by ELO
           let sorted = Array.sort<EventRegistration>(
             registrations,
-            func(a, b) { Nat.compare(getElo(b.tokenIndex), getElo(a.tokenIndex)) },
+            func(a, b) {
+              Nat.compare(getElo(b.tokenIndex), getElo(a.tokenIndex));
+            },
           );
 
           // Split in half: top ELO in first heat(s), bottom ELO in last heat(s)
@@ -1239,7 +1484,7 @@ module {
           let numBottomHeats = (sorted.size() - midPoint + maxPerHeat - 1) / maxPerHeat;
 
           let heats = Buffer.Buffer<Buffer.Buffer<EventRegistration>>(numTopHeats + numBottomHeats);
-          
+
           // Initialize top heats
           for (i in Iter.range(0, numTopHeats - 1)) {
             heats.add(Buffer.Buffer<EventRegistration>(maxPerHeat));
@@ -1262,10 +1507,12 @@ module {
             heats.get(heatIndex).add(sorted[i]);
           };
 
-          Buffer.toArray(Buffer.map<Buffer.Buffer<EventRegistration>, [EventRegistration]>(
-            heats,
-            func(h) { Buffer.toArray(h) },
-          ));
+          Buffer.toArray(
+            Buffer.map<Buffer.Buffer<EventRegistration>, [EventRegistration]>(
+              heats,
+              func(h) { Buffer.toArray(h) },
+            )
+          );
         };
 
         case (#Random) {
@@ -1280,10 +1527,12 @@ module {
             heats.get(heatIndex).add(registrations[i]);
           };
 
-          Buffer.toArray(Buffer.map<Buffer.Buffer<EventRegistration>, [EventRegistration]>(
-            heats,
-            func(h) { Buffer.toArray(h) },
-          ));
+          Buffer.toArray(
+            Buffer.map<Buffer.Buffer<EventRegistration>, [EventRegistration]>(
+              heats,
+              func(h) { Buffer.toArray(h) },
+            )
+          );
         };
       };
     };
@@ -1316,13 +1565,15 @@ module {
           };
 
           // Convert to array
-          Buffer.toArray(Buffer.map<(RaceClass, Buffer.Buffer<EventRegistration>), (RaceClass, [EventRegistration])>(
-            result,
-            func(entry) {
-              let (raceClass, buffer) = entry;
-              (raceClass, Buffer.toArray(buffer));
-            },
-          ));
+          Buffer.toArray(
+            Buffer.map<(RaceClass, Buffer.Buffer<EventRegistration>), (RaceClass, [EventRegistration])>(
+              result,
+              func(entry) {
+                let (raceClass, buffer) = entry;
+                (raceClass, Buffer.toArray(buffer));
+              },
+            )
+          );
         };
       };
     };

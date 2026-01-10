@@ -89,106 +89,70 @@ import Star "mo:star/star";
 // (
 //   with migration = func(
 //     old_state : {
-//       var stable_races : Map.Map<Nat, {
-//         raceId : Nat;
-//         name : Text;
-//         distance : Nat;
-//         terrain : RacingSimulator.Terrain;
-//         trackId : Nat;
-//         trackSeed : Nat;
-//         raceClass : RacingSimulator.RaceClass;
-//         entryFee : Nat;
-//         maxEntries : Nat;
-//         minEntries : Nat;
-//         startTime : Int;
-//         duration : Nat;
-//         entryDeadline : Int;
+//       var stable_events : Map.Map<Nat, {
+//         eventId : Nat;
+//         eventType : RaceCalendar.EventType;
+//         scheduledTime : Int;
+//         registrationOpens : Int;
+//         registrationCloses : Int;
+//         status : RaceCalendar.EventStatus;
+//         metadata : RaceCalendar.EventMetadata;
+//         raceIds : [Nat];
 //         createdAt : Int;
-//         entries : [RacingSimulator.RaceEntry];
-//         status : RacingSimulator.RaceStatus;
-//         results : ?[{
-//           nftId : Text;
-//           owner : Principal;
-//           position : Nat;
-//           finalTime : Float;
-//           prizeAmount : Nat;
-//           stats : ?RacingSimulator.RacingStats;
-//           // partsEarned and partType are MISSING - that's what we're adding
-//         }];
-//         events : [RacingSimulator.RaceEvent];
-//         prizePool : Nat;
-//         platformTax : Nat;
-//         platformBonus : Nat;
-//         sponsors : [RacingSimulator.Sponsor];
+//         // Missing: creator, creatorName, registrations, sponsorships, visibility, creationFee, raceCreationMode, cancellationDeadlines, etc.
 //       }>;
 //     }
 //   ) : {
-//     var stable_races : Map.Map<Nat, RacingSimulator.Race>;
+//     var stable_events : Map.Map<Nat, RaceCalendar.ScheduledEvent>;
 //   } {
-//     // Migrate races - add partsEarned and partType to RaceResult entries
-//     let new_races = Map.new<Nat, RacingSimulator.Race>();
+//     // Migrate events - add all new fields
+//     let new_events = Map.new<Nat, RaceCalendar.ScheduledEvent>();
 
-//     for ((raceId, oldRace) in Map.entries(old_state.stable_races)) {
-//       // Only transform results if they exist
-//       let newResults = switch (oldRace.results) {
-//         case (null) { null };
-//         case (?results) {
-//           ?Array.map<{
-//             nftId : Text;
-//             owner : Principal;
-//             position : Nat;
-//             finalTime : Float;
-//             prizeAmount : Nat;
-//             stats : ?RacingSimulator.RacingStats;
-//           }, RacingSimulator.RaceResult>(
-//             results,
-//             func(oldResult) : RacingSimulator.RaceResult {
-//               {
-//                 position = oldResult.position;
-//                 nftId = oldResult.nftId;
-//                 owner = oldResult.owner;
-//                 finalTime = oldResult.finalTime;
-//                 stats = oldResult.stats;
-//                 prizeAmount = oldResult.prizeAmount;
-//                 partsEarned = 0; // NEW FIELD - default for existing results
-//                 partType = "universal"; // NEW FIELD - default for existing results
-//               }
-//             }
-//           );
-//         };
+//     for ((eventId, oldEvent) in Map.entries(old_state.stable_events)) {
+//       // Default cancellation deadlines: 24h full refund, 12h half, 6h quarter
+//       let defaultDeadlines = {
+//         fullRefund = oldEvent.scheduledTime - (24 * 3600 * 1_000_000_000);
+//         halfRefund = oldEvent.scheduledTime - (12 * 3600 * 1_000_000_000);
+//         quarterRefund = oldEvent.scheduledTime - (6 * 3600 * 1_000_000_000);
 //       };
 
-//       // Copy race with updated results
-//       let newRace : RacingSimulator.Race = {
-//         raceId = oldRace.raceId;
-//         name = oldRace.name;
-//         distance = oldRace.distance;
-//         terrain = oldRace.terrain;
-//         trackId = oldRace.trackId;
-//         trackSeed = oldRace.trackSeed;
-//         raceClass = oldRace.raceClass;
-//         entryFee = oldRace.entryFee;
-//         maxEntries = oldRace.maxEntries;
-//         minEntries = oldRace.minEntries;
-//         startTime = oldRace.startTime;
-//         duration = oldRace.duration;
-//         entryDeadline = oldRace.entryDeadline;
-//         createdAt = oldRace.createdAt;
-//         entries = oldRace.entries;
-//         status = oldRace.status;
-//         results = newResults; // Only this field changed
-//         events = oldRace.events;
-//         prizePool = oldRace.prizePool;
-//         platformTax = oldRace.platformTax;
-//         platformBonus = oldRace.platformBonus;
-//         sponsors = oldRace.sponsors;
+//       // Default race creation mode: Automatic with all terrains and balanced allocation
+//       let defaultCreationMode : RaceCalendar.RaceCreationMode = #Automatic({
+//         terrains = [#ScrapHeaps, #WastelandSand, #MetalRoads];
+//         distanceRange = { min = 8000; max = 15000 };
+//         heatAllocation = #SnakeDraft;
+//         racesPerClass = null; // NEW FIELD - auto-calculate based on registrations
+//       });
+
+//       // Copy event with new fields
+//       let newEvent : RaceCalendar.ScheduledEvent = {
+//         eventId = oldEvent.eventId;
+//         eventType = oldEvent.eventType;
+//         scheduledTime = oldEvent.scheduledTime;
+//         createdAt = oldEvent.createdAt;
+//         creator = null; // NEW FIELD - system-created events
+//         creatorName = null; // NEW FIELD
+//         status = oldEvent.status;
+//         metadata = oldEvent.metadata;
+//         registrations = []; // NEW FIELD - no registrations for old events
+//         raceIds = oldEvent.raceIds;
+//         sponsorships = []; // NEW FIELD - no sponsorships for old events
+//         visibility = #Public; // NEW FIELD - all old events were public
+//         creationFee = 0; // NEW FIELD - default to 0 for old events
+//         raceCreationMode = defaultCreationMode; // NEW FIELD
+//         cancellationDeadlines = defaultDeadlines; // NEW FIELD
+//         registrationOpens = oldEvent.registrationOpens; // Preserve existing
+//         registrationCloses = oldEvent.registrationCloses; // Preserve existing
+//         maxRegistrationsPerClass = 64; // NEW FIELD - default 64 per class
+//         registrationCounts = { total = 0; byClass = [] }; // NEW FIELD - no registrations
+//         invitedParticipants = null; // NEW FIELD - public events by default
 //       };
 
-//       ignore Map.put(new_races, Map.nhash, raceId, newRace);
+//       ignore Map.put(new_events, Map.nhash, eventId, newEvent);
 //     };
 
 //     {
-//       var stable_races = new_races;
+//       var stable_events = new_events;
 //     };
 //   }
 // )
@@ -501,36 +465,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   };
 
   // Handle completed upgrades with V2 RNG mechanics
-  func handleScavengingAccumulation<system>(actionId : TT.ActionId, action : TT.Action) : TT.ActionId {
-    Debug.print("Scavenging accumulation handler triggered");
-
-    // Decode the token index from params
-    let tokenIndexOpt : ?Nat = from_candid (action.params);
-
-    switch (tokenIndexOpt) {
-      case (?tokenIndex) {
-        Debug.print("Processing accumulation for token " # debug_show (tokenIndex));
-
-        let now = Time.now();
-        switch (garageManager.accumulateScavengingRewards(tokenIndex, now)) {
-          case (#ok(msg)) {
-            Debug.print("Accumulation successful: " # msg);
-            // Note: No longer scheduling individual timers - global periodic timer handles all accumulations
-          };
-          case (#err(msg)) {
-            Debug.print("Accumulation failed: " # msg);
-            // Mission likely ended (bot died or was pulled)
-          };
-        };
-      };
-      case (null) {
-        Debug.print("Could not decode token index for scavenging accumulation");
-      };
-    };
-
-    actionId;
-  };
-
   func handleUpgradeCompletion<system>(actionId : TT.ActionId, action : TT.Action) : TT.ActionId {
     Debug.print("Upgrade completion handler triggered (V2)");
 
@@ -1300,7 +1234,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
 
     // ===== SPECIAL EVENTS SCHEDULING =====
-    
+
     // Check for Monthly Cup in next month
     let monthlyCups = Array.filter<RaceCalendar.ScheduledEvent>(
       upcomingEvents,
@@ -1345,8 +1279,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       upcomingEvents,
       func(e) {
         switch (e.eventType) {
-          case (#SpecialEvent(name)) { 
-            name == "Sand Master" or name == "Metal Master" or name == "Scrap Master"
+          case (#SpecialEvent(name)) {
+            name == "Sand Master" or name == "Metal Master" or name == "Scrap Master";
           };
           case (_) { false };
         };
@@ -2298,20 +2232,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         // Complete mission
         switch (garageManager.completeScavengingMissionV2(tokenIndex, now)) {
           case (#ok(result)) {
-            // Cancel remaining accumulation timers for this bot
-            let scavengeTimers = tt().getActionsByFilter(#ByType("scavenge_accumulate"));
-            for ((timerId, timerAction) in scavengeTimers.vals()) {
-              let timerTokenOpt : ?Nat = from_candid (timerAction.params);
-              switch (timerTokenOpt) {
-                case (?timerToken) {
-                  if (timerToken == tokenIndex) {
-                    ignore tt().cancelActionsByIds<system>([timerId.id]);
-                  };
-                };
-                case (null) {};
-              };
-            };
-
             Debug.print("Auto-completed scavenging for bot " # Nat.toText(tokenIndex) # ": " # Nat.toText(result.totalParts) # " parts collected");
           };
           case (#err(msg)) {
@@ -2327,7 +2247,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     actionId;
   };
 
-  tt().registerExecutionListenerSync(?"scavenge_accumulate", handleScavengingAccumulation);
   tt().registerExecutionListenerSync(?"scavenge_auto_complete", handleScavengingAutoComplete);
   tt().registerExecutionListenerSync(?"upgrade_complete", handleUpgradeCompletion);
   tt().registerExecutionListenerSync(?"hourly_recharge", handleHourlyRecharge);
@@ -7311,20 +7230,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           };
         };
 
-        // Cancel all pending scavenge_accumulate AND auto_complete timers for this bot
-        let scavengeTimers = tt().getActionsByFilter(#ByType("scavenge_accumulate"));
-        for ((timerId, timerAction) in scavengeTimers.vals()) {
-          let timerTokenOpt : ?Nat = from_candid (timerAction.params);
-          switch (timerTokenOpt) {
-            case (?timerToken) {
-              if (timerToken == tokenIndex) {
-                ignore tt().cancelActionsByIds<system>([timerId.id]);
-              };
-            };
-            case (null) {};
-          };
-        };
-
+        // Cancel any pending auto_complete timer for this bot
         let autoCompleteTimers = tt().getActionsByFilter(#ByType("scavenge_auto_complete"));
         for ((timerId, timerAction) in autoCompleteTimers.vals()) {
           let timerTokenOpt : ?Nat = from_candid (timerAction.params);

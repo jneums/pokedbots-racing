@@ -188,6 +188,10 @@ module {
       case (9) { ?VELOCITY_VIADUCT };
       case (10) { ?SANDSTORM_CIRCUIT };
       case (11) { ?DESERT_SPRINT };
+      case (12) { ?WASTELAND_ODYSSEY };
+      case (13) { ?IRON_CRUCIBLE };
+      case (14) { ?ENDLESS_EXPANSE };
+      case (15) { ?SURVIVAL_GAUNTLET };
       case (_) { null };
     };
   };
@@ -197,7 +201,7 @@ module {
     trackId = 1;
     name = "Scrap Mountain Circuit";
     description = "Technical climb through unstable debris";
-    totalDistance = 10100; // 15 segments × 2 laps
+    totalDistance = 10600; // 15 segments × 2 laps
     primaryTerrain = #ScrapHeaps;
     laps = 2;
     segments = [
@@ -248,7 +252,7 @@ module {
     trackId = 3;
     name = "Wasteland Gauntlet";
     description = "Endurance test through deep sand";
-    totalDistance = 13300;
+    totalDistance = 12600;
     primaryTerrain = #WastelandSand;
     laps = 1;
     segments = [
@@ -277,7 +281,7 @@ module {
     trackId = 4;
     name = "Junkyard Sprint";
     description = "Short aggressive circuit";
-    totalDistance = 4050;
+    totalDistance = 4470;
     primaryTerrain = #ScrapHeaps;
     laps = 3;
     segments = [
@@ -298,7 +302,7 @@ module {
     trackId = 5;
     name = "Metal Mesa Loop";
     description = "Mixed terrain balanced circuit";
-    totalDistance = 7400;
+    totalDistance = 7600;
     primaryTerrain = #MetalRoads;
     laps = 2;
     segments = [
@@ -322,7 +326,7 @@ module {
     trackId = 6;
     name = "Dune Runner";
     description = "Brutal marathon through endless dunes - pure power core test";
-    totalDistance = 16600;
+    totalDistance = 16500;
     primaryTerrain = #WastelandSand;
     laps = 1;
     segments = [
@@ -457,6 +461,186 @@ module {
       { length = 320; angle = 0; terrain = #WastelandSand; difficulty = 1.18 },
       { length = 300; angle = -5; terrain = #WastelandSand; difficulty = 1.08 },
       { length = 300; angle = -1; terrain = #WastelandSand; difficulty = 1.15 },
+    ];
+  };
+
+  /// Track 12: Wasteland Odyssey (Mixed, long endurance challenge - 22.4km)
+  private let WASTELAND_ODYSSEY : TrackTemplate = {
+    trackId = 12;
+    name = "Wasteland Odyssey";
+    description = "Epic journey across varied terrain - true test of balanced builds";
+    totalDistance = 22600;
+    primaryTerrain = #WastelandSand;
+    laps = 1;
+    segments = [
+      // Sand section (8km)
+      { length = 1400; angle = 3; terrain = #WastelandSand; difficulty = 1.18 },
+      { length = 1200; angle = 8; terrain = #WastelandSand; difficulty = 1.25 },
+      { length = 1300; angle = 12; terrain = #WastelandSand; difficulty = 1.28 },
+      { length = 1100; angle = 5; terrain = #WastelandSand; difficulty = 1.22 },
+      { length = 1000; angle = 0; terrain = #WastelandSand; difficulty = 1.2 },
+      { length = 1200; angle = -8; terrain = #WastelandSand; difficulty = 1.15 },
+      { length = 1000; angle = -4; terrain = #WastelandSand; difficulty = 1.12 },
+      // Metal highway section (7km)
+      { length = 1500; angle = 0; terrain = #MetalRoads; difficulty = 0.85 },
+      { length = 1400; angle = 0; terrain = #MetalRoads; difficulty = 0.82 },
+      { length = 1200; angle = -5; terrain = #MetalRoads; difficulty = 0.78 },
+      { length = 1300; angle = 0; terrain = #MetalRoads; difficulty = 0.88 },
+      { length = 1600; angle = 0; terrain = #MetalRoads; difficulty = 0.9 },
+      // Scrap mountain finale (7.4km)
+      { length = 900; angle = 8; terrain = #ScrapHeaps; difficulty = 1.15 },
+      { length = 800; angle = 15; terrain = #ScrapHeaps; difficulty = 1.25 },
+      { length = 1000; angle = 22; terrain = #ScrapHeaps; difficulty = 1.32 },
+      { length = 900; angle = 18; terrain = #ScrapHeaps; difficulty = 1.28 },
+      { length = 1100; angle = -12; terrain = #ScrapHeaps; difficulty = 1.12 },
+      { length = 1200; angle = -18; terrain = #ScrapHeaps; difficulty = 1.05 },
+      { length = 1500; angle = -10; terrain = #ScrapHeaps; difficulty = 1.08 },
+    ];
+  };
+
+  /// Track 13: Iron Crucible (MetalRoads/ScrapHeaps mixed, technical endurance - 28.8km)
+  private let IRON_CRUCIBLE : TrackTemplate = {
+    trackId = 13;
+    name = "Iron Crucible";
+    description = "Brutal metal-to-scrap transition course demanding versatility";
+    totalDistance = 28800;
+    primaryTerrain = #MetalRoads;
+    laps = 2;
+    segments = [
+      // Fast highway opening (4.5km)
+      { length = 1200; angle = 0; terrain = #MetalRoads; difficulty = 0.82 },
+      { length = 1100; angle = -4; terrain = #MetalRoads; difficulty = 0.78 },
+      { length = 1000; angle = 0; terrain = #MetalRoads; difficulty = 0.85 },
+      { length = 1200; angle = 0; terrain = #MetalRoads; difficulty = 0.88 },
+      // Technical scrap transition (5.1km)
+      { length = 800; angle = 5; terrain = #ScrapHeaps; difficulty = 1.12 },
+      { length = 900; angle = 12; terrain = #ScrapHeaps; difficulty = 1.22 },
+      { length = 700; angle = 18; terrain = #ScrapHeaps; difficulty = 1.3 },
+      { length = 1000; angle = 15; terrain = #ScrapHeaps; difficulty = 1.25 },
+      { length = 800; angle = 8; terrain = #ScrapHeaps; difficulty = 1.18 },
+      { length = 900; angle = 0; terrain = #ScrapHeaps; difficulty = 1.2 },
+      // Mixed technical section (4.8km)
+      { length = 600; angle = 0; terrain = #MetalRoads; difficulty = 0.92 },
+      { length = 700; angle = 8; terrain = #ScrapHeaps; difficulty = 1.15 },
+      { length = 800; angle = 12; terrain = #ScrapHeaps; difficulty = 1.22 },
+      { length = 900; angle = -10; terrain = #MetalRoads; difficulty = 0.88 },
+      { length = 1000; angle = -27; terrain = #MetalRoads; difficulty = 0.85 },
+      { length = 800; angle = -37; terrain = #ScrapHeaps; difficulty = 1.28 },
+    ];
+  };
+
+  /// Track 14: Endless Expanse (WastelandSand ultra-marathon - 51km)
+  private let ENDLESS_EXPANSE : TrackTemplate = {
+    trackId = 14;
+    name = "Endless Expanse";
+    description = "Ultimate power core test - 51km of unforgiving desert dunes";
+    totalDistance = 50500;
+    primaryTerrain = #WastelandSand;
+    laps = 1;
+    segments = [
+      // Opening dune climb (10km)
+      { length = 1800; angle = 8; terrain = #WastelandSand; difficulty = 1.22 },
+      { length = 1600; angle = 12; terrain = #WastelandSand; difficulty = 1.28 },
+      { length = 1700; angle = 15; terrain = #WastelandSand; difficulty = 1.32 },
+      { length = 1500; angle = 18; terrain = #WastelandSand; difficulty = 1.35 },
+      { length = 1400; angle = 10; terrain = #WastelandSand; difficulty = 1.25 },
+      { length = 2000; angle = 5; terrain = #WastelandSand; difficulty = 1.2 },
+      // Mid-expanse rolling (15km)
+      { length = 2000; angle = 0; terrain = #WastelandSand; difficulty = 1.18 },
+      { length = 1800; angle = 6; terrain = #WastelandSand; difficulty = 1.22 },
+      { length = 1600; angle = -4; terrain = #WastelandSand; difficulty = 1.15 },
+      { length = 1700; angle = 0; terrain = #WastelandSand; difficulty = 1.2 },
+      { length = 1900; angle = 8; terrain = #WastelandSand; difficulty = 1.25 },
+      { length = 2000; angle = 10; terrain = #WastelandSand; difficulty = 1.28 },
+      { length = 1800; angle = 4; terrain = #WastelandSand; difficulty = 1.18 },
+      { length = 1700; angle = -6; terrain = #WastelandSand; difficulty = 1.12 },
+      // Deep desert crucible (14km)
+      { length = 2200; angle = 12; terrain = #WastelandSand; difficulty = 1.3 },
+      { length = 2000; angle = 15; terrain = #WastelandSand; difficulty = 1.32 },
+      { length = 1800; angle = 8; terrain = #WastelandSand; difficulty = 1.25 },
+      { length = 1900; angle = 0; terrain = #WastelandSand; difficulty = 1.22 },
+      { length = 2100; angle = 5; terrain = #WastelandSand; difficulty = 1.2 },
+      { length = 2000; angle = 10; terrain = #WastelandSand; difficulty = 1.28 },
+      { length = 2000; angle = -8; terrain = #WastelandSand; difficulty = 1.15 },
+      // Final descent (12km)
+      { length = 1900; angle = -12; terrain = #WastelandSand; difficulty = 1.1 },
+      {
+        length = 1800;
+        angle = -15;
+        terrain = #WastelandSand;
+        difficulty = 1.08;
+      },
+      {
+        length = 2000;
+        angle = -10;
+        terrain = #WastelandSand;
+        difficulty = 1.12;
+      },
+      { length = 1700; angle = -6; terrain = #WastelandSand; difficulty = 1.15 },
+      { length = 1600; angle = 0; terrain = #WastelandSand; difficulty = 1.18 },
+      { length = 2000; angle = -8; terrain = #WastelandSand; difficulty = 1.1 },
+      {
+        length = 1000;
+        angle = -20;
+        terrain = #WastelandSand;
+        difficulty = 1.05;
+      },
+    ];
+  };
+
+  /// Track 15: Survival Gauntlet (Mixed ultra-endurance - 58km)
+  private let SURVIVAL_GAUNTLET : TrackTemplate = {
+    trackId = 15;
+    name = "Survival Gauntlet";
+    description = "The ultimate test - 59km through every terrain type";
+    totalDistance = 59000;
+    primaryTerrain = #ScrapHeaps;
+    laps = 1;
+    segments = [
+      // Scrap mountain approach (12km)
+      { length = 1500; angle = 8; terrain = #ScrapHeaps; difficulty = 1.15 },
+      { length = 1400; angle = 15; terrain = #ScrapHeaps; difficulty = 1.25 },
+      { length = 1600; angle = 20; terrain = #ScrapHeaps; difficulty = 1.32 },
+      { length = 1300; angle = 18; terrain = #ScrapHeaps; difficulty = 1.28 },
+      { length = 1200; angle = 12; terrain = #ScrapHeaps; difficulty = 1.22 },
+      { length = 1500; angle = -10; terrain = #ScrapHeaps; difficulty = 1.12 },
+      { length = 1400; angle = -15; terrain = #ScrapHeaps; difficulty = 1.08 },
+      { length = 1600; angle = -8; terrain = #ScrapHeaps; difficulty = 1.15 },
+      { length = 1500; angle = 0; terrain = #ScrapHeaps; difficulty = 1.2 },
+      // Highway speed section (16km)
+      { length = 2000; angle = 0; terrain = #MetalRoads; difficulty = 0.82 },
+      { length = 1900; angle = -5; terrain = #MetalRoads; difficulty = 0.78 },
+      { length = 1800; angle = 0; terrain = #MetalRoads; difficulty = 0.85 },
+      { length = 2100; angle = 0; terrain = #MetalRoads; difficulty = 0.88 },
+      { length = 2000; angle = -3; terrain = #MetalRoads; difficulty = 0.8 },
+      { length = 1900; angle = 0; terrain = #MetalRoads; difficulty = 0.9 },
+      { length = 2200; angle = 0; terrain = #MetalRoads; difficulty = 0.85 },
+      { length = 2100; angle = 0; terrain = #MetalRoads; difficulty = 0.88 },
+      // Desert endurance gauntlet (20km)
+      { length = 2200; angle = 8; terrain = #WastelandSand; difficulty = 1.22 },
+      { length = 2000; angle = 12; terrain = #WastelandSand; difficulty = 1.28 },
+      { length = 1900; angle = 15; terrain = #WastelandSand; difficulty = 1.32 },
+      { length = 2100; angle = 10; terrain = #WastelandSand; difficulty = 1.25 },
+      { length = 2000; angle = 5; terrain = #WastelandSand; difficulty = 1.2 },
+      { length = 1800; angle = 0; terrain = #WastelandSand; difficulty = 1.18 },
+      { length = 2000; angle = -6; terrain = #WastelandSand; difficulty = 1.12 },
+      {
+        length = 1900;
+        angle = -10;
+        terrain = #WastelandSand;
+        difficulty = 1.08;
+      },
+      { length = 2100; angle = 8; terrain = #WastelandSand; difficulty = 1.22 },
+      { length = 2000; angle = 0; terrain = #WastelandSand; difficulty = 1.15 },
+      // Final mixed technical (10km)
+      { length = 1200; angle = 0; terrain = #MetalRoads; difficulty = 0.92 },
+      { length = 1100; angle = 8; terrain = #ScrapHeaps; difficulty = 1.18 },
+      { length = 1300; angle = 15; terrain = #ScrapHeaps; difficulty = 1.28 },
+      { length = 1200; angle = 10; terrain = #WastelandSand; difficulty = 1.22 },
+      { length = 1100; angle = -8; terrain = #MetalRoads; difficulty = 0.88 },
+      { length = 1400; angle = 0; terrain = #WastelandSand; difficulty = 1.15 },
+      { length = 1200; angle = -12; terrain = #ScrapHeaps; difficulty = 1.1 },
+      { length = 1500; angle = -6; terrain = #MetalRoads; difficulty = 0.85 },
     ];
   };
 

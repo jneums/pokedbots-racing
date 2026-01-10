@@ -72,19 +72,6 @@ module {
           return ToolContext.makeError(e, cb);
         };
         case (#ok(result)) {
-          // Cancel all pending scavenge_accumulate timers for this bot
-          let scavengeTimers = ctx.timerTool.getActionsByFilter(#ByType("scavenge_accumulate"));
-          for ((timerId, timerAction) in scavengeTimers.vals()) {
-            let timerTokenOpt : ?Nat = from_candid (timerAction.params);
-            switch (timerTokenOpt) {
-              case (?timerToken) {
-                if (timerToken == tokenIndex) {
-                  ignore ctx.timerTool.cancelActionsByIds<system>([timerId.id]);
-                };
-              };
-              case (null) {};
-            };
-          };
           // Build parts breakdown
           let partsBreakdown = "Speed Chips: " # Nat.toText(result.speedChips) #
           ", Power Cells: " # Nat.toText(result.powerCoreFragments) #
