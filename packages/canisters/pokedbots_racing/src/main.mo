@@ -1434,6 +1434,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             ignore bettingManager.closePool(raceId);
             Debug.print("Closed betting pool for race " # debug_show (raceId));
 
+            // Update race start time to NOW (for chained races, this differs from the original scheduledTime)
+            // This is critical for calculating correct finish times
+            ignore raceManager.updateRaceStartTime(raceId, executionTime);
+            Debug.print("Updated race " # debug_show (raceId) # " startTime to actual execution time: " # debug_show (executionTime));
+
             // Mark as in progress
             ignore raceManager.updateRaceStatus(raceId, #InProgress);
             Debug.print("Race in progress: " # race.name # " with " # debug_show (race.entries.size()) # " entries");
@@ -1547,9 +1552,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                 Debug.print("Updated race duration from " # Nat.toText(race.duration) # "s to actual " # Nat.toText(actualDuration) # "s");
 
                 // Convert slowest time to nanoseconds and schedule finish
-                // Note: slowestTime is already divided by 10 for display, so use it as-is for real-time scheduling
+                // Use executionTime (actual start time) instead of race.startTime (which may be outdated for chained races)
                 let raceDurationNanos = Int.abs(Float.toInt(slowestTime * 1_000_000_000.0));
-                let finishTime = race.startTime + raceDurationNanos;
+                let finishTime = executionTime + raceDurationNanos;
 
                 let finishActionId = tt().setActionASync<system>(
                   Int.abs(finishTime),
@@ -1563,8 +1568,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               };
               case (null) {
                 Debug.print("Error: Failed to simulate race at start");
-                // Fallback to estimated duration
-                let finishTime = race.startTime + (race.duration * 1_000_000_000);
+                // Fallback to estimated duration using actual execution time
+                let finishTime = executionTime + (race.duration * 1_000_000_000);
                 let finishActionId = tt().setActionASync<system>(
                   Int.abs(finishTime),
                   {

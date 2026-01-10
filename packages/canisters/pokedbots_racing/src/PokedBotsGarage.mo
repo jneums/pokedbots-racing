@@ -3181,16 +3181,18 @@ module {
           );
 
           // Calculate battery and condition with VARIANCE (MATCH UPDATE FUNCTION)
-          // Charging curve: stepped rates like real fast chargers
+          // Charging curve: INVERTED - slower at low, faster at high
+          // Rewards keeping battery topped up, punishes letting it drain
+          // 1x at <25% (slowest) → 2x at <50% → 3x at <75% → 4x at 75-100% (fastest)
           let chargingCurve = if (mission.zone == #ChargingStation) {
             if (botStats.battery < 25) {
-              4.0;
-            } else if (botStats.battery < 50) {
-              3.0;
-            } else if (botStats.battery < 75) {
-              2.0;
-            } else {
               1.0;
+            } else if (botStats.battery < 50) {
+              2.0;
+            } else if (botStats.battery < 75) {
+              3.0;
+            } else {
+              4.0;
             };
           } else {
             1.0; // No curve for non-charging zones

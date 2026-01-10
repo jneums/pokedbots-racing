@@ -1638,6 +1638,21 @@ module {
       };
     };
 
+    /// Update race start time (for chained races that start later than scheduled)
+    public func updateRaceStartTime(raceId : Nat, newStartTime : Int) : ?Race {
+      switch (getRace(raceId)) {
+        case (?race) {
+          let updatedRace = {
+            race with
+            startTime = newStartTime;
+          };
+          ignore Map.put(races, nhash, raceId, updatedRace);
+          ?updatedRace;
+        };
+        case (null) { null };
+      };
+    };
+
     /// Get races map for stable storage
     public func getRacesMap() : Map.Map<Nat, Race> {
       races;

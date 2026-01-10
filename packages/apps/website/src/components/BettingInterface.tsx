@@ -304,9 +304,30 @@ export function BettingInterface({ raceId, entryDeadline, raceStatus }: BettingI
             {/* Bet Type Tabs */}
             <Tabs value={betType} onValueChange={(v) => setBetType(v as any)}>
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="Win">Win (1st)</TabsTrigger>
-                <TabsTrigger value="Place">Place (Top 3)</TabsTrigger>
-                <TabsTrigger value="Show">Show (Top 5)</TabsTrigger>
+                <TabsTrigger value="Win" className="flex items-center gap-2">
+                  Win (1st)
+                  {poolInfoFinal?.winBetsByBot && poolInfoFinal.winBetsByBot.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {poolInfoFinal.winBetsByBot.filter(([_, amount]: [bigint, bigint]) => amount > 0n).length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="Place" className="flex items-center gap-2">
+                  Place (Top 3)
+                  {poolInfoFinal?.placeBetsByBot && poolInfoFinal.placeBetsByBot.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {poolInfoFinal.placeBetsByBot.filter(([_, amount]: [bigint, bigint]) => amount > 0n).length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="Show" className="flex items-center gap-2">
+                  Show (Top 5)
+                  {poolInfoFinal?.showBetsByBot && poolInfoFinal.showBetsByBot.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {poolInfoFinal.showBetsByBot.filter(([_, amount]: [bigint, bigint]) => amount > 0n).length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="Win" className="space-y-4">
