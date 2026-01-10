@@ -3,6 +3,7 @@ import Nat "mo:base/Nat";
 import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Text "mo:base/Text";
+import Result "mo:base/Result";
 import Map "mo:map/Map";
 import { nhash } "mo:map/Map";
 import RacingSimulator "./RacingSimulator";
@@ -593,6 +594,275 @@ module {
         customMetadata,
         now,
       );
+    };
+
+    // ===== EVENT REGISTRATION FUNCTIONS =====
+
+    // Register a bot for an event
+    public func registerForEvent(
+      eventId : Nat,
+      tokenIndex : Nat,
+      owner : Principal,
+      raceClass : RaceClass,
+      entryFee : Nat,
+      now : Int,
+    ) : Result.Result<(), Text> {
+      switch (getEvent(eventId)) {
+        case (null) { #err("Event not found") };
+        case (?event) {
+          // Check event status
+          if (event.status != #RegistrationOpen) {
+            return #err("Registration is not open for this event");
+          };
+
+          // Check if registration window is valid
+          if (now < event.registrationOpens) {
+            return #err("Registration has not opened yet");
+          };
+          if (now >= event.registrationCloses) {
+            return #err("Registration has closed");
+          };
+
+          // Check if bot is already registered
+          let alreadyRegistered = Array.find<EventRegistration>(
+            event.registrations,
+            func(r) { r.tokenIndex == tokenIndex },
+          );
+          switch (alreadyRegistered) {
+            case (?_) { return #err("Bot is already registered for this event") };
+            case (null) {};
+          };
+
+          // Check class capacity
+          let classCount = Array.filter<EventRegistration>(
+            event.registrations,
+            func(r) { r.raceClass == raceClass },
+          ).size();
+
+          if (classCount >= event.maxRegistrationsPerClass) {
+            return #err("Registration is full for this class");
+          };
+
+          // Check visibility/access control
+          switch (event.visibility) {
+            case (#Public) {}; // Anyone can register
+            case (#Private) {
+              // Check if owner is invited
+              switch (event.invitedParticipants) {
+                case (null) { return #err("Event is private but has no invite list") };
+                case (?invited) {
+                  let isInvited = Array.find<Principal>(invited, func(p) { p == owner });
+                  switch (isInvited) {
+                    case (null) { return #err("You are not invited to this private event") };
+                    case (?_) {};
+                  };
+                };
+              };
+            };
+            case (#Restricted(rules)) {
+              // Note: ELO/faction/achievement checks would need to be done by caller
+              // before calling this function, as we don't have access to garage data here
+              
+              // Check allowed bots
+              switch (rules.allowedBots) {
+                case (?allowed) {
+                  let isAllowed = Array.find<Nat>(allowed, func(i) { i == tokenIndex });
+                  switch (isAllowed) {
+                    case (null) { return #err("This bot is not allowed in this restricted event") };
+                    case (?_) {};
+                  };
+                };
+                case (null) {};
+              };
+
+              // Check allowed players
+              switch (rules.allowedPlayers) {
+                case (?allowed) {
+                  let isAllowed = Array.find<Principal>(allowed, func(p) { p == owner });
+                  switch (isAllowed) {
+                    case (null) { return #err("You are not allowed in this restricted event") };
+                    case (?_) {};
+                  };
+                };
+                case (null) {};
+              };
+            };
+          };
+
+          // Create registration
+          let registration : EventRegistration = {
+            eventId = eventId;
+            tokenIndex = tokenIndex;
+            owner = owner;
+            raceClass = raceClass;
+            registeredAt = now;
+            entryFeePaid = entryFee;
+          };
+
+          // Update event
+          let newRegistrations = Array.append(event.registrations, [registration]);
+          
+          // Update class counts
+          let newByClass = updateClassCount(event.registrationCounts.byClass, raceClass, 1);
+
+          let updatedEvent = {
+            event with
+            registrations = newRegistrations;
+            registrationCounts = {
+              total = event.registrationCounts.total + 1;
+              byClass = newByClass;
+            };
+          };
+
+          ignore Map.put(events, nhash, eventId, updatedEvent);
+          #ok(());
+        };
+      };
+    };
+
+    // Unregister a bot from an event
+    public func unregisterFromEvent(
+      eventId : Nat,
+      tokenIndex : Nat,
+      owner : Principal,
+      now : Int,
+    ) : Result.Result<Nat, Text> {
+      switch (getEvent(eventId)) {
+        case (null) { #err("Event not found") };
+        case (?event) {
+          // Cannot unregister after registration closes
+          if (now >= event.registrationCloses) {
+            return #err("Cannot unregister after registration closes");
+          };
+
+          // Find registration
+          let registration = Array.find<EventRegistration>(
+            event.registrations,
+            func(r) { r.tokenIndex == tokenIndex and r.owner == owner },
+          );
+
+          switch (registration) {
+            case (null) { #err("Bot is not registered for this event") };
+            case (?reg) {
+              // Calculate refund based on cancellation deadlines
+              let refundAmount = if (now <= event.cancellationDeadlines.fullRefund) {
+                reg.entryFeePaid; // 100% refund
+              } else if (now <= event.cancellationDeadlines.halfRefund) {
+                reg.entryFeePaid / 2; // 50% refund
+              } else if (now <= event.cancellationDeadlines.quarterRefund) {
+                reg.entryFeePaid / 4; // 25% refund
+              } else {
+                0; // No refund
+              };
+
+              // Remove registration
+              let newRegistrations = Array.filter<EventRegistration>(
+                event.registrations,
+                func(r) { r.tokenIndex != tokenIndex or r.owner != owner },
+              );
+
+              // Update class counts
+              let newByClass = updateClassCount(event.registrationCounts.byClass, reg.raceClass, -1);
+
+              let updatedEvent = {
+                event with
+                registrations = newRegistrations;
+                registrationCounts = {
+                  total = Nat.sub(event.registrationCounts.total, 1);
+                  byClass = newByClass;
+                };
+              };
+
+              ignore Map.put(events, nhash, eventId, updatedEvent);
+              #ok(refundAmount);
+            };
+          };
+        };
+      };
+    };
+
+    // Helper: Update class count in byClass array
+    private func updateClassCount(
+      byClass : [(RaceClass, Nat)],
+      targetClass : RaceClass,
+      delta : Int,
+    ) : [(RaceClass, Nat)] {
+      var found = false;
+      let updated = Array.map<(RaceClass, Nat), (RaceClass, Nat)>(
+        byClass,
+        func(entry) {
+          let (raceClass, count) = entry;
+          if (raceClass == targetClass) {
+            found := true;
+            let newCount = if (delta >= 0) {
+              count + Int.abs(delta);
+            } else {
+              Nat.sub(count, Int.abs(delta));
+            };
+            (raceClass, newCount);
+          } else {
+            entry;
+          };
+        },
+      );
+
+      if (found) {
+        updated;
+      } else {
+        // Class not in array yet, add it
+        Array.append(updated, [(targetClass, Int.abs(delta))]);
+      };
+    };
+
+    // Get event registrations (hidden until registration closes)
+    public func getEventRegistrations(eventId : Nat, now : Int) : ?[EventRegistration] {
+      switch (getEvent(eventId)) {
+        case (null) { null };
+        case (?event) {
+          // Only reveal registrations after registration closes
+          if (now >= event.registrationCloses) {
+            ?event.registrations;
+          } else {
+            // Return empty array during blind registration period
+            ?[];
+          };
+        };
+      };
+    };
+
+    // Get public registration stats (always visible)
+    public func getEventRegistrationStats(eventId : Nat) : ?{
+      total : Nat;
+      byClass : [(RaceClass, Nat)];
+      maxPerClass : Nat;
+    } {
+      switch (getEvent(eventId)) {
+        case (null) { null };
+        case (?event) {
+          ?{
+            total = event.registrationCounts.total;
+            byClass = event.registrationCounts.byClass;
+            maxPerClass = event.maxRegistrationsPerClass;
+          };
+        };
+      };
+    };
+
+    // Check if a bot is registered for an event
+    public func isRegisteredForEvent(eventId : Nat, tokenIndex : Nat) : Bool {
+      switch (getEvent(eventId)) {
+        case (null) { false };
+        case (?event) {
+          let reg = Array.find<EventRegistration>(
+            event.registrations,
+            func(r) { r.tokenIndex == tokenIndex },
+          );
+          switch (reg) {
+            case (null) { false };
+            case (?_) { true };
+          };
+        };
+      };
     };
   };
 };
