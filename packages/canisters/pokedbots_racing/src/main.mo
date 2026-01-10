@@ -60,6 +60,8 @@ import RacingEnterRace "tools/racing_enter_race";
 import RacingSponsorRace "tools/racing_sponsor_race";
 import RacingGetRaceDetails "tools/racing_get_race_details";
 import RacingGetBotRaces "tools/racing_get_bot_races";
+import RacingRegisterForEvent "tools/racing_register_for_event";
+import RacingUnregisterFromEvent "tools/racing_unregister_from_event";
 import HelpGetCompendium "tools/help_get_compendium";
 import BettingPlaceBet "tools/betting_place_bet";
 import BettingListPools "tools/betting_list_pools";
@@ -833,8 +835,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               let (distance, terrain) = switch (event.raceCreationMode) {
                 case (#Automatic(config)) {
                   // Use configured distance range and terrain options
-                  let distMin = config.distanceRange.0;
-                  let distMax = config.distanceRange.1;
+                  let distMin = config.distanceRange.min;
+                  let distMax = config.distanceRange.max;
                   let distRange = distMax - distMin;
                   let dist = if (distRange > 0) {
                     distMin + Nat32.toNat(seed % Nat32.fromNat(distRange + 1));
@@ -2138,6 +2140,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     garageManager = garageManager;
     raceManager = raceManager;
     bettingManager = bettingManager;
+    eventCalendar = eventCalendar;
     extCanister = extCanister;
     extCanisterId = extCanisterId;
     icpLedgerCanisterId = func() : ?Principal { icpLedgerCanisterId };
@@ -2233,6 +2236,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     RacingSponsorRace.config(),
     RacingGetRaceDetails.config(),
     RacingGetBotRaces.config(),
+    RacingRegisterForEvent.config(),
+    RacingUnregisterFromEvent.config(),
     BettingPlaceBet.config(),
     BettingListPools.config(),
     BettingGetPoolInfo.config(),
@@ -2274,6 +2279,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       ("racing_sponsor_race", RacingSponsorRace.handle(toolContext)),
       ("racing_get_race_details", RacingGetRaceDetails.handle(toolContext)),
       ("racing_get_bot_races", RacingGetBotRaces.handle(toolContext)),
+      ("racing_register_for_event", RacingRegisterForEvent.handle(toolContext)),
+      ("racing_unregister_from_event", RacingUnregisterFromEvent.handle(toolContext)),
       ("betting_place_bet", BettingPlaceBet.handle(toolContext)),
       ("betting_list_pools", BettingListPools.handle(toolContext)),
       ("betting_get_pool_info", BettingGetPoolInfo.handle(toolContext)),

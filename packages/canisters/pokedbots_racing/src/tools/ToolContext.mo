@@ -7,6 +7,7 @@ import PokedBotsGarage "../PokedBotsGarage";
 import RacingSimulator "../RacingSimulator";
 import ExtIntegration "../ExtIntegration";
 import BettingManager "../BettingManager";
+import RaceCalendar "../RaceCalendar";
 import TimerTool "mo:timer-tool";
 
 module ToolContext {
@@ -26,6 +27,8 @@ module ToolContext {
     raceManager : RacingSimulator.RaceManager;
     /// Betting manager (integrated betting system)
     bettingManager : BettingManager.BettingManager;
+    /// Event calendar for event-based registration
+    eventCalendar : RaceCalendar.EventCalendar;
     /// EXT canister interface for ownership verification
     extCanister : ExtIntegration.ExtCanisterInterface;
     /// EXT canister ID (needed for encoding token identifiers)
