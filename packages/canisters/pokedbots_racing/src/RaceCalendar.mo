@@ -4,6 +4,7 @@ import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Text "mo:base/Text";
 import Result "mo:base/Result";
+import Buffer "mo:base/Buffer";
 import Map "mo:map/Map";
 import { nhash } "mo:map/Map";
 import RacingSimulator "./RacingSimulator";
@@ -861,6 +862,189 @@ module {
             case (null) { false };
             case (?_) { true };
           };
+        };
+      };
+    };
+
+    // ===== HEAT ALLOCATION FUNCTIONS =====
+
+    // Split registrations into heats based on allocation strategy
+    public func splitIntoHeats(
+      registrations : [EventRegistration],
+      maxPerHeat : Nat,
+      strategy : HeatAllocationStrategy,
+      getElo : (Nat) -> Nat, // Function to get ELO for a bot
+    ) : [[EventRegistration]] {
+      if (registrations.size() == 0) {
+        return [];
+      };
+
+      // If under max, return single heat
+      if (registrations.size() <= maxPerHeat) {
+        return [registrations];
+      };
+
+      // Calculate number of heats needed
+      let numHeats = (registrations.size() + maxPerHeat - 1) / maxPerHeat;
+
+      switch (strategy) {
+        case (#SnakeDraft) {
+          // Sort by ELO (highest to lowest)
+          let sorted = Array.sort<EventRegistration>(
+            registrations,
+            func(a, b) { Nat.compare(getElo(b.tokenIndex), getElo(a.tokenIndex)) },
+          );
+
+          // Snake draft: 1→4→5→8, 2→3→6→7
+          let heats = Buffer.Buffer<Buffer.Buffer<EventRegistration>>(numHeats);
+          for (i in Iter.range(0, numHeats - 1)) {
+            heats.add(Buffer.Buffer<EventRegistration>(maxPerHeat));
+          };
+
+          var heatIndex : Int = 0;
+          var direction : Int = 1; // 1 = forward, -1 = backward
+
+          for (reg in sorted.vals()) {
+            heats.get(Int.abs(heatIndex)).add(reg);
+
+            // Snake pattern
+            heatIndex += direction;
+            if (heatIndex >= numHeats) {
+              heatIndex := Int.abs(numHeats) - 1;
+              direction := -1;
+            } else if (heatIndex < 0) {
+              heatIndex := 0;
+              direction := 1;
+            };
+          };
+
+          Buffer.toArray(Buffer.map<Buffer.Buffer<EventRegistration>, [EventRegistration]>(
+            heats,
+            func(h) { Buffer.toArray(h) },
+          ));
+        };
+
+        case (#SkillTiered) {
+          // Sort by ELO
+          let sorted = Array.sort<EventRegistration>(
+            registrations,
+            func(a, b) { Nat.compare(getElo(b.tokenIndex), getElo(a.tokenIndex)) },
+          );
+
+          // Group into skill tiers
+          let heats = Buffer.Buffer<Buffer.Buffer<EventRegistration>>(numHeats);
+          for (i in Iter.range(0, numHeats - 1)) {
+            heats.add(Buffer.Buffer<EventRegistration>(maxPerHeat));
+          };
+
+          for (i in Iter.range(0, sorted.size() - 1)) {
+            let heatIndex = Nat.min(i / maxPerHeat, numHeats - 1);
+            heats.get(heatIndex).add(sorted[i]);
+          };
+
+          Buffer.toArray(Buffer.map<Buffer.Buffer<EventRegistration>, [EventRegistration]>(
+            heats,
+            func(h) { Buffer.toArray(h) },
+          ));
+        };
+
+        case (#TopBottom) {
+          // Sort by ELO
+          let sorted = Array.sort<EventRegistration>(
+            registrations,
+            func(a, b) { Nat.compare(getElo(b.tokenIndex), getElo(a.tokenIndex)) },
+          );
+
+          // Split in half: top ELO in first heat(s), bottom ELO in last heat(s)
+          let midPoint = sorted.size() / 2;
+          let numTopHeats = (midPoint + maxPerHeat - 1) / maxPerHeat;
+          let numBottomHeats = (sorted.size() - midPoint + maxPerHeat - 1) / maxPerHeat;
+
+          let heats = Buffer.Buffer<Buffer.Buffer<EventRegistration>>(numTopHeats + numBottomHeats);
+          
+          // Initialize top heats
+          for (i in Iter.range(0, numTopHeats - 1)) {
+            heats.add(Buffer.Buffer<EventRegistration>(maxPerHeat));
+          };
+
+          // Initialize bottom heats
+          for (i in Iter.range(0, numBottomHeats - 1)) {
+            heats.add(Buffer.Buffer<EventRegistration>(maxPerHeat));
+          };
+
+          // Fill top heats
+          for (i in Iter.range(0, midPoint - 1)) {
+            let heatIndex = i / maxPerHeat;
+            heats.get(heatIndex).add(sorted[i]);
+          };
+
+          // Fill bottom heats
+          for (i in Iter.range(midPoint, sorted.size() - 1)) {
+            let heatIndex = numTopHeats + (Nat.sub(i, midPoint) / maxPerHeat);
+            heats.get(heatIndex).add(sorted[i]);
+          };
+
+          Buffer.toArray(Buffer.map<Buffer.Buffer<EventRegistration>, [EventRegistration]>(
+            heats,
+            func(h) { Buffer.toArray(h) },
+          ));
+        };
+
+        case (#Random) {
+          // Simple round-robin distribution
+          let heats = Buffer.Buffer<Buffer.Buffer<EventRegistration>>(numHeats);
+          for (i in Iter.range(0, numHeats - 1)) {
+            heats.add(Buffer.Buffer<EventRegistration>(maxPerHeat));
+          };
+
+          for (i in Iter.range(0, registrations.size() - 1)) {
+            let heatIndex = i % numHeats;
+            heats.get(heatIndex).add(registrations[i]);
+          };
+
+          Buffer.toArray(Buffer.map<Buffer.Buffer<EventRegistration>, [EventRegistration]>(
+            heats,
+            func(h) { Buffer.toArray(h) },
+          ));
+        };
+      };
+    };
+
+    // Get registrations grouped by class
+    public func getRegistrationsByClass(eventId : Nat) : [(RaceClass, [EventRegistration])] {
+      switch (getEvent(eventId)) {
+        case (null) { [] };
+        case (?event) {
+          // Group by class using a buffer
+          let result = Buffer.Buffer<(RaceClass, Buffer.Buffer<EventRegistration>)>(5);
+
+          for (reg in event.registrations.vals()) {
+            // Find existing class entry
+            var found = false;
+            for (i in Iter.range(0, result.size() - 1)) {
+              let (raceClass, buffer) = result.get(i);
+              if (raceClass == reg.raceClass) {
+                buffer.add(reg);
+                found := true;
+              };
+            };
+
+            // Add new class entry if not found
+            if (not found) {
+              let newBuffer = Buffer.Buffer<EventRegistration>(10);
+              newBuffer.add(reg);
+              result.add((reg.raceClass, newBuffer));
+            };
+          };
+
+          // Convert to array
+          Buffer.toArray(Buffer.map<(RaceClass, Buffer.Buffer<EventRegistration>), (RaceClass, [EventRegistration])>(
+            result,
+            func(entry) {
+              let (raceClass, buffer) = entry;
+              (raceClass, Buffer.toArray(buffer));
+            },
+          ));
         };
       };
     };
