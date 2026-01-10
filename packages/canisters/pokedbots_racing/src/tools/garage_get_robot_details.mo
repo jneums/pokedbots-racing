@@ -11,6 +11,7 @@ import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
 import Json "mo:json";
 import ToolContext "ToolContext";
 import WastelandFlavor "WastelandFlavor";
+import RaceClassUtils "../RaceClassUtils";
 import ExtIntegration "../ExtIntegration";
 import TimeUtils "../TimeUtils";
 
@@ -115,17 +116,8 @@ module {
           let canRace = ctx.garageManager.canRace(Nat.toText(tokenIndex));
 
           // Determine race class bracket (rating-based)
-          let raceClass = if (overallRating >= 50) {
-            "SilentKlan (50+ rating)";
-          } else if (overallRating >= 40) {
-            "Elite (40-49 rating)";
-          } else if (overallRating >= 30) {
-            "Raider (30-39 rating)";
-          } else if (overallRating >= 20) {
-            "Junker (20-29 rating)";
-          } else {
-            "Scrap (0-19 rating)";
-          };
+          let raceClassVariant = RaceClassUtils.getRaceClassFromRating(overallRating);
+          let raceClass = RaceClassUtils.getClassDescription(raceClassVariant);
 
           // Get wasteland flavor text
           let factionGreeting = WastelandFlavor.getFactionGreeting(racingStats.faction);

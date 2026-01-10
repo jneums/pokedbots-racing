@@ -14,6 +14,7 @@ import Json "mo:json";
 import ToolContext "./ToolContext";
 import ExtIntegration "../ExtIntegration";
 import RacingSimulator "../RacingSimulator";
+import RaceClassUtils "../RaceClassUtils";
 
 module {
   let RECHARGE_COOLDOWN : Int = 21600000000000; // 6 hours in nanoseconds
@@ -393,16 +394,13 @@ module {
                   };
 
                   // Show race class bracket (rating-based)
-                  let raceClassText = if (totalRatingAt100 >= 50) {
-                    "💀 SilentKlan (50+ rating)";
-                  } else if (totalRatingAt100 >= 40) {
-                    "🥇 Elite (40-49 rating)";
-                  } else if (totalRatingAt100 >= 30) {
-                    "🥈 Raider (30-39 rating)";
-                  } else if (totalRatingAt100 >= 20) {
-                    "🥉 Junker (20-29 rating)";
-                  } else {
-                    "🗑️ Scrap (0-19 rating)";
+                  let raceClassVariant = RaceClassUtils.getRaceClassFromRating(totalRatingAt100);
+                  let raceClassText = switch (raceClassVariant) {
+                    case (#Scrap) { "🗑️ Scrap (0-19 rating)" };
+                    case (#Junker) { "🥉 Junker (20-29 rating)" };
+                    case (#Raider) { "🥈 Raider (30-39 rating)" };
+                    case (#Elite) { "🥇 Elite (40-49 rating)" };
+                    case (#SilentKlan) { "💀 SilentKlan (50+ rating)" };
                   };
                   msg #= "   🏆 Class: " # raceClassText # " | ELO: " # Nat.toText(stats.eloRating) # " (skill)\n";
 

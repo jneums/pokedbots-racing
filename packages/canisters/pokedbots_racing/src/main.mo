@@ -82,6 +82,7 @@ import IcpLedger "IcpLedger";
 import UsernameValidator "UsernameValidator";
 import BettingManager "BettingManager";
 import BettingTypes "BettingTypes";
+import RaceClassUtils "RaceClassUtils";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
 
@@ -355,18 +356,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   /// Get race class based on overall rating (average of max stats)
   func getRaceClassFromRating(overallRating : Nat) : RacingSimulator.RaceClass {
-    // Based on overall rating (average of max stats: 0-100)
-    if (overallRating >= 50) {
-      #SilentKlan; // Top tier: 50+ (highly upgraded)
-    } else if (overallRating >= 40) {
-      #Elite; // High tier: 40-49
-    } else if (overallRating >= 30) {
-      #Raider; // Mid tier: 30-39
-    } else if (overallRating >= 20) {
-      #Junker; // Low tier: 20-29
-    } else {
-      #Scrap; // Bottom tier: 0-19
-    };
+    // Delegate to centralized utility to ensure consistency
+    RaceClassUtils.getRaceClassFromRating(overallRating);
   };
 
   /// Calculate overall rating from max stats (for race class determination)
@@ -4325,13 +4316,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             for (bot in callerBots.vals()) {
               // Check if bot's rating (max stats) matches race class
               let rating = calculateMaxRating(bot); // Use max stats, not current degraded stats
-              let isEligible = switch (race.raceClass) {
-                case (#Scrap) { rating < 20 };
-                case (#Junker) { rating >= 20 and rating < 30 };
-                case (#Raider) { rating >= 30 and rating < 40 };
-                case (#Elite) { rating >= 40 and rating < 50 };
-                case (#SilentKlan) { rating >= 50 };
-              };
+              let isEligible = RaceClassUtils.isEligibleForClass(rating, race.raceClass);
 
               // Check if this bot is not already entered
               var botAlreadyEntered = false;

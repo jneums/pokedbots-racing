@@ -12,6 +12,7 @@ import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
 import Json "mo:json";
 import ToolContext "ToolContext";
+import RaceClassUtils "../RaceClassUtils";
 import RacingSimulator "../RacingSimulator";
 import TimeUtils "../TimeUtils";
 
@@ -113,13 +114,7 @@ module {
                 case (#Cancelled) { "Cancelled" };
               };
 
-              let classText = switch (race.raceClass) {
-                case (#Scrap) { "Scrap (0-19 rating)" };
-                case (#Junker) { "Junker (20-29 rating)" };
-                case (#Raider) { "Raider (30-39 rating)" };
-                case (#Elite) { "Elite (40-49 rating)" };
-                case (#SilentKlan) { "Silent Klan Invitational (50+ rating)" };
-              };
+              let classText = RaceClassUtils.getClassDescription(race.raceClass);
 
               let terrainText = switch (race.terrain) {
                 case (#ScrapHeaps) { "Scrap Heaps" };

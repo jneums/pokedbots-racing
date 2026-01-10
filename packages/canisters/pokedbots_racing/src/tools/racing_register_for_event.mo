@@ -16,6 +16,7 @@ import Json "mo:json";
 import ToolContext "ToolContext";
 import RaceCalendar "../RaceCalendar";
 import IcpLedger "../IcpLedger";
+import RaceClassUtils "../RaceClassUtils";
 
 module {
   let TRANSFER_FEE = 10000 : Nat;
@@ -97,18 +98,8 @@ module {
       let currentStats = ctx.garageManager.getCurrentStats(botStats);
       let overallRating = (currentStats.speed + currentStats.powerCore + currentStats.acceleration + currentStats.stability) / 4;
 
-      // Determine race class from overall rating (bracket system)
-      let raceClass : RaceCalendar.RaceClass = if (overallRating < 30) {
-        #Scrap;
-      } else if (overallRating < 50) {
-        #Junker;
-      } else if (overallRating < 70) {
-        #Raider;
-      } else if (overallRating < 90) {
-        #Elite;
-      } else {
-        #SilentKlan;
-      };
+      // Determine race class from overall rating using centralized utility
+      let raceClass : RaceCalendar.RaceClass = RaceClassUtils.getRaceClassFromRating(overallRating);
 
       // Calculate class-based entry fee
       let classFeeMultiplier : Float = switch (raceClass) {
