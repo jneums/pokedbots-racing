@@ -106,25 +106,6 @@ module {
               return ToolContext.makeError(e, cb);
             };
             case (#ok(_)) {
-              // Schedule auto-complete timer if duration is specified
-              switch (durationMinutes) {
-                case (?duration) {
-                  let durationNanos = duration * 60 * 1_000_000_000;
-                  let executeAt = now + durationNanos;
-
-                  ignore ctx.timerTool.setActionSync<system>(
-                    Int.abs(executeAt),
-                    {
-                      actionType = "scavenge_auto_complete";
-                      params = to_candid (tokenIndex);
-                    },
-                  );
-                };
-                case (null) {
-                  // Continuous mode - no auto-complete timer needed
-                };
-              };
-
               let zoneDesc = switch (zone) {
                 case (#ScrapHeaps) { "Scrap Heaps (Safe)" };
                 case (#AbandonedSettlements) {

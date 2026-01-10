@@ -2219,35 +2219,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     return #awaited(actionId);
   };
-
-  /// Handle auto-complete of scavenging mission when duration expires
-  func handleScavengingAutoComplete<system>(actionId : TT.ActionId, action : TT.Action) : TT.ActionId {
-    Debug.print("Handling scavenging auto-complete for action " # debug_show (actionId));
-
-    let tokenIndexOpt : ?Nat = from_candid (action.params);
-    switch (tokenIndexOpt) {
-      case (?tokenIndex) {
-        let now = Time.now();
-
-        // Complete mission
-        switch (garageManager.completeScavengingMissionV2(tokenIndex, now)) {
-          case (#ok(result)) {
-            Debug.print("Auto-completed scavenging for bot " # Nat.toText(tokenIndex) # ": " # Nat.toText(result.totalParts) # " parts collected");
-          };
-          case (#err(msg)) {
-            Debug.print("Error auto-completing scavenging for bot " # Nat.toText(tokenIndex) # ": " # msg);
-          };
-        };
-      };
-      case (null) {
-        Debug.print("Could not decode token index");
-      };
-    };
-
-    actionId;
-  };
-
-  tt().registerExecutionListenerSync(?"scavenge_auto_complete", handleScavengingAutoComplete);
   tt().registerExecutionListenerSync(?"upgrade_complete", handleUpgradeCompletion);
   tt().registerExecutionListenerSync(?"hourly_recharge", handleHourlyRecharge);
   tt().registerExecutionListenerSync(?"race_create", handleRaceCreation);
@@ -7163,30 +7134,18 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       };
     };
 
-    // Start continuous mission
+    // Start mission
     let now = Time.now();
     switch (garageManager.startScavengingMission(tokenIndex, parsedZone, now, durationMinutes)) {
       case (#ok(_)) {
-        // Schedule auto-complete timer if duration is specified
         let message = switch (durationMinutes) {
           case (?minutes) {
-            let durationNanos = minutes * 60 * 1_000_000_000;
-            let executeAt = now + durationNanos;
-
-            ignore tt().setActionSync<system>(
-              Int.abs(executeAt),
-              {
-                actionType = "scavenge_auto_complete";
-                params = to_candid (tokenIndex);
-              },
-            );
-            "Scavenging started for " # Nat.toText(minutes) # " minutes! Bot will auto-return when done.";
+            "Scavenging started for " # Nat.toText(minutes) # " minutes. Retrieve bot anytime with web_complete_scavenging.";
           };
           case (null) {
             "Continuous scavenging started! Retrieve anytime with web_complete_scavenging.";
           };
         };
-
         #ok(message);
       };
       case (#err(msg)) {
@@ -7227,20 +7186,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           };
           case (null) {
             Debug.print("WARNING: Could not retrieve stats after completing mission for bot " # debug_show (tokenIndex));
-          };
-        };
-
-        // Cancel any pending auto_complete timer for this bot
-        let autoCompleteTimers = tt().getActionsByFilter(#ByType("scavenge_auto_complete"));
-        for ((timerId, timerAction) in autoCompleteTimers.vals()) {
-          let timerTokenOpt : ?Nat = from_candid (timerAction.params);
-          switch (timerTokenOpt) {
-            case (?timerToken) {
-              if (timerToken == tokenIndex) {
-                ignore tt().cancelActionsByIds<system>([timerId.id]);
-              };
-            };
-            case (null) {};
           };
         };
 
