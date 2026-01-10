@@ -790,143 +790,335 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         var createdRaceIds : [Nat] = [];
         var raceIndex : Nat = 0;
 
-        // Create races based on event divisions
-        for (division in event.metadata.divisions.vals()) {
-          // Use event ID and race count for better seed variation
-          let seed = Nat32.fromNat(Int.abs((event.scheduledTime + event.eventId * 7919 + createdRaceIds.size() * 1000000) % 1000000));
+        // Check if this is a registration-based event
+        if (event.registrations.size() > 0) {
+          // NEW SYSTEM: Event has registrations - create heats from registered bots
+          Debug.print("Creating races from " # Nat.toText(event.registrations.size()) # " registrations for event " # Nat.toText(event.eventId));
 
-          // Distance and terrain based on event type
-          let (distance, terrain) = switch (event.eventType) {
-            case (#WeeklyLeague) {
-              // League races: longer distances (15-30km) with varied terrain
-              let leagueDistances = [15, 20, 25, 30];
-              let dist = leagueDistances[Nat32.toNat(seed % 4)];
-
-              let terr = switch (Nat32.toNat((seed / 4) % 3)) {
-                case (0) { #WastelandSand }; // Favor endurance
-                case (1) { #MetalRoads }; // High speed
-                case (_) { #ScrapHeaps }; // Technical
-              };
-              (dist, terr);
-            };
-            case (#MonthlyCup) {
-              // Cup races: epic distances (25-40km) with challenging terrain
-              let cupDistances = [25, 30, 35, 40];
-              let dist = cupDistances[Nat32.toNat(seed % 4)];
-
-              let terr = switch (Nat32.toNat((seed / 4) % 3)) {
-                case (0) { #WastelandSand };
-                case (1) { #MetalRoads };
-                case (_) { #ScrapHeaps };
-              };
-              (dist, terr);
-            };
-            case (#DailySprint) {
-              // Sprint races: short distances (5-10km) with varied terrain
-              let sprintDistances = [5, 7, 10];
-              let dist = sprintDistances[Nat32.toNat(seed % 3)];
-
-              // Better terrain distribution using different modulo
-              let terr = switch (Nat32.toNat(seed % 3)) {
-                case (0) { #ScrapHeaps };
-                case (1) { #WastelandSand };
-                case (_) { #MetalRoads };
-              };
-              (dist, terr);
-            };
-            case (#SpecialEvent(_)) {
-              // Special events: full variety
-              let distances = [10, 15, 20, 25, 30];
-              let dist = distances[Nat32.toNat(seed % 5)];
-
-              let terr = switch (Nat32.toNat((seed / 5) % 3)) {
-                case (0) { #ScrapHeaps };
-                case (1) { #WastelandSand };
-                case (_) { #MetalRoads };
-              };
-              (dist, terr);
+          // Helper function to get bot ELO for skill-based allocation
+          let getElo = func(tokenIndex : Nat) : Nat {
+            switch (garageManager.getStats(tokenIndex)) {
+              case (?stats) { stats.eloRating };
+              case (null) { 1500 }; // Default ELO for new bots
             };
           };
 
-          // Apply class-based entry fee multiplier - More linear progression
-          let classFeeMultiplier : Float = switch (division) {
-            case (#Scrap) { 0.5 }; // 0.5x base
-            case (#Junker) { 1.0 }; // 1x base (reference)
-            case (#Raider) { 1.5 }; // 1.5x base (+50%)
-            case (#Elite) { 2.0 }; // 2x base (+100%)
-            case (#SilentKlan) { 2.5 }; // 2.5x base (+150%)
+          // Group registrations by race class
+          let registrationsByClass = eventCalendar.getRegistrationsByClass(event.eventId);
+
+          // Get heat allocation strategy from event (default to SnakeDraft)
+          let heatStrategy = switch (event.raceCreationMode) {
+            case (#Automatic(config)) { config.heatAllocation };
+            case (#Manual(_)) { #SnakeDraft }; // Manual mode uses default
           };
 
-          let adjustedEntryFee = Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
+          // Process each class
+          for ((raceClass, classRegistrations) in registrationsByClass.vals()) {
+            // Split into heats of max 8 players
+            let heats = eventCalendar.splitIntoHeats(
+              classRegistrations,
+              8,
+              heatStrategy,
+              getElo,
+            );
 
-          // Platform bonus to guarantee top 3 profitability, 4th breaks even
-          // Calculated for 8-player races with new distribution (45%, 28%, 18%, 9%)
-          // Increased by 25% to maximize player rewards
-          let platformBonus : Nat = switch (event.eventType, division) {
-            // Daily Sprint bonuses - Entry fees: Scrap 0.1, Junker 0.2, Raider 0.3, Elite 0.4, SilentKlan 0.5
-            case (#DailySprint, #Scrap) { 20_000_000 }; // 0.20 ICP (2x)
-            case (#DailySprint, #Junker) { 40_000_000 }; // 0.40 ICP (2x)
-            case (#DailySprint, #Raider) { 60_000_000 }; // 0.60 ICP (2x)
-            case (#DailySprint, #Elite) { 80_000_000 }; // 0.80 ICP (2x)
-            case (#DailySprint, #SilentKlan) { 100_000_000 }; // 1.00 ICP (2x)
-            // Weekly League bonuses - Entry fees: Scrap 0.4, Junker 0.8, Raider 1.2, Elite 1.6, SilentKlan 2.4
-            case (#WeeklyLeague, #Scrap) { 80_000_000 }; // 0.80 ICP (2x)
-            case (#WeeklyLeague, #Junker) { 160_000_000 }; // 1.60 ICP (2x)
-            case (#WeeklyLeague, #Raider) { 240_000_000 }; // 2.40 ICP (2x)
-            case (#WeeklyLeague, #Elite) { 320_000_000 }; // 3.20 ICP (2x)
-            case (#WeeklyLeague, #SilentKlan) { 480_000_000 }; // 4.80 ICP (2x)
-            // Monthly Cup bonuses - Entry fees: Elite 4.0, SilentKlan 6.0
-            case (#MonthlyCup, #Elite) { 800_000_000 }; // 8.0 ICP (2x)
-            case (#MonthlyCup, #SilentKlan) { 1_200_000_000 }; // 12.0 ICP (2x)
-            // Fallback
-            case _ { event.metadata.prizePoolBonus };
+            Debug.print("Split " # Nat.toText(classRegistrations.size()) # " " # debug_show (raceClass) # " registrations into " # Nat.toText(heats.size()) # " heats");
+
+            // Create a race for each heat
+            var heatNumber = 1;
+            for (heat in heats.vals()) {
+              // Determine distance and terrain for this heat's race
+              let seed = Nat32.fromNat(Int.abs((event.scheduledTime + event.eventId * 7919 + createdRaceIds.size() * 1000000) % 1000000));
+
+              let (distance, terrain) = switch (event.raceCreationMode) {
+                case (#Automatic(config)) {
+                  // Use configured distance range and terrain options
+                  let distMin = config.distanceRange.0;
+                  let distMax = config.distanceRange.1;
+                  let distRange = distMax - distMin;
+                  let dist = if (distRange > 0) {
+                    distMin + Nat32.toNat(seed % Nat32.fromNat(distRange + 1));
+                  } else {
+                    distMin;
+                  };
+
+                  // Pick terrain from configured options
+                  let terrainCount = config.terrains.size();
+                  let terr = if (terrainCount > 0) {
+                    config.terrains[Nat32.toNat(seed % Nat32.fromNat(terrainCount))];
+                  } else {
+                    #ScrapHeaps; // Fallback
+                  };
+
+                  (dist, terr);
+                };
+                case (#Manual(templates)) {
+                  // Manual mode: use race templates (TODO: implement template selection)
+                  // For now, fall back to event type defaults
+                  switch (event.eventType) {
+                    case (#WeeklyLeague) {
+                      let leagueDistances = [15, 20, 25, 30];
+                      let dist = leagueDistances[Nat32.toNat(seed % 4)];
+                      let terr = switch (Nat32.toNat((seed / 4) % 3)) {
+                        case (0) { #WastelandSand };
+                        case (1) { #MetalRoads };
+                        case (_) { #ScrapHeaps };
+                      };
+                      (dist, terr);
+                    };
+                    case (#MonthlyCup) {
+                      let cupDistances = [25, 30, 35, 40];
+                      let dist = cupDistances[Nat32.toNat(seed % 4)];
+                      let terr = switch (Nat32.toNat((seed / 4) % 3)) {
+                        case (0) { #WastelandSand };
+                        case (1) { #MetalRoads };
+                        case (_) { #ScrapHeaps };
+                      };
+                      (dist, terr);
+                    };
+                    case (#DailySprint) {
+                      let sprintDistances = [5, 7, 10];
+                      let dist = sprintDistances[Nat32.toNat(seed % 3)];
+                      let terr = switch (Nat32.toNat(seed % 3)) {
+                        case (0) { #ScrapHeaps };
+                        case (1) { #WastelandSand };
+                        case (_) { #MetalRoads };
+                      };
+                      (dist, terr);
+                    };
+                    case (#SpecialEvent(_)) {
+                      let distances = [10, 15, 20, 25, 30];
+                      let dist = distances[Nat32.toNat(seed % 5)];
+                      let terr = switch (Nat32.toNat((seed / 5) % 3)) {
+                        case (0) { #ScrapHeaps };
+                        case (1) { #WastelandSand };
+                        case (_) { #MetalRoads };
+                      };
+                      (dist, terr);
+                    };
+                  };
+                };
+              };
+
+              // Calculate entry fee for this class
+              let classFeeMultiplier : Float = switch (raceClass) {
+                case (#Scrap) { 0.5 };
+                case (#Junker) { 1.0 };
+                case (#Raider) { 1.5 };
+                case (#Elite) { 2.0 };
+                case (#SilentKlan) { 2.5 };
+              };
+              let adjustedEntryFee = Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
+
+              // Platform bonus
+              let platformBonus : Nat = switch (event.eventType, raceClass) {
+                case (#DailySprint, #Scrap) { 20_000_000 };
+                case (#DailySprint, #Junker) { 40_000_000 };
+                case (#DailySprint, #Raider) { 60_000_000 };
+                case (#DailySprint, #Elite) { 80_000_000 };
+                case (#DailySprint, #SilentKlan) { 100_000_000 };
+                case (#WeeklyLeague, #Scrap) { 80_000_000 };
+                case (#WeeklyLeague, #Junker) { 160_000_000 };
+                case (#WeeklyLeague, #Raider) { 240_000_000 };
+                case (#WeeklyLeague, #Elite) { 320_000_000 };
+                case (#WeeklyLeague, #SilentKlan) { 480_000_000 };
+                case (#MonthlyCup, #Elite) { 800_000_000 };
+                case (#MonthlyCup, #SilentKlan) { 1_200_000_000 };
+                case _ { event.metadata.prizePoolBonus };
+              };
+
+              // Create race with pre-populated entries
+              let race = raceManager.createRace(
+                distance,
+                terrain,
+                raceClass,
+                adjustedEntryFee,
+                heat.size(), // Max entries = heat size
+                heat.size(), // Min entries = heat size (already have all entries)
+                event.scheduledTime,
+                platformBonus,
+                event.registrationCloses,
+              );
+
+              // Add all heat members to the race (entry fees already paid at event registration)
+              for (registration in heat.vals()) {
+                // Entry was already paid at event registration time
+                ignore raceManager.addEntryWithoutPayment(race.raceId, registration.tokenIndex, registration.owner);
+              };
+
+              createdRaceIds := Array.append(createdRaceIds, [race.raceId]);
+
+              Debug.print("Created race " # Nat.toText(race.raceId) # " (Heat " # Nat.toText(heatNumber) # "/" # Nat.toText(heats.size()) # ") for " # event.metadata.name # ": " # race.name # " with " # Nat.toText(heat.size()) # " pre-registered entries");
+
+              // Schedule betting pool creation
+              let poolActionId = tt().setActionASync<system>(
+                Int.abs(event.registrationCloses),
+                {
+                  actionType = "betting_pool_create";
+                  params = to_candid (race.raceId);
+                },
+                3_600_000_000_000,
+              );
+
+              // Only schedule the first race - subsequent races will be chained
+              if (raceIndex == 0) {
+                let startActionId = tt().setActionASync<system>(
+                  Int.abs(event.scheduledTime),
+                  {
+                    actionType = "race_start";
+                    params = to_candid (race.raceId);
+                  },
+                  3_600_000_000_000,
+                );
+                Debug.print("Scheduled FIRST race start for race " # Nat.toText(race.raceId) # " at event time - subsequent races will chain");
+              };
+
+              raceIndex += 1;
+              heatNumber += 1;
+            };
           };
+        } else {
+          // OLD SYSTEM: No registrations - create empty races per division (backward compatibility)
+          Debug.print("Creating empty races for event " # Nat.toText(event.eventId) # " (legacy mode - no registrations)");
 
-          // All races in an event share the same base scheduled time
-          // Only the first race will be scheduled - the rest chain dynamically
-          let race = raceManager.createRace(
-            distance,
-            terrain,
-            division,
-            adjustedEntryFee,
-            event.metadata.maxEntries,
-            event.metadata.minEntries,
-            event.scheduledTime, // All races use event scheduled time
-            platformBonus,
-            event.registrationCloses,
-          );
+          // Create races based on event divisions
+          for (division in event.metadata.divisions.vals()) {
+            // Use event ID and race count for better seed variation
+            let seed = Nat32.fromNat(Int.abs((event.scheduledTime + event.eventId * 7919 + createdRaceIds.size() * 1000000) % 1000000));
 
-          createdRaceIds := Array.append(createdRaceIds, [race.raceId]);
+            // Distance and terrain based on event type
+            let (distance, terrain) = switch (event.eventType) {
+              case (#WeeklyLeague) {
+                // League races: longer distances (15-30km) with varied terrain
+                let leagueDistances = [15, 20, 25, 30];
+                let dist = leagueDistances[Nat32.toNat(seed % 4)];
 
-          Debug.print("Created race " # Nat.toText(race.raceId) # " for " # event.metadata.name # ": " # race.name # " (duration ~" # Nat.toText(race.duration) # "s)");
+                let terr = switch (Nat32.toNat((seed / 4) % 3)) {
+                  case (0) { #WastelandSand }; // Favor endurance
+                  case (1) { #MetalRoads }; // High speed
+                  case (_) { #ScrapHeaps }; // Technical
+                };
+                (dist, terr);
+              };
+              case (#MonthlyCup) {
+                // Cup races: epic distances (25-40km) with challenging terrain
+                let cupDistances = [25, 30, 35, 40];
+                let dist = cupDistances[Nat32.toNat(seed % 4)];
 
-          // Schedule betting pool creation when registration closes (using ASync for timer context)
-          let poolActionId = tt().setActionASync<system>(
-            Int.abs(event.registrationCloses),
-            {
-              actionType = "betting_pool_create";
-              params = to_candid (race.raceId);
-            },
-            3_600_000_000_000, // 1 hour timeout
-          );
-          Debug.print("Scheduled betting pool creation for race " # Nat.toText(race.raceId) # " at registration close (action " # debug_show (poolActionId) # ")");
+                let terr = switch (Nat32.toNat((seed / 4) % 3)) {
+                  case (0) { #WastelandSand };
+                  case (1) { #MetalRoads };
+                  case (_) { #ScrapHeaps };
+                };
+                (dist, terr);
+              };
+              case (#DailySprint) {
+                // Sprint races: short distances (5-10km) with varied terrain
+                let sprintDistances = [5, 7, 10];
+                let dist = sprintDistances[Nat32.toNat(seed % 3)];
 
-          // Only schedule the first race - subsequent races will be chained from handleRaceFinish
-          if (raceIndex == 0) {
-            let startActionId = tt().setActionASync<system>(
-              Int.abs(event.scheduledTime),
+                // Better terrain distribution using different modulo
+                let terr = switch (Nat32.toNat(seed % 3)) {
+                  case (0) { #ScrapHeaps };
+                  case (1) { #WastelandSand };
+                  case (_) { #MetalRoads };
+                };
+                (dist, terr);
+              };
+              case (#SpecialEvent(_)) {
+                // Special events: full variety
+                let distances = [10, 15, 20, 25, 30];
+                let dist = distances[Nat32.toNat(seed % 5)];
+
+                let terr = switch (Nat32.toNat((seed / 5) % 3)) {
+                  case (0) { #ScrapHeaps };
+                  case (1) { #WastelandSand };
+                  case (_) { #MetalRoads };
+                };
+                (dist, terr);
+              };
+            };
+
+            // Apply class-based entry fee multiplier - More linear progression
+            let classFeeMultiplier : Float = switch (division) {
+              case (#Scrap) { 0.5 }; // 0.5x base
+              case (#Junker) { 1.0 }; // 1x base (reference)
+              case (#Raider) { 1.5 }; // 1.5x base (+50%)
+              case (#Elite) { 2.0 }; // 2x base (+100%)
+              case (#SilentKlan) { 2.5 }; // 2.5x base (+150%)
+            };
+
+            let adjustedEntryFee = Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
+
+            // Platform bonus to guarantee top 3 profitability, 4th breaks even
+            // Calculated for 8-player races with new distribution (45%, 28%, 18%, 9%)
+            // Increased by 25% to maximize player rewards
+            let platformBonus : Nat = switch (event.eventType, division) {
+              // Daily Sprint bonuses - Entry fees: Scrap 0.1, Junker 0.2, Raider 0.3, Elite 0.4, SilentKlan 0.5
+              case (#DailySprint, #Scrap) { 20_000_000 }; // 0.20 ICP (2x)
+              case (#DailySprint, #Junker) { 40_000_000 }; // 0.40 ICP (2x)
+              case (#DailySprint, #Raider) { 60_000_000 }; // 0.60 ICP (2x)
+              case (#DailySprint, #Elite) { 80_000_000 }; // 0.80 ICP (2x)
+              case (#DailySprint, #SilentKlan) { 100_000_000 }; // 1.00 ICP (2x)
+              // Weekly League bonuses - Entry fees: Scrap 0.4, Junker 0.8, Raider 1.2, Elite 1.6, SilentKlan 2.4
+              case (#WeeklyLeague, #Scrap) { 80_000_000 }; // 0.80 ICP (2x)
+              case (#WeeklyLeague, #Junker) { 160_000_000 }; // 1.60 ICP (2x)
+              case (#WeeklyLeague, #Raider) { 240_000_000 }; // 2.40 ICP (2x)
+              case (#WeeklyLeague, #Elite) { 320_000_000 }; // 3.20 ICP (2x)
+              case (#WeeklyLeague, #SilentKlan) { 480_000_000 }; // 4.80 ICP (2x)
+              // Monthly Cup bonuses - Entry fees: Elite 4.0, SilentKlan 6.0
+              case (#MonthlyCup, #Elite) { 800_000_000 }; // 8.0 ICP (2x)
+              case (#MonthlyCup, #SilentKlan) { 1_200_000_000 }; // 12.0 ICP (2x)
+              // Fallback
+              case _ { event.metadata.prizePoolBonus };
+            };
+
+            // All races in an event share the same base scheduled time
+            // Only the first race will be scheduled - the rest chain dynamically
+            let race = raceManager.createRace(
+              distance,
+              terrain,
+              division,
+              adjustedEntryFee,
+              event.metadata.maxEntries,
+              event.metadata.minEntries,
+              event.scheduledTime, // All races use event scheduled time
+              platformBonus,
+              event.registrationCloses,
+            );
+
+            createdRaceIds := Array.append(createdRaceIds, [race.raceId]);
+
+            Debug.print("Created race " # Nat.toText(race.raceId) # " for " # event.metadata.name # ": " # race.name # " (duration ~" # Nat.toText(race.duration) # "s)");
+
+            // Schedule betting pool creation when registration closes (using ASync for timer context)
+            let poolActionId = tt().setActionASync<system>(
+              Int.abs(event.registrationCloses),
               {
-                actionType = "race_start";
+                actionType = "betting_pool_create";
                 params = to_candid (race.raceId);
               },
               3_600_000_000_000, // 1 hour timeout
             );
-            Debug.print("Scheduled FIRST race start for race " # Nat.toText(race.raceId) # " at event time (action " # debug_show (startActionId) # ") - subsequent races will chain");
-          } else {
-            Debug.print("Race " # Nat.toText(race.raceId) # " will be chained from previous race completion");
-          };
+            Debug.print("Scheduled betting pool creation for race " # Nat.toText(race.raceId) # " at registration close (action " # debug_show (poolActionId) # ")");
 
-          raceIndex += 1;
+            // Only schedule the first race - subsequent races will be chained from handleRaceFinish
+            if (raceIndex == 0) {
+              let startActionId = tt().setActionASync<system>(
+                Int.abs(event.scheduledTime),
+                {
+                  actionType = "race_start";
+                  params = to_candid (race.raceId);
+                },
+                3_600_000_000_000, // 1 hour timeout
+              );
+              Debug.print("Scheduled FIRST race start for race " # Nat.toText(race.raceId) # " at event time (action " # debug_show (startActionId) # ") - subsequent races will chain");
+            } else {
+              Debug.print("Race " # Nat.toText(race.raceId) # " will be chained from previous race completion");
+            };
+
+            raceIndex += 1;
+          };
         };
 
         // Atomically add races to event - only succeeds if event still has no races

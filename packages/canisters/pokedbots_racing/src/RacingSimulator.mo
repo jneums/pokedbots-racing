@@ -1520,6 +1520,56 @@ module {
       };
     };
 
+    /// Add entry to race without payment (for pre-registered event participants)
+    /// Entry fee was already paid at event registration time
+    public func addEntryWithoutPayment(
+      raceId : Nat,
+      tokenIndex : Nat,
+      owner : Principal,
+    ) : ?Race {
+      let nftId = Nat.toText(tokenIndex);
+      let now = Time.now();
+
+      switch (getRace(raceId)) {
+        case (?race) {
+          // Check if this bot is already entered in this race
+          let alreadyEntered = Array.find<RaceEntry>(
+            race.entries,
+            func(e : RaceEntry) : Bool { e.nftId == nftId },
+          );
+
+          switch (alreadyEntered) {
+            case (?_) {
+              // Bot is already entered, return null to indicate failure
+              return null;
+            };
+            case (null) {
+              // Bot not entered yet, add entry WITHOUT modifying prize pool
+              let entry : RaceEntry = {
+                nftId = nftId;
+                owner = owner;
+                entryFee = race.entryFee;
+                enteredAt = now;
+                stats = null; // Stats snapshot added at race start
+              };
+
+              let newEntries = Array.append<RaceEntry>(race.entries, [entry]);
+
+              let updatedRace = {
+                race with
+                entries = newEntries;
+                // Prize pool NOT modified - entry fee already collected at event registration
+              };
+
+              ignore Map.put(races, nhash, raceId, updatedRace);
+              ?updatedRace;
+            };
+          };
+        };
+        case (null) { null };
+      };
+    };
+
     /// Add sponsor to race
     public func addSponsor(
       raceId : Nat,
