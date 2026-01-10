@@ -239,6 +239,62 @@ module {
     firstSaturdaySeconds * NANOS_PER_SECOND;
   };
 
+  // Calculate next occurrence of specific week of month
+  // weekOfMonth: 1 = first, 2 = second, 3 = third, -1 = last
+  public func getNextMonthlyOccurrence(
+    targetDayOfWeek : Nat, // 0=Sunday, 1=Monday, etc.
+    weekOfMonth : Int, // 1=first, 2=second, 3=third, -1=last
+    targetHour : Nat,
+    targetMinute : Nat,
+    fromTime : Int,
+  ) : Int {
+    let NANOS_PER_SECOND : Int = 1_000_000_000;
+    let SECONDS_PER_DAY : Int = 86400;
+    let SECONDS_PER_HOUR : Int = 3600;
+
+    let currentSeconds = fromTime / NANOS_PER_SECOND;
+    
+    // Simplified monthly calculation - finds next occurrence of target day
+    // For first/second/third week, we scan forward from fromTime
+    // For last week (-1), we find last occurrence in month
+    
+    var searchTime = currentSeconds;
+    let maxSearchDays = 60; // Search up to 2 months ahead
+    
+    for (i in Iter.range(1, maxSearchDays)) {
+      searchTime += SECONDS_PER_DAY;
+      
+      let dayOfWeek = Int.abs(((searchTime / SECONDS_PER_DAY) + 4) % 7);
+      
+      if (dayOfWeek == targetDayOfWeek) {
+        // Found a matching day of week - check if it's the right week of month
+        let dayOfMonth = Int.abs(((searchTime / SECONDS_PER_DAY) % 30) + 1); // Simplified
+        
+        let isCorrectWeek = if (weekOfMonth == 1) {
+          dayOfMonth >= 1 and dayOfMonth <= 7;
+        } else if (weekOfMonth == 2) {
+          dayOfMonth >= 8 and dayOfMonth <= 14;
+        } else if (weekOfMonth == 3) {
+          dayOfMonth >= 15 and dayOfMonth <= 21;
+        } else if (weekOfMonth == -1) {
+          dayOfMonth >= 22 and dayOfMonth <= 31; // Last week
+        } else {
+          false;
+        };
+        
+        if (isCorrectWeek) {
+          // Found it! Set to target time
+          let secondsIntoDay = Int.abs(searchTime % SECONDS_PER_DAY);
+          let targetSeconds = searchTime - secondsIntoDay + (targetHour * SECONDS_PER_HOUR) + (targetMinute * 60);
+          return targetSeconds * NANOS_PER_SECOND;
+        };
+      };
+    };
+    
+    // Fallback: just return something reasonable
+    (currentSeconds + (30 * SECONDS_PER_DAY)) * NANOS_PER_SECOND;
+  };
+
   // ===== EVENT CALENDAR MANAGER =====
 
   public class EventCalendar(
@@ -580,7 +636,7 @@ module {
       );
     };
 
-    // Create Special Event
+    // Create Special Event (generic)
     public func createSpecialEvent(
       theme : Text,
       scheduledTime : Int,
@@ -593,6 +649,228 @@ module {
         scheduledTime - (72 * 3600 * 1_000_000_000), // Opens 72h before (advance notice)
         scheduledTime - (1 * 3600 * 1_000_000_000), // Closes 1h before
         customMetadata,
+        now,
+      );
+    };
+
+    // ===== SPECIALIZED EVENT CREATORS =====
+
+    // Weekend Warrior Tournament (Friday-Sunday progressive)
+    public func createWeekendWarriorEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
+      let metadata : EventMetadata = {
+        name = "Weekend Warrior Tournament";
+        description = "Friday to Sunday progression. Survive all three stages for glory!";
+        entryFee = 100_000_000; // 1.0 ICP
+        maxEntries = 100;
+        minEntries = 8;
+        prizePoolBonus = 300_000_000; // 3 ICP bonus
+        pointsMultiplier = 2.5;
+        divisions = [#Junker, #Raider, #Elite];
+      };
+      scheduleEvent(
+        #SpecialEvent("Weekend Warrior"),
+        scheduledTime,
+        scheduledTime - (48 * 3600 * 1_000_000_000), // Opens Wednesday (48h before)
+        scheduledTime - (2 * 3600 * 1_000_000_000), // Closes 2h before Friday start
+        metadata,
+        now,
+      );
+    };
+
+    // Terrain Master Series (Sand/Metal/Scrap specialists)
+    public func createTerrainMasterEvent(terrain : Text, scheduledTime : Int, now : Int) : ScheduledEvent {
+      let metadata : EventMetadata = {
+        name = terrain # " Master Championship";
+        description = "Only the best " # terrain # " racers survive. All races on specialized terrain.";
+        entryFee = 60_000_000; // 0.6 ICP
+        maxEntries = 40;
+        minEntries = 8;
+        prizePoolBonus = 150_000_000; // 1.5 ICP bonus
+        pointsMultiplier = 1.5;
+        divisions = [#Junker, #Raider, #Elite];
+      };
+      scheduleEvent(
+        #SpecialEvent(terrain # " Master"),
+        scheduledTime,
+        scheduledTime - (48 * 3600 * 1_000_000_000), // Opens Thursday (48h before)
+        scheduledTime - (1 * 3600 * 1_000_000_000), // Closes 1h before
+        metadata,
+        now,
+      );
+    };
+
+    // Elite Showcase (high-skill exhibition)
+    public func createEliteShowcaseEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
+      let metadata : EventMetadata = {
+        name = "Elite Racing Showcase";
+        description = "Watch the best racers compete. Top ELO players only.";
+        entryFee = 150_000_000; // 1.5 ICP
+        maxEntries = 24;
+        minEntries = 8;
+        prizePoolBonus = 400_000_000; // 4 ICP bonus
+        pointsMultiplier = 2.0;
+        divisions = [#Elite, #SilentKlan];
+      };
+      scheduleEvent(
+        #SpecialEvent("Elite Showcase"),
+        scheduledTime,
+        scheduledTime - (48 * 3600 * 1_000_000_000), // Opens Friday (48h before)
+        scheduledTime - (1 * 3600 * 1_000_000_000), // Closes 1h before
+        metadata,
+        now,
+      );
+    };
+
+    // Beginner Bootcamp (welcoming for new racers)
+    public func createBeginnerBootcampEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
+      let metadata : EventMetadata = {
+        name = "Wasteland Beginner Bootcamp";
+        description = "New to racing? Start here! Low stakes, fair competition.";
+        entryFee = 10_000_000; // 0.1 ICP
+        maxEntries = 50;
+        minEntries = 4;
+        prizePoolBonus = 100_000_000; // 1 ICP bonus (very generous)
+        pointsMultiplier = 1.0;
+        divisions = [#Scrap, #Junker];
+      };
+      scheduleEvent(
+        #SpecialEvent("Beginner Bootcamp"),
+        scheduledTime,
+        scheduledTime - (48 * 3600 * 1_000_000_000), // Opens Thursday (48h before)
+        scheduledTime - (1 * 3600 * 1_000_000_000), // Closes 1h before
+        metadata,
+        now,
+      );
+    };
+
+    // Faction Wars (faction vs faction competition)
+    public func createFactionWarsEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
+      let metadata : EventMetadata = {
+        name = "Faction Wars: Battle for Supremacy";
+        description = "Factions clash for glory! Aggregate scores determine the winning faction.";
+        entryFee = 50_000_000; // 0.5 ICP
+        maxEntries = 60;
+        minEntries = 10;
+        prizePoolBonus = 200_000_000; // 2 ICP bonus
+        pointsMultiplier = 1.5;
+        divisions = [#Junker, #Raider, #Elite];
+      };
+      scheduleEvent(
+        #SpecialEvent("Faction Wars"),
+        scheduledTime,
+        scheduledTime - (72 * 3600 * 1_000_000_000), // Opens Thursday (72h before)
+        scheduledTime - (1 * 3600 * 1_000_000_000), // Closes 1h before
+        metadata,
+        now,
+      );
+    };
+
+    // Distance Challenge (progressive distance series)
+    public func createDistanceChallengeEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
+      let metadata : EventMetadata = {
+        name = "Ultimate Distance Challenge";
+        description = "Three races, increasing distances. Can you survive them all?";
+        entryFee = 80_000_000; // 0.8 ICP
+        maxEntries = 40;
+        minEntries = 8;
+        prizePoolBonus = 250_000_000; // 2.5 ICP bonus
+        pointsMultiplier = 2.0;
+        divisions = [#Raider, #Elite];
+      };
+      scheduleEvent(
+        #SpecialEvent("Distance Challenge"),
+        scheduledTime,
+        scheduledTime - (48 * 3600 * 1_000_000_000), // Opens Thursday (48h before)
+        scheduledTime - (1 * 3600 * 1_000_000_000), // Closes 1h before
+        metadata,
+        now,
+      );
+    };
+
+    // Rush Hour Rumble (quick-fire evening series)
+    public func createRushHourEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
+      let metadata : EventMetadata = {
+        name = "Friday Rush Hour Rumble";
+        description = "5 quick races in 2 hours. Maximum chaos!";
+        entryFee = 30_000_000; // 0.3 ICP
+        maxEntries = 50;
+        minEntries = 8;
+        prizePoolBonus = 100_000_000; // 1 ICP bonus
+        pointsMultiplier = 1.2;
+        divisions = [#Junker, #Raider, #Elite];
+      };
+      scheduleEvent(
+        #SpecialEvent("Rush Hour"),
+        scheduledTime,
+        scheduledTime - (7 * 3600 * 1_000_000_000), // Opens at noon same day
+        scheduledTime - (15 * 60 * 1_000_000_000), // Closes 15min before
+        metadata,
+        now,
+      );
+    };
+
+    // Ultra Marathon (extreme endurance)
+    public func createUltraMarathonEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
+      let metadata : EventMetadata = {
+        name = "Wasteland Ultra Marathon";
+        description = "One race. All terrains. 60km of pure survival.";
+        entryFee = 200_000_000; // 2.0 ICP
+        maxEntries = 20;
+        minEntries = 5;
+        prizePoolBonus = 600_000_000; // 6 ICP bonus!
+        pointsMultiplier = 3.0;
+        divisions = [#Elite, #SilentKlan];
+      };
+      scheduleEvent(
+        #SpecialEvent("Ultra Marathon"),
+        scheduledTime,
+        scheduledTime - (120 * 3600 * 1_000_000_000), // Opens Monday (5 days before)
+        scheduledTime - (2 * 3600 * 1_000_000_000), // Closes 2h before
+        metadata,
+        now,
+      );
+    };
+
+    // Midnight Madness (late night chaos)
+    public func createMidnightMadnessEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
+      let metadata : EventMetadata = {
+        name = "Saturday Midnight Madness";
+        description = "Late night racing. Anything goes!";
+        entryFee = 25_000_000; // 0.25 ICP
+        maxEntries = 40;
+        minEntries = 4;
+        prizePoolBonus = 75_000_000; // 0.75 ICP bonus
+        pointsMultiplier = 1.0;
+        divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan];
+      };
+      scheduleEvent(
+        #SpecialEvent("Midnight Madness"),
+        scheduledTime,
+        scheduledTime - (6 * 3600 * 1_000_000_000), // Opens 6pm same day
+        scheduledTime - (30 * 60 * 1_000_000_000), // Closes 30min before
+        metadata,
+        now,
+      );
+    };
+
+    // Champions Cup (winners only, prestige event)
+    public func createChampionsCupEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
+      let metadata : EventMetadata = {
+        name = "Champions Defense Cup";
+        description = "Only previous event winners allowed. Defend your title!";
+        entryFee = 300_000_000; // 3.0 ICP
+        maxEntries = 16;
+        minEntries = 8;
+        prizePoolBonus = 1_000_000_000; // 10 ICP!
+        pointsMultiplier = 5.0;
+        divisions = [#Elite, #SilentKlan];
+      };
+      scheduleEvent(
+        #SpecialEvent("Champions Cup"),
+        scheduledTime,
+        scheduledTime - (7 * 86400 * 1_000_000_000), // Opens 1 week before
+        scheduledTime - (24 * 3600 * 1_000_000_000), // Closes 1 day before
+        metadata,
         now,
       );
     };

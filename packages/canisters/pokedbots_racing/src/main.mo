@@ -1298,6 +1298,221 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         scheduleTime := nextSprint + 1_000_000_000;
       };
     };
+
+    // ===== SPECIAL EVENTS SCHEDULING =====
+    
+    // Check for Monthly Cup in next month
+    let monthlyCups = Array.filter<RaceCalendar.ScheduledEvent>(
+      upcomingEvents,
+      func(e) {
+        switch (e.eventType) {
+          case (#MonthlyCup) { true };
+          case (_) { false };
+        };
+      },
+    );
+
+    // Schedule Monthly Cup (first Saturday of month at 8pm UTC)
+    if (monthlyCups.size() == 0) {
+      let nextFirstSaturday = RaceCalendar.getNextMonthlyOccurrence(6, 1, 20, 0, now); // Saturday=6, first=1, 8pm
+      ignore eventCalendar.createMonthlyCupEvent(nextFirstSaturday, now);
+      Debug.print("Auto-scheduled Monthly Cup for timestamp: " # debug_show (nextFirstSaturday));
+    };
+
+    // Check for Weekend Warrior (every Friday 8pm)
+    let weekendWarriors = Array.filter<RaceCalendar.ScheduledEvent>(
+      upcomingEvents,
+      func(e) {
+        switch (e.eventType) {
+          case (#SpecialEvent(name)) { name == "Weekend Warrior" };
+          case (_) { false };
+        };
+      },
+    );
+
+    if (weekendWarriors.size() < 2) {
+      var scheduleTime = now;
+      for (i in Iter.range(0, 1 - weekendWarriors.size())) {
+        let nextFriday = RaceCalendar.getNextWeeklyOccurrence(5, 20, 0, scheduleTime); // Friday=5, 8pm
+        ignore eventCalendar.createWeekendWarriorEvent(nextFriday, now);
+        Debug.print("Auto-scheduled Weekend Warrior for timestamp: " # debug_show (nextFriday));
+        scheduleTime := nextFriday + (7 * 86400 * 1_000_000_000); // Next week
+      };
+    };
+
+    // Terrain Master Series (rotating: Sand Saturday, Metal next Saturday, Scrap next)
+    let terrainMasters = Array.filter<RaceCalendar.ScheduledEvent>(
+      upcomingEvents,
+      func(e) {
+        switch (e.eventType) {
+          case (#SpecialEvent(name)) { 
+            name == "Sand Master" or name == "Metal Master" or name == "Scrap Master"
+          };
+          case (_) { false };
+        };
+      },
+    );
+
+    if (terrainMasters.size() < 2) {
+      let terrains = ["Sand", "Metal", "Scrap"];
+      let weekNum = (now / (7 * 86400 * 1_000_000_000)) % 3; // Rotate every week
+      let terrain = terrains[Int.abs(weekNum) % 3];
+      let nextSaturday = RaceCalendar.getNextWeeklyOccurrence(6, 14, 0, now); // Saturday=6, 2pm
+      ignore eventCalendar.createTerrainMasterEvent(terrain, nextSaturday, now);
+      Debug.print("Auto-scheduled " # terrain # " Master for timestamp: " # debug_show (nextSaturday));
+    };
+
+    // Elite Showcase (every Sunday 6pm - 2 hours before Weekly League)
+    let eliteShowcases = Array.filter<RaceCalendar.ScheduledEvent>(
+      upcomingEvents,
+      func(e) {
+        switch (e.eventType) {
+          case (#SpecialEvent(name)) { name == "Elite Showcase" };
+          case (_) { false };
+        };
+      },
+    );
+
+    if (eliteShowcases.size() < 2) {
+      var scheduleTime = now;
+      for (i in Iter.range(0, 1 - eliteShowcases.size())) {
+        let nextSunday = RaceCalendar.getNextWeeklyOccurrence(0, 18, 0, scheduleTime); // Sunday=0, 6pm
+        ignore eventCalendar.createEliteShowcaseEvent(nextSunday, now);
+        Debug.print("Auto-scheduled Elite Showcase for timestamp: " # debug_show (nextSunday));
+        scheduleTime := nextSunday + (7 * 86400 * 1_000_000_000); // Next week
+      };
+    };
+
+    // Beginner Bootcamp (every Saturday 10am)
+    let beginnerBootcamps = Array.filter<RaceCalendar.ScheduledEvent>(
+      upcomingEvents,
+      func(e) {
+        switch (e.eventType) {
+          case (#SpecialEvent(name)) { name == "Beginner Bootcamp" };
+          case (_) { false };
+        };
+      },
+    );
+
+    if (beginnerBootcamps.size() < 2) {
+      var scheduleTime = now;
+      for (i in Iter.range(0, 1 - beginnerBootcamps.size())) {
+        let nextSaturday = RaceCalendar.getNextWeeklyOccurrence(6, 10, 0, scheduleTime); // Saturday=6, 10am
+        ignore eventCalendar.createBeginnerBootcampEvent(nextSaturday, now);
+        Debug.print("Auto-scheduled Beginner Bootcamp for timestamp: " # debug_show (nextSaturday));
+        scheduleTime := nextSaturday + (7 * 86400 * 1_000_000_000); // Next week
+      };
+    };
+
+    // Faction Wars (second Sunday of each month at 4pm)
+    let factionWars = Array.filter<RaceCalendar.ScheduledEvent>(
+      upcomingEvents,
+      func(e) {
+        switch (e.eventType) {
+          case (#SpecialEvent(name)) { name == "Faction Wars" };
+          case (_) { false };
+        };
+      },
+    );
+
+    if (factionWars.size() == 0) {
+      let nextSecondSunday = RaceCalendar.getNextMonthlyOccurrence(0, 2, 16, 0, now); // Sunday=0, second=2, 4pm
+      ignore eventCalendar.createFactionWarsEvent(nextSecondSunday, now);
+      Debug.print("Auto-scheduled Faction Wars for timestamp: " # debug_show (nextSecondSunday));
+    };
+
+    // Distance Challenge (third Saturday of each month at noon)
+    let distanceChallenges = Array.filter<RaceCalendar.ScheduledEvent>(
+      upcomingEvents,
+      func(e) {
+        switch (e.eventType) {
+          case (#SpecialEvent(name)) { name == "Distance Challenge" };
+          case (_) { false };
+        };
+      },
+    );
+
+    if (distanceChallenges.size() == 0) {
+      let nextThirdSaturday = RaceCalendar.getNextMonthlyOccurrence(6, 3, 12, 0, now); // Saturday=6, third=3, noon
+      ignore eventCalendar.createDistanceChallengeEvent(nextThirdSaturday, now);
+      Debug.print("Auto-scheduled Distance Challenge for timestamp: " # debug_show (nextThirdSaturday));
+    };
+
+    // Rush Hour Rumble (every Friday 7pm)
+    let rushHours = Array.filter<RaceCalendar.ScheduledEvent>(
+      upcomingEvents,
+      func(e) {
+        switch (e.eventType) {
+          case (#SpecialEvent(name)) { name == "Rush Hour" };
+          case (_) { false };
+        };
+      },
+    );
+
+    if (rushHours.size() < 2) {
+      var scheduleTime = now;
+      for (i in Iter.range(0, 1 - rushHours.size())) {
+        let nextFriday = RaceCalendar.getNextWeeklyOccurrence(5, 19, 0, scheduleTime); // Friday=5, 7pm
+        ignore eventCalendar.createRushHourEvent(nextFriday, now);
+        Debug.print("Auto-scheduled Rush Hour for timestamp: " # debug_show (nextFriday));
+        scheduleTime := nextFriday + (7 * 86400 * 1_000_000_000); // Next week
+      };
+    };
+
+    // Ultra Marathon (second Saturday of each month at noon)
+    let ultraMarathons = Array.filter<RaceCalendar.ScheduledEvent>(
+      upcomingEvents,
+      func(e) {
+        switch (e.eventType) {
+          case (#SpecialEvent(name)) { name == "Ultra Marathon" };
+          case (_) { false };
+        };
+      },
+    );
+
+    if (ultraMarathons.size() == 0) {
+      let nextSecondSaturday = RaceCalendar.getNextMonthlyOccurrence(6, 2, 12, 0, now); // Saturday=6, second=2, noon
+      ignore eventCalendar.createUltraMarathonEvent(nextSecondSaturday, now);
+      Debug.print("Auto-scheduled Ultra Marathon for timestamp: " # debug_show (nextSecondSaturday));
+    };
+
+    // Midnight Madness (every Saturday midnight)
+    let midnightMadnesses = Array.filter<RaceCalendar.ScheduledEvent>(
+      upcomingEvents,
+      func(e) {
+        switch (e.eventType) {
+          case (#SpecialEvent(name)) { name == "Midnight Madness" };
+          case (_) { false };
+        };
+      },
+    );
+
+    if (midnightMadnesses.size() < 2) {
+      var scheduleTime = now;
+      for (i in Iter.range(0, 1 - midnightMadnesses.size())) {
+        let nextSaturday = RaceCalendar.getNextWeeklyOccurrence(6, 24, 0, scheduleTime); // Saturday=6 -> Sunday=0, midnight
+        ignore eventCalendar.createMidnightMadnessEvent(nextSaturday, now);
+        Debug.print("Auto-scheduled Midnight Madness for timestamp: " # debug_show (nextSaturday));
+        scheduleTime := nextSaturday + (7 * 86400 * 1_000_000_000); // Next week
+      };
+    };
+
+    // Champions Cup (last Sunday of each month at 8pm)
+    let championsCups = Array.filter<RaceCalendar.ScheduledEvent>(
+      upcomingEvents,
+      func(e) {
+        switch (e.eventType) {
+          case (#SpecialEvent(name)) { name == "Champions Cup" };
+          case (_) { false };
+        };
+      },
+    );
+
+    if (championsCups.size() == 0) {
+      let nextLastSunday = RaceCalendar.getNextMonthlyOccurrence(0, -1, 20, 0, now); // Sunday=0, last=-1, 8pm
+      ignore eventCalendar.createChampionsCupEvent(nextLastSunday, now);
+      Debug.print("Auto-scheduled Champions Cup for timestamp: " # debug_show (nextLastSunday));
+    };
   };
 
   // Handle prize distribution asynchronously
