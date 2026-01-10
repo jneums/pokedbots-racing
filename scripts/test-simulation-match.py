@@ -16,12 +16,14 @@ def calculate_segment_time(
     acceleration = stats["acceleration"]
 
     # === PART 1: UNIVERSAL STAT COMPONENTS (70% always active) ===
-    speed_universal = math.sqrt(speed) * 5.25
+    speed_universal = (
+        math.sqrt(speed) * 4.0
+    )  # Reduced from 5.25 to balance with other stats
     speed_bonus = 0.0
     if segment["angle"] == 0 and segment["terrain"] == "MetalRoads":
-        speed_bonus = math.sqrt(speed) * 2.25
+        speed_bonus = math.sqrt(speed) * 1.7  # Reduced from 2.25
     elif segment["angle"] < 0:
-        speed_bonus = math.sqrt(speed) * 1.125
+        speed_bonus = math.sqrt(speed) * 0.85  # Reduced from 1.125
 
     # === PART 2: STAT SYNERGIES ===
     speed_accel_ratio = (speed + acceleration) / 200.0
@@ -88,7 +90,7 @@ def calculate_segment_time(
     distance_adjusted_speed = synergistic_speed / (sprint_factor * trek_factor)
 
     segment_seed = seed % 1000
-    random_mod = 0.90 + (segment_seed / 5000.0)
+    random_mod = 0.80 + (segment_seed / 2500.0)  # 0.80 to 1.20
 
     segment_length = segment["length"]
     effective_speed = distance_adjusted_speed / (

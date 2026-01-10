@@ -1,5 +1,5 @@
 import { useGetMyBets } from '../hooks/useBetting';
-import { useGetBotProfile } from '../hooks/useRacing';
+import { useGetBotProfilesBatch } from '../hooks/useRacing';
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -23,8 +23,8 @@ function formatTimestamp(timestamp: number): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function BotNameWithAvatar({ tokenIndex }: { tokenIndex: number }) {
-  const { data: botProfile } = useGetBotProfile(tokenIndex);
+
+function BotNameWithAvatarDisplay({ tokenIndex, botProfile }: { tokenIndex: number; botProfile: any }) {
   const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', tokenIndex);
   const imageUrl = generateExtThumbnailLink(tokenId);
   
@@ -101,6 +101,11 @@ export function BettingHistory() {
   const wonBets = bettingData.bets.filter(bet => bet.status === 'Won');
   const recentBets = bettingData.bets.slice(0, 10); // Show last 10 bets
   
+  // Batch fetch all bot profiles
+  const betIndices = bettingData.bets.map(bet => Number(bet.token_index));
+  const uniqueIndices = Array.from(new Set(betIndices));
+  const { data: botProfiles } = useGetBotProfilesBatch(uniqueIndices);
+  
   // Calculate actual won count from summary (not from limited bet list)
   const actualWonCount = Math.round(
     Number(bettingData.summary.total_bets) * 
@@ -153,7 +158,9 @@ export function BettingHistory() {
                 <Trophy className="h-4 w-4" />
                 Winning Bets ({actualWonCount})
               </div>
-              {wonBets.slice(0, 5).map((bet) => (
+              {wonBets.slice(0, 5).map((bet) => {
+                const botProfile = botProfiles?.find(p => Number(p.tokenIndex) === Number(bet.token_index));
+                return (
                 <Link
                   key={Number(bet.bet_id)}
                   to={`/race/${Number(bet.race_id)}`}
@@ -162,7 +169,7 @@ export function BettingHistory() {
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <BotNameWithAvatar tokenIndex={Number(bet.token_index)} />
+                        <BotNameWithAvatarDisplay tokenIndex={Number(bet.token_index)} botProfile={botProfile} />
                         <Badge variant="outline" className="text-xs">
                           {bet.bet_type}
                         </Badge>
@@ -182,7 +189,8 @@ export function BettingHistory() {
                     </div>
                   </div>
                 </Link>
-              ))}
+              );
+              })}
             </div>
           )}
 
@@ -191,7 +199,9 @@ export function BettingHistory() {
             <div className="text-sm font-semibold text-muted-foreground">
               Recent Bets
             </div>
-            {recentBets.map((bet) => (
+            {recentBets.map((bet) => {
+              const botProfile = botProfiles?.find(p => Number(p.tokenIndex) === Number(bet.token_index));
+              return (
               <Link
                 key={Number(bet.bet_id)}
                 to={`/race/${Number(bet.race_id)}`}
@@ -206,7 +216,7 @@ export function BettingHistory() {
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <BotNameWithAvatar tokenIndex={Number(bet.token_index)} />
+                    <BotNameWithAvatarDisplay tokenIndex={Number(bet.token_index)} botProfile={botProfile} />
                     <Badge variant="outline" className="text-xs">
                       {bet.bet_type}
                     </Badge>
@@ -250,7 +260,8 @@ export function BettingHistory() {
                   )}
                 </div>
               </Link>
-            ))}
+            );
+            })}
           </div>
         </div>
       </CardContent>

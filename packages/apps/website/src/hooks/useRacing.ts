@@ -8,6 +8,7 @@ import {
   getEventWithRaces,
   getRaceById,
   getBotProfile,
+  getBotProfilesBatch,
   getBotRaceHistory,
   debugTestSimulation,
   queryRaces,
@@ -133,6 +134,25 @@ export const useGetBotProfile = (tokenIndex: number | null) => {
       return getBotProfile(tokenIndex);
     },
     enabled: tokenIndex !== null,
+  });
+};
+
+/**
+ * React Query hook to fetch multiple bot profiles in a single query (efficient batch operation).
+ * Uses a 1-hour cache since bot profiles don't change frequently.
+ */
+export const useGetBotProfilesBatch = (tokenIndices: number[]) => {
+  return useQuery<any[]>({
+    queryKey: ['botProfiles', ...tokenIndices.sort()],
+    queryFn: () => {
+      if (tokenIndices.length === 0) {
+        return [];
+      }
+      return getBotProfilesBatch(tokenIndices);
+    },
+    enabled: tokenIndices.length > 0,
+    staleTime: 60 * 60 * 1000, // 1 hour cache
+    gcTime: 2 * 60 * 60 * 1000, // Keep in cache for 2 hours
   });
 };
 

@@ -49,12 +49,12 @@ function calculateSegmentTime(
   // === PART 1: UNIVERSAL STAT COMPONENTS (70% always active) ===
   
   // Speed: 70% universal base, 30% conditional bonus
-  const speedUniversal = Math.sqrt(speed) * 5.25; // 70% of original 7.5
+  const speedUniversal = Math.sqrt(speed) * 4.0; // Reduced from 5.25 to balance with other stats
   let speedBonus = 0.0;
   if (segment.angle === 0 && segment.terrain === 'MetalRoads') {
-    speedBonus = Math.sqrt(speed) * 2.25; // +30% bonus on ideal conditions
+    speedBonus = Math.sqrt(speed) * 1.7; // +30% bonus on ideal conditions (reduced from 2.25)
   } else if (segment.angle < 0) {
-    speedBonus = Math.sqrt(speed) * 1.125; // +15% bonus on downhills
+    speedBonus = Math.sqrt(speed) * 0.85; // +15% bonus on downhills (reduced from 1.125)
   }
   
   // === PART 2: STAT SYNERGIES ===
@@ -142,9 +142,9 @@ function calculateSegmentTime(
   // Apply distance-based scaling
   const distanceAdjustedSpeed = synergisticSpeed / (sprintFactor * trekFactor);
   
-  // Randomness for this segment (±10% per segment)
+  // Randomness for this segment (±20% per segment)
   const segmentSeed = Number(seed % 1000n);
-  const randomMod = 0.90 + (segmentSeed / 5000.0); // 0.90 to 1.10
+  const randomMod = 0.80 + (segmentSeed / 2500.0); // 0.80 to 1.20
   
   // Calculate segment time
   const segmentLength = segment.length;

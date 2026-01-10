@@ -495,11 +495,11 @@ module {
       // === PART 1: UNIVERSAL STAT COMPONENTS (70% always active) ===
 
       // Speed: 70% universal base, 30% conditional bonus
-      let speedUniversal = Float.sqrt(speed) * 5.25; // 70% of original 7.5
+      let speedUniversal = Float.sqrt(speed) * 4.0; // Reduced from 5.25 to balance with other stats
       let speedBonus = if (segment.angle == 0 and segment.terrain == #MetalRoads) {
-        Float.sqrt(speed) * 2.25; // +30% bonus on ideal conditions
+        Float.sqrt(speed) * 1.7; // +30% bonus on ideal conditions (reduced from 2.25)
       } else if (segment.angle < 0) {
-        Float.sqrt(speed) * 1.125; // +15% bonus on downhills
+        Float.sqrt(speed) * 0.85; // +15% bonus on downhills (reduced from 1.125)
       } else { 0.0 };
 
       // === PART 2: STAT SYNERGIES ===
@@ -595,9 +595,9 @@ module {
       // Apply distance-based scaling
       let distanceAdjustedSpeed = synergisticSpeed / (sprintFactor * trekFactor);
 
-      // Randomness for this segment (±10% per segment)
+      // Randomness for this segment (±20% per segment)
       let segmentSeed = seed % 1000;
-      let randomMod = 0.90 + (Float.fromInt(segmentSeed) / 5000.0); // 0.90 to 1.10
+      let randomMod = 0.80 + (Float.fromInt(segmentSeed) / 2500.0); // 0.80 to 1.20
 
       // Calculate segment time
       let segmentLength = Float.fromInt(segment.length);
@@ -703,6 +703,11 @@ module {
         }],
       );
 
+      // Store segment 0 debug data for logging at the end
+      var segment0DebugData : Text = "";
+      var segment1DebugData : Text = "";
+      var segment2DebugData : Text = "";
+
       // Simulate segment by segment
       for (segmentIdx in Iter.range(0, allSegments.size() - 1)) {
         let segment = allSegments[segmentIdx];
@@ -711,6 +716,11 @@ module {
         for (i in Iter.range(0, racerProgress.size() - 1)) {
           let racer = racerProgress[i];
           let segmentSeed = race.trackSeed + (i * 1000) + segmentIdx;
+
+          // Debug: print i and segmentIdx values
+          if (segmentIdx < 2) {
+            Debug.print("LOOP_VALUES: i=" # Nat.toText(i) # " segmentIdx=" # Nat.toText(segmentIdx));
+          };
 
           // Calculate base segment time (convert distance from meters to km)
           let baseSegmentTime = calculateSegmentTime(
@@ -721,12 +731,43 @@ module {
             race.distance / 1000, // Convert meters to km
           );
 
-          // Per-segment performance variation
+          // === SLIPSTREAM MECHANIC ===
+          // Bots close behind another bot get a speed advantage
+          var slipstreamBonus : Float = 1.0; // Multiplier on time (lower = faster)
+
+          // Check if this bot is within slipstream range of bot ahead (within 2 seconds at this point)
+          let currentTime = racer.cumulativeTime;
+          for (j in Iter.range(0, racerProgress.size() - 1)) {
+            if (i != j) {
+              let otherRacer = racerProgress[j];
+              let timeDiff = currentTime - otherRacer.cumulativeTime;
+
+              // In slipstream if 0.5-2.5 seconds behind (too close = no benefit, too far = no effect)
+              if (timeDiff > 0.5 and timeDiff < 2.5) {
+                // 5% speed boost when in slipstream (reduces time by 5%)
+                slipstreamBonus := 0.95;
+              };
+            };
+          };
+
+          // Per-segment performance variation (±20% = 0.80 to 1.20)
           let lap = segmentIdx / track.segments.size();
           let segmentConditionSeed = ((segmentSeed * 31337 + i * 7919 + lap * 12345) % 1000);
-          let segmentPerformance = 0.94 + (Float.fromInt(segmentConditionSeed) / 8325.0); // 0.94 to 1.06
+          let segmentPerformance = 0.80 + (Float.fromInt(segmentConditionSeed) / 2500.0); // 0.80 to 1.20
 
-          let segmentTime = baseSegmentTime * segmentPerformance;
+          let segmentTime = baseSegmentTime * segmentPerformance * slipstreamBonus;
+
+          // Store first 3 segments data for all bots
+          if (segmentIdx == 0) {
+            segment0DebugData := segment0DebugData # "BOT" # Nat.toText(i) # ":seed=" # Nat.toText(segmentConditionSeed) # ",perf=" # Float.toText(segmentPerformance) # ",slip=" # Float.toText(slipstreamBonus) # ",base=" # Float.toText(baseSegmentTime) # " | ";
+          };
+          if (segmentIdx == 1) {
+            segment1DebugData := segment1DebugData # "BOT" # Nat.toText(i) # ":seed=" # Nat.toText(segmentConditionSeed) # ",perf=" # Float.toText(segmentPerformance) # ",slip=" # Float.toText(slipstreamBonus) # ",base=" # Float.toText(baseSegmentTime) # " | ";
+          };
+          if (segmentIdx == 2) {
+            segment2DebugData := segment2DebugData # "BOT" # Nat.toText(i) # ":seed=" # Nat.toText(segmentConditionSeed) # ",perf=" # Float.toText(segmentPerformance) # ",slip=" # Float.toText(slipstreamBonus) # ",base=" # Float.toText(baseSegmentTime) # " | ";
+          };
+
           racer.cumulativeTime += segmentTime;
           racer.previousDifficulty := segment.difficulty;
 
@@ -1195,6 +1236,14 @@ module {
         };
         // Otherwise skip (same bucket, lower or equal priority)
       };
+
+      // Print segment 0 debug data at the very end
+      Debug.print("=== SEGMENT 0 DEBUG DATA ===");
+      Debug.print(segment0DebugData);
+      Debug.print("=== SEGMENT 1 DEBUG DATA ===");
+      Debug.print(segment1DebugData);
+      Debug.print("=== SEGMENT 2 DEBUG DATA ===");
+      Debug.print(segment2DebugData);
 
       ?(results, Buffer.toArray(filteredEvents));
     };

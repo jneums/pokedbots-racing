@@ -57,30 +57,17 @@ module {
         case (?idx) { idx };
       };
 
-      // Verify ownership via EXT (source of truth) - check user's wallet
-      let walletAccountId = ExtIntegration.principalToAccountIdentifier(user, null);
-      let ownerResult = try {
-        await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId));
-      } catch (_) {
-        return ToolContext.makeError("Failed to verify ownership", cb);
-      };
-      switch (ownerResult) {
-        case (#err(_)) {
-          return ToolContext.makeError("This PokedBot does not exist.", cb);
-        };
-        case (#ok(currentOwner)) {
-          if (currentOwner != walletAccountId) {
-            return ToolContext.makeError("You do not own this PokedBot.", cb);
-          };
-        };
-      };
-
-      // Get racing stats
+      // Get racing stats and verify ownership via registration
       let racingStats = switch (ctx.garageManager.getStats(tokenIndex)) {
         case (null) {
           return ToolContext.makeError("This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first.", cb);
         };
         case (?stats) { stats };
+      };
+
+      // Verify caller is registered owner
+      if (racingStats.ownerPrincipal != user) {
+        return ToolContext.makeError("You are not the registered owner of this PokedBot.", cb);
       };
 
       // Check if bot is currently scavenging

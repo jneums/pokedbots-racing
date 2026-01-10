@@ -7,6 +7,7 @@ import {
   useInitializeBot,
   useRechargeBot,
   useRepairBot,
+  useFullMaintenanceBot,
   useUpgradeBot, 
   useCancelUpgrade,
   useListBotForSale,
@@ -70,6 +71,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   const initializeMutation = useInitializeBot();
   const rechargeMutation = useRechargeBot();
   const repairMutation = useRepairBot();
+  const fullMaintenanceMutation = useFullMaintenanceBot();
   const upgradeMutation = useUpgradeBot();
   const cancelUpgradeMutation = useCancelUpgrade();
   const listForSaleMutation = useListBotForSale();
@@ -149,21 +151,13 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   };
 
   const handleFullMaintenance = () => {
-    // Perform recharge first, then repair
-    rechargeMutation.mutate(Number(bot.tokenIndex), {
-      onSuccess: (rechargeResult) => {
-        repairMutation.mutate(Number(bot.tokenIndex), {
-          onSuccess: (repairResult) => {
-            toast.success(`🔧 Full maintenance complete!\n${rechargeResult}\n${repairResult}`);
-            onUpdate();
-          },
-          onError: (err: Error) => {
-            toast.error(err.message || 'Failed to repair');
-          },
-        });
+    fullMaintenanceMutation.mutate(Number(bot.tokenIndex), {
+      onSuccess: (result) => {
+        toast.success(result);
+        onUpdate();
       },
       onError: (err: Error) => {
-        toast.error(err.message || 'Failed to recharge');
+        toast.error(err.message || 'Failed to perform full maintenance');
       },
     });
   };
@@ -853,12 +847,12 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 {!bot.activeMission && (
                   <Button
                     onClick={handleFullMaintenance}
-                    disabled={rechargeMutation.isPending || repairMutation.isPending || rechargeCooldown || repairCooldown || (Number(stats.battery) >= 100 || Number(stats.condition) >= 100)}
+                    disabled={fullMaintenanceMutation.isPending || rechargeCooldown || repairCooldown || (Number(stats.battery) >= 100 && Number(stats.condition) >= 100)}
                     size="sm"
                     variant="secondary"
                     className="w-full"
                   >
-                  {rechargeMutation.isPending || repairMutation.isPending ? (
+                  {fullMaintenanceMutation.isPending ? (
                     <>
                       <span className="animate-spin mr-2">⚙️</span>
                       Full Maintenance...
@@ -1578,7 +1572,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Mission Duration (Optional)</Label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant={scavengingDuration === undefined ? 'default' : 'outline'}
@@ -1614,6 +1608,24 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                   className="flex-1"
                 >
                   1 hr
+                </Button>
+                <Button
+                  type="button"
+                  variant={scavengingDuration === 120 ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setScavengingDuration(120)}
+                  className="flex-1"
+                >
+                  2 hrs
+                </Button>
+                <Button
+                  type="button"
+                  variant={scavengingDuration === 180 ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setScavengingDuration(180)}
+                  className="flex-1"
+                >
+                  3 hrs
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -1712,19 +1724,19 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                       <div className="text-xs text-muted-foreground pl-4 space-y-0.5">
                         <div className="flex justify-between">
                           <span>0-24% battery:</span>
-                          <span className="text-cyan-600 font-medium">~16/hr (4x)</span>
+                          <span className="text-red-500 font-medium">~0.25/hr (1x - SLOW!)</span>
                         </div>
                         <div className="flex justify-between">
                           <span>25-49% battery:</span>
-                          <span className="text-cyan-600 font-medium">~12/hr (3x)</span>
+                          <span className="text-orange-500 font-medium">~0.5/hr (2x)</span>
                         </div>
                         <div className="flex justify-between">
                           <span>50-74% battery:</span>
-                          <span className="text-cyan-600 font-medium">~8/hr (2x)</span>
+                          <span className="text-yellow-500 font-medium">~0.75/hr (3x)</span>
                         </div>
                         <div className="flex justify-between">
                           <span>75-100% battery:</span>
-                          <span className="text-cyan-600 font-medium">~4/hr (1x)</span>
+                          <span className="text-green-500 font-medium">~1/hr (4x - FAST!)</span>
                         </div>
                       </div>
                     </div>
@@ -1737,7 +1749,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                       <span className="font-medium text-primary">FREE (vs 0.1 ICP instant)</span>
                     </div>
                     <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                      ⚡ <strong>Fast charging when low!</strong> 0% → 100% in ~6-7 hours
+                      ⚡ <strong>INVERTED CHARGING:</strong> Faster when high, slower when low! Keep it topped up or pay 0.1 ICP for instant 50-90 battery. 0% → 100% takes ~25 hours.
                     </div>
                   </>
                 )}

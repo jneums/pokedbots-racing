@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useGetEventDetails, useGetRaceById, useGetBotProfile } from "@/hooks/useRacing";
+import { useGetEventDetails, useGetRaceById, useGetBotProfilesBatch } from "@/hooks/useRacing";
 import { useMyBots, useEnterRace } from "@/hooks/useGarage";
 import { useAuth } from "@/hooks/useAuth";
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
@@ -65,11 +65,11 @@ function getTrackName(trackId: number): string {
   return trackNames[trackId] || trackNames[0];
 }
 
-function BotName({ tokenIndex }: { tokenIndex: number }) {
-  const { data: botProfile } = useGetBotProfile(tokenIndex);
-  
-  if (botProfile?.name && botProfile.name.length > 0 && botProfile.name[0]) {
-    return <>PokedBot #{tokenIndex} - {botProfile.name[0]}</>;
+
+// Simple display component that doesn't use hooks
+function BotNameDisplay({ tokenIndex, profile }: { tokenIndex: number; profile?: any }) {
+  if (profile?.name && profile.name.length > 0 && profile.name[0]) {
+    return <>PokedBot #{tokenIndex} - {profile.name[0]}</>;
   }
   
   return <>PokedBot #{tokenIndex}</>;
@@ -88,14 +88,11 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
   startAtEnd?: boolean;
   disableAutoplay?: boolean;
 }) {
-  // Fetch bot profiles for faction and preferredTerrain (not in stats snapshot)
-  const botProfiles = results.map(r => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const { data } = useGetBotProfile(Number(r.nftId));
-    return data;
-  });
+  // Fetch bot profiles in a single batch query
+  const botIndices = results.map(r => Number(r.nftId));
+  const { data: botProfiles = [] } = useGetBotProfilesBatch(botIndices);
 
-  const allLoaded = botProfiles.every(p => p !== undefined);
+  const allLoaded = botProfiles.length === botIndices.length;
 
   if (!allLoaded) {
     return (
@@ -156,6 +153,15 @@ function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolea
   
   // Calculate if we need aggressive polling
   const { data: race } = useGetRaceById(Number(raceId));
+  
+  // Fetch bot profiles in batch for all race entries and results
+  const entryIndices = race?.entries ? race.entries.map((e: any) => Number(e.nftId)) : [];
+  const resultIndices = race?.results && race.results.length > 0 && race.results[0] 
+    ? race.results[0].map((r: any) => Number(r.nftId)) 
+    : [];
+  const allBotIndices = [...new Set([...entryIndices, ...resultIndices])]; // Deduplicate
+  const { data: botProfiles = [] } = useGetBotProfilesBatch(allBotIndices);
+  
   const now = Date.now() * 1_000_000;
   const isUpcoming = race && 'Upcoming' in race.status;
   const isInProgress = race && 'InProgress' in race.status;
@@ -399,7 +405,7 @@ function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolea
                         className="w-10 h-10 rounded border-2 border-primary/30"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold"><BotName tokenIndex={typeof tokenIndex === 'number' ? tokenIndex : 0} /></p>
+                        <p className="text-sm font-semibold"><BotNameDisplay tokenIndex={typeof tokenIndex === 'number' ? tokenIndex : 0} profile={botProfiles.find(p => p && Number(p.tokenIndex) === (typeof tokenIndex === 'number' ? tokenIndex : 0))} /></p>
                       </div>
                       <Badge variant="outline" className="text-xs">
                         #{idx + 1}
@@ -520,7 +526,7 @@ function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolea
                         }`}
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold"><BotName tokenIndex={Number(result.nftId)} /></p>
+                        <p className="font-semibold"><BotNameDisplay tokenIndex={Number(result.nftId)} profile={botProfiles.find(p => p && Number(p.tokenIndex) === Number(result.nftId))} /></p>
                         <p className="text-xs text-muted-foreground">
                           {result.finalTime.toFixed(2)}s
                         </p>

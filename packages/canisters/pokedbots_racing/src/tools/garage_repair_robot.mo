@@ -54,30 +54,17 @@ module {
         case (?idx) { idx };
       };
 
-      // Verify ownership via EXT (source of truth) - check user's wallet
-      let walletAccountId = ExtIntegration.principalToAccountIdentifier(user, null);
-      let ownerResult = try {
-        await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId));
-      } catch (_) {
-        return ToolContext.makeError("Failed to verify ownership", cb);
-      };
-      switch (ownerResult) {
-        case (#err(_)) {
-          return ToolContext.makeError("This PokedBot does not exist.", cb);
-        };
-        case (#ok(currentOwner)) {
-          if (currentOwner != walletAccountId) {
-            return ToolContext.makeError("You do not own this PokedBot.", cb);
-          };
-        };
-      };
-
-      // Get racing stats
+      // Get racing stats and verify ownership via registration
       let racingStats = switch (ctx.garageManager.getStats(tokenIndex)) {
         case (null) {
           return ToolContext.makeError("This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first.", cb);
         };
         case (?stats) { stats };
+      };
+
+      // Verify caller is registered owner
+      if (racingStats.ownerPrincipal != user) {
+        return ToolContext.makeError("You are not the registered owner of this PokedBot.", cb);
       };
 
       // Check if bot is currently scavenging
@@ -131,12 +118,12 @@ module {
             return ToolContext.makeError("Payment failed", cb);
           };
           case (#Ok(blockIndex)) {
-            let conditionRestored = Nat.min(25, 100 - racingStats.condition);
-            let newCondition = Nat.min(100, racingStats.condition + 25);
+            let conditionRestored = Nat.min(30, 100 - racingStats.condition);
+            let newCondition = Nat.min(100, racingStats.condition + 30);
 
             // Perfect Tune-Up: If repair lands on exactly 100% with active overcharge, mark it penalty-free
             // Check the UNCAPPED value (before min) to ensure it's exactly 100, not just capped at 100
-            let perfectTuneUp = (racingStats.condition + 25 == 100 and racingStats.overcharge > 0);
+            let perfectTuneUp = (racingStats.condition + 30 == 100 and racingStats.overcharge > 0);
 
             let updatedStats = {
               racingStats with

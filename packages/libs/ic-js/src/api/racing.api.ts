@@ -25,23 +25,16 @@ function isPlugAgent(identityOrAgent: any): boolean {
 }
 
 // Helper to get racing actor from Identity or Plug agent
-async function getActor(identityOrAgent: IdentityOrAgent): Promise<PokedBotsRacing._SERVICE> {
-  // Check if it's a Plug agent - use window.ic.plug.createActor
-  if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
-    // Check if Plug is still connected before calling createActor (which can trigger popup)
-    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
-    if (!isConnected) {
-      throw new Error('Plug session expired. Please reconnect.');
-    }
-    const canisterId = getCanisterId('POKEDBOTS_RACING');
-    return await (globalThis as any).window.ic.plug.createActor({
-      canisterId,
-      interfaceFactory: PokedBotsRacing.idlFactory,
-    });
+// For Plug users, we use pre-created actors from login to avoid duplicate requests
+async function getActor(identityOrAgent?: IdentityOrAgent): Promise<PokedBotsRacing._SERVICE> {
+  // Check if this is a Plug user with pre-created actors
+  if (isPlugAgent(identityOrAgent) && (identityOrAgent as any)._plugRacingActor) {
+    console.log('[getActor] Using pre-created Plug racing actor');
+    return (identityOrAgent as any)._plugRacingActor;
   }
   
-  // It's a standard Identity - use our standard actor creation
-  return getRacingActor(identityOrAgent as Identity);
+  // Fallback: standard Identity
+  return getRacingActor(identityOrAgent as Identity | undefined);
 }
 
 /**
@@ -132,6 +125,21 @@ export const getBotProfile = async (
   const racingActor = await getActor(identity);
   const result = await racingActor.get_bot_profile(BigInt(tokenIndex));
   return result.length > 0 ? (result[0] ?? null) : null;
+};
+
+/**
+ * Fetches multiple bot profiles in a single query (efficient batch operation)
+ * @param tokenIndices Array of token indices to fetch profiles for
+ * @param identity Optional identity to use for the actor
+ * @returns An array of bot profiles
+ */
+export const getBotProfilesBatch = async (
+  tokenIndices: number[],
+  identity?: Identity
+): Promise<any[]> => {
+  const racingActor = await getActor(identity);
+  const result = await racingActor.get_bot_profiles_batch(tokenIndices.map(BigInt));
+  return result;
 };
 
 /**

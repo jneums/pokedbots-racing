@@ -28,40 +28,26 @@ function isPlugAgent(identityOrAgent: any): boolean {
 }
 
 // Helper to get racing actor from Identity or Plug agent
+// For Plug users, we use pre-created actors from login to avoid duplicate requests
 async function getActor(identityOrAgent: IdentityOrAgent): Promise<PokedBotsRacing._SERVICE> {
-  // Check if it's a Plug agent - use window.ic.plug.createActor
-  if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
-    // Check if Plug is still connected before calling createActor (which can trigger popup)
-    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
-    if (!isConnected) {
-      throw new Error('Plug session expired. Please reconnect.');
-    }
-    const canisterId = getCanisterId('POKEDBOTS_RACING');
-    return await (globalThis as any).window.ic.plug.createActor({
-      canisterId,
-      interfaceFactory: PokedBotsRacing.idlFactory,
-    });
+  // Check if this is a Plug user with pre-created actors
+  if (isPlugAgent(identityOrAgent) && (identityOrAgent as any)._plugRacingActor) {
+    console.log('[getActor] Using pre-created Plug racing actor');
+    return (identityOrAgent as any)._plugRacingActor;
   }
   
-  // It's a standard Identity - use our standard actor creation
+  // Fallback: standard Identity
   return getRacingActor(identityOrAgent as Identity);
 }// Helper to get NFTs actor from Identity or Plug agent
+// For Plug users, we use pre-created actors from login to avoid duplicate requests
 async function getNFTsActorFromAgent(identityOrAgent: IdentityOrAgent): Promise<PokedBotsNFTs._SERVICE> {
-  // Check if it's a Plug agent - use window.ic.plug.createActor
-  if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
-    // Check if Plug is still connected before calling createActor (which can trigger popup)
-    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
-    if (!isConnected) {
-      throw new Error('Plug session expired. Please reconnect.');
-    }
-    const canisterId = getCanisterId('POKEDBOTS_NFTS');
-    return await (globalThis as any).window.ic.plug.createActor({
-      canisterId,
-      interfaceFactory: PokedBotsNFTs.idlFactory,
-    });
+  // Check if this is a Plug user with pre-created actors
+  if (isPlugAgent(identityOrAgent) && (identityOrAgent as any)._plugNFTsActor) {
+    console.log('[getNFTsActor] Using pre-created Plug NFTs actor');
+    return (identityOrAgent as any)._plugNFTsActor;
   }
   
-  // It's a standard Identity - use our standard actor creation
+  // Fallback: standard Identity
   return getNFTsActor(identityOrAgent as Identity);
 }
 
@@ -413,6 +399,60 @@ export const repairBot = async (
 ): Promise<string> => {
   const racingActor = await getActor(identityOrAgent);
   const result = await racingActor.web_repair_bot(BigInt(tokenIndex));
+  
+  if ('ok' in result) {
+    return result.ok;
+  } else {
+    throw new Error(result.err);
+  }
+};
+
+/**
+ * Full maintenance - combines recharge and repair in a single transaction (0.15 ICP + 0.0001 fee).
+ * Automatically handles ICRC-2 approval.
+ * @param tokenIndex The token index of the bot
+ * @param identity Required identity for authentication
+ * @returns Success message or error
+ */
+export const fullMaintenanceBot = async (
+  tokenIndex: number,
+  identityOrAgent: IdentityOrAgent
+): Promise<string> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_full_maintenance(BigInt(tokenIndex));
+  
+  if ('ok' in result) {
+    return result.ok;
+  } else {
+    throw new Error(result.err);
+  }
+};
+
+/**
+ * Get user's starred bots (favorites)
+ * @param identity Required identity for authentication
+ * @returns Array of token indices
+ */
+export const getStarredBots = async (
+  identityOrAgent: IdentityOrAgent
+): Promise<number[]> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_get_starred_bots();
+  return result.map(n => Number(n));
+};
+
+/**
+ * Set user's starred bots (favorites) - replaces entire list
+ * @param tokenIndices Array of token indices to star
+ * @param identity Required identity for authentication
+ * @returns Success message or error
+ */
+export const setStarredBots = async (
+  tokenIndices: number[],
+  identityOrAgent: IdentityOrAgent
+): Promise<string> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_set_starred_bots(tokenIndices.map(n => BigInt(n)));
   
   if ('ok' in result) {
     return result.ok;

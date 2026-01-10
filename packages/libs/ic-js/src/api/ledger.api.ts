@@ -23,9 +23,6 @@ function stringifyError(err: any): string {
   }
 }
 
-// Cache for Plug ledger actor to avoid recreating on every call
-let cachedPlugLedgerActor: ICPLedger | null = null;
-
 // Helper to detect Plug agents
 function isPlugAgent(identityOrAgent: any): boolean {
   return identityOrAgent && 
@@ -36,27 +33,10 @@ function isPlugAgent(identityOrAgent: any): boolean {
 }
 
 async function createLedgerActor(identityOrAgent?: IdentityOrAgent): Promise<ICPLedger> {
-  // Check if it's a Plug agent - use window.ic.plug.createActor
-  if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
-    // Return cached actor if available
-    if (cachedPlugLedgerActor !== null) {
-      return cachedPlugLedgerActor;
-    }
-    
-    // Check if Plug is still connected before calling createActor (which can trigger popup)
-    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
-    if (!isConnected) {
-      throw new Error('Plug session expired. Please reconnect.');
-    }
-    
-    // Create new actor and cache it
-    const newActor = await (globalThis as any).window.ic.plug.createActor({
-      canisterId: ICP_LEDGER_CANISTER_ID,
-      interfaceFactory: Ledger.idlFactory,
-    });
-    
-    cachedPlugLedgerActor = newActor;
-    return newActor;
+  // Check if this is a Plug user with pre-created actors
+  if (isPlugAgent(identityOrAgent) && (identityOrAgent as any)._plugLedgerActor) {
+    console.log('[createLedgerActor] Using pre-created Plug ledger actor');
+    return (identityOrAgent as any)._plugLedgerActor;
   }
 
   // It's a standard Identity - create HttpAgent
@@ -262,11 +242,4 @@ export async function setAllowance(
 ): Promise<bigint> {
   const amountE8s = BigInt(Math.floor(amountICP * 100_000_000));
   return approveICRC2(identityOrAgent, spender, amountE8s);
-}
-
-/**
- * Clear cached Plug ledger actor (call on logout/disconnect)
- */
-export function clearPlugLedgerCache(): void {
-  cachedPlugLedgerActor = null;
 }

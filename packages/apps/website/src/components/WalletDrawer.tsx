@@ -9,7 +9,7 @@ import { AllowanceManager } from './AllowanceManager';
 import { ApiKeysManager } from './ApiKeysManager';
 import { AccountIdentifier } from '@icp-sdk/canisters/ledger/icp';
 import { Principal } from '@icp-sdk/core/principal';
-import { Copy, RefreshCw, Check, LogOut } from 'lucide-react';
+import { Copy, RefreshCw, Check, LogOut, X } from 'lucide-react';
 import { useState } from 'react';
 
 export function WalletDrawer() {
@@ -44,19 +44,10 @@ export function WalletDrawer() {
     }
   };
 
-  return (
-    <Sheet open={isOpen} onOpenChange={closeDrawer}>
-      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Wallet & Account</SheetTitle>
-          <SheetDescription>
-            Manage your ICP balance, allowances, and API keys
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="space-y-6 mt-6">
-          {/* Wallet Section */}
-          <Card>
+  const drawerContent = (
+    <div className="space-y-6">
+      {/* Wallet Section */}
+      <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -176,7 +167,60 @@ export function WalletDrawer() {
             </Button>
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+  );
+
+  return (
+    <>
+      {/* Mobile: Fixed positioned drawer (matching your working example) */}
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 md:hidden"
+            onClick={closeDrawer}
+          />
+          
+          {/* Mobile Drawer */}
+          <div className="fixed top-24 right-4 w-80 max-w-[calc(100vw-2rem)] z-50 md:hidden">
+            <div className="bg-background border border-border rounded-2xl shadow-2xl overflow-hidden max-h-[calc(100vh-7rem)]">
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold">Wallet & Account</h2>
+                  <p className="text-xs text-muted-foreground">Manage your ICP balance</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={closeDrawer}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="p-4 overflow-y-auto max-h-[calc(100vh-12rem)]">
+                {drawerContent}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Desktop: Sheet component */}
+      <div className="hidden md:block">
+        <Sheet open={isOpen} onOpenChange={closeDrawer}>
+          <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Wallet & Account</SheetTitle>
+              <SheetDescription>
+                Manage your ICP balance, allowances, and API keys
+              </SheetDescription>
+            </SheetHeader>
+            <div className="mt-6">
+              {drawerContent}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+    </>
   );
 }

@@ -5,6 +5,9 @@ import {
   getBotDetails,
   rechargeBot,
   repairBot,
+  fullMaintenanceBot,
+  getStarredBots,
+  setStarredBots,
   upgradeBot,
   cancelUpgrade,
   enterRace,
@@ -134,6 +137,87 @@ export function useRepairBot() {
     onSuccess: (_, tokenIndex) => {
       queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
       queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+    },
+  });
+}
+
+/**
+ * Hook to perform full maintenance (recharge + repair combined)
+ */
+export function useFullMaintenanceBot() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (tokenIndex: number) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return fullMaintenanceBot(tokenIndex, user.agent);
+    },
+    onSuccess: (_, tokenIndex) => {
+      // Force refetch of bot data
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.refetchQueries({ queryKey: ['my-bots'] });
+    },
+  });
+}
+
+/**
+ * Hook to fetch user's starred bots from backend
+ */
+export function useStarredBots() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['starred-bots', user?.principal],
+    queryFn: async () => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return getStarredBots(user.agent);
+    },
+    enabled: !!user?.agent,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+}
+
+/**
+ * Hook to update user's starred bots on backend
+ */
+export function useSetStarredBots() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (tokenIndices: number[]) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return setStarredBots(tokenIndices, user.agent);
+    },
+    onMutate: async (newStarredBots) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['starred-bots', user?.principal] });
+
+      // Snapshot previous value
+      const previousStarredBots = queryClient.getQueryData(['starred-bots', user?.principal]);
+
+      // Optimistically update to new value
+      queryClient.setQueryData(['starred-bots', user?.principal], newStarredBots);
+
+      // Return context with previous value
+      return { previousStarredBots };
+    },
+    onError: (err, newStarredBots, context) => {
+      // Rollback on error
+      if (context?.previousStarredBots) {
+        queryClient.setQueryData(['starred-bots', user?.principal], context.previousStarredBots);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['starred-bots'] });
     },
   });
 }

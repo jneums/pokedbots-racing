@@ -8,6 +8,11 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Derives terrain preference from background color and faction
  * Based on NFT metadata background attribute
+ * 
+ * All colors: black, black stars, blue, bones, brown, dark blue, dark brown, 
+ * dark grey, dark planets, dark purple, dark red grey, green, grey, grey blue, 
+ * grey planets, light blue, light grey, light purple, master gold, mid blue, 
+ * muted purple, muted red, muted yellow, purple, red, teal
  */
 export function getTerrainPreference(
   backgroundColor: string | undefined,
@@ -23,29 +28,33 @@ export function getTerrainPreference(
 
   const bg = backgroundColor.toLowerCase();
 
-  // MetalRoads: Purple shades, darker blues, teals (industrial/tech aesthetic)
+  // MetalRoads: Purple shades, darker blues, teals, space themes (industrial/tech/space aesthetic)
   if (
     bg.includes('purple') ||
     bg.includes('teal') ||
-    bg.includes('dark blue') ||
-    bg.includes('grey blue')
+    bg === 'dark blue' ||
+    bg === 'grey blue' ||
+    bg.includes('planets') ||
+    bg === 'black stars' ||
+    bg === 'master gold'
   ) {
     return 'MetalRoads';
   }
 
-  // WastelandSand: Warm colors, light/mid blues, reds (desert/sand aesthetic)
+  // WastelandSand: Warm colors, light/mid blues, reds, bones (desert/sand aesthetic)
   if (
     bg.includes('red') ||
     bg.includes('yellow') ||
-    bg.includes('bones') ||
-    bg.includes('light blue') ||
-    (bg.includes('blue') && !bg.includes('dark') && !bg.includes('grey'))
+    bg === 'bones' ||
+    bg === 'light blue' ||
+    bg === 'mid blue' ||
+    bg === 'blue'
   ) {
     return 'WastelandSand';
   }
 
-  // ScrapHeaps: Greys, browns, blacks, darks, greens (junkyard aesthetic)
-  // Default fallback for anything not matched above
+  // ScrapHeaps: Greys, browns, blacks, greens (junkyard aesthetic)
+  // Includes: black, brown, dark brown, dark grey, green, grey, light grey, dark red grey
   return 'ScrapHeaps';
 }
 

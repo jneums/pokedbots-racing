@@ -331,6 +331,34 @@ export interface McpServer {
       }
     ]
   >,
+  'get_bot_profiles_batch' : ActorMethod<
+    [Array<bigint>],
+    Array<
+      {
+        'tokenIndex' : bigint,
+        'owner' : [] | [Principal],
+        'isInitialized' : boolean,
+        'name' : [] | [string],
+        'eloRating' : [] | [bigint],
+        'stats' : {
+          'stability' : bigint,
+          'speed' : bigint,
+          'overallRating' : bigint,
+          'acceleration' : bigint,
+          'powerCore' : bigint,
+        },
+        'preferredTerrain' : [] | [Terrain],
+        'faction' : [] | [FactionType],
+        'career' : {
+          'wins' : bigint,
+          'podiums' : bigint,
+          'racesEntered' : bigint,
+          'totalEarnings' : bigint,
+        },
+        'raceClass' : [] | [RaceClass],
+      }
+    >
+  >,
   'get_bot_race_history' : ActorMethod<
     [bigint, bigint, [] | [bigint]],
     {
@@ -680,6 +708,7 @@ export interface McpServer {
   'web_convert_parts' : ActorMethod<[string, string, bigint], Result_1>,
   'web_deregister_bot' : ActorMethod<[bigint], Result_1>,
   'web_enter_race' : ActorMethod<[bigint, bigint], Result_1>,
+  'web_full_maintenance' : ActorMethod<[bigint], Result_1>,
   'web_get_bot_details' : ActorMethod<[bigint], Result_3>,
   'web_get_bot_details_batch' : ActorMethod<
     [Array<bigint>],
@@ -718,6 +747,7 @@ export interface McpServer {
       },
     }
   >,
+  'web_get_starred_bots' : ActorMethod<[], Array<bigint>>,
   'web_get_user_inventory' : ActorMethod<[], UserInventory>,
   'web_initialize_bot' : ActorMethod<[bigint, [] | [string]], Result_1>,
   'web_list_my_bots' : ActorMethod<
@@ -831,6 +861,7 @@ export interface McpServer {
   'web_recharge_bot' : ActorMethod<[bigint], Result_1>,
   'web_repair_bot' : ActorMethod<[bigint], Result_1>,
   'web_respec_bot' : ActorMethod<[bigint, Array<string>], Result_2>,
+  'web_set_starred_bots' : ActorMethod<[Array<bigint>], Result_1>,
   'web_start_scavenging' : ActorMethod<
     [bigint, string, [] | [bigint]],
     Result_1

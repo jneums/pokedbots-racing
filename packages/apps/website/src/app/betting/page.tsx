@@ -5,9 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Badge } from '../../components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
 import { Link } from 'react-router-dom';
-import { Trophy, TrendingUp, TrendingDown, ArrowLeft, Clock, Loader2 } from 'lucide-react';
+import {  TrendingUp, TrendingDown, ArrowLeft, Clock, Loader2 } from 'lucide-react';
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
-import { useGetBotProfile } from '../../hooks/useRacing';
+import {  useGetBotProfilesBatch } from '../../hooks/useRacing';
 import { Button } from '../../components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
 import { WalletConnect } from '../../components/WalletConnect';
@@ -28,8 +28,7 @@ function formatTimestamp(timestamp: number): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function BotNameWithAvatar({ tokenIndex }: { tokenIndex: number }) {
-  const { data: botProfile } = useGetBotProfile(tokenIndex);
+function BotNameWithAvatarDisplay({ tokenIndex, botProfile }: { tokenIndex: number; botProfile: any }) {
   const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', tokenIndex);
   const imageUrl = generateExtThumbnailLink(tokenId);
   
@@ -64,6 +63,11 @@ export default function BettingPage() {
   // Get summary from the first page (summary is the same across all pages)
   const summary = data?.pages[0]?.summary;
   const totalBets = Number(data?.pages[0]?.total || 0);
+
+  // Batch fetch all bot profiles for bets
+  const betIndices = allBets.map(bet => Number(bet.token_index));
+  const uniqueIndices = Array.from(new Set(betIndices));
+  const { data: botProfiles } = useGetBotProfilesBatch(uniqueIndices);
 
   if (!isAuthenticated) {
     return (
@@ -191,7 +195,9 @@ export default function BettingPage() {
               ) : (
                 <>
                   <div className="space-y-2">
-                    {allBets.map((bet) => (
+                    {allBets.map((bet) => {
+                      const botProfile = botProfiles?.find(p => Number(p.tokenIndex) === Number(bet.token_index));
+                      return (
                       <Link
                         key={Number(bet.bet_id)}
                         to={`/race/${Number(bet.race_id)}`}
@@ -200,7 +206,7 @@ export default function BettingPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0 space-y-2">
                             <div className="flex items-center gap-3 flex-wrap">
-                              <BotNameWithAvatar tokenIndex={Number(bet.token_index)} />
+                              <BotNameWithAvatarDisplay tokenIndex={Number(bet.token_index)} botProfile={botProfile} />
                               <Badge variant="outline" className="text-xs">
                                 {bet.bet_type}
                               </Badge>
@@ -258,7 +264,8 @@ export default function BettingPage() {
                           )}
                         </div>
                       </Link>
-                    ))}
+                    );
+                    })}
                   </div>
 
                   {/* Load More Button */}

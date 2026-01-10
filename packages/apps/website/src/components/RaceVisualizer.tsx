@@ -4,52 +4,27 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause, RotateCcw, FastForward, SkipForward, Radio, PlayCircle, Zap, Trophy, TrendingUp, TrendingDown, Users } from 'lucide-react';
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
-import { useGetBotProfile } from '@/hooks/useRacing';
+import {  useGetBotProfilesBatch } from '@/hooks/useRacing';
 
-// Bot name component
-function BotName({ tokenIndex }: { tokenIndex: number }) {
-  const { data: botProfile } = useGetBotProfile(tokenIndex);
-  
-  if (botProfile?.name && botProfile.name.length > 0 && botProfile.name[0]) {
-    return <>{botProfile.name[0]}</>;
-  }
-  
-  return <>Bot #{tokenIndex}</>;
-}
 
-// Hook to get bot name as string
-function useBotName(tokenIndex: number): string {
-  const { data: botProfile } = useGetBotProfile(tokenIndex);
-  
-  if (botProfile?.name && botProfile.name.length > 0 && botProfile.name[0]) {
-    return botProfile.name[0];
-  }
-  
-  return `Bot #${tokenIndex}`;
-}
-
-// Component to fetch all bot names at once
+// Component to fetch all bot names at once using batch endpoint
 function BotNamesFetcher({ botIds, children }: { botIds: string[]; children: (botNames: Map<string, string>) => React.ReactNode }) {
-  // Call useGetBotProfile for each bot exactly once
+  const botIndices = useMemo(() => botIds.map(id => Number(id)), [botIds]);
+  const { data: botProfiles = [] } = useGetBotProfilesBatch(botIndices);
+
   const botNames = useMemo(() => {
     const names = new Map<string, string>();
-    botIds.forEach(id => {
-      const tokenIndex = Number(id);
-      // This will be called once per bot when botIds change
-      names.set(id, `Bot #${tokenIndex}`);
+    botIds.forEach((id) => {
+      // Match profile by tokenIndex, not array index
+      const profile = botProfiles.find(p => Number(p.tokenIndex) === Number(id));
+      if (profile?.name && profile.name.length > 0 && profile.name[0]) {
+        names.set(id, profile.name[0]);
+      } else {
+        names.set(id, `Bot #${id}`);
+      }
     });
     return names;
-  }, [botIds]);
-
-  // Fetch profiles and update names
-  botIds.forEach(id => {
-    const tokenIndex = Number(id);
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const { data: botProfile } = useGetBotProfile(tokenIndex);
-    if (botProfile?.name && botProfile.name.length > 0 && botProfile.name[0]) {
-      botNames.set(id, botProfile.name[0]);
-    }
-  });
+  }, [botIds, botProfiles]);
 
   return children(botNames);
 }
@@ -498,12 +473,12 @@ function calculateSegmentTimeEstimate(
   // === PART 1: UNIVERSAL STAT COMPONENTS (70% always active) ===
   
   // Speed: 70% universal base, 30% conditional bonus
-  const speedUniversal = Math.sqrt(speed) * 5.25; // 70% of original 7.5
+  const speedUniversal = Math.sqrt(speed) * 4.0; // Reduced from 5.25 to balance with other stats
   let speedBonus = 0.0;
   if (segment.angle === 0 && segment.terrain === 'MetalRoads') {
-    speedBonus = Math.sqrt(speed) * 2.25; // +30% bonus on ideal conditions
+    speedBonus = Math.sqrt(speed) * 1.7; // +30% bonus on ideal conditions (reduced from 2.25)
   } else if (segment.angle < 0) {
-    speedBonus = Math.sqrt(speed) * 1.125; // +15% bonus on downhills
+    speedBonus = Math.sqrt(speed) * 0.85; // +15% bonus on downhills (reduced from 1.125)
   }
   
   // === PART 2: STAT SYNERGIES ===
@@ -591,9 +566,9 @@ function calculateSegmentTimeEstimate(
   // Apply distance-based scaling
   const distanceAdjustedSpeed = synergisticSpeed / (sprintFactor * trekFactor);
   
-  // Randomness for this segment (±10% per segment)
+  // Randomness for this segment (±20% per segment)
   const segmentSeed = Number(seed % 1000n);
-  const randomMod = 0.90 + (segmentSeed / 5000.0); // 0.90 to 1.10
+  const randomMod = 0.80 + (segmentSeed / 2500.0); // 0.80 to 1.20
   
   // Calculate segment time
   const segmentLength = segment.length;
@@ -602,18 +577,7 @@ function calculateSegmentTimeEstimate(
   
   // 10x speed multiplier to reduce race times for better UX
   const finalTime = Math.max(0.1, segmentTime / 10.0);
-  
-  // Debug logging for common first segment lengths
-  if (segment.length >= 990 && segment.length <= 1010) {
-    console.log('=== SEGMENT TIME CALCULATION ===');
-    console.log('Race Distance (km):', raceDistance);
-    console.log('Segment:', segment);
-    console.log('Stats:', { speed, powerCore, acceleration, stability });
-    console.log('Speed Components:', { speedUniversal, speedBonus, synergisticSpeed });
-    console.log('Distance Scaling:', { sprintFactor, trekFactor });
-    console.log('Modifiers:', { totalPowerMod, totalAccelMod, totalStabilityMod, difficultyMod });
-    console.log('Results:', { distanceAdjustedSpeed, effectiveSpeed, segmentLength, randomMod, segmentTime, finalTime });
-  }
+
   
   return finalTime;
 }
@@ -649,13 +613,7 @@ function calculateBotSegmentTimes(
   // Apply faction + preferred terrain bonuses (only if not already applied by backend)
   const terrainType = terrain || getTerrainString(track.segments[0]?.terrain);
   const botStats = bonusesAlreadyApplied ? rawStats : applyFactionBonuses(rawStats, faction, terrainType, preferredTerrain);
-  
-  // Debug: log if we applied bonuses
-  if (nftId && Number(nftId) < 10000) {
-    console.log(`[Bot ${nftId}] Raw stats:`, rawStats);
-    console.log(`[Bot ${nftId}] Bonused stats:`, botStats);
-    console.log(`[Bot ${nftId}] Faction: ${faction}, Terrain: ${terrainType}, Preferred: ${preferredTerrain}, BonusesAlready: ${bonusesAlreadyApplied}`);
-  }
+
   
   // Calculate distance from track segments (matches backend track.totalDistance)
   const segmentDistance = (track.segments.reduce((sum, seg) => sum + seg.length, 0) * track.laps) / 1000;
@@ -664,8 +622,7 @@ function calculateBotSegmentTimes(
   // So we use segment distance when raceDistance is 0 or not provided
   const distanceKm = (raceDistance && raceDistance > 0) ? raceDistance : segmentDistance;
   
-  console.log(`[Bot ${nftId}] Race Distance: ${distanceKm}km (segments=${segmentDistance}km), Stats:`, botStats);
-  
+
   const segmentTimes: SegmentTime[] = [];
   let cumulativeTime = 0;
   let cumulativeDistance = 0;
@@ -690,10 +647,6 @@ function calculateBotSegmentTimes(
       const segmentPerformance = 0.94 + (segmentConditionSeed / 8325.0); // 0.94 to 1.06 (±6%)
       
       const time = calculateSegmentTimeEstimate(segment, segmentSeed, botStats, previousDifficulty, distanceKm) * segmentPerformance;
-      
-      if (globalSegmentIdx === 0) {
-        console.log(`[Bot ${nftId}] Segment 0: baseTime=${calculateSegmentTimeEstimate(segment, segmentSeed, botStats, previousDifficulty, distanceKm)}, performance=${segmentPerformance}, finalTime=${time}`);
-      }
       
       cumulativeTime += time;
       cumulativeDistance += segment.length;
@@ -873,13 +826,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
   // Determine if race is currently in progress (live mode)
   // Race is live if status is InProgress
   const isLive = useMemo(() => {
-    console.log('[RaceVisualizer] Status check:', {
-      raceStatus,
-      keys: raceStatus ? Object.keys(raceStatus) : [],
-      hasInProgress: raceStatus && 'InProgress' in raceStatus,
-      hasCompleted: raceStatus && 'Completed' in raceStatus,
-      stringified: JSON.stringify(raceStatus),
-    });
+
     
     // Check if status is InProgress (handle both string keys and object structure)
     if (!raceStatus) return false;
@@ -941,28 +888,138 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
   // Memoize bot IDs for name fetching
   const botIds = useMemo(() => results.map(r => r.nftId), [results]);
   
-  // Pre-calculate segment times for all bots (memoized)
+  // Pre-calculate segment times for all bots WITH SLIPSTREAM (memoized)
+  // Must simulate segment-by-segment for all bots simultaneously to match backend
   const segmentTimesMap = useMemo(() => {
     const map = new Map<string, SegmentTime[]>();
     
-    results.forEach((result) => {
-      // Use botOrder to find the correct participant index (matches backend)
-      const participantIndex = botOrder ? botOrder.indexOf(result.nftId) : results.findIndex(r => r.nftId === result.nftId);
-      
-      const segmentTimes = calculateBotSegmentTimes(
-        trackId, 
-        trackSeed, 
-        participantIndex,
-        result.stats, 
-        result.finalTime,
-        result.faction,
-        result.preferredTerrain,
-        getTerrainString(terrain),
-        result.nftId,
-        bonusesAlreadyApplied,
-        distance // Distance in km - used as fallback for unknown tracks
-      );
-      map.set(result.nftId, segmentTimes);
+    // Get track info
+    const track = TRACK_TEMPLATES[trackId] || { segments: [], laps: 1 };
+    if (track.segments.length === 0) {
+      // No track data, fall back to simple calculation
+      results.forEach((result) => {
+        const participantIndex = botOrder ? botOrder.indexOf(result.nftId) : results.findIndex(r => r.nftId === result.nftId);
+        const segmentTimes = calculateBotSegmentTimes(
+          trackId, trackSeed, participantIndex, result.stats, result.finalTime,
+          result.faction, result.preferredTerrain, getTerrainString(terrain),
+          result.nftId, bonusesAlreadyApplied, distance
+        );
+        map.set(result.nftId, segmentTimes);
+      });
+      return map;
+    }
+    
+    // Initialize racer progress for all bots
+    interface RacerProgress {
+      nftId: string;
+      participantIndex: number;
+      stats: any;
+      faction?: string;
+      preferredTerrain?: string;
+      cumulativeTime: number;
+      previousDifficulty: number;
+      segments: SegmentTime[];
+    }
+    
+    const racerProgress: RacerProgress[] = results.map((result) => ({
+      nftId: result.nftId,
+      participantIndex: botOrder ? botOrder.indexOf(result.nftId) : results.findIndex(r => r.nftId === result.nftId),
+      stats: result.stats,
+      faction: result.faction,
+      preferredTerrain: result.preferredTerrain,
+      cumulativeTime: 0,
+      previousDifficulty: 1.0,
+      segments: []
+    })).sort((a, b) => a.participantIndex - b.participantIndex); // CRITICAL: Sort by participantIndex to match backend order
+    
+    const terrainType = getTerrainString(terrain);
+    const segmentDistance = (track.segments.reduce((sum, seg) => sum + seg.length, 0) * track.laps) / 1000;
+    const distanceKm = (distance && distance > 0) ? distance : segmentDistance;
+    
+    // Simulate segment by segment for all bots
+    for (let lap = 0; lap < track.laps; lap++) {
+      for (let segIdx = 0; segIdx < track.segments.length; segIdx++) {
+        const segment = track.segments[segIdx];
+        const globalSegmentIdx = lap * track.segments.length + segIdx;
+        
+        // Calculate times for all bots in this segment (process in order like backend)
+        for (let i = 0; i < racerProgress.length; i++) {
+          const racer = racerProgress[i];
+          
+          // Apply faction bonuses if needed
+          const rawStats = racer.stats;
+          const botStats = bonusesAlreadyApplied ? rawStats : applyFactionBonuses(
+            rawStats, racer.faction, terrainType, racer.preferredTerrain
+          );
+          
+          if (!botStats) continue;
+          
+          // Calculate seed
+          const seedBase = typeof trackSeed === 'bigint' ? trackSeed : BigInt(trackSeed);
+          const segmentSeed = seedBase + BigInt(racer.participantIndex * 1000 + globalSegmentIdx);
+          
+          // Calculate base segment time
+          let segmentTime = calculateSegmentTimeEstimate(
+            segment, segmentSeed, botStats, racer.previousDifficulty, distanceKm
+          );
+          
+          // Check for slipstream BEFORE applying performance variation
+          // This happens BEFORE updating cumulative time (uses time at START of this segment)
+          let slipstreamBonus = 1.0;
+          const currentTime = racer.cumulativeTime;
+          
+          for (let j = 0; j < racerProgress.length; j++) {
+            if (i !== j) {
+              const otherRacer = racerProgress[j];
+              const timeDiff = currentTime - otherRacer.cumulativeTime;
+              
+              // In slipstream if 0.5-2.5 seconds behind
+              // Note: otherRacer.cumulativeTime is already updated if j < i (processed earlier this segment)
+              if (timeDiff > 0.5 && timeDiff < 2.5) {
+                slipstreamBonus = 0.95;
+                break;
+              }
+            }
+          }
+          
+          // Apply segment performance variation (±20% = 0.80 to 1.20)
+          const segmentConditionSeed = Number((segmentSeed * 31337n + BigInt(racer.participantIndex * 7919) + BigInt(lap * 12345)) % 1000n);
+          const segmentPerformance = 0.80 + (segmentConditionSeed / 2500.0);
+          
+          segmentTime = segmentTime * segmentPerformance * slipstreamBonus;
+          
+          // Debug logging for first 3 segments
+          if (globalSegmentIdx < 3) {
+            console.log(`=== FRONTEND SEGMENT ${globalSegmentIdx} BOT ${i} (${racer.nftId}) ===`);
+            console.log(`participantIndex: ${racer.participantIndex}`);
+            console.log(`Stats:`, botStats);
+            console.log(`segmentSeed: ${segmentSeed.toString()}`);
+            console.log(`segmentConditionSeed: ${segmentConditionSeed}`);
+            console.log(`segmentPerformance: ${segmentPerformance}`);
+            console.log(`slipstreamBonus: ${slipstreamBonus}`);
+            console.log(`baseSegmentTime (before perf/slipstream): ${(segmentTime / (segmentPerformance * slipstreamBonus)).toFixed(4)}`);
+            console.log(`segmentTime (final): ${segmentTime.toFixed(4)}`);
+            console.log(`cumulativeTime: ${(racer.cumulativeTime + segmentTime).toFixed(4)}`);
+          }
+          
+          // Update cumulative time IMMEDIATELY (so next bot sees updated time)
+          racer.cumulativeTime += segmentTime;
+          racer.previousDifficulty = segment.difficulty;
+          
+          racer.segments.push({
+            segmentIndex: globalSegmentIdx,
+            time: segmentTime,
+            cumulativeTime: racer.cumulativeTime,
+            distance: segment.length,
+            cumulativeDistance: racer.segments.reduce((sum, s) => sum + s.distance, 0) + segment.length
+          });
+        }
+      }
+    }
+    
+    // Store results
+    racerProgress.forEach((racer) => {
+      map.set(racer.nftId, racer.segments);
     });
     
     return map;
@@ -999,6 +1056,9 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     return [...results].sort((a, b) => {
       const indexA = botOrder.indexOf(a.nftId);
       const indexB = botOrder.indexOf(b.nftId);
+      // Handle case where nftId isn't in botOrder (shouldn't happen but be defensive)
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
       return indexA - indexB;
     });
   }, [results, botOrder]);
@@ -1036,14 +1096,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
   useEffect(() => {
     const wasLive = liveMode;
     setLiveMode(isLive);
-    
-    // If transitioning from live to completed, DON'T jump to end
-    // Let the animation play out naturally
-    if (wasLive && !isLive) {
-      // Just stop auto-playing, but don't skip to end
-      // User can still watch the animation complete
-      console.log('[RaceVisualizer] Race completed, but letting animation finish naturally');
-    }
+  
   }, [isLive, maxTime, raceStartTime, raceKey, onRaceWatched]);
   
   // Mark race as watched when user completes watching it
@@ -1569,6 +1622,8 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
               <Trophy className="w-4 h-4" />
               Live Positions
             </h3>
+            <BotNamesFetcher botIds={botIds}>
+              {(botNames) => (
             <div className="space-y-1.5">
               {/* Sort by current race position (live standings) */}
               {sortedPositions.map((bot) => {
@@ -1581,6 +1636,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                 const result = results.find(r => r.nftId === bot.nftId);
                 const rating = result?.rating || (result?.stats ? 
                   Math.round((result.stats.speed + result.stats.stability + result.stats.powerCore + result.stats.acceleration) / 4) : null);
+                const botName = botNames.get(bot.nftId) || `Bot #${bot.nftId}`;
                 
                 return (
                   <div 
@@ -1605,11 +1661,11 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                     </span>
                     <img
                       src={imageUrl}
-                      alt={`Bot #${bot.nftId}`}
+                      alt={botName}
                       className="w-8 h-8 rounded border border-primary/40 shadow-sm"
                     />
                     <div className="flex flex-col flex-1 min-w-0">
-                      <span className="font-mono text-xs font-semibold"><BotName tokenIndex={Number(bot.nftId)} /></span>
+                      <span className="font-mono text-xs font-semibold">{botName}</span>
                       {rating && (
                         <span className="text-[10px] text-muted-foreground">⭐ {rating}</span>
                       )}
@@ -1643,6 +1699,8 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                 );
               })}
             </div>
+              )}
+            </BotNamesFetcher>
           </div>
           
           {/* Event Feed - Right Column(s) */}
@@ -1719,6 +1777,8 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
         {animationCompleted && (
           <div className="mt-6 pt-4 border-t border-primary/20">
             <h3 className="text-sm font-semibold mb-3">Final Results:</h3>
+            <BotNamesFetcher botIds={botIds}>
+              {(botNames) => (
             <div className="grid grid-cols-3 gap-2 text-xs">
               {[...stablePositions]
                 .filter(r => r.finalTime < 100000)
@@ -1728,6 +1788,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                 const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(result.nftId));
                 const imageUrl = generateExtThumbnailLink(tokenId);
                 const localTime = result.finalTime;
+                const botName = botNames.get(result.nftId) || `Bot #${result.nftId}`;
                 
                 return (
                   <div key={result.nftId} className="flex flex-col items-center gap-1 p-2 bg-card/50 rounded border border-primary/20">
@@ -1738,15 +1799,17 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                     </div>
                     <img
                       src={imageUrl}
-                      alt={`Bot #${result.nftId}`}
+                      alt={botName}
                       className="w-8 h-8 rounded"
                     />
-                    <span className="font-mono text-xs font-semibold"><BotName tokenIndex={Number(result.nftId)} /></span>
+                    <span className="font-mono text-xs font-semibold">{botName}</span>
                     <span className="text-muted-foreground">{localTime.toFixed(2)}s</span>
                   </div>
                 );
               })}
             </div>
+              )}
+            </BotNamesFetcher>
           </div>
         )}
       </CardContent>

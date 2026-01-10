@@ -55,22 +55,6 @@ module {
         };
       };
 
-      // Verify ownership via EXT (source of truth) - check user's wallet
-      let walletAccountId = ExtIntegration.principalToAccountIdentifier(user, null);
-      let ownerResult = try {
-        await ctx.extCanister.bearer(ExtIntegration.encodeTokenIdentifier(Nat32.fromNat(tokenIndex), ctx.extCanisterId));
-      } catch (_) {
-        return ToolContext.makeError("Failed to verify ownership", cb);
-      };
-      let isOwner = switch (ownerResult) {
-        case (#err(_)) {
-          return ToolContext.makeError("This PokedBot does not exist.", cb);
-        };
-        case (#ok(currentOwner)) {
-          currentOwner == walletAccountId;
-        };
-      };
-
       // Get racing stats (optional - may not be initialized)
       let racingStatsOpt = ctx.garageManager.getStats(tokenIndex);
 
@@ -95,7 +79,9 @@ module {
       // If not initialized, show base stats only
       switch (racingStatsOpt) {
         case (null) {
-          // Bot not initialized - show base stats and initialization prompt
+          // Bot not initialized - can't determine ownership without EXT call
+          // Since this is rare (most bots are initialized) and this tool is mainly for
+          // checking registered bots, we don't show ownership info for uninitialized bots
           let totalBaseStats = baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability;
           let baseRating = totalBaseStats / 4;
 
@@ -108,7 +94,6 @@ module {
             ("message", Json.str("⚠️ This PokedBot has not been initialized for racing yet.")),
             ("token_index", Json.int(tokenIndex)),
             ("is_initialized", Json.bool(false)),
-            ("is_owner", Json.bool(isOwner)),
             ("base_stats", Json.obj([("speed", Json.int(baseStats.speed)), ("power_core", Json.int(baseStats.powerCore)), ("acceleration", Json.int(baseStats.acceleration)), ("stability", Json.int(baseStats.stability)), ("total", Json.int(totalBaseStats)), ("estimated_rating", Json.int(baseRating))])),
             ("next_step", Json.str("Use garage_initialize_pokedbot to register this bot for racing (0.1 ICP one-time fee). This will reveal its faction, preferred terrain, and enable upgrades and racing.")),
             ("thumbnail", Json.str(thumbnailUrl)),
@@ -120,6 +105,9 @@ module {
         case (?stats) {
           // Continue with normal initialized bot logic
           let racingStats = stats;
+
+          // Check ownership via registration - if bot is registered, the ownerPrincipal is the owner
+          let isOwner = racingStats.ownerPrincipal == user;
 
           // Calculate overall rating
           let overallRating = ctx.garageManager.calculateOverallRating(racingStats);

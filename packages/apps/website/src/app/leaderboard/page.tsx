@@ -1,9 +1,6 @@
-'use client';
-
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +9,7 @@ import {
   useGetAllTimeLeaderboard,
   type LeaderboardEntry,
 } from "@/hooks/useLeaderboard";
-import { useGetBotProfile } from "@/hooks/useRacing";
+import {  useGetBotProfilesBatch } from "@/hooks/useRacing";
 import { generatetokenIdentifier, generateExtThumbnailLink, getPlatformStats } from "@pokedbots-racing/ic-js";
 import { PokedBotsRacing } from '@pokedbots-racing/declarations';
 import { useQuery } from '@tanstack/react-query';
@@ -34,9 +31,7 @@ function formatICP(amount: bigint): string {
   }).format(icp) + ' ICP';
 }
 
-function BotName({ tokenIndex }: { tokenIndex: number }) {
-  const { data: botProfile } = useGetBotProfile(tokenIndex);
-  
+function BotNameDisplay({ tokenIndex, botProfile }: { tokenIndex: number; botProfile: any }) {
   if (botProfile?.name && botProfile.name.length > 0 && botProfile.name[0]) {
     return <>PokedBot #{tokenIndex} - {botProfile.name[0]}</>;
   }
@@ -44,10 +39,6 @@ function BotName({ tokenIndex }: { tokenIndex: number }) {
   return <>PokedBot #{tokenIndex}</>;
 }
 
-function formatPrincipal(principal: string): string {
-  if (principal.length <= 12) return principal;
-  return `${principal.slice(0, 6)}...${principal.slice(-4)}`;
-}
 
 function formatPercentage(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
@@ -67,7 +58,7 @@ function getTrendText(trend: LeaderboardEntry['trend']): string {
   return 'Same';
 }
 
-function LeaderboardTable({ entries, type }: { entries: LeaderboardEntry[], type: 'points' | 'wins' | 'winrate' | 'earnings' }) {
+function LeaderboardTable({ entries, type, botProfiles }: { entries: LeaderboardEntry[], type: 'points' | 'wins' | 'winrate' | 'earnings', botProfiles?: any[] }) {
   if (entries.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -80,6 +71,7 @@ function LeaderboardTable({ entries, type }: { entries: LeaderboardEntry[], type
   return (
     <div className="space-y-2">
       {entries.map((entry) => {
+        const botProfile = botProfiles?.find(p => Number(p.tokenIndex) === Number(entry.tokenIndex));
         return (
           <Card key={entry.rank.toString()} className="border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur">
             <CardContent className="p-5 sm:p-6">
@@ -128,7 +120,7 @@ function LeaderboardTable({ entries, type }: { entries: LeaderboardEntry[], type
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="font-bold text-sm sm:text-base">
-                      <BotName tokenIndex={Number(entry.tokenIndex)} />
+                      <BotNameDisplay tokenIndex={Number(entry.tokenIndex)} botProfile={botProfile} />
                     </div>
                     <div className="text-xs sm:text-sm text-muted-foreground mt-1 flex items-center gap-2">
                       <span>{entry.races.toString()} races</span>
@@ -233,6 +225,15 @@ export default function LeaderboardPage() {
     if (winsB !== winsA) return winsB - winsA; // Sort by wins descending
     return Number(b.points) - Number(a.points); // Tie-breaker: points
   });
+
+  // Batch fetch all bot profiles for current visible entries
+  const allVisibleIndices = [
+    ...monthlyLeaderboard.map(e => Number(e.tokenIndex)),
+    ...seasonLeaderboard.map(e => Number(e.tokenIndex)),
+    ...allTimeLeaderboard.map(e => Number(e.tokenIndex)),
+  ];
+  const uniqueIndices = Array.from(new Set(allVisibleIndices));
+  const { data: botProfiles } = useGetBotProfilesBatch(uniqueIndices);
 
   // Use platform-wide statistics
   const totalRacers = platformStats?.totalRacers ?? 0;
@@ -357,7 +358,7 @@ export default function LeaderboardPage() {
                     </div>
                   ) : (
                     <>
-                      <LeaderboardTable entries={allTimeLeaderboard} type="points" />
+                      <LeaderboardTable entries={allTimeLeaderboard} type="points" botProfiles={botProfiles} />
                       {hasNextAllTime && (
                         <div className="text-center mt-6">
                           <Button 
@@ -391,7 +392,7 @@ export default function LeaderboardPage() {
                     </div>
                   ) : (
                     <>
-                      <LeaderboardTable entries={winsSortedLeaderboard} type="wins" />
+                      <LeaderboardTable entries={winsSortedLeaderboard} type="wins" botProfiles={botProfiles} />
                       {hasNextAllTime && (
                         <div className="text-center mt-6">
                           <Button 
@@ -425,7 +426,7 @@ export default function LeaderboardPage() {
                     </div>
                   ) : (
                     <>
-                      <LeaderboardTable entries={seasonLeaderboard} type="points" />
+                      <LeaderboardTable entries={seasonLeaderboard} type="points" botProfiles={botProfiles} />
                       {hasNextSeason && (
                         <div className="text-center mt-6">
                           <Button 
@@ -459,7 +460,7 @@ export default function LeaderboardPage() {
                     </div>
                   ) : (
                     <>
-                      <LeaderboardTable entries={monthlyLeaderboard} type="points" />
+                      <LeaderboardTable entries={monthlyLeaderboard} type="points" botProfiles={botProfiles} />
                       {hasNextMonthly && (
                         <div className="text-center mt-6">
                           <Button 

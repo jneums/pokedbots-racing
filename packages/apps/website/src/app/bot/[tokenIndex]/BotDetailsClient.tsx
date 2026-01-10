@@ -1,5 +1,3 @@
-'use client';
-
 import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,8 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { useGetBotProfile, useGetBotRaceHistory } from '@/hooks/useRacing';
 import { useBackgrounds } from '@/hooks/useBackgrounds';
 import { useBotBaseStats } from '@/hooks/usePrecomputedStats';
-import { generatetokenIdentifier, generateExtThumbnailLink, generateExtAssetLink } from '@pokedbots-racing/ic-js';
-import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus, getFactionSpecialTerrain } from '@/lib/utils';
+import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionBonus, getFactionSpecialTerrain } from '@/lib/utils';
 
 function formatICP(amount: bigint): string {
   const icp = Number(amount) / 100_000_000;

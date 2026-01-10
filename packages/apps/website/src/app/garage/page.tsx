@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useMyBots, useUserInventory, useCollectionBonuses, useUserWalletNFTs, useRechargeBot, useRepairBot, useBatchRechargeBots, useBatchRepairBots, useBatchCompleteScavenging, useBatchStartScavenging } from '../../hooks/useGarage';
+import { useMyBots, useUserInventory, useCollectionBonuses, useUserWalletNFTs, useRechargeBot, useRepairBot, useBatchRechargeBots, useBatchRepairBots, useBatchCompleteScavenging, useBatchStartScavenging, useStarredBots, useSetStarredBots } from '../../hooks/useGarage';
 import { useBackgrounds } from '../../hooks/useBackgrounds';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -18,7 +18,7 @@ import { Progress } from '../../components/ui/progress';
 import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
 import { generatetokenIdentifier, completeScavenging } from '@pokedbots-racing/ic-js';
 import { toast } from 'sonner';
-import { getTerrainIcon } from '../../lib/utils';
+import { getTerrainIcon, getTerrainPreference } from '../../lib/utils';
 import { Input } from '../../components/ui/input';
 import { Checkbox } from '../../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
@@ -93,7 +93,6 @@ export default function GaragePage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedBotIndex, setSelectedBotIndex] = useState<bigint | null>(null);
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [customOrder, setCustomOrder] = useState<string[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
@@ -151,20 +150,22 @@ export default function GaragePage() {
   const { data: walletNFTs = [], isLoading: walletNFTsLoading, error: walletNFTsError } = useUserWalletNFTs();
   const { data: backgroundData } = useBackgrounds();
   
+  // Starred bots from backend
+  const { data: starredBotsArray = [], isLoading: starredBotsLoading } = useStarredBots();
+  const setStarredBotsMutation = useSetStarredBots();
+  
+  // Convert array to Set for easy lookup
+  const favorites = useMemo(() => new Set(starredBotsArray.map(String)), [starredBotsArray]);
+  
   // Use isFetching for loading state (shows on both initial load and manual refetch)
   const loading = isFetching;
 
-  // Load favorites and custom order from localStorage
+  // Load custom order from localStorage (favorites now come from backend)
   useEffect(() => {
     if (user?.principal) {
-      const storageKey = `garage_favorites_${user.principal}`;
       const orderKey = `garage_order_${user.principal}`;
-      const savedFavorites = localStorage.getItem(storageKey);
       const savedOrder = localStorage.getItem(orderKey);
       
-      if (savedFavorites) {
-        setFavorites(new Set(JSON.parse(savedFavorites)));
-      }
       if (savedOrder) {
         setCustomOrder(JSON.parse(savedOrder));
       }
@@ -194,23 +195,19 @@ export default function GaragePage() {
     localStorage.setItem('garage_group_by', JSON.stringify(groupBy));
   }, [groupBy]);
 
-  // Save favorites to localStorage
-  const toggleFavorite = (tokenIndex: string) => {
-    setFavorites(prev => {
-      const newFavorites = new Set(prev);
-      if (newFavorites.has(tokenIndex)) {
-        newFavorites.delete(tokenIndex);
-      } else {
-        newFavorites.add(tokenIndex);
-      }
-      
-      if (user?.principal) {
-        const storageKey = `garage_favorites_${user.principal}`;
-        localStorage.setItem(storageKey, JSON.stringify(Array.from(newFavorites)));
-      }
-      
-      return newFavorites;
-    });
+  // Toggle favorite - syncs to backend
+  const toggleFavorite = async (tokenIndex: string) => {
+    const currentFavorites = Array.from(favorites);
+    const newFavorites = favorites.has(tokenIndex)
+      ? currentFavorites.filter(id => id !== tokenIndex)
+      : [...currentFavorites, tokenIndex];
+    
+    try {
+      await setStarredBotsMutation.mutateAsync(newFavorites.map(Number));
+    } catch (err) {
+      console.error('Failed to update starred bots:', err);
+      toast.error('Failed to update favorites');
+    }
   };
 
   // Sort bots: favorites first, then by custom order, then registered, then unregistered
@@ -275,6 +272,20 @@ export default function GaragePage() {
     });
   }, [bots, walletNFTs, favorites, customOrder]);
 
+  // Helper: Get bracket from bot rating
+  const getBotBracket = (bot: BotListItem): string => {
+    if (!bot.maxStats) return 'Unregistered';
+    const rating = Math.floor((
+      Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + 
+      Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)
+    ) / 4);
+    
+    return rating >= 50 ? 'SilentKlan' :
+           rating >= 40 ? 'Elite' :
+           rating >= 30 ? 'Raider' :
+           rating >= 20 ? 'Junker' : 'Scrap';
+  };
+
   // Apply filters to sorted bots
   const filteredBots = useMemo(() => {
     let filtered = [...sortedBots];
@@ -324,28 +335,43 @@ export default function GaragePage() {
       );
     }
     if (activeQuickFilters.has('inNextRace')) {
-      // Find the next race (earliest start time across all bots)
-      let nextRaceId: number | null = null;
-      let earliestStartTime: bigint | null = null;
+      // Find the next event (earliest start time) and get all race IDs from that event
+      // Events have multiple races (one per class), so we need to group races by start time
+      const racesByStartTime = new Map<string, Set<number>>();
       
       for (const bot of sortedBots) {
         if (bot.upcomingRaces && bot.upcomingRaces.length > 0) {
           for (const race of bot.upcomingRaces) {
-            if (earliestStartTime === null || race.startTime < earliestStartTime) {
-              earliestStartTime = race.startTime;
-              nextRaceId = race.raceId;
+            const startTimeKey = race.startTime.toString();
+            if (!racesByStartTime.has(startTimeKey)) {
+              racesByStartTime.set(startTimeKey, new Set());
             }
+            racesByStartTime.get(startTimeKey)!.add(Number(race.raceId));
           }
         }
       }
       
-      // Filter bots that are in the next race
-      if (nextRaceId !== null) {
+      // Find the earliest start time (next event)
+      let earliestStartTime: bigint | null = null;
+      let nextEventRaceIds: Set<number> | null = null;
+      
+      for (const [startTimeKey, raceIds] of racesByStartTime.entries()) {
+        const startTime = BigInt(startTimeKey);
+        if (earliestStartTime === null || startTime < earliestStartTime) {
+          earliestStartTime = startTime;
+          nextEventRaceIds = raceIds;
+        }
+      }
+      
+      // Filter bots that are in ANY race from the next event
+      if (nextEventRaceIds !== null && nextEventRaceIds.size > 0) {
         filtered = filtered.filter(bot => 
-          bot.upcomingRaces && bot.upcomingRaces.some(race => race.raceId === nextRaceId)
+          bot.upcomingRaces && bot.upcomingRaces.some(race => 
+            nextEventRaceIds!.has(Number(race.raceId))
+          )
         );
       } else {
-        // If no next race found, show no bots
+        // If no next event found, show no bots
         filtered = [];
       }
     }
@@ -403,15 +429,6 @@ export default function GaragePage() {
     
     return filtered;
   }, [sortedBots, searchQuery, activeQuickFilters, classFilter, factionFilter, terrainFilter, batteryRange, conditionRange, backgroundData]);
-
-  // Get terrain preference helper
-  const getTerrainPreference = (background: string | undefined, faction: string): string => {
-    // Implementation depends on your getTerrainPreference function
-    // This is a placeholder - use your actual implementation
-    if (!background) return 'Unknown';
-    // Your actual terrain logic here
-    return 'ScrapHeaps'; // placeholder
-  };
 
   // Selection handlers
   const toggleBotSelection = (tokenIndex: string) => {
@@ -733,20 +750,6 @@ export default function GaragePage() {
 
   const error = botsError ? (botsError instanceof Error ? botsError.message : 'Failed to load bots') : null;
 
-  // Helper: Get bracket from bot rating
-  const getBotBracket = (bot: BotListItem): string => {
-    if (!bot.maxStats) return 'Unregistered';
-    const rating = Math.floor((
-      Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + 
-      Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)
-    ) / 4);
-    
-    return rating >= 50 ? 'SilentKlan' :
-           rating >= 40 ? 'Elite' :
-           rating >= 30 ? 'Raider' :
-           rating >= 20 ? 'Junker' : 'Scrap';
-  };
-
   // Helper: Get next race info including time and terrain
   const getNextRaceInfo = (bot: BotListItem): { time: string; terrain: any } | null => {
     if (!bot.upcomingRaces || bot.upcomingRaces.length === 0) return null;
@@ -799,21 +802,16 @@ export default function GaragePage() {
         groups[bracket].push(bot);
       });
     } else if (groupBy === 'terrain') {
-      // Group by terrain bonus
+      // Group by terrain bonus (derived from background color)
       groups['ScrapHeaps'] = [];
       groups['WastelandSand'] = [];
       groups['MetalRoads'] = [];
-      groups['None'] = [];
       
       filteredBots.forEach(bot => {
-        if (bot.stats?.terrainBonus) {
-          const terrain = Object.keys(bot.stats.terrainBonus)[0];
-          if (groups[terrain]) {
-            groups[terrain].push(bot);
-          }
-        } else {
-          groups['None'].push(bot);
-        }
+        const bg = backgroundData?.backgrounds[bot.tokenIndex.toString()];
+        const factionKey = bot.stats?.faction ? Object.keys(bot.stats.faction)[0] : '';
+        const terrain = getTerrainPreference(bg, factionKey);
+        groups[terrain].push(bot);
       });
     } else if (groupBy === 'faction') {
       // Group by faction
@@ -944,6 +942,11 @@ export default function GaragePage() {
                     🔧 -{Math.round((1 - bonuses.costMultipliers.repair) * 100)}% Repair
                   </Badge>
                 )}
+                {bonuses.costMultipliers.rechargeCooldown < 1 && (
+                  <Badge variant="outline" className="text-xs">
+                    🔋 -{Math.round((1 - bonuses.costMultipliers.rechargeCooldown) * 100)}% Recharge Time
+                  </Badge>
+                )}
                 {bonuses.yieldMultipliers.parts > 1 && (
                   <Badge variant="outline" className="text-xs text-green-600">
                     📦 +{Math.round((bonuses.yieldMultipliers.parts - 1) * 100)}% Parts
@@ -980,18 +983,6 @@ export default function GaragePage() {
                   className="pl-10"
                 />
               </div>
-              
-              {/* Group By Dropdown */}
-              <select
-                value={groupBy}
-                onChange={(e) => setGroupBy(e.target.value as 'none' | 'class' | 'terrain' | 'faction')}
-                className="px-3 py-2 bg-background border border-input rounded-md text-sm min-w-[160px]"
-              >
-                <option value="none">No Grouping</option>
-                <option value="class">Group by Class</option>
-                <option value="terrain">Group by Terrain</option>
-                <option value="faction">Group by Faction</option>
-              </select>
               
               <Button
                 variant={selectionMode ? "default" : "outline"}
@@ -1099,34 +1090,36 @@ export default function GaragePage() {
                   {/* Class Filter */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Class</label>
-                    <select
-                      value={classFilter}
-                      onChange={(e) => setClassFilter(e.target.value)}
-                      className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm"
-                    >
-                      <option value="all">All Classes</option>
-                      <option value="SilentKlan">SilentKlan (50+)</option>
-                      <option value="Elite">Elite (40-49)</option>
-                      <option value="Raider">Raider (30-39)</option>
-                      <option value="Junker">Junker (20-29)</option>
-                      <option value="Scrap">Scrap (0-19)</option>
-                      <option value="Unregistered">Unregistered</option>
-                    </select>
+                    <Select value={classFilter} onValueChange={setClassFilter}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Classes</SelectItem>
+                        <SelectItem value="SilentKlan">SilentKlan (50+)</SelectItem>
+                        <SelectItem value="Elite">Elite (40-49)</SelectItem>
+                        <SelectItem value="Raider">Raider (30-39)</SelectItem>
+                        <SelectItem value="Junker">Junker (20-29)</SelectItem>
+                        <SelectItem value="Scrap">Scrap (0-19)</SelectItem>
+                        <SelectItem value="Unregistered">Unregistered</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Terrain Filter */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Terrain Bonus</label>
-                    <select
-                      value={terrainFilter}
-                      onChange={(e) => setTerrainFilter(e.target.value)}
-                      className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm"
-                    >
-                      <option value="all">All Terrains</option>
-                      <option value="ScrapHeaps">Scrap Heaps</option>
-                      <option value="WastelandSand">Wasteland Sand</option>
-                      <option value="MetalRoads">Metal Roads</option>
-                    </select>
+                    <Select value={terrainFilter} onValueChange={setTerrainFilter}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Terrains</SelectItem>
+                        <SelectItem value="ScrapHeaps">Scrap Heaps</SelectItem>
+                        <SelectItem value="WastelandSand">Wasteland Sand</SelectItem>
+                        <SelectItem value="MetalRoads">Metal Roads</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Clear Advanced Filters */}
@@ -1376,6 +1369,20 @@ export default function GaragePage() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-lg">Your Bots ({bots.length})</CardTitle>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground hidden sm:inline">Group by:</span>
+                  <Select value={groupBy} onValueChange={(value) => setGroupBy(value as 'none' | 'class' | 'terrain' | 'faction')}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Grouping</SelectItem>
+                      <SelectItem value="class">Class</SelectItem>
+                      <SelectItem value="terrain">Terrain</SelectItem>
+                      <SelectItem value="faction">Faction</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -1527,9 +1534,10 @@ export default function GaragePage() {
                                     }
                                   }}
                                   onMouseDown={(e) => e.stopPropagation()}
-                                  className="flex-1 text-left px-2 py-3"
+                                  className="flex-1 text-left px-2 py-4"
                                 >
-                                  <div className="space-y-2">
+                                  {/* Mobile/Tablet Layout (< md) */}
+                                  <div className="md:hidden space-y-2">
                                     {/* Header with Avatar and Name */}
                                     <div className="flex items-center gap-3">
                                       <div className="relative">
@@ -1550,12 +1558,12 @@ export default function GaragePage() {
                                         <div className="font-semibold truncate text-sm text-foreground">
                                           #{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}
                                         </div>
-                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-                                          <span>{factionName}</span>
+                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1 min-w-0">
+                                          <span className="truncate">{factionName}</span>
                                           {bot.currentStats && bot.maxStats && (
                                             <>
-                                              <span>|</span>
-                                              <span className="font-mono">{Math.floor((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4)}/{Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4)}</span>
+                                              <span className="flex-shrink-0">|</span>
+                                              <span className="font-mono flex-shrink-0">{Math.floor((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4)}/{Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4)}</span>
                                             </>
                                           )}
                                         </div>
@@ -1601,10 +1609,134 @@ export default function GaragePage() {
                                       </div>
                                     </div>
                                   
-                                  {!isCollapsed && bot.isInitialized && bot.stats ? (
-                                    <>      
-                                      {/* Cooldowns and Status */}
-                                      <div className="flex flex-col gap-1">
+                                    {!isCollapsed && bot.isInitialized && bot.stats && (
+                                      <>      
+                                        {/* Cooldowns and Status */}
+                                        <div className="flex flex-col gap-1">
+                                            {(() => {
+                                              const now = Date.now();
+                                              const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
+                                              const rechargeReady = bot.stats.lastRecharged 
+                                                ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
+                                                : 0;
+                                              const repairReady = bot.stats.lastRepaired
+                                                ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
+                                                : 0;
+                                              
+                                              const rechargeTime = bot.stats.lastRecharged 
+                                                ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + BigInt(Math.round(rechargeCooldownMs * 1_000_000)))
+                                                : null;
+                                              const repairTime = bot.stats.lastRepaired
+                                                ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)
+                                                : null;
+                                              
+                                              return (
+                                                <>
+                                                  {rechargeReady > now && rechargeTime && (
+                                                    <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                                      <Zap className="h-3 w-3" />
+                                                      Recharge: {rechargeTime}
+                                                    </Badge>
+                                                  )}
+                                                  {repairReady > now && repairTime && (
+                                                    <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                                      <Hammer className="h-3 w-3" />
+                                                      Repair: {repairTime}
+                                                    </Badge>
+                                                  )}
+                                                  {bot.activeUpgrade && (
+                                                    <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                                                      <Clock className="h-3 w-3" />
+                                                      {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])} Upgrade: {formatTimeRemaining(bot.activeUpgrade.endsAt)}
+                                                    </Badge>
+                                                  )}
+                                                  {bot.activeMission && (() => {
+                                                    const zone = Object.keys(bot.activeMission.zone)[0];
+                                                    const timeRemaining = getScavengingTimeRemaining(bot);
+                                                    return (
+                                                      <Badge 
+                                                        variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
+                                                        className="text-xs"
+                                                      >
+                                                        {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}🔍 {formatScavengingZone(zone)}{timeRemaining ? ` • ${timeRemaining}` : ''}
+                                                      </Badge>
+                                                    );
+                                                  })()}
+                                                </>
+                                              );
+                                            })()}
+                                        </div>
+                                      </>
+                                    )}
+                                    {!bot.isInitialized && (
+                                      <Badge variant="outline" className="text-xs">Not Initialized</Badge>
+                                    )}
+                                  </div>
+
+                                  {/* Desktop Layout (>= md) */}
+                                  <div className="hidden md:flex items-center gap-4">
+                                    {/* Avatar */}
+                                    <div className="relative flex-shrink-0">
+                                      <Avatar className="h-12 w-12">
+                                        <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
+                                        <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
+                                      </Avatar>
+                                      {(() => {
+                                        const raceInfo = getNextRaceInfo(bot);
+                                        return raceInfo && (
+                                          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-[9px] font-bold shadow-md border border-primary-foreground/20 flex items-center gap-0.5 whitespace-nowrap leading-none">
+                                            {getTerrainIcon(raceInfo.terrain)}{raceInfo.time}
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+
+                                    {/* Bot Info Column */}
+                                    <div className="w-[240px] flex-shrink-0">
+                                      <div className="font-semibold truncate text-sm text-foreground">
+                                        #{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+                                        <span className="truncate">{factionName}</span>
+                                        {bot.currentStats && bot.maxStats && (
+                                          <>
+                                            <span className="flex-shrink-0">|</span>
+                                            <span className="font-mono flex-shrink-0">{Math.floor((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4)}/{Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4)}</span>
+                                          </>
+                                        )}
+                                      </div>
+                                      {/* Stats Strip */}
+                                      {bot.stats && bot.currentStats && bot.maxStats && (
+                                        <div className="flex items-center gap-2 text-xs mt-1">
+                                          <div className="flex items-center gap-0.5">
+                                            <span className="text-yellow-500">⚡</span>
+                                            <span className="font-mono text-yellow-500">{Number(bot.currentStats.speed)}</span>
+                                            <span className="text-muted-foreground/40">/{Number(bot.maxStats.speed)}</span>
+                                          </div>
+                                          <div className="flex items-center gap-0.5">
+                                            <span className="text-orange-500">💪</span>
+                                            <span className="font-mono text-orange-500">{Number(bot.currentStats.powerCore)}</span>
+                                            <span className="text-muted-foreground/40">/{Number(bot.maxStats.powerCore)}</span>
+                                          </div>
+                                          <div className="flex items-center gap-0.5">
+                                            <span className="text-blue-500">🚀</span>
+                                            <span className="font-mono text-blue-500">{Number(bot.currentStats.acceleration)}</span>
+                                            <span className="text-muted-foreground/40">/{Number(bot.maxStats.acceleration)}</span>
+                                          </div>
+                                          <div className="flex items-center gap-0.5">
+                                            <span className="text-red-500">🎯</span>
+                                            <span className="font-mono text-red-500">{Number(bot.currentStats.stability)}</span>
+                                            <span className="text-muted-foreground/40">/{Number(bot.maxStats.stability)}</span>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Middle Section: Cooldowns/Status + Resource Bars */}
+                                    <div className="flex-1 min-w-0 flex items-center gap-6">
+                                      {/* Cooldown Chips - Stacked Vertically */}
+                                      {bot.isInitialized && bot.stats && (
+                                        <div className="flex flex-col gap-1">
                                           {(() => {
                                             const now = Date.now();
                                             const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
@@ -1625,21 +1757,21 @@ export default function GaragePage() {
                                             return (
                                               <>
                                                 {rechargeReady > now && rechargeTime && (
-                                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                                  <Badge variant="outline" className="text-xs flex items-center gap-1 w-fit">
                                                     <Zap className="h-3 w-3" />
-                                                    Recharge: {rechargeTime}
+                                                    {rechargeTime}
                                                   </Badge>
                                                 )}
                                                 {repairReady > now && repairTime && (
-                                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                                  <Badge variant="outline" className="text-xs flex items-center gap-1 w-fit">
                                                     <Hammer className="h-3 w-3" />
-                                                    Repair: {repairTime}
+                                                    {repairTime}
                                                   </Badge>
                                                 )}
                                                 {bot.activeUpgrade && (
-                                                  <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                                                  <Badge variant="secondary" className="text-xs flex items-center gap-1 w-fit">
                                                     <Clock className="h-3 w-3" />
-                                                    {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])} Upgrade: {formatTimeRemaining(bot.activeUpgrade.endsAt)}
+                                                    {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])}: {formatTimeRemaining(bot.activeUpgrade.endsAt)}
                                                   </Badge>
                                                 )}
                                                 {bot.activeMission && (() => {
@@ -1648,7 +1780,7 @@ export default function GaragePage() {
                                                   return (
                                                     <Badge 
                                                       variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
-                                                      className="text-xs"
+                                                      className="text-xs w-fit"
                                                     >
                                                       {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}🔍 {formatScavengingZone(zone)}{timeRemaining ? ` • ${timeRemaining}` : ''}
                                                     </Badge>
@@ -1657,13 +1789,44 @@ export default function GaragePage() {
                                               </>
                                             );
                                           })()}
-                                      </div>
-                                    </>
-                                  ) : !bot.isInitialized ? (
-                                    <Badge variant="outline" className="text-xs">Not Initialized</Badge>
-                                  ) : null}
-                                </div>
-                              </button>
+                                        </div>
+                                      )}
+
+                                      {/* Mini Resource Bars - Stacked Vertically */}
+                                      {bot.isInitialized && bot.stats && (
+                                        <div className="flex flex-col gap-1.5 ml-auto flex-shrink-0">
+                                          {/* Battery Bar */}
+                                          <div className="flex items-center gap-1.5">
+                                            <Battery className={`h-3.5 w-3.5 ${Number(bot.stats.battery) < 30 ? 'text-destructive' : 'text-blue-500'}`} />
+                                            <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
+                                              <div
+                                                className={`h-full transition-all ${Number(bot.stats.battery) < 30 ? 'bg-destructive' : 'bg-blue-500'}`}
+                                                style={{ width: `${Number(bot.stats.battery)}%` }}
+                                              />
+                                            </div>
+                                            <span className="text-xs font-mono w-8 text-right">{Number(bot.stats.battery)}%</span>
+                                          </div>
+
+                                          {/* Condition Bar */}
+                                          <div className="flex items-center gap-1.5">
+                                            <Wrench className={`h-3.5 w-3.5 ${Number(bot.stats.condition) < 30 ? 'text-destructive' : 'text-green-500'}`} />
+                                            <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
+                                              <div
+                                                className={`h-full transition-all ${Number(bot.stats.condition) < 30 ? 'bg-destructive' : 'bg-green-500'}`}
+                                                style={{ width: `${Number(bot.stats.condition)}%` }}
+                                              />
+                                            </div>
+                                            <span className="text-xs font-mono w-8 text-right">{Number(bot.stats.condition)}%</span>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {!bot.isInitialized && (
+                                        <Badge variant="outline" className="text-xs">Not Initialized</Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1813,9 +1976,10 @@ export default function GaragePage() {
                           }
                         }}
                         onMouseDown={(e) => e.stopPropagation()}
-                        className="flex-1 text-left px-2 py-3"
+                        className="flex-1 text-left px-2 py-4"
                       >
-                        <div className="space-y-2">
+                        {/* Mobile/Tablet Layout (< md) */}
+                        <div className="md:hidden space-y-2">
                           {/* Header with Avatar and Name */}
                           <div className="flex items-center gap-3">
                             <div className="relative">
@@ -1836,12 +2000,12 @@ export default function GaragePage() {
                               <div className="font-semibold truncate text-sm text-foreground">
                                 #{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}
                               </div>
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-                                <span>{factionName}</span>
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1 min-w-0">
+                                <span className="truncate">{factionName}</span>
                                 {bot.stats?.eloRating !== undefined && (
                                   <>
-                                    <span>•</span>
-                                    <span>
+                                    <span className="flex-shrink-0">•</span>
+                                    <span className="flex-shrink-0">
                                       {(() => {
                                         // Calculate overall rating (average of max stats)
                                         const rating = bot.maxStats 
@@ -1905,11 +2069,150 @@ export default function GaragePage() {
                             </div>
                           </div>
                         
-                        {!isCollapsed && bot.isInitialized && bot.stats ? (
-                          <>
-                            
-                            {/* Cooldowns and Status */}
-                            <div className="flex flex-col gap-1">
+                          {!isCollapsed && bot.isInitialized && bot.stats && (
+                            <>
+                              {/* Cooldowns and Status */}
+                              <div className="flex flex-col gap-1">
+                                  {(() => {
+                                    const now = Date.now();
+                                    const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
+                                    const rechargeReady = bot.stats.lastRecharged 
+                                      ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
+                                      : 0;
+                                    const repairReady = bot.stats.lastRepaired
+                                      ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
+                                      : 0;
+                                    
+                                    const rechargeTime = bot.stats.lastRecharged 
+                                      ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + BigInt(Math.round(rechargeCooldownMs * 1_000_000)))
+                                      : null;
+                                    const repairTime = bot.stats.lastRepaired
+                                      ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)
+                                      : null;
+                                    
+                                    return (
+                                      <>
+                                        {rechargeReady > now && rechargeTime && (
+                                          <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                            <Zap className="h-3 w-3" />
+                                            Recharge: {rechargeTime}
+                                          </Badge>
+                                        )}
+                                        {repairReady > now && repairTime && (
+                                          <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                            <Hammer className="h-3 w-3" />
+                                            Repair: {repairTime}
+                                          </Badge>
+                                        )}
+                                        {bot.activeUpgrade && (
+                                          <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                                            <Clock className="h-3 w-3" />
+                                            {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])} Upgrade: {formatTimeRemaining(bot.activeUpgrade.endsAt)}
+                                          </Badge>
+                                        )}
+                                        {bot.activeMission && (() => {
+                                          const zone = Object.keys(bot.activeMission.zone)[0];
+                                          const timeRemaining = getScavengingTimeRemaining(bot);
+                                          return (
+                                            <Badge 
+                                              variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
+                                              className="text-xs"
+                                            >
+                                              {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}🔍 {formatScavengingZone(zone)}{timeRemaining ? ` • ${timeRemaining}` : ''}
+                                            </Badge>
+                                          );
+                                        })()}
+                                      </>
+                                    );
+                                  })()}
+                              </div>
+                            </>
+                          )}
+                          {!bot.isInitialized && (
+                            <Badge variant="outline" className="text-xs">Not Initialized</Badge>
+                          )}
+                        </div>
+
+                        {/* Desktop Layout (>= md) */}
+                        <div className="hidden md:flex items-center gap-4">
+                          {/* Avatar */}
+                          <div className="relative flex-shrink-0">
+                            <Avatar className="h-12 w-12">
+                              <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
+                              <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
+                            </Avatar>
+                            {(() => {
+                              const raceInfo = getNextRaceInfo(bot);
+                              return raceInfo && (
+                                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-[9px] font-bold shadow-md border border-primary-foreground/20 flex items-center gap-0.5 whitespace-nowrap leading-none">
+                                  {getTerrainIcon(raceInfo.terrain)}{raceInfo.time}
+                                </div>
+                              );
+                            })()}
+                          </div>
+
+                          {/* Bot Info Column */}
+                          <div className="w-[180px] flex-shrink-0">
+                            <div className="font-semibold truncate text-sm text-foreground">
+                              #{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+                              <span className="truncate">{factionName}</span>
+                              {bot.stats?.eloRating !== undefined && (
+                                <>
+                                  <span className="flex-shrink-0">•</span>
+                                  <span className="flex-shrink-0">
+                                    {(() => {
+                                      const rating = bot.maxStats 
+                                        ? Math.floor((
+                                            Number(bot.maxStats.speed) + 
+                                            Number(bot.maxStats.powerCore) + 
+                                            Number(bot.maxStats.acceleration) + 
+                                            Number(bot.maxStats.stability)
+                                          ) / 4)
+                                        : 0;
+                                      
+                                      return rating >= 50 ? 'SilentKlan' :
+                                             rating >= 40 ? 'Elite' :
+                                             rating >= 30 ? 'Raider' :
+                                             rating >= 20 ? 'Junker' : 'Scrap';
+                                    })()}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                            {/* Stats Strip */}
+                            {bot.stats && bot.currentStats && bot.maxStats && (
+                              <div className="flex items-center gap-1.5 text-[10px] mt-0.5 opacity-80">
+                                <div className="flex items-center gap-0.5">
+                                  <span className="text-yellow-500 text-[11px]">⚡</span>
+                                  <span className="font-mono text-yellow-500">{Number(bot.currentStats.speed)}</span>
+                                  <span className="text-muted-foreground/40">/{Number(bot.maxStats.speed)}</span>
+                                </div>
+                                <div className="flex items-center gap-0.5">
+                                  <span className="text-orange-500 text-[11px]">💪</span>
+                                  <span className="font-mono text-orange-500">{Number(bot.currentStats.powerCore)}</span>
+                                  <span className="text-muted-foreground/40">/{Number(bot.maxStats.powerCore)}</span>
+                                </div>
+                                <div className="flex items-center gap-0.5">
+                                  <span className="text-blue-500 text-[11px]">🚀</span>
+                                  <span className="font-mono text-blue-500">{Number(bot.currentStats.acceleration)}</span>
+                                  <span className="text-muted-foreground/40">/{Number(bot.maxStats.acceleration)}</span>
+                                </div>
+                                <div className="flex items-center gap-0.5">
+                                  <span className="text-red-500 text-[11px]">🎯</span>
+                                  <span className="font-mono text-red-500">{Number(bot.currentStats.stability)}</span>
+                                  <span className="text-muted-foreground/40">/{Number(bot.maxStats.stability)}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Middle Section: Cooldowns/Status + Resource Bars */}
+                          <div className="flex-1 min-w-0 flex items-center gap-6">
+                            {/* Cooldown Chips - Stacked Vertically */}
+                            {bot.isInitialized && bot.stats && (
+                              <div className="flex flex-col gap-1">
                                 {(() => {
                                   const now = Date.now();
                                   const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
@@ -1930,21 +2233,21 @@ export default function GaragePage() {
                                   return (
                                     <>
                                       {rechargeReady > now && rechargeTime && (
-                                        <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                        <Badge variant="outline" className="text-xs flex items-center gap-1 w-fit">
                                           <Zap className="h-3 w-3" />
-                                          Recharge: {rechargeTime}
+                                          {rechargeTime}
                                         </Badge>
                                       )}
                                       {repairReady > now && repairTime && (
-                                        <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                        <Badge variant="outline" className="text-xs flex items-center gap-1 w-fit">
                                           <Hammer className="h-3 w-3" />
-                                          Repair: {repairTime}
+                                          {repairTime}
                                         </Badge>
                                       )}
                                       {bot.activeUpgrade && (
-                                        <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                                        <Badge variant="secondary" className="text-xs flex items-center gap-1 w-fit">
                                           <Clock className="h-3 w-3" />
-                                          {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])} Upgrade: {formatTimeRemaining(bot.activeUpgrade.endsAt)}
+                                          {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])}: {formatTimeRemaining(bot.activeUpgrade.endsAt)}
                                         </Badge>
                                       )}
                                       {bot.activeMission && (() => {
@@ -1953,7 +2256,7 @@ export default function GaragePage() {
                                         return (
                                           <Badge 
                                             variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
-                                            className="text-xs"
+                                            className="text-xs w-fit"
                                           >
                                             {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}🔍 {formatScavengingZone(zone)}{timeRemaining ? ` • ${timeRemaining}` : ''}
                                           </Badge>
@@ -1962,12 +2265,43 @@ export default function GaragePage() {
                                     </>
                                   );
                                 })()}
-                            </div>
-                          </>
-                        ) : !bot.isInitialized ? (
-                          <Badge variant="outline" className="text-xs">Not Initialized</Badge>
-                        ) : null}
-                      </div>
+                              </div>
+                            )}
+
+                            {/* Mini Resource Bars - Stacked Vertically */}
+                            {bot.isInitialized && bot.stats && (
+                              <div className="flex flex-col gap-1.5 ml-auto flex-shrink-0">
+                                {/* Battery Bar */}
+                                <div className="flex items-center gap-1.5">
+                                  <Battery className={`h-3.5 w-3.5 ${Number(bot.stats.battery) < 30 ? 'text-destructive' : 'text-blue-500'}`} />
+                                  <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full transition-all ${Number(bot.stats.battery) < 30 ? 'bg-destructive' : 'bg-blue-500'}`}
+                                      style={{ width: `${Number(bot.stats.battery)}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs font-mono w-8 text-right">{Number(bot.stats.battery)}%</span>
+                                </div>
+
+                                {/* Condition Bar */}
+                                <div className="flex items-center gap-1.5">
+                                  <Wrench className={`h-3.5 w-3.5 ${Number(bot.stats.condition) < 30 ? 'text-destructive' : 'text-green-500'}`} />
+                                  <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full transition-all ${Number(bot.stats.condition) < 30 ? 'bg-destructive' : 'bg-green-500'}`}
+                                      style={{ width: `${Number(bot.stats.condition)}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs font-mono w-8 text-right">{Number(bot.stats.condition)}%</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {!bot.isInitialized && (
+                              <Badge variant="outline" className="text-xs">Not Initialized</Badge>
+                            )}
+                          </div>
+                        </div>
                     </button>
                     <button
                       onClick={(e) => {
@@ -2159,12 +2493,17 @@ export default function GaragePage() {
                     {/* Economic Bonuses */}
                     <div className="pb-3 border-b border-border space-y-2">
                       <h4 className="text-xs font-semibold text-muted-foreground uppercase">Economic Bonuses</h4>
-                      {(bonuses.costMultipliers.repair < 1 || bonuses.yieldMultipliers.parts > 1 || 
-                        bonuses.yieldMultipliers.prizes > 1) ? (
+                      {(bonuses.costMultipliers.repair < 1 || bonuses.costMultipliers.rechargeCooldown < 1 || 
+                        bonuses.yieldMultipliers.parts > 1 || bonuses.yieldMultipliers.prizes > 1) ? (
                         <div className="flex flex-wrap gap-1.5 text-xs">
                           {bonuses.costMultipliers.repair < 1 && (
                             <Badge variant="outline" className="text-xs">
                               🔧 -{Math.round((1 - bonuses.costMultipliers.repair) * 100)}%
+                            </Badge>
+                          )}
+                          {bonuses.costMultipliers.rechargeCooldown < 1 && (
+                            <Badge variant="outline" className="text-xs">
+                              🔋 -{Math.round((1 - bonuses.costMultipliers.rechargeCooldown) * 100)}%
                             </Badge>
                           )}
                           {bonuses.yieldMultipliers.parts > 1 && (

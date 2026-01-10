@@ -1,24 +1,20 @@
 import { Routes, Route, useLocation, Link } from 'react-router-dom';
 import { useEffect } from 'react';
-import { Toaster, toast } from 'sonner';
+import { Toaster } from 'sonner';
 import Navigation from './app/navigation';
 import HomePage from './app/page';
 import MarketplacePage from './app/marketplace/page';
 import GaragePage from './app/garage/page';
 import SchedulePage from './app/schedule/page';
 import EventDetailsPage from './app/schedule/[eventId]/page';
-import RaceDetailsPage from './app/race/[raceId]/page';
 import LeaderboardPage from './app/leaderboard/page';
 import BettingPage from './app/betting/page';
 import SimulatorPage from './app/simulator/page';
-import DocsListPage from './app/docs/page';
-import DocPage from './app/docs/[slug]/page';
 import GuidesListPage from './app/guides/page';
 import GuidePage from './app/guides/[slug]/page';
 import NewsPage from './app/news/page';
 import NewsArticlePage from './app/news/[slug]/page';
 import BotDetailsPage from './app/bot/[tokenIndex]/page';
-import Track3DTestPage from './app/track3d-test/page';
 import { WalletDrawerProvider } from './contexts/WalletDrawerContext';
 import { WalletDrawer } from './components/WalletDrawer';
 import { useAuth } from './hooks/useAuth';
@@ -148,18 +144,14 @@ export default function App() {
           <Route path="/garage" element={<GaragePage />} />
           <Route path="/schedule" element={<SchedulePage />} />
           <Route path="/schedule/:eventId" element={<EventDetailsPage />} />
-          <Route path="/race/:raceId" element={<RaceDetailsPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/betting" element={<BettingPage />} />
           <Route path="/simulator" element={<SimulatorPage />} />
           <Route path="/bot/:tokenIndex" element={<BotDetailsPage />} />
-          <Route path="/docs" element={<DocsListPage />} />
-          <Route path="/docs/:slug" element={<DocPage />} />
           <Route path="/guides" element={<GuidesListPage />} />
           <Route path="/guides/:slug" element={<GuidePage />} />
           <Route path="/news" element={<NewsPage />} />
           <Route path="/news/:slug" element={<NewsArticlePage />} />
-          <Route path="/track3d-test" element={<Track3DTestPage />} />
         </Routes>
       </main>
       <footer className="border-t-2 border-primary/20 py-12 bg-card/30">

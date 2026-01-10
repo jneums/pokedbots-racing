@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from '../hooks/useAuth';
 import WalletButton from '../components/WalletButton';
 import EventsHub from '../components/EventsHub';
@@ -37,6 +37,18 @@ export default function Navigation() {
   const isRaceActive = ['/schedule', '/leaderboard', '/betting', '/simulator'].some(p => isActive(p));
   const isMyBotsActive = ['/garage', '/marketplace'].some(p => isActive(p));
   
+  // Prevent body scroll when mobile drawer is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+  
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-6">
@@ -50,20 +62,22 @@ export default function Navigation() {
             <EventsHub />
             
             {/* Racing Dropdown */}
-            <div 
-              className="relative"
-              onMouseEnter={() => setRaceMenuOpen(true)}
-              onMouseLeave={() => setRaceMenuOpen(false)}
-            >
+            <div className="relative">
               <button
+                onMouseEnter={() => setRaceMenuOpen(true)}
+                onMouseLeave={() => setRaceMenuOpen(false)}
                 className={`${linkClass('/schedule')} flex items-center gap-1 ${isRaceActive ? 'text-primary drop-shadow-[0_0_8px_hsl(var(--primary))]' : ''}`}
               >
                 Racing
                 <ChevronDown className="h-3 w-3" />
               </button>
               {raceMenuOpen && (
-                <div className="absolute top-full left-0 pt-2">
-                  <div className="w-48 bg-card border border-border rounded-lg shadow-xl py-2">
+                <div 
+                  className="absolute top-full left-0 pt-2 w-48"
+                  onMouseEnter={() => setRaceMenuOpen(true)}
+                  onMouseLeave={() => setRaceMenuOpen(false)}
+                >
+                  <div className="bg-card border border-border rounded-lg shadow-xl py-2">
                   <Link to="/schedule" className="block px-4 py-2 text-sm hover:bg-muted transition-colors">
                     <div className="font-medium">Schedule</div>
                     <div className="text-xs text-muted-foreground">View upcoming races</div>
@@ -86,20 +100,22 @@ export default function Navigation() {
             </div>
 
             {/* My Bots Dropdown */}
-            <div 
-              className="relative"
-              onMouseEnter={() => setMyBotsMenuOpen(true)}
-              onMouseLeave={() => setMyBotsMenuOpen(false)}
-            >
+            <div className="relative">
               <button
+                onMouseEnter={() => setMyBotsMenuOpen(true)}
+                onMouseLeave={() => setMyBotsMenuOpen(false)}
                 className={`${linkClass('/garage')} flex items-center gap-1 ${isMyBotsActive ? 'text-primary drop-shadow-[0_0_8px_hsl(var(--primary))]' : ''}`}
               >
                 My Bots
                 <ChevronDown className="h-3 w-3" />
               </button>
               {myBotsMenuOpen && (
-                <div className="absolute top-full left-0 pt-2">
-                  <div className="w-48 bg-card border border-border rounded-lg shadow-xl py-2">
+                <div 
+                  className="absolute top-full left-0 pt-2 w-48"
+                  onMouseEnter={() => setMyBotsMenuOpen(true)}
+                  onMouseLeave={() => setMyBotsMenuOpen(false)}
+                >
+                  <div className="bg-card border border-border rounded-lg shadow-xl py-2">
                   <Link to="/garage" className="block px-4 py-2 text-sm hover:bg-muted transition-colors">
                     <div className="font-medium">Garage</div>
                     <div className="text-xs text-muted-foreground">Manage your bots</div>
@@ -147,8 +163,8 @@ export default function Navigation() {
               />
               
               {/* Drawer */}
-              <div className="fixed top-[80px] right-0 bottom-0 w-72 border-l-2 border-primary/40 z-40 lg:hidden shadow-2xl overflow-y-auto">
-                <nav className="flex flex-col py-4 bg-card">
+              <div className="fixed top-20 right-0 w-72 z-50 md:hidden overflow-y-auto max-h-[calc(100vh-5rem)] bg-card border-l border-border shadow-2xl">
+                <nav className="flex flex-col py-4">
                   <div className="px-4 pb-4 space-y-3">
                     <EventsHub />
                     <WalletButton />

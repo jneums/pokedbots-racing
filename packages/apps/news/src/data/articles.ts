@@ -14,9 +14,7 @@ export const articles: Article[] = [
     description: 'An introduction to the wasteland racing platform where your robots compete for glory and ICP.',
     author: 'PokedBots Team',
     date: '2026-01-08',
-    content: `# Welcome to PokedBots Racing
-
-We're excited to introduce PokedBots Racing - a unique racing platform built on the Internet Computer where your robot NFTs compete in thrilling wasteland races.
+    content: `We're excited to introduce PokedBots Racing - a unique racing platform built on the Internet Computer where your robot NFTs compete in thrilling wasteland races.
 
 ## What is PokedBots Racing?
 
@@ -60,9 +58,7 @@ See you on the track!
     description: 'A deep dive into how bot statistics affect race performance and how to build winning machines.',
     author: 'Race Analyst',
     date: '2026-01-07',
-    content: `# Understanding Bot Stats and Performance
-
-Knowing how your bot's stats translate to track performance is key to racing success. Let's break down each stat and how it impacts races.
+    content: `Knowing how your bot's stats translate to track performance is key to racing success. Let's break down each stat and how it impacts races.
 
 ## The Four Core Stats
 

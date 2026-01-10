@@ -677,7 +677,7 @@ export const idlFactory = ({ IDL }) => {
             })
           ),
         ],
-        ['query'],
+        [],
       ),
     'debug_test_simulation' : IDL.Func(
         [IDL.Vec(IDL.Nat), IDL.Nat, IDL.Nat, IDL.Nat],
@@ -699,7 +699,7 @@ export const idlFactory = ({ IDL }) => {
             })
           ),
         ],
-        ['query'],
+        [],
       ),
     'decode_token_identifier' : IDL.Func([IDL.Text], [IDL.Nat], ['query']),
     'delete_events_and_races' : IDL.Func([IDL.Vec(IDL.Nat)], [IDL.Text], []),
@@ -724,6 +724,37 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [
           IDL.Opt(
+            IDL.Record({
+              'tokenIndex' : IDL.Nat,
+              'owner' : IDL.Opt(IDL.Principal),
+              'isInitialized' : IDL.Bool,
+              'name' : IDL.Opt(IDL.Text),
+              'eloRating' : IDL.Opt(IDL.Nat),
+              'stats' : IDL.Record({
+                'stability' : IDL.Nat,
+                'speed' : IDL.Nat,
+                'overallRating' : IDL.Nat,
+                'acceleration' : IDL.Nat,
+                'powerCore' : IDL.Nat,
+              }),
+              'preferredTerrain' : IDL.Opt(Terrain),
+              'faction' : IDL.Opt(FactionType),
+              'career' : IDL.Record({
+                'wins' : IDL.Nat,
+                'podiums' : IDL.Nat,
+                'racesEntered' : IDL.Nat,
+                'totalEarnings' : IDL.Nat,
+              }),
+              'raceClass' : IDL.Opt(RaceClass),
+            })
+          ),
+        ],
+        ['query'],
+      ),
+    'get_bot_profiles_batch' : IDL.Func(
+        [IDL.Vec(IDL.Nat)],
+        [
+          IDL.Vec(
             IDL.Record({
               'tokenIndex' : IDL.Nat,
               'owner' : IDL.Opt(IDL.Principal),
@@ -1204,6 +1235,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'web_deregister_bot' : IDL.Func([IDL.Nat], [Result_1], []),
     'web_enter_race' : IDL.Func([IDL.Nat, IDL.Nat], [Result_1], []),
+    'web_full_maintenance' : IDL.Func([IDL.Nat], [Result_1], []),
     'web_get_bot_details' : IDL.Func([IDL.Nat], [Result_3], []),
     'web_get_bot_details_batch' : IDL.Func(
         [IDL.Vec(IDL.Nat)],
@@ -1251,6 +1283,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'web_get_starred_bots' : IDL.Func([], [IDL.Vec(IDL.Nat)], ['query']),
     'web_get_user_inventory' : IDL.Func([], [UserInventory], ['query']),
     'web_initialize_bot' : IDL.Func(
         [IDL.Nat, IDL.Opt(IDL.Text)],
@@ -1398,6 +1431,7 @@ export const idlFactory = ({ IDL }) => {
     'web_recharge_bot' : IDL.Func([IDL.Nat], [Result_1], []),
     'web_repair_bot' : IDL.Func([IDL.Nat], [Result_1], []),
     'web_respec_bot' : IDL.Func([IDL.Nat, IDL.Vec(IDL.Text)], [Result_2], []),
+    'web_set_starred_bots' : IDL.Func([IDL.Vec(IDL.Nat)], [Result_1], []),
     'web_start_scavenging' : IDL.Func(
         [IDL.Nat, IDL.Text, IDL.Opt(IDL.Nat)],
         [Result_1],

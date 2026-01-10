@@ -18,19 +18,15 @@ function isPlugAgent(identityOrAgent: any): boolean {
 }
 
 // Helper to get racing actor
+// For Plug users, we use pre-created actors from login to avoid duplicate requests
 async function getActor(identityOrAgent?: IdentityOrAgent): Promise<PokedBotsRacing._SERVICE> {
-  if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
-    // Check if Plug is still connected before calling createActor (which can trigger popup)
-    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
-    if (!isConnected) {
-      throw new Error('Plug session expired. Please reconnect.');
-    }
-    const canisterId = getCanisterId('POKEDBOTS_RACING');
-    return await (globalThis as any).window.ic.plug.createActor({
-      canisterId,
-      interfaceFactory: PokedBotsRacing.idlFactory,
-    });
+  // Check if this is a Plug user with pre-created actors
+  if (isPlugAgent(identityOrAgent) && (identityOrAgent as any)._plugRacingActor) {
+    console.log('[getActor] Using pre-created Plug racing actor');
+    return (identityOrAgent as any)._plugRacingActor;
   }
+  
+  // Fallback: standard Identity
   return getRacingActor(identityOrAgent as Identity | undefined);
 }
 

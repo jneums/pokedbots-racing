@@ -592,6 +592,9 @@ export interface McpServer {
   >,
   'web_recharge_bot' : ActorMethod<[bigint], Result_1>,
   'web_repair_bot' : ActorMethod<[bigint], Result_1>,
+  'web_full_maintenance' : ActorMethod<[bigint], Result_1>,
+  'web_get_starred_bots' : ActorMethod<[], Array<bigint>>,
+  'web_set_starred_bots' : ActorMethod<[Array<bigint>], Result_1>,
   'web_start_scavenging' : ActorMethod<
     [bigint, string, [] | [bigint]],
     Result_1

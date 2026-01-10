@@ -40,6 +40,15 @@ export const useAuthStore = create<AuthStore>((set: any, get: any) => ({
     
     try {
       const user = await authService.login(provider);
+      
+      // For Plug users, attach pre-created actors to the agent for API functions
+      if (user.provider === 'plug' && user.plugActors) {
+        console.log('[Auth] Attaching Plug actors to agent');
+        (user.agent as any)._plugRacingActor = user.plugActors.racing;
+        (user.agent as any)._plugNFTsActor = user.plugActors.nfts;
+        (user.agent as any)._plugLedgerActor = user.plugActors.ledger;
+      }
+      
       set({ 
         user, 
         isAuthenticated: true, 
@@ -65,14 +74,19 @@ export const useAuthStore = create<AuthStore>((set: any, get: any) => ({
   },
 
   logout: async () => {
-    await authService.logout();
+    // Clear user state FIRST before invalidating queries
+    // This prevents queries from running with stale auth during logout
     set({ 
       user: null, 
       isAuthenticated: false, 
       error: null 
     });
     
-    // Invalidate all React Query caches after logout
+    // Then perform actual logout (clears storage)
+    await authService.logout();
+    
+    // Finally, invalidate all React Query caches
+    // Queries will now see isAuthenticated=false and won't execute
     const invalidate = get().invalidateQueries;
     if (invalidate) {
       invalidate();
@@ -112,12 +126,23 @@ export const useAuthStore = create<AuthStore>((set: any, get: any) => ({
     const principal = authService.getPrincipal();
     
     if (isAuth && agent && principal) {
+      const user = {
+        principal,
+        agent,
+        provider: authService.getProvider() || 'identity',
+        plugActors: (authService as any).currentUser?.plugActors,
+      };
+      
+      // For Plug users, attach pre-created actors to the agent
+      if (user.provider === 'plug' && user.plugActors) {
+        console.log('[Auth] Attaching Plug actors to agent during init');
+        (user.agent as any)._plugRacingActor = user.plugActors.racing;
+        (user.agent as any)._plugNFTsActor = user.plugActors.nfts;
+        (user.agent as any)._plugLedgerActor = user.plugActors.ledger;
+      }
+      
       useAuthStore.setState({
-        user: {
-          principal,
-          agent,
-          provider: authService.getProvider() || 'identity',
-        },
+        user,
         isAuthenticated: true,
         isLoading: false,
       });

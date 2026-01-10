@@ -73,52 +73,28 @@ function isPlugAgent(identityOrAgent: any): boolean {
 }
 
 async function getRacingActorFromIdentity(identityOrAgent: IdentityOrAgent): Promise<PokedBotsRacing._SERVICE> {
-  // Check if it's a Plug agent - use window.ic.plug.createActor
-  if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
-    // Check if Plug is still connected before calling createActor (which can trigger popup)
-    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
-    if (!isConnected) {
-      throw new Error('Plug session expired. Please reconnect.');
-    }
-    const canisterId = getCanisterId('POKEDBOTS_RACING');
-    return await (globalThis as any).window.ic.plug.createActor({
-      canisterId,
-      interfaceFactory: PokedBotsRacing.idlFactory,
-    });
+  // Check if this is a Plug user with pre-created actors
+  if (isPlugAgent(identityOrAgent) && (identityOrAgent as any)._plugRacingActor) {
+    console.log('[getRacingActorFromIdentity] Using pre-created Plug racing actor');
+    return (identityOrAgent as any)._plugRacingActor;
   }
   return getRacingActor(identityOrAgent);
 }
 
 async function getNFTsActorFromIdentity(identityOrAgent: IdentityOrAgent): Promise<PokedBotsNFTs._SERVICE> {
-  // Check if it's a Plug agent - use window.ic.plug.createActor
-  if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
-    // Check if Plug is still connected before calling createActor (which can trigger popup)
-    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
-    if (!isConnected) {
-      throw new Error('Plug session expired. Please reconnect.');
-    }
-    const canisterId = getCanisterId('POKEDBOTS_NFTS');
-    return await (globalThis as any).window.ic.plug.createActor({
-      canisterId,
-      interfaceFactory: PokedBotsNFTs.idlFactory,
-    });
+  // Check if this is a Plug user with pre-created actors
+  if (isPlugAgent(identityOrAgent) && (identityOrAgent as any)._plugNFTsActor) {
+    console.log('[getNFTsActorFromIdentity] Using pre-created Plug NFTs actor');
+    return (identityOrAgent as any)._plugNFTsActor;
   }
   return getNFTsActor(identityOrAgent);
 }
 
 async function getLedgerActorFromIdentity(identityOrAgent: IdentityOrAgent): Promise<Ledger._SERVICE> {
-  // Check if it's a Plug agent - use window.ic.plug.createActor
-  if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
-    // Check if Plug is still connected before calling createActor (which can trigger popup)
-    const isConnected = await (globalThis as any).window.ic.plug.isConnected();
-    if (!isConnected) {
-      throw new Error('Plug session expired. Please reconnect.');
-    }
-    const canisterId = getCanisterId('ICP_LEDGER');
-    return await (globalThis as any).window.ic.plug.createActor({
-      canisterId,
-      interfaceFactory: Ledger.idlFactory,
-    });
+  // Check if this is a Plug user with pre-created actors
+  if (isPlugAgent(identityOrAgent) && (identityOrAgent as any)._plugLedgerActor) {
+    console.log('[getLedgerActorFromIdentity] Using pre-created Plug ledger actor');
+    return (identityOrAgent as any)._plugLedgerActor;
   }
   return getLedgerActor(identityOrAgent);
 }

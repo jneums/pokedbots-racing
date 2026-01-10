@@ -43,9 +43,13 @@ export function WalletConnect() {
     setConnectingProvider(provider);
     try {
       await login(provider);
+      // Close dialog on successful login
       setIsOpen(false);
     } catch (err) {
       console.error('Login failed:', err);
+      // Close dialog on error too - user can see error in auth state
+      // and try again by clicking Connect Wallet button
+      setIsOpen(false);
       // Error is already in the useAuth state
     } finally {
       setConnectingProvider(null);

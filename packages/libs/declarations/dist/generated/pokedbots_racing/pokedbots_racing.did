@@ -580,7 +580,7 @@ type McpServer =
            totalDistance: nat;
            trackId: nat;
          };
-      }) query;
+      });
    /// Debug: Test simulate a race with specific bots and track
    /// Returns backend-calculated times for validation
    debug_test_simulation: (tokenIndexes: vec nat, trackId: nat, trackSeed:
@@ -599,7 +599,7 @@ type McpServer =
                stability: nat;
              };
             tokenIndex: nat;
-          };}) query;
+          };});
    /// Decode EXT token identifier to get token index (public query)
    decode_token_identifier: (tokenIdentifier: text) -> (nat) query;
    delete_events_and_races: (eventIds: vec nat) -> (text);
@@ -618,6 +618,34 @@ type McpServer =
    /// Get public bot profile (stats + career, no sensitive info like battery/condition)
    get_bot_profile: (tokenIndex: nat) ->
     (opt
+      record {
+        career:
+         record {
+           podiums: nat;
+           racesEntered: nat;
+           totalEarnings: nat;
+           wins: nat;
+         };
+        eloRating: opt nat;
+        faction: opt FactionType;
+        isInitialized: bool;
+        name: opt text;
+        owner: opt principal;
+        preferredTerrain: opt Terrain;
+        raceClass: opt RaceClass;
+        stats:
+         record {
+           acceleration: nat;
+           overallRating: nat;
+           powerCore: nat;
+           speed: nat;
+           stability: nat;
+         };
+        tokenIndex: nat;
+      }) query;
+   /// Batch get bot profiles (efficient for loading multiple bots at once)
+   get_bot_profiles_batch: (tokenIndices: vec nat) ->
+    (vec
       record {
         career:
          record {
@@ -1017,6 +1045,8 @@ type McpServer =
    web_deregister_bot: (tokenIndex: nat) -> (Result_1);
    /// Enter a race (with ICRC-2 payment for entry fee)
    web_enter_race: (raceId: nat, tokenIndex: nat) -> (Result_1);
+   /// Full Maintenance - combines recharge and repair in a single transaction (0.15 ICP + fee via ICRC-2)
+   web_full_maintenance: (tokenIndex: nat) -> (Result_1);
    /// Get detailed stats for a specific bot
    web_get_bot_details: (tokenIndex: nat) -> (Result_3);
    /// Get bot details for multiple token indices (query call for performance)
@@ -1058,6 +1088,8 @@ type McpServer =
                            prizes: float64;
                          };
      }) query;
+   /// Get user's starred bots
+   web_get_starred_bots: () -> (vec nat) query;
    /// Get user's parts inventory
    web_get_user_inventory: () -> (UserInventory) query;
    /// Initialize a bot for racing (web equivalent of garage_initialize_pokedbot)
@@ -1204,6 +1236,8 @@ type McpServer =
    /// statsToStrip: Array of stat names to reset (["speed", "powerCore", "acceleration", "stability"])
    /// Empty array strips all stats (backward compatible)
    web_respec_bot: (tokenIndex: nat, statsToStrip: vec text) -> (Result_2);
+   /// Set user's starred bots (replaces entire list)
+   web_set_starred_bots: (starredBots: vec nat) -> (Result_1);
    /// Start a scavenging mission (web method)
    web_start_scavenging: (tokenIndex: nat, zone: text, durationMinutes:
     opt nat) -> (Result_1);

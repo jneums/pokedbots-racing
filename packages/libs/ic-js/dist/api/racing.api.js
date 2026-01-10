@@ -1,7 +1,5 @@
 // packages/libs/ic-js/src/api/racing.api.ts
 import { getRacingActor } from '../actors.js';
-import { PokedBotsRacing } from '@pokedbots-racing/declarations';
-import { getCanisterId } from '../config.js';
 // Helper function to detect if this is a Plug agent
 // Plug agents are HttpAgent instances with specific structure, not standard Identity objects
 function isPlugAgent(identityOrAgent) {
@@ -14,21 +12,14 @@ function isPlugAgent(identityOrAgent) {
         typeof identityOrAgent.getPrincipal === 'function';
 }
 // Helper to get racing actor from Identity or Plug agent
+// For Plug users, we use pre-created actors from login to avoid duplicate requests
 async function getActor(identityOrAgent) {
-    // Check if it's a Plug agent - use window.ic.plug.createActor
-    if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && globalThis.window?.ic?.plug?.createActor) {
-        // Check if Plug is still connected before calling createActor (which can trigger popup)
-        const isConnected = await globalThis.window.ic.plug.isConnected();
-        if (!isConnected) {
-            throw new Error('Plug session expired. Please reconnect.');
-        }
-        const canisterId = getCanisterId('POKEDBOTS_RACING');
-        return await globalThis.window.ic.plug.createActor({
-            canisterId,
-            interfaceFactory: PokedBotsRacing.idlFactory,
-        });
+    // Check if this is a Plug user with pre-created actors
+    if (isPlugAgent(identityOrAgent) && identityOrAgent._plugRacingActor) {
+        console.log('[getActor] Using pre-created Plug racing actor');
+        return identityOrAgent._plugRacingActor;
     }
-    // It's a standard Identity - use our standard actor creation
+    // Fallback: standard Identity
     return getRacingActor(identityOrAgent);
 }
 /**
@@ -96,6 +87,17 @@ export const getBotProfile = async (tokenIndex, identity) => {
     const racingActor = await getActor(identity);
     const result = await racingActor.get_bot_profile(BigInt(tokenIndex));
     return result.length > 0 ? (result[0] ?? null) : null;
+};
+/**
+ * Fetches multiple bot profiles in a single query (efficient batch operation)
+ * @param tokenIndices Array of token indices to fetch profiles for
+ * @param identity Optional identity to use for the actor
+ * @returns An array of bot profiles
+ */
+export const getBotProfilesBatch = async (tokenIndices, identity) => {
+    const racingActor = await getActor(identity);
+    const result = await racingActor.get_bot_profiles_batch(tokenIndices.map(BigInt));
+    return result;
 };
 /**
  * Fetches upcoming scheduled race events with race summaries.

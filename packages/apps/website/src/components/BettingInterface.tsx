@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlaceBet, useGetBettingPool } from '@/hooks/useBetting';
-import { useGetBotProfile } from '@/hooks/useRacing';
+import { useGetBotProfilesBatch } from '@/hooks/useRacing';
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
 import { Link } from 'react-router-dom';
 import type { BetType } from '@pokedbots-racing/ic-js';
@@ -72,11 +72,11 @@ function getStatusBadge(status: any) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
-function BotName({ tokenIndex }: { tokenIndex: number }) {
-  const { data: botProfile } = useGetBotProfile(tokenIndex);
-  
-  if (botProfile?.name && botProfile.name.length > 0 && botProfile.name[0]) {
-    return <>{botProfile.name[0]}</>;
+
+// Display component for batch-fetched profiles
+function BotNameDisplay({ tokenIndex, profile }: { tokenIndex: number; profile?: any }) {
+  if (profile?.name && profile.name.length > 0 && profile.name[0]) {
+    return <>{profile.name[0]}</>;
   }
   
   return <>Bot #{tokenIndex}</>;
@@ -90,6 +90,10 @@ export function BettingInterface({ raceId, entryDeadline, raceStatus }: BettingI
   
   // Backend returns array or object, normalize it
   const poolInfo = Array.isArray(poolInfoRaw) ? poolInfoRaw[0] : poolInfoRaw;
+
+  // Fetch bot profiles in batch for all entrants
+  const entrantIndices = poolInfo?.entrants ? poolInfo.entrants.map((idx: bigint) => Number(idx)) : [];
+  const { data: botProfiles = [] } = useGetBotProfilesBatch(entrantIndices);
 
   // Extract status string from Motoko variant format
   const getStatusString = (status: any): string => {
@@ -311,6 +315,7 @@ export function BettingInterface({ raceId, entryDeadline, raceStatus }: BettingI
                   selectedBot={selectedBot}
                   onSelect={setSelectedBot}
                   oddsType="win"
+                  botProfiles={botProfiles}
                 />
               </TabsContent>
 
@@ -320,6 +325,7 @@ export function BettingInterface({ raceId, entryDeadline, raceStatus }: BettingI
                   selectedBot={selectedBot}
                   onSelect={setSelectedBot}
                   oddsType="place"
+                  botProfiles={botProfiles}
                 />
               </TabsContent>
 
@@ -329,6 +335,7 @@ export function BettingInterface({ raceId, entryDeadline, raceStatus }: BettingI
                   selectedBot={selectedBot}
                   onSelect={setSelectedBot}
                   oddsType="show"
+                  botProfiles={botProfiles}
                 />
               </TabsContent>
             </Tabs>
@@ -403,9 +410,10 @@ interface EntrantsListProps {
   onSelect: (bot: number) => void;
   oddsType: 'win' | 'place' | 'show';
   readonly?: boolean;
+  botProfiles?: any[];
 }
 
-function EntrantsList({ entrants, selectedBot, onSelect, oddsType, readonly = false }: EntrantsListProps) {
+function EntrantsList({ entrants, selectedBot, onSelect, oddsType, readonly = false, botProfiles = [] }: EntrantsListProps) {
   const oddsKey = `${oddsType}_odds`;
   const poolKey = `${oddsType}_pool_icp`;
 
@@ -439,7 +447,7 @@ function EntrantsList({ entrants, selectedBot, onSelect, oddsType, readonly = fa
                 />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">
-                    <BotName tokenIndex={entrant.token_index} />
+                    <BotNameDisplay tokenIndex={entrant.token_index} profile={botProfiles.find(p => p && Number(p.tokenIndex) === entrant.token_index)} />
                   </div>
                   <div className="text-sm text-muted-foreground">
                     {pool !== '0.00' ? `${pool} ICP wagered` : 'No bets yet'}

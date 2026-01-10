@@ -14,6 +14,7 @@ declare global {
         requestConnect: (options?: { whitelist?: string[]; host?: string }) => Promise<boolean>;
         isConnected: (options?: { host?: string }) => Promise<boolean>;
         createAgent: (options?: { whitelist?: string[]; host?: string }) => Promise<any>;
+        createActor: (options: { canisterId: string; interfaceFactory: any }) => Promise<any>;
         agent: any;
         getPrincipal: () => Promise<any>;
         disconnect: () => Promise<void>;
@@ -25,6 +26,7 @@ declare global {
 export type WalletProvider = 'identity' | 'nfid' | 'plug';
 
 const STORAGE_KEY = 'pokedbots_auth';
+const PLUG_CONNECT_TIMEOUT = 60000; // 60 seconds timeout for Plug operations
 
 interface StoredAuth {
   provider: WalletProvider;
@@ -32,10 +34,28 @@ interface StoredAuth {
   timestamp: number;
 }
 
+/**
+ * Wrap a promise with a timeout
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    ),
+  ]);
+}
+
 export interface UserObject {
   principal: string;
   agent: Identity;
   provider: string;
+  // For Plug wallet, we pre-create actors during login to avoid duplicate requests
+  plugActors?: {
+    racing?: any;
+    nfts?: any;
+    ledger?: any;
+  };
 }
 
 export class AuthService {
@@ -99,9 +119,10 @@ export class AuthService {
         
         // Only check connection status during initialization
         // Note: isConnected should not trigger popup, but if disconnected we silently clear storage
+        // Don't pass host parameter to isConnected() - matches production behavior
         let isConnected = false;
         try {
-          isConnected = await window.ic.plug.isConnected({ host: this.host });
+          isConnected = await window.ic.plug.isConnected();
         } catch (error) {
           // If isConnected fails (e.g., Plug locked/disconnected), silently clear storage
           console.log('[Auth] Plug isConnected check failed, clearing storage:', error);
@@ -120,10 +141,36 @@ export class AuthService {
           
           try {
             const principal = await agent.getPrincipal();
+            
+            console.log('[Auth] Re-creating Plug actors for restored session...');
+            
+            // Re-create actors for restored session
+            const [PokedBotsRacing, PokedBotsNFTs, Ledger] = await Promise.all([
+              import('@pokedbots-racing/declarations').then(m => m.PokedBotsRacing),
+              import('@pokedbots-racing/declarations').then(m => m.PokedBotsNFTs),
+              import('@pokedbots-racing/declarations').then(m => m.Ledger),
+            ]);
+
+            const plugActors = {
+              racing: await window.ic.plug.createActor({
+                canisterId: whitelist[1],
+                interfaceFactory: PokedBotsRacing.idlFactory,
+              }),
+              nfts: await window.ic.plug.createActor({
+                canisterId: whitelist[0],
+                interfaceFactory: PokedBotsNFTs.idlFactory,
+              }),
+              ledger: await window.ic.plug.createActor({
+                canisterId: whitelist[2],
+                interfaceFactory: Ledger.idlFactory,
+              }),
+            };
+            
             this.currentUser = {
               principal: principal.toText(),
               agent: agent,
               provider: 'plug',
+              plugActors,
             };
             console.log('[Auth] Restored Plug session:', this.currentUser.principal);
             return;
@@ -259,36 +306,80 @@ export class AuthService {
     }
 
     // Check if already connected (e.g., user just unlocked Plug)
-    let isConnected = false;
-    try {
-      isConnected = await window.ic.plug.isConnected({ host: this.host });
-    } catch (error) {
-      console.log('Error checking Plug connection:', error);
-    }
+    // Note: Don't pass host to isConnected() - matches production behavior
+    const isConnected = await withTimeout(
+      window.ic.plug.isConnected(),
+      PLUG_CONNECT_TIMEOUT,
+      'Plug connection check timed out'
+    );
 
-    // Only request connection if not already connected
-    if (!isConnected) {
-      const connected = await window.ic.plug.requestConnect({ whitelist, host: this.host });
+    // Match production logic: if connected, create agent; if not, request connection
+    if (isConnected) {
+      console.log('Plug already connected, creating agent...');
+      await withTimeout(
+        window.ic.plug.createAgent({ whitelist, host: this.host }),
+        PLUG_CONNECT_TIMEOUT,
+        'Plug agent creation timed out. Please try again.'
+      );
+    } else {
+      console.log('Plug not connected, requesting connection...');
+      const connected = await withTimeout(
+        window.ic.plug.requestConnect({ whitelist, host: this.host }),
+        PLUG_CONNECT_TIMEOUT,
+        'Plug connection request timed out. Please try again.'
+      );
       if (!connected) {
         throw new Error('User denied Plug wallet connection');
       }
-    } else {
-      console.log('Plug already connected, creating agent...');
-      // Ensure agent is created even if already connected
-      await window.ic.plug.createAgent({ whitelist, host: this.host });
     }
-  
 
+    // Get agent and principal after connection/agent creation
     const agent = window.ic.plug.agent;
+    if (!agent) {
+      throw new Error('Plug agent not available after connection');
+    }
+
     const principal = await agent.getPrincipal();
+
+    console.log('[Auth] Creating Plug actors once during login...');
+    
+    // Pre-create actors for all canisters we'll need
+    // This prevents duplicate createActor calls later
+    const [PokedBotsRacing, PokedBotsNFTs, Ledger] = await Promise.all([
+      import('@pokedbots-racing/declarations').then(m => m.PokedBotsRacing),
+      import('@pokedbots-racing/declarations').then(m => m.PokedBotsNFTs),
+      import('@pokedbots-racing/declarations').then(m => m.Ledger),
+    ]);
+
+    const racingCanisterId = whitelist[1]; // p6nop-vyaaa-aaaai-q4djq-cai
+    const nftsCanisterId = whitelist[0]; // bzsui-sqaaa-aaaah-qce2a-cai
+    const ledgerCanisterId = whitelist[2]; // ryjl3-tyaaa-aaaaa-aaaba-cai
+
+    const plugActors = {
+      racing: await window.ic.plug.createActor({
+        canisterId: racingCanisterId,
+        interfaceFactory: PokedBotsRacing.idlFactory,
+      }),
+      nfts: await window.ic.plug.createActor({
+        canisterId: nftsCanisterId,
+        interfaceFactory: PokedBotsNFTs.idlFactory,
+      }),
+      ledger: await window.ic.plug.createActor({
+        canisterId: ledgerCanisterId,
+        interfaceFactory: Ledger.idlFactory,
+      }),
+    };
+
+    console.log('[Auth] Plug actors created successfully');
 
     this.currentUser = {
       principal: principal.toText(),
-      agent: agent,
+      agent: agent, // Keep agent for compatibility but prefer plugActors
       provider: 'plug',
+      plugActors,
     };
 
-    console.log('Plug connected!', this.currentUser);
+    console.log('Plug connected!', this.currentUser.principal);
     this.saveToStorage('plug', principal.toText());
     return this.currentUser;
   }
@@ -297,14 +388,20 @@ export class AuthService {
    * Logout the current user
    */
   async logout(): Promise<void> {
-    // Handle Plug logout separately
-    if (this.currentUser?.provider === 'plug' && window.ic?.plug?.disconnect) {
-      await window.ic.plug.disconnect();
+    // For Plug: Don't call disconnect() as it triggers popup
+    // Just clear local state - user can disconnect from Plug extension directly
+    if (this.currentUser?.provider === 'plug') {
+      console.log('[Auth] Logging out Plug user (clearing local state only)');
+      this.currentUser = null;
+      this.clearStorage();
     } else if (this.authClient) {
       await this.authClient.logout();
+      this.currentUser = null;
+      this.clearStorage();
+    } else {
+      this.currentUser = null;
+      this.clearStorage();
     }
-    this.currentUser = null;
-    this.clearStorage();
   }
 
   /**

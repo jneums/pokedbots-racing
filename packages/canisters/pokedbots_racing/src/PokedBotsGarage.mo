@@ -789,15 +789,33 @@ module {
               let finalBatteryDrain = Nat.min(botStats.battery, Int.abs(totalBatteryDrain));
 
               // Condition wear scales linearly with distance
-              // Formula: 1.2 condition per km (e.g., 4km = 4.8, 10km = 12, 20km = 24)
+              // Formula: 5.0 condition per km (e.g., 4km = 20, 10km = 50, 20km = 100)
               // All racers pay the same - position doesn't affect wear
-              let baseConditionWear = Float.toInt(Float.fromInt(distance) * 1.2);
+              let baseConditionWear = Float.toInt(Float.fromInt(distance) * 5.0);
 
               // Terrain modifier already calculated from track composition above
 
-              // STAT SCALING: Higher speed/stability = higher condition wear
-              // Use same multiplier as battery drain for consistency
-              let totalConditionWear = Float.toInt(Float.fromInt(baseConditionWear) * terrainConditionMod * statScalingMultiplier);
+              // STABILITY REDUCES CONDITION WEAR: Higher stability = more durable
+              // At stability 1 (min): 100% wear (1.0x multiplier)
+              // At stability 20 (avg beginner): ~85% wear (0.85x multiplier)
+              // At stability 40 (solid): ~79% wear (0.79x multiplier)
+              // At stability 80 (god mode): ~74% wear (0.74x multiplier)
+              // At stability 100 (max): ~70% wear (0.70x multiplier) - same as power core efficiency
+              // Formula: multiplier = 1.0 - (0.30 * log(stability) / log(100))
+              let normalizedStability = Float.max(1.0, Float.fromInt(stability));
+              let stabilityLogEffect = Float.min(0.30, 0.30 * (Float.log(normalizedStability) / Float.log(100.0)));
+              let stabilityProtection = 1.0 - stabilityLogEffect;
+
+              // Faction-based condition drain modifiers
+              let factionConditionMultiplier = switch (botStats.faction) {
+                case (#UltimateMaster) { 0.75 }; // -25% decay
+                case (#Dead) { 0.85 }; // -15% decay
+                case (#Wild) { 0.60 }; // -40% decay (in scavenging, less in racing)
+                case (#Animal) { 0.85 }; // -15% decay
+                case (_) { 1.0 }; // Standard decay
+              };
+
+              let totalConditionWear = Float.toInt(Float.fromInt(baseConditionWear) * terrainConditionMod * stabilityProtection * factionConditionMultiplier);
               let finalConditionWear = Nat.min(botStats.condition, Int.abs(totalConditionWear));
 
               // CONSUME overcharge and world buff after race
@@ -2413,7 +2431,7 @@ module {
       {
         basePartsPerHour = 10.0; // 10 parts per hour base
         baseBatteryDrain = 20.0; // 20 battery drain per hour base
-        baseConditionLoss = 8.0; // 8 condition loss per hour base
+        baseConditionLoss = 22.0; // 22 condition loss per hour base
       };
     };
 
@@ -2625,13 +2643,15 @@ module {
         };
         // Repair Bay: Double battery drain compared to safe zone, but restores condition instead of gathering parts
         // Negative condition value = restoration instead of loss
+        // Adjusted multiplier to compensate for increased base rate (22.0 vs old 8.0)
         case (#RepairBay) {
-          { battery = 2.0; condition = -3.0; parts = 0.0 };
+          { battery = 2.0; condition = -1.1; parts = 0.0 };
         };
         // Charging Station: No battery drain, restores battery instead. No condition penalty.
         // Negative battery value = restoration instead of loss
+        // Base rate: -0.25 per hour (25% speed, 4x slower)
         case (#ChargingStation) {
-          { battery = -1.0; condition = 0.0; parts = 0.0 };
+          { battery = -0.25; condition = 0.0; parts = 0.0 };
         };
       };
     };
@@ -2852,24 +2872,34 @@ module {
               // Synergy bonuses: apply collection-wide bonuses to parts and drain
               let partsThisAccumulation = rates.basePartsPerHour * hoursElapsed * zoneMultipliers.parts * factionBonus.partsMultiplier * speedBonus * durationBonus * synergies.yieldMultipliers.scavengingParts;
 
-              // Charging curve: stepped rates like real fast chargers
-              // 4x at <25% → 3x at <50% → 2x at <75% → 1x at 75-100%
+              // Charging curve: INVERTED - slower at low, faster at high
+              // Rewards keeping battery topped up, punishes letting it drain
+              // 1x at <25% (slowest) → 2x at <50% → 3x at <75% → 4x at 75-100% (fastest)
               let chargingCurve = if (mission.zone == #ChargingStation) {
                 if (botStats.battery < 25) {
-                  4.0;
-                } else if (botStats.battery < 50) {
-                  3.0;
-                } else if (botStats.battery < 75) {
-                  2.0;
-                } else {
                   1.0;
+                } else if (botStats.battery < 50) {
+                  2.0;
+                } else if (botStats.battery < 75) {
+                  3.0;
+                } else {
+                  4.0;
                 };
               } else {
                 1.0; // No curve for non-charging zones
               };
 
               let batteryDrain = rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus * chargingCurve / durationBonus * synergies.drainMultipliers.scavengingDrain;
-              let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionBonus.conditionMultiplier * stabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
+
+              // Faction condition multiplier should only apply to damage, not restoration
+              // In RepairBay, baseConditionLoss is negative (restoration), so we don't apply faction penalty
+              let factionConditionMult = if (rates.baseConditionLoss < 0.0) {
+                1.0; // No faction modifier for restoration
+              } else {
+                factionBonus.conditionMultiplier; // Apply faction modifier for damage
+              };
+
+              let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionConditionMult * stabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
 
               // Add variance to battery and condition costs (±20% random variation)
               // This creates more unpredictable resource management - sometimes lucky, sometimes not
@@ -3167,7 +3197,16 @@ module {
           };
 
           let batteryDrain = rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus * chargingCurve / durationBonus * synergies.drainMultipliers.scavengingDrain;
-          let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionBonus.conditionMultiplier * stabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
+
+          // Faction condition multiplier should only apply to damage, not restoration
+          // In RepairBay, baseConditionLoss is negative (restoration), so we don't apply faction penalty
+          let factionConditionMult = if (rates.baseConditionLoss < 0.0) {
+            1.0; // No faction modifier for restoration
+          } else {
+            factionBonus.conditionMultiplier; // Apply faction modifier for damage
+          };
+
+          let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionConditionMult * stabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
 
           // Add variance to battery and condition costs (±20% random variation) - MATCH UPDATE FUNCTION
           // Use lastAccumulation in seed for deterministic results (must match actual accumulate)

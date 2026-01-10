@@ -46,6 +46,13 @@ export declare const getRaceById: (raceId: number, identity?: Identity) => Promi
  */
 export declare const getBotProfile: (tokenIndex: number, identity?: Identity) => Promise<any>;
 /**
+ * Fetches multiple bot profiles in a single query (efficient batch operation)
+ * @param tokenIndices Array of token indices to fetch profiles for
+ * @param identity Optional identity to use for the actor
+ * @returns An array of bot profiles
+ */
+export declare const getBotProfilesBatch: (tokenIndices: number[], identity?: Identity) => Promise<any[]>;
+/**
  * Fetches upcoming scheduled race events with race summaries.
  * @param daysAhead Number of days ahead to look for events
  * @param identity Optional identity to use for the actor
