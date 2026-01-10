@@ -40,6 +40,79 @@ module {
     divisions : [RaceClass]; // Which classes can enter
   };
 
+  // ===== EVENT REGISTRATION TYPES =====
+
+  // Individual player registration for an event
+  public type EventRegistration = {
+    eventId : Nat;
+    tokenIndex : Nat;
+    owner : Principal;
+    raceClass : RaceClass; // Player's division
+    registeredAt : Int;
+    entryFeePaid : Nat; // Amount paid at registration
+  };
+
+  // Heat allocation strategies for splitting players into races
+  public type HeatAllocationStrategy = {
+    #SnakeDraft;     // Balanced: 1,4,5,8,9... | 2,3,6,7,10...
+    #SkillTiered;    // Group by ELO: Top heat, mid heat, low heat
+    #Random;         // Pure random distribution
+    #TopBottom;      // Segregate extremes: Heat 1 = highest ELO, Heat 2 = lowest ELO
+  };
+
+  // Race template for manual event configuration
+  public type RaceTemplate = {
+    stageName : ?Text;       // Optional: "Qualifying", "Finals", etc.
+    raceClass : RaceClass;   // Which division
+    terrain : Terrain;       // Specific terrain
+    distance : Nat;          // Exact distance in km
+    trackId : ?Nat;          // Optional: Specific track for consistency
+    startOffset : Int;       // Nanoseconds after event scheduledTime
+  };
+
+  // Race creation modes
+  public type RaceCreationMode = {
+    // Automatic: System creates races based on registrations
+    #Automatic : {
+      terrains : [Terrain];  // Pool of terrains to use
+      distanceRange : {      // Random distance per race
+        min : Nat;
+        max : Nat;
+      };
+      racesPerClass : ?Nat;  // Optional: Force specific number of races
+      heatAllocation : HeatAllocationStrategy;
+    };
+    // Manual: Pre-defined exact race schedule
+    #Manual : {
+      raceTemplates : [RaceTemplate];
+      heatAllocation : HeatAllocationStrategy;
+    };
+  };
+
+  // Visibility modes for events
+  public type EventVisibility = {
+    #Public;           // Anyone can register
+    #Private;          // Only invited players
+    #Restricted : {    // Conditional restrictions
+      minElo : ?Nat;
+      maxElo : ?Nat;
+      requiredFaction : ?Text;
+      requiredAchievement : ?Text;
+      allowedBots : ?[Nat];
+      allowedPlayers : ?[Principal];
+    };
+  };
+
+  // Sponsorship tracking
+  public type Sponsorship = {
+    sponsor : Principal;
+    sponsorName : ?Text;
+    amount : Nat; // ICP e8s
+    message : ?Text; // Optional sponsor message
+    timestamp : Int;
+  };
+
+  // Extended event with registration support
   public type ScheduledEvent = {
     eventId : Nat;
     eventType : EventType;
@@ -50,6 +123,30 @@ module {
     metadata : EventMetadata;
     raceIds : [Nat]; // Associated race IDs
     createdAt : Int;
+    
+    // EVENT REGISTRATION
+    registrations : [EventRegistration]; // Who signed up (hidden until close)
+    registrationCounts : {
+      total : Nat;
+      byClass : [(RaceClass, Nat)];
+    };
+    maxRegistrationsPerClass : Nat;
+    cancellationDeadlines : {
+      fullRefund : Int;    // >48h before close
+      halfRefund : Int;    // 24-48h before close
+      quarterRefund : Int; // <24h before close
+    };
+    
+    // RACE CONFIGURATION
+    raceCreationMode : RaceCreationMode;
+    
+    // USER-CREATED EVENTS (optional fields)
+    creator : ?Principal;        // null for platform events
+    creatorName : ?Text;
+    creationFee : Nat;           // 0 for platform events
+    visibility : EventVisibility;
+    invitedParticipants : ?[Principal];
+    sponsorships : [Sponsorship];
   };
 
   // ===== SCHEDULE PATTERNS =====
@@ -167,6 +264,19 @@ module {
       let eventId = nextEventId;
       nextEventId += 1;
 
+      // Calculate cancellation deadlines
+      let fullRefundDeadline = registrationCloses - (48 * 3600 * 1_000_000_000); // 48h before close
+      let halfRefundDeadline = registrationCloses - (24 * 3600 * 1_000_000_000); // 24h before close
+      let quarterRefundDeadline = registrationCloses - (12 * 3600 * 1_000_000_000); // 12h before close
+
+      // Default race creation mode (Automatic with reasonable defaults)
+      let defaultRaceMode : RaceCreationMode = #Automatic({
+        terrains = [#ScrapHeaps, #WastelandSand, #MetalRoads];
+        distanceRange = { min = 10; max = 30 };
+        racesPerClass = null;
+        heatAllocation = #SnakeDraft;
+      });
+
       let event : ScheduledEvent = {
         eventId = eventId;
         eventType = eventType;
@@ -179,6 +289,30 @@ module {
         metadata = metadata;
         raceIds = [];
         createdAt = now;
+        
+        // EVENT REGISTRATION (defaults for platform events)
+        registrations = [];
+        registrationCounts = {
+          total = 0;
+          byClass = [];
+        };
+        maxRegistrationsPerClass = metadata.maxEntries; // Use metadata maxEntries
+        cancellationDeadlines = {
+          fullRefund = fullRefundDeadline;
+          halfRefund = halfRefundDeadline;
+          quarterRefund = quarterRefundDeadline;
+        };
+        
+        // RACE CONFIGURATION
+        raceCreationMode = defaultRaceMode;
+        
+        // USER-CREATED EVENTS (defaults for platform events)
+        creator = null; // Platform event
+        creatorName = null;
+        creationFee = 0;
+        visibility = #Public;
+        invitedParticipants = null;
+        sponsorships = [];
       };
 
       ignore Map.put(events, nhash, eventId, event);
