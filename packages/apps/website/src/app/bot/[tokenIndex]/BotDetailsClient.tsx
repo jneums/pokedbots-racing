@@ -2,7 +2,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { useGetBotProfile, useGetBotRaceHistory } from '@/hooks/useRacing';
+import { useDedicationInfo } from '@/hooks/useGarage';
 import { useBackgrounds } from '@/hooks/useBackgrounds';
 import { useBotBaseStats } from '@/hooks/usePrecomputedStats';
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
@@ -51,12 +53,49 @@ function getRaceClassBadge(raceClass: any): string {
   return 'Unknown';
 }
 
+// Get tier display info (emoji, color gradient)
+function getDedicationTierInfo(tier: number): { emoji: string; gradient: string; textColor: string } {
+  switch (tier) {
+    case 0: return { emoji: '🔰', gradient: 'from-gray-400 to-gray-500', textColor: 'text-gray-400' };
+    case 1: return { emoji: '⭐', gradient: 'from-green-400 to-green-600', textColor: 'text-green-400' };
+    case 2: return { emoji: '🌟', gradient: 'from-blue-400 to-blue-600', textColor: 'text-blue-400' };
+    case 3: return { emoji: '💫', gradient: 'from-purple-400 to-purple-600', textColor: 'text-purple-400' };
+    case 4: return { emoji: '🏆', gradient: 'from-yellow-400 to-orange-500', textColor: 'text-yellow-400' };
+    case 5: return { emoji: '👑', gradient: 'from-pink-500 to-red-500', textColor: 'text-pink-500' };
+    default: return { emoji: '🔰', gradient: 'from-gray-400 to-gray-500', textColor: 'text-gray-400' };
+  }
+}
+
 export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
   const navigate = useNavigate();
   const { data: profile } = useGetBotProfile(Number(tokenIndex));
-  const { data: raceHistory } = useGetBotRaceHistory(Number(tokenIndex), 10);
+  const { 
+    data: raceHistoryData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: isLoadingHistory
+  } = useGetBotRaceHistory(Number(tokenIndex), 10);
   const { data: backgroundData } = useBackgrounds();
+  const { data: dedicationInfo } = useDedicationInfo(Number(tokenIndex));
   const baseStats = useBotBaseStats(Number(tokenIndex));
+  
+  // Flatten all pages of race history
+  const allRaces = raceHistoryData?.pages.flatMap(page => page.races) || [];
+  
+  // Check if there are more races from the last page
+  const lastPage = raceHistoryData?.pages[raceHistoryData.pages.length - 1];
+  const hasMoreRaces = lastPage?.hasMore ?? false;
+  
+  // Debug logging
+  console.log('Race History Debug:', {
+    totalPages: raceHistoryData?.pages.length,
+    totalRaces: allRaces.length,
+    lastPageHasMore: lastPage?.hasMore,
+    lastPageNextRaceId: lastPage?.nextRaceId,
+    hasNextPage,
+    hasMoreRaces
+  });
 
   if (!profile) {
     return (
@@ -314,6 +353,122 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
             </CardContent>
           </Card>
 
+          {/* Dedication System */}
+          {dedicationInfo && (
+            <Card className="border-2 border-primary/20 mt-8">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    {getDedicationTierInfo(dedicationInfo.tier).emoji} Dedication Level
+                  </CardTitle>
+                  <Badge className={`bg-gradient-to-r ${getDedicationTierInfo(dedicationInfo.tier).gradient} text-white`}>
+                    {dedicationInfo.tierName}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Progress to next tier */}
+                  {dedicationInfo.nextTierName && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Progress to {dedicationInfo.nextTierName}</span>
+                        <span className="font-medium">{dedicationInfo.progressPercent}%</span>
+                      </div>
+                      <Progress value={dedicationInfo.progressPercent} className="h-2" />
+                      <p className="text-xs text-muted-foreground text-right">
+                        {dedicationInfo.totalDP.toLocaleString()} / {dedicationInfo.nextTierDP?.toLocaleString()} DP
+                      </p>
+                    </div>
+                  )}
+
+                  {/* DP Breakdown */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-card/50 border border-primary/20 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Total DP</p>
+                      <p className="text-lg font-bold text-primary">{dedicationInfo.totalDP.toLocaleString()}</p>
+                    </div>
+                    <div className="p-3 bg-card/50 border border-primary/20 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Total Invested</p>
+                      <p className="text-lg font-bold text-primary">{dedicationInfo.totalInvestedICP.toFixed(2)} ICP</p>
+                    </div>
+                    <div className="p-3 bg-card/50 border border-primary/20 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Investment DP</p>
+                      <p className="text-lg font-bold text-green-500">{dedicationInfo.investmentDP.toLocaleString()}</p>
+                    </div>
+                    <div className="p-3 bg-card/50 border border-primary/20 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Activity DP</p>
+                      <p className="text-lg font-bold text-blue-500">{dedicationInfo.activityDP.toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  {/* Benefits */}
+                  {dedicationInfo.tier > 0 && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium mb-2">Active Benefits</p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                        {dedicationInfo.benefits.speedBonus > 0 && (
+                          <div className="p-2 bg-green-500/10 border border-green-500/30 rounded">
+                            ⚡ Speed +{dedicationInfo.benefits.speedBonus}
+                          </div>
+                        )}
+                        {dedicationInfo.benefits.accelerationBonus > 0 && (
+                          <div className="p-2 bg-green-500/10 border border-green-500/30 rounded">
+                            🚀 Accel +{dedicationInfo.benefits.accelerationBonus}
+                          </div>
+                        )}
+                        {dedicationInfo.benefits.powerCoreBonus > 0 && (
+                          <div className="p-2 bg-green-500/10 border border-green-500/30 rounded">
+                            ⚙️ Power +{dedicationInfo.benefits.powerCoreBonus}
+                          </div>
+                        )}
+                        {dedicationInfo.benefits.stabilityBonus > 0 && (
+                          <div className="p-2 bg-green-500/10 border border-green-500/30 rounded">
+                            🛡️ Stability +{dedicationInfo.benefits.stabilityBonus}
+                          </div>
+                        )}
+                        {dedicationInfo.benefits.terrainBonusPercent > 0 && (
+                          <div className="p-2 bg-blue-500/10 border border-blue-500/30 rounded">
+                            🏔️ Terrain +{dedicationInfo.benefits.terrainBonusPercent}%
+                          </div>
+                        )}
+                        {dedicationInfo.benefits.scavengingYieldMult > 1 && (
+                          <div className="p-2 bg-yellow-500/10 border border-yellow-500/30 rounded">
+                            🔧 Scavenge x{dedicationInfo.benefits.scavengingYieldMult.toFixed(2)}
+                          </div>
+                        )}
+                        {dedicationInfo.benefits.upgradeDiscountMult < 1 && (
+                          <div className="p-2 bg-purple-500/10 border border-purple-500/30 rounded">
+                            💰 Upgrades -{Math.round((1 - dedicationInfo.benefits.upgradeDiscountMult) * 100)}%
+                          </div>
+                        )}
+                        {dedicationInfo.benefits.rechargeCooldownMult < 1 && (
+                          <div className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded">
+                            ⏱️ Recharge -{Math.round((1 - dedicationInfo.benefits.rechargeCooldownMult) * 100)}%
+                          </div>
+                        )}
+                        {dedicationInfo.benefits.repairCooldownMult < 1 && (
+                          <div className="p-2 bg-orange-500/10 border border-orange-500/30 rounded">
+                            🔧 Repair -{Math.round((1 - dedicationInfo.benefits.repairCooldownMult) * 100)}%
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Info for tier 0 */}
+                  {dedicationInfo.tier === 0 && (
+                    <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                      <p className="text-sm text-muted-foreground">
+                        💡 <strong>Earn Dedication Points</strong> by investing in your bot (upgrades, repairs, recharges) and competing in activities (races, scavenging). Higher tiers unlock stat bonuses and cost reductions!
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Race History */}
           <Card className="border-2 border-primary/20 mt-8">
             <CardHeader>
@@ -325,58 +480,107 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
                   <p className="mb-2">📊 No race data available</p>
                   <p className="text-sm">This bot needs to be initialized and enter races to build a history.</p>
                 </div>
-              ) : !raceHistory ? (
+              ) : isLoadingHistory ? (
                 <p className="text-center text-muted-foreground">Loading race history...</p>
-              ) : raceHistory.races.length === 0 ? (
+              ) : allRaces.length === 0 ? (
                 <p className="text-center text-muted-foreground">No completed races yet</p>
               ) : (
-                <div className="space-y-2">
-                  {raceHistory.races.map((race: any, idx: number) => {
-                    const position = Number(race.position);
-                    const wasWin = position === 1;
-                    const wasPodium = position > 0 && position <= 3;
-                    
-                    return (
-                      <Link 
-                        key={idx} 
-                        to={`/schedule/${race.eventId}`}
-                        className="block hover:bg-card/70 transition-colors rounded-lg"
+                <>
+                  <div className="space-y-3">
+                    {allRaces.map((race: any, idx: number) => {
+                      const position = Number(race.position);
+                      const wasWin = position === 1;
+                      const wasPodium = position > 0 && position <= 3;
+                      const leaderboardPoints = race.leaderboardPoints || 0;
+                      
+                      return (
+                        <Link 
+                          key={`${race.raceId}-${idx}`}
+                          to={`/schedule/${race.eventId}`}
+                          className="block group"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gradient-to-r from-card/80 to-card/40 border border-primary/20 rounded-lg hover:border-primary/40 hover:from-card hover:to-card/60 transition-all duration-200 shadow-sm hover:shadow-md">
+                            {/* Top row on mobile: Position + Race Info */}
+                            <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                              {/* Position Badge */}
+                              <div className={`flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold ${
+                                wasWin ? 'bg-gradient-to-br from-yellow-500/20 to-yellow-600/20 ring-2 ring-yellow-500/30' :
+                                wasPodium ? 'bg-gradient-to-br from-blue-500/20 to-purple-500/20 ring-2 ring-blue-500/30' :
+                                'bg-card/50 ring-2 ring-primary/20'
+                              }`}>
+                                {position === 1 && '🥇'}
+                                {position === 2 && '🥈'}
+                                {position === 3 && '🥉'}
+                                {position > 3 && <span className="text-base sm:text-lg">#{position}</span>}
+                              </div>
+                              
+                              {/* Race Info */}
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm sm:text-base mb-0.5 sm:mb-1 group-hover:text-primary transition-colors line-clamp-1">
+                                  {race.raceName}
+                                </p>
+                                <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 text-xs text-muted-foreground">
+                                  <span className="whitespace-nowrap">📅 {new Date(Number(race.scheduledTime) / 1_000_000).toLocaleDateString()}</span>
+                                  {race.finalTime && race.finalTime.length > 0 && race.finalTime[0] !== undefined && (
+                                    race.finalTime[0] > 100000 
+                                      ? <span className="text-red-400 font-semibold whitespace-nowrap">• DNF</span>
+                                      : <span className="text-green-400 whitespace-nowrap">• ⏱️ {race.finalTime[0].toFixed(2)}s</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Stats and Rewards - stack on mobile, align right on desktop */}
+                            <div className="flex flex-row sm:flex-col gap-2 items-start sm:items-end justify-between sm:justify-start flex-wrap sm:flex-nowrap">
+                              {race.prizeAmount > 0n && (
+                                <div className="text-xs sm:text-sm font-bold text-green-400 bg-green-500/10 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border border-green-500/20 whitespace-nowrap">
+                                  💰 +{formatICP(BigInt(race.prizeAmount))}
+                                </div>
+                              )}
+                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                <Badge 
+                                  variant={wasWin ? "default" : wasPodium ? "secondary" : "outline"} 
+                                  className="text-xs font-medium px-2 sm:px-2.5 py-0.5"
+                                >
+                                  👥 {race.totalRacers}
+                                </Badge>
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-xs font-semibold px-2 sm:px-2.5 py-0.5 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/30 text-blue-400"
+                                >
+                                  ⭐ +{leaderboardPoints}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Load More Button */}
+                  {hasMoreRaces && (
+                    <div className="mt-6 text-center">
+                      <Button
+                        onClick={() => fetchNextPage()}
+                        disabled={isFetchingNextPage}
+                        variant="outline"
+                        className="w-full sm:w-auto"
                       >
-                        <div className="flex items-center justify-between p-3 bg-card/50 border border-primary/20 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div className="text-xl font-bold w-10 text-center">
-                              {position === 1 && '🥇'}
-                              {position === 2 && '🥈'}
-                              {position === 3 && '🥉'}
-                              {position > 3 && `#${position}`}
-                            </div>
-                            <div>
-                              <p className="font-semibold">{race.raceName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(Number(race.scheduledTime) / 1_000_000).toLocaleDateString()}
-                                {race.finalTime && race.finalTime.length > 0 && race.finalTime[0] !== undefined && (
-                                  race.finalTime[0] > 100000 
-                                    ? <span className="text-red-500 font-bold ml-1">• DNF</span>
-                                    : ` • ${race.finalTime[0].toFixed(2)}s`
-                                )}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            {race.prizeAmount > 0n && (
-                              <p className="text-sm font-bold text-green-500">
-                                +{formatICP(BigInt(race.prizeAmount))} ICP
-                              </p>
-                            )}
-                            <Badge variant={wasWin ? "default" : wasPodium ? "secondary" : "outline"} className="text-xs">
-                              {race.totalRacers} racers
-                            </Badge>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
+                        {isFetchingNextPage ? (
+                          <>
+                            <span className="animate-spin mr-2">⏳</span>
+                            Loading more races...
+                          </>
+                        ) : (
+                          <>
+                            📜 Load More Races
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

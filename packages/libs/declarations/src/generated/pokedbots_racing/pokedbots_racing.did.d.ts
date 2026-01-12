@@ -69,9 +69,19 @@ export interface EventMetadata {
   'name' : string,
   'description' : string,
   'divisions' : Array<RaceClass>,
+  'eventBonusPrize' : bigint,
   'prizePoolBonus' : bigint,
+  'scoringMode' : ScoringMode,
   'entryFee' : bigint,
   'maxEntries' : bigint,
+}
+export interface EventRegistration {
+  'eventId' : bigint,
+  'tokenIndex' : bigint,
+  'owner' : Principal,
+  'entryFeePaid' : bigint,
+  'registeredAt' : bigint,
+  'raceClass' : RaceClass,
 }
 export type EventStatus = { 'Announced' : null } |
   { 'RegistrationClosed' : null } |
@@ -83,6 +93,18 @@ export type EventType = { 'DailySprint' : null } |
   { 'SpecialEvent' : string } |
   { 'WeeklyLeague' : null } |
   { 'MonthlyCup' : null };
+export type EventVisibility = { 'Private' : null } |
+  { 'Public' : null } |
+  {
+    'Restricted' : {
+      'allowedPlayers' : [] | [Array<Principal>],
+      'allowedBots' : [] | [Array<bigint>],
+      'minElo' : [] | [bigint],
+      'requiredFaction' : [] | [string],
+      'requiredAchievement' : [] | [string],
+      'maxElo' : [] | [bigint],
+    }
+  };
 export type FactionType = { 'Bee' : null } |
   { 'Box' : null } |
   { 'Dead' : null } |
@@ -107,6 +129,10 @@ export interface FailedPayout {
 }
 export type HashedApiKey = string;
 export type Header = [string, string];
+export type HeatAllocationStrategy = { 'SkillTiered' : null } |
+  { 'TopBottom' : null } |
+  { 'SnakeDraft' : null } |
+  { 'Random' : null };
 export interface HttpHeader { 'value' : string, 'name' : string }
 export interface HttpRequest {
   'url' : string,
@@ -150,16 +176,24 @@ export type LeaderboardType = { 'AllTime' : null } |
   { 'Monthly' : bigint } |
   { 'Season' : bigint };
 export interface McpServer {
+  'admin_adjust_leaderboard_points' : ActorMethod<[Array<bigint>], string>,
   'admin_clear_active_mission' : ActorMethod<[bigint], string>,
+  'admin_compensate_resimulated_winners' : ActorMethod<[Array<bigint>], string>,
   'admin_create_betting_pool' : ActorMethod<[bigint], Result_1>,
   'admin_get_active_mission' : ActorMethod<[bigint], string>,
+  'admin_get_stat_breakdown' : ActorMethod<[bigint], Result_8>,
+  'admin_rebuild_bot_histories' : ActorMethod<[Array<bigint>], string>,
   'admin_remove_race_entry' : ActorMethod<[bigint, bigint], Result_1>,
+  'admin_resimulate_race' : ActorMethod<[bigint], Result_1>,
+  'admin_resimulate_races_batch' : ActorMethod<[Array<bigint>], string>,
+  'admin_update_prize_amounts' : ActorMethod<[Array<bigint>], string>,
   'admin_update_race_min_entries' : ActorMethod<[bigint, bigint], string>,
   'cancel_actions_by_filter' : ActorMethod<[ActionFilter], CancellationResult>,
   'cancel_actions_by_ids' : ActorMethod<[Array<bigint>], CancellationResult>,
   'cancel_races_by_ids' : ActorMethod<[Array<bigint>], Array<[bigint, string]>>,
   'cleanup_duplicate_race_create_timers' : ActorMethod<[], string>,
   'cleanup_duplicate_recharge_timers' : ActorMethod<[], string>,
+  'clear_event_races' : ActorMethod<[Array<bigint>], string>,
   'clear_reconstitution_traces' : ActorMethod<[], undefined>,
   'create_my_api_key' : ActorMethod<[string, Array<string>], string>,
   'debug_get_all_tracks' : ActorMethod<
@@ -372,6 +406,7 @@ export interface McpServer {
           'scheduledTime' : bigint,
           'totalRacers' : bigint,
           'finalTime' : [] | [number],
+          'leaderboardPoints' : bigint,
           'raceId' : bigint,
           'position' : bigint,
           'eventName' : string,
@@ -564,16 +599,19 @@ export interface McpServer {
     }
   >,
   'recalculate_bot_stats' : ActorMethod<[], string>,
+  'register_for_event' : ActorMethod<[bigint, bigint], Result_1>,
   'revoke_my_api_key' : ActorMethod<[string], undefined>,
   'set_ext_canister' : ActorMethod<[Principal], Result_5>,
   'set_icp_ledger' : ActorMethod<[Principal], Result_5>,
-  'set_owner' : ActorMethod<[Principal], Result_6>,
+  'set_owner' : ActorMethod<[Principal], Result_7>,
   'transformJwksResponse' : ActorMethod<
     [{ 'context' : Uint8Array | number[], 'response' : HttpRequestResult }],
     HttpRequestResult
   >,
+  'trigger_race_creation' : ActorMethod<[], string>,
   'trigger_race_finish' : ActorMethod<[bigint], string>,
   'trigger_race_start' : ActorMethod<[bigint], string>,
+  'unregister_from_event' : ActorMethod<[bigint, bigint], Result_6>,
   'upload_base_stats_batch' : ActorMethod<
     [
       Array<
@@ -747,6 +785,33 @@ export interface McpServer {
       },
     }
   >,
+  'web_get_dedication_info' : ActorMethod<
+    [bigint],
+    {
+      'tierName' : string,
+      'totalDP' : bigint,
+      'tier' : bigint,
+      'activityDP' : bigint,
+      'progressPercent' : bigint,
+      'benefits' : {
+        'accelerationBonus' : bigint,
+        'stabilityBonus' : bigint,
+        'scavengingYieldMult' : number,
+        'repairCooldownMult' : number,
+        'rechargeCooldownMult' : number,
+        'powerCoreBonus' : bigint,
+        'terrainBonusPercent' : bigint,
+        'upgradeDiscountMult' : number,
+        'speedBonus' : bigint,
+      },
+      'investmentDP' : bigint,
+      'nextTierDP' : [] | [bigint],
+      'nextTierName' : [] | [string],
+      'totalInvestedICP' : number,
+    }
+  >,
+  'web_get_racer_bots' : ActorMethod<[], Array<bigint>>,
+  'web_get_scavenger_bots' : ActorMethod<[], Array<bigint>>,
   'web_get_starred_bots' : ActorMethod<[], Array<bigint>>,
   'web_get_user_inventory' : ActorMethod<[], UserInventory>,
   'web_initialize_bot' : ActorMethod<[bigint, [] | [string]], Result_1>,
@@ -788,6 +853,14 @@ export interface McpServer {
             'entryFee' : bigint,
           }
         >,
+        'dedicationBonuses' : [] | [
+          {
+            'stability' : bigint,
+            'speed' : bigint,
+            'acceleration' : bigint,
+            'powerCore' : bigint,
+          }
+        ],
         'currentStats' : [] | [
           {
             'stability' : bigint,
@@ -842,6 +915,12 @@ export interface McpServer {
             'entryFee' : bigint,
           }
         >,
+        'dedicationBonuses' : {
+          'stability' : bigint,
+          'speed' : bigint,
+          'acceleration' : bigint,
+          'powerCore' : bigint,
+        },
         'currentStats' : {
           'stability' : bigint,
           'speed' : bigint,
@@ -861,6 +940,8 @@ export interface McpServer {
   'web_recharge_bot' : ActorMethod<[bigint], Result_1>,
   'web_repair_bot' : ActorMethod<[bigint], Result_1>,
   'web_respec_bot' : ActorMethod<[bigint, Array<string>], Result_2>,
+  'web_set_racer_bots' : ActorMethod<[Array<bigint>], Result_1>,
+  'web_set_scavenger_bots' : ActorMethod<[Array<bigint>], Result_1>,
   'web_set_starred_bots' : ActorMethod<[Array<bigint>], Result_1>,
   'web_start_scavenging' : ActorMethod<
     [bigint, string, [] | [bigint]],
@@ -966,6 +1047,20 @@ export type RaceClass = { 'Elite' : null } |
   { 'Junker' : null } |
   { 'SilentKlan' : null } |
   { 'Raider' : null };
+export type RaceCreationMode = {
+    'Manual' : {
+      'raceTemplates' : Array<RaceTemplate>,
+      'heatAllocation' : HeatAllocationStrategy,
+    }
+  } |
+  {
+    'Automatic' : {
+      'racesPerClass' : [] | [bigint],
+      'heatAllocation' : HeatAllocationStrategy,
+      'distanceRange' : { 'max' : bigint, 'min' : bigint },
+      'terrains' : Array<Terrain>,
+    }
+  };
 export interface RaceEntry {
   'owner' : Principal,
   'stats' : [] | [RacingStats],
@@ -1006,6 +1101,14 @@ export type RaceStatus = { 'Cancelled' : null } |
   { 'InProgress' : null } |
   { 'Completed' : null } |
   { 'Upcoming' : null };
+export interface RaceTemplate {
+  'terrain' : Terrain,
+  'distance' : bigint,
+  'trackId' : [] | [bigint],
+  'startOffset' : bigint,
+  'raceClass' : RaceClass,
+  'stageName' : [] | [string],
+}
 export interface RacingStats {
   'stability' : bigint,
   'speed' : bigint,
@@ -1071,8 +1174,72 @@ export type Result_4 = {
   { 'err' : string };
 export type Result_5 = { 'ok' : null } |
   { 'err' : string };
-export type Result_6 = { 'ok' : null } |
+export type Result_6 = {
+    'ok' : { 'refundAmount' : bigint, 'penalty' : bigint }
+  } |
+  { 'err' : string };
+export type Result_7 = { 'ok' : null } |
   { 'err' : TreasuryError };
+export type Result_8 = {
+    'ok' : {
+      'tokenIndex' : bigint,
+      'owner' : [] | [Principal],
+      'isInitialized' : boolean,
+      'stability' : {
+        'final' : bigint,
+        'base' : bigint,
+        'worldBuff' : bigint,
+        'upgrades' : bigint,
+        'overcharge' : number,
+        'conditionEffect' : bigint,
+        'dedication' : bigint,
+        'overchargeEffect' : bigint,
+        'synergy' : bigint,
+        'conditionPenalty' : number,
+      },
+      'speed' : {
+        'final' : bigint,
+        'batteryEffect' : bigint,
+        'base' : bigint,
+        'worldBuff' : bigint,
+        'upgrades' : bigint,
+        'overcharge' : number,
+        'dedication' : bigint,
+        'overchargeEffect' : bigint,
+        'synergy' : bigint,
+        'batteryPenalty' : number,
+      },
+      'acceleration' : {
+        'final' : bigint,
+        'batteryEffect' : bigint,
+        'base' : bigint,
+        'worldBuff' : bigint,
+        'upgrades' : bigint,
+        'overcharge' : number,
+        'dedication' : bigint,
+        'overchargeEffect' : bigint,
+        'synergy' : bigint,
+        'batteryPenalty' : number,
+      },
+      'powerCore' : {
+        'final' : bigint,
+        'base' : bigint,
+        'worldBuff' : bigint,
+        'upgrades' : bigint,
+        'overcharge' : number,
+        'conditionEffect' : bigint,
+        'dedication' : bigint,
+        'overchargeEffect' : bigint,
+        'synergy' : bigint,
+        'conditionPenalty' : number,
+      },
+      'battery' : bigint,
+      'perfectTuneUp' : boolean,
+      'overchargePercent' : bigint,
+      'condition' : bigint,
+    }
+  } |
+  { 'err' : string };
 export interface ScavengingMission {
   'pendingConditionRestored' : bigint,
   'startTime' : bigint,
@@ -1098,19 +1265,48 @@ export type ScavengingZone = { 'ChargingStation' : null } |
 export interface ScheduledEvent {
   'status' : EventStatus,
   'eventId' : bigint,
+  'creator' : [] | [Principal],
+  'raceCreationMode' : RaceCreationMode,
   'scheduledTime' : bigint,
   'metadata' : EventMetadata,
   'createdAt' : bigint,
+  'creationFee' : bigint,
+  'creatorName' : [] | [string],
+  'invitedParticipants' : [] | [Array<Principal>],
+  'cancellationDeadlines' : {
+    'quarterRefund' : bigint,
+    'fullRefund' : bigint,
+    'halfRefund' : bigint,
+  },
+  'maxRegistrationsPerClass' : bigint,
   'raceIds' : Array<bigint>,
+  'registrationCounts' : {
+    'total' : bigint,
+    'byClass' : Array<[RaceClass, bigint]>,
+  },
+  'sponsorships' : Array<Sponsorship>,
+  'registrations' : Array<EventRegistration>,
+  'visibility' : EventVisibility,
   'registrationCloses' : bigint,
   'registrationOpens' : bigint,
   'eventType' : EventType,
 }
+export type ScoringMode = { 'Cumulative' : null } |
+  { 'Individual' : null } |
+  { 'TeamAggregate' : null } |
+  { 'Elimination' : null };
 export interface Sponsor {
   'message' : [] | [string],
   'timestamp' : bigint,
   'sponsor' : Principal,
   'amount' : bigint,
+}
+export interface Sponsorship {
+  'message' : [] | [string],
+  'timestamp' : bigint,
+  'sponsor' : Principal,
+  'amount' : bigint,
+  'sponsorName' : [] | [string],
 }
 export type StreamingCallback = ActorMethod<
   [StreamingToken],

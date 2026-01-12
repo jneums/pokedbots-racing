@@ -77,6 +77,12 @@ export interface BotListItem {
     stability: { costE8s: bigint; successRate: number };
     pityCounter: bigint;
   };
+  dedicationBonuses?: {
+    speed: bigint;
+    powerCore: bigint;
+    acceleration: bigint;
+    stability: bigint;
+  };
   isListed?: boolean;
   listPrice?: number;
   activeUpgrade?: any;
@@ -139,6 +145,29 @@ export interface BotDetailsResponse {
     Thruster: { icp: bigint; parts: bigint };
     Gyro: { icp: bigint; parts: bigint };
   }]; // Candid opt type
+}
+
+export interface DedicationInfo {
+  tier: number;
+  tierName: string;
+  totalDP: number;
+  investmentDP: number;
+  activityDP: number;
+  totalInvestedICP: number;
+  nextTierDP: number | null;
+  nextTierName: string | null;
+  progressPercent: number;
+  benefits: {
+    speedBonus: number;
+    accelerationBonus: number;
+    powerCoreBonus: number;
+    stabilityBonus: number;
+    terrainBonusPercent: number;
+    scavengingYieldMult: number;
+    upgradeDiscountMult: number;
+    rechargeCooldownMult: number;
+    repairCooldownMult: number;
+  };
 }
 
 /**
@@ -366,6 +395,43 @@ export const getBotDetails = async (
 };
 
 /**
+ * Get dedication info for a specific bot (QUERY - fast).
+ * Shows tier, dedication points, benefits, and progress to next tier.
+ * @param tokenIndex The token index of the bot
+ * @returns Dedication info including tier, DP, and benefits
+ */
+export const getDedicationInfo = async (
+  tokenIndex: number
+): Promise<DedicationInfo> => {
+  // Use anonymous actor for query call (no auth needed)
+  const racingActor = await getRacingActor();
+  const result = await racingActor.web_get_dedication_info(BigInt(tokenIndex));
+  
+  return {
+    tier: Number(result.tier),
+    tierName: result.tierName,
+    totalDP: Number(result.totalDP),
+    investmentDP: Number(result.investmentDP),
+    activityDP: Number(result.activityDP),
+    totalInvestedICP: result.totalInvestedICP,
+    nextTierDP: result.nextTierDP.length > 0 ? Number(result.nextTierDP[0]) : null,
+    nextTierName: result.nextTierName.length > 0 ? result.nextTierName[0] ?? null : null,
+    progressPercent: Number(result.progressPercent),
+    benefits: {
+      speedBonus: Number(result.benefits.speedBonus),
+      accelerationBonus: Number(result.benefits.accelerationBonus),
+      powerCoreBonus: Number(result.benefits.powerCoreBonus),
+      stabilityBonus: Number(result.benefits.stabilityBonus),
+      terrainBonusPercent: Number(result.benefits.terrainBonusPercent),
+      scavengingYieldMult: result.benefits.scavengingYieldMult,
+      upgradeDiscountMult: result.benefits.upgradeDiscountMult,
+      rechargeCooldownMult: result.benefits.rechargeCooldownMult,
+      repairCooldownMult: result.benefits.repairCooldownMult,
+    },
+  };
+};
+
+/**
  * Recharge a bot's battery using ICRC-2 payment (0.1 ICP + 0.0001 fee).
  * Automatically handles ICRC-2 approval.
  * @param tokenIndex The token index of the bot
@@ -453,6 +519,72 @@ export const setStarredBots = async (
 ): Promise<string> => {
   const racingActor = await getActor(identityOrAgent);
   const result = await racingActor.web_set_starred_bots(tokenIndices.map(n => BigInt(n)));
+  
+  if ('ok' in result) {
+    return result.ok;
+  } else {
+    throw new Error(result.err);
+  }
+};
+
+/**
+ * Get user's bots tagged as racers
+ * @param identity Required identity for authentication
+ * @returns Array of token indices
+ */
+export const getRacerBots = async (
+  identityOrAgent: IdentityOrAgent
+): Promise<number[]> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_get_racer_bots();
+  return result.map(n => Number(n));
+};
+
+/**
+ * Set user's bots tagged as racers - replaces entire list
+ * @param tokenIndices Array of token indices to tag as racers
+ * @param identity Required identity for authentication
+ * @returns Success message or error
+ */
+export const setRacerBots = async (
+  tokenIndices: number[],
+  identityOrAgent: IdentityOrAgent
+): Promise<string> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_set_racer_bots(tokenIndices.map(n => BigInt(n)));
+  
+  if ('ok' in result) {
+    return result.ok;
+  } else {
+    throw new Error(result.err);
+  }
+};
+
+/**
+ * Get user's bots tagged as scavengers
+ * @param identity Required identity for authentication
+ * @returns Array of token indices
+ */
+export const getScavengerBots = async (
+  identityOrAgent: IdentityOrAgent
+): Promise<number[]> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_get_scavenger_bots();
+  return result.map(n => Number(n));
+};
+
+/**
+ * Set user's bots tagged as scavengers - replaces entire list
+ * @param tokenIndices Array of token indices to tag as scavengers
+ * @param identity Required identity for authentication
+ * @returns Success message or error
+ */
+export const setScavengerBots = async (
+  tokenIndices: number[],
+  identityOrAgent: IdentityOrAgent
+): Promise<string> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_set_scavenger_bots(tokenIndices.map(n => BigInt(n)));
   
   if ('ok' in result) {
     return result.ok;

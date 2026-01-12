@@ -79,8 +79,10 @@ module {
       };
 
       // Check cooldown with Food faction synergy (reduces cooldown by 15-45%)
+      // Also apply Bot Dedication tier cooldown reduction (0-50%)
       let synergies = ctx.garageManager.calculateFactionSynergies(user);
-      let adjustedCooldown = Float.toInt(Float.fromInt(RECHARGE_COOLDOWN) * synergies.costMultipliers.rechargeCooldown);
+      let tierBenefits = ctx.dedicationManager.getBenefitsForBot(tokenIndex);
+      let adjustedCooldown = Float.toInt(Float.fromInt(RECHARGE_COOLDOWN) * synergies.costMultipliers.rechargeCooldown * tierBenefits.rechargeCooldownMult);
 
       let now = Time.now();
       switch (racingStats.lastRecharged) {
@@ -192,6 +194,13 @@ module {
             };
 
             ctx.garageManager.updateStats(tokenIndex, updatedStats);
+
+            // Record dedication points for ICP investment (1 ICP = 100 DP)
+            // Recharge costs 0.1 ICP = 10,000,000 e8s = 10 DP
+            ctx.dedicationManager.recordRecharge(tokenIndex, RECHARGE_COST, now);
+
+            // Record activity DP for battery restoration (1 DP per 25 battery)
+            ctx.dedicationManager.recordBatteryRestored(tokenIndex, batteryRestored, now);
 
             let overchargeMsg = if (overchargeAdded > 0) {
               let speedBoost = Int.abs(Float.toInt(Float.fromInt(overchargeAdded) * 0.125));

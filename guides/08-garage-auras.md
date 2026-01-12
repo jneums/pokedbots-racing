@@ -83,11 +83,11 @@ Energy efficiency specialists - reduces battery drain in races. Reaches max +5 a
 
 ### Dead (2/4/6+ bots)
 **Yield Bonus:**
-- 2+ bots: +15% scavenging parts
-- 4+ bots: +30% scavenging parts
-- 6+ bots: +45% scavenging parts
+- 2+ bots: +10% scavenging parts
+- 4+ bots: +20% scavenging parts
+- 6+ bots: +30% scavenging parts
 
-The ultimate scavengers - earn significantly more upgrade parts. Best for whales grinding upgrades.
+The ultimate scavengers - earn more upgrade parts from scavenging missions.
 
 ## RARE FACTIONS (Progressive Bonuses)
 
@@ -119,9 +119,9 @@ Consistency and durability focus - reaches max +5 at 6 bots
 
 ### Food (2/4/6+ bots)
 **Cost Bonus:**
-- 2+ bots: -15% recharge cooldown (6h → 5.1h)
-- 4+ bots: -30% recharge cooldown (6h → 4.2h)
-- 6+ bots: -45% recharge cooldown (6h → 3.3h)
+- 2+ bots: -10% recharge cooldown (6h → 5.4h)
+- 4+ bots: -20% recharge cooldown (6h → 4.8h)
+- 6+ bots: -30% recharge cooldown (6h → 4.2h)
 
 Race more frequently with faster recharges
 
@@ -130,18 +130,18 @@ Race more frequently with faster recharges
 ### Game (2/4/6+ bots)
 **Cost Bonus:**
 - 2+ bots: -5% upgrade costs
-- 4+ bots: -12% upgrade costs
-- 6+ bots: -20% upgrade costs
+- 4+ bots: -10% upgrade costs
+- 6+ bots: -15% upgrade costs
 
-Makes upgrading significantly cheaper
+Makes upgrading cheaper
 
 ### Industrial (2/4/6+ bots)
 **Cost Bonus:**
-- 2+ bots: -20% repair costs (0.05 ICP → 0.04 ICP)
-- 4+ bots: -40% repair costs (0.05 ICP → 0.03 ICP)
-- 6+ bots: -60% repair costs (0.05 ICP → 0.02 ICP)
+- 2+ bots: -10% repair costs
+- 4+ bots: -20% repair costs
+- 6+ bots: -30% repair costs
 
-Maintenance becomes almost free
+Reduced maintenance costs
 
 ### Animal (4/8/16+ bots)
 **Stat Bonuses:**
@@ -161,7 +161,7 @@ Balanced progression - requires large collection for meaningful power
 ### For Collectors
 - **UltimateMaster** provides instant +5 rating boost from just 1 bot
 - **Golden** (3 bots) gives +15% earnings boost - compounds over time
-- **Dead** (4 bots) +30% parts generation makes self-upgrading easier
+- **Dead** (4 bots) +20% parts generation makes self-upgrading easier
 
 ### For Competitive Players
 - **Ultimate** (6 bots) +5 Speed/Accel makes your entire garage faster - reaches the cap!
@@ -195,13 +195,13 @@ However, the effective stats in races ARE boosted, which means:
 **Example:** A rating 30 bot with +5 from UltimateMaster aura still enters Raider races (30-39), but races with effective 35 stats against true 30-35 opponents. Having 6 Bee bots would give the same +5 Speed, not +8!
 
 ### Cost Bonuses
-- **Game** (6 bots): Save 20% on all upgrades (0.5 ICP → 0.4 ICP base)
-- **Industrial** (6 bots): Save 60% on repairs (0.05 ICP → 0.02 ICP)
-- **Food** (6 bots): Recharge 45% faster (race 2-3 more times per day)
+- **Game** (6 bots): Save 15% on all upgrades
+- **Industrial** (6 bots): Save 30% on repairs
+- **Food** (6 bots): Recharge 30% faster
 
 ### Yield Bonuses
 - **Golden** (3 bots): +15% race earnings compounds rapidly
-- **Dead** (4 bots): +30% parts generation = faster self-upgrading
+- **Dead** (6 bots): +30% parts generation = faster self-upgrading
 - **Ultimate** (3 bots): -30% scavenging costs = longer missions, more parts
 
 ## HOW TO BUILD YOUR COLLECTION

@@ -17,7 +17,9 @@ import {
   useCompleteScavenging,
   useRespecBot,
   useEnterRace,
+  useDedicationInfo,
 } from '../hooks/useGarage';
+import { useGetUpcomingEventsWithRaces, useRegisterForEvent, useUnregisterFromEvent } from '../hooks/useRacing';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -63,9 +65,28 @@ function getUpgradeDisplayName(upgradeType: string): string {
   return nameMap[upgradeType] || upgradeType;
 }
 
+// Get dedication tier badge (emoji + color for overlay)
+function getDedicationBadge(tier: number): { emoji: string; bgColor: string; borderColor: string } | null {
+  if (tier === 0) return null; // No badge for Rookie tier
+  switch (tier) {
+    case 1: return { emoji: '⭐', bgColor: 'bg-green-500', borderColor: 'border-green-400' };
+    case 2: return { emoji: '🌟', bgColor: 'bg-blue-500', borderColor: 'border-blue-400' };
+    case 3: return { emoji: '💫', bgColor: 'bg-purple-500', borderColor: 'border-purple-400' };
+    case 4: return { emoji: '🏆', bgColor: 'bg-yellow-500', borderColor: 'border-yellow-400' };
+    case 5: return { emoji: '👑', bgColor: 'bg-gradient-to-r from-pink-500 to-red-500', borderColor: 'border-pink-400' };
+    default: return null;
+  }
+}
+
 export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechargeCooldownMultiplier = 1.0, backgroundColor, inventory }: BotCardProps) {
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   const { user } = useAuth();
+  
+  // Fetch dedication info for badge display
+  const { data: dedicationInfo } = useDedicationInfo(Number(bot.tokenIndex));
+  
+  // Fetch upcoming events for event registration
+  const { data: upcomingEvents } = useGetUpcomingEventsWithRaces(7); // Next 7 days
   
   // Mutation hooks
   const initializeMutation = useInitializeBot();
@@ -81,6 +102,8 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   const completeScavengingMutation = useCompleteScavenging();
   const respecMutation = useRespecBot();
   const enterRaceMutation = useEnterRace();
+  const registerForEventMutation = useRegisterForEvent();
+  const unregisterFromEventMutation = useUnregisterFromEvent();
 
   
   const [showInitialize, setShowInitialize] = useState(false);
@@ -102,6 +125,10 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   
   // Racing section state - must be at top level
   const [selectedRaces, setSelectedRaces] = useState<Set<number>>(new Set());
+  
+  // Event registration state
+  const [registeringEventId, setRegisteringEventId] = useState<number | null>(null);
+  const [unregisteringEventId, setUnregisteringEventId] = useState<number | null>(null);
 
   // Clear selected races when bot changes to prevent selecting races for one bot
   // then switching to another bot and accidentally entering wrong races
@@ -482,15 +509,26 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   }
 
   const stats = bot.stats!;
+  const dedicationBadge = dedicationInfo ? getDedicationBadge(dedicationInfo.tier) : null;
 
   return (
     <Card className="border-2 border-primary/20 bg-card/80 backdrop-blur">
       <CardHeader>
         <CardTitle className="flex items-center gap-3">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={imageUrl} alt={bot.name || `Bot #${bot.tokenIndex}`} />
-            <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar className="h-16 w-16">
+              <AvatarImage src={imageUrl} alt={bot.name || `Bot #${bot.tokenIndex}`} />
+              <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
+            </Avatar>
+            {dedicationBadge && (
+              <div 
+                className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ${dedicationBadge.bgColor} border-2 ${dedicationBadge.borderColor} flex items-center justify-center text-xs shadow-lg`}
+                title={`${dedicationInfo?.tierName} - ${dedicationInfo?.totalDP.toLocaleString()} DP`}
+              >
+                {dedicationBadge.emoji}
+              </div>
+            )}
+          </div>
           <div className="flex-1 flex flex-col gap-1">
             <div className="flex items-center justify-between">
               <span className="text-xl">{bot.name || `Bot #${bot.tokenIndex.toString()}`}</span>
@@ -867,7 +905,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 {bot.activeMission && (
                   <p className="text-xs text-muted-foreground text-center">⚠️ Maintenance unavailable while scavenging</p>
                 )}
-                {(rechargeCooldown || repairCooldown) && !bot.activeMission && (
+                {(rechargeCooldown || repairCooldown) && (
                   <p className="text-xs text-muted-foreground text-center">
                     ⏳ {rechargeCooldown && `Recharge (${formatTimeRemaining(rechargeReady)})`}{rechargeCooldown && repairCooldown && " & "}{repairCooldown && `Repair (${formatTimeRemaining(repairReady)})`} on cooldown
                   </p>
@@ -1360,6 +1398,318 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                   >
                     {enteringRaces ? 'Entering...' : `Enter Selected (${selectedRaces.size})`}
                   </Button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Event Registration Section */}
+        {(() => {
+          // Helper functions for events
+          const formatICP = (amount: bigint): string => {
+            const icp = Number(amount) / 100_000_000;
+            return icp.toFixed(2) + ' ICP';
+          };
+
+          const getRaceClassName = (raceClass: any): string => {
+            if (!raceClass) return 'Unknown';
+            if ('Scrap' in raceClass) return 'Scrap';
+            if ('Junker' in raceClass) return 'Junker';
+            if ('Raider' in raceClass) return 'Raider';
+            if ('Elite' in raceClass) return 'Elite';
+            if ('SilentKlan' in raceClass) return 'Silent Klan';
+            return 'Unknown';
+          };
+
+          const getClassRatingRange = (raceClass: any): string => {
+            if (!raceClass) return '';
+            if ('Scrap' in raceClass) return '0-19';
+            if ('Junker' in raceClass) return '20-29';
+            if ('Raider' in raceClass) return '30-39';
+            if ('Elite' in raceClass) return '40-49';
+            if ('SilentKlan' in raceClass) return '50+';
+            return '';
+          };
+
+          // Calculate bracket-scaled entry fee
+          const calculateBracketEntryFee = (baseEntryFee: bigint, raceClass: any): bigint => {
+            const base = Number(baseEntryFee);
+            let multiplier = 1.0;
+            
+            if ('Scrap' in raceClass) multiplier = 0.5;
+            else if ('Junker' in raceClass) multiplier = 1.0;
+            else if ('Raider' in raceClass) multiplier = 1.5;
+            else if ('Elite' in raceClass) multiplier = 2.0;
+            else if ('SilentKlan' in raceClass) multiplier = 2.5;
+            
+            return BigInt(Math.floor(base * multiplier));
+          };
+
+          const isBotEligibleForClass = (raceClass: any): boolean => {
+            if (!bot.maxStats) return false;
+            const rating = Math.floor(
+              (Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + 
+               Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4
+            );
+            
+            if ('Scrap' in raceClass) return rating < 20;
+            if ('Junker' in raceClass) return rating >= 20 && rating < 30;
+            if ('Raider' in raceClass) return rating >= 30 && rating < 40;
+            if ('Elite' in raceClass) return rating >= 40 && rating < 50;
+            if ('SilentKlan' in raceClass) return rating >= 50;
+            return false;
+          };
+
+          const now = Date.now() * 1_000_000; // Convert to nanoseconds
+
+          // Extract events from the { event, raceSummary } wrapper
+          const allEvents = (upcomingEvents || []).map((item: any) => item.event);
+
+          // Filter events where registration is open, races haven't been created yet, and sort by scheduled time
+          const eventsWithOpenRegistration = allEvents
+            .filter((event: any) => {
+              const regOpens = Number(event.registrationOpens);
+              const regCloses = Number(event.registrationCloses);
+              const hasNoRacesYet = !event.raceIds || event.raceIds.length === 0;
+              return regOpens < now && regCloses > now && hasNoRacesYet;
+            })
+            .sort((a: any, b: any) => Number(a.scheduledTime) - Number(b.scheduledTime));
+
+          // Find events this bot is registered for
+          const botRegisteredEvents = eventsWithOpenRegistration.filter((event: any) => {
+            const registrations = event.registrations || [];
+            return registrations.some((reg: any) => 
+              Number(reg.tokenIndex) === Number(bot.tokenIndex)
+            );
+          });
+
+          // Find events this bot is eligible for but not registered
+          const botEligibleEvents = eventsWithOpenRegistration.filter((event: any) => {
+            const registrations = event.registrations || [];
+            const isRegistered = registrations.some((reg: any) => 
+              Number(reg.tokenIndex) === Number(bot.tokenIndex)
+            );
+            if (isRegistered) return false;
+            
+            // Check if bot is eligible for any division
+            const divisions = event.metadata?.divisions || [];
+            return divisions.some((division: any) => isBotEligibleForClass(division));
+          });
+
+          const handleRegisterForEvent = async (eventId: number) => {
+            if (!user || !bot.maxStats) return;
+            
+            setRegisteringEventId(eventId);
+            
+            registerForEventMutation.mutate(
+              { eventId, tokenIndex: Number(bot.tokenIndex) },
+              {
+                onSuccess: () => {
+                  toast.success('Successfully registered for event!');
+                  setRegisteringEventId(null);
+                  onUpdate();
+                },
+                onError: (error: any) => {
+                  toast.error(error.message || 'Failed to register for event');
+                  setRegisteringEventId(null);
+                },
+              }
+            );
+          };
+
+          const handleUnregisterFromEvent = async (eventId: number) => {
+            if (!user) return;
+            
+            setUnregisteringEventId(eventId);
+            
+            unregisterFromEventMutation.mutate(
+              { eventId, tokenIndex: Number(bot.tokenIndex) },
+              {
+                onSuccess: (result: any) => {
+                  const refundMsg = result?.refundE8s 
+                    ? ` Refund: ${(Number(result.refundE8s) / 100_000_000).toFixed(4)} ICP`
+                    : '';
+                  toast.success(`Withdrawn from event!${refundMsg}`);
+                  setUnregisteringEventId(null);
+                  onUpdate();
+                },
+                onError: (error: any) => {
+                  toast.error(error.message || 'Failed to withdraw from event');
+                  setUnregisteringEventId(null);
+                },
+              }
+            );
+          };
+
+          // Don't show section if no events available
+          if (eventsWithOpenRegistration.length === 0) {
+            return null;
+          }
+
+          return (
+            <div className="space-y-2">
+              {/* Registered Events */}
+              {botRegisteredEvents.length > 0 && (
+                <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg space-y-2">
+                  <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                    📅 Registered Events ({botRegisteredEvents.length})
+                  </p>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {botRegisteredEvents.map((event: any) => {
+                      const registration = (event.registrations || []).find(
+                        (reg: any) => Number(reg.tokenIndex) === Number(bot.tokenIndex)
+                      );
+                      
+                      return (
+                        <div
+                          key={event.eventId}
+                          className="p-2 rounded bg-green-500/5 flex items-center justify-between"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <Link
+                              to={`/schedule/${event.eventId}`}
+                              className="text-xs text-foreground hover:text-primary transition-colors block truncate font-medium"
+                            >
+                              {event.metadata?.name || `Event #${event.eventId}`}
+                            </Link>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>{getRaceClassName(registration?.raceClass)} Division</span>
+                              <span>•</span>
+                              <span>{formatICP(calculateBracketEntryFee(BigInt(event.metadata?.entryFee || 0), registration?.raceClass))}</span>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleUnregisterFromEvent(Number(event.eventId))}
+                            disabled={unregisteringEventId === Number(event.eventId)}
+                            className="ml-2 text-xs h-7"
+                          >
+                            {unregisteringEventId === Number(event.eventId) ? '...' : 'Withdraw'}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Eligible Events */}
+              {botEligibleEvents.length > 0 && (
+                <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-purple-600 dark:text-purple-400">
+                      📅 Available Events ({botEligibleEvents.length})
+                    </p>
+                    {botEligibleEvents.length > 1 && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={async () => {
+                          if (!user || !bot.maxStats) return;
+                          
+                          let successCount = 0;
+                          let failCount = 0;
+                          
+                          for (const event of botEligibleEvents) {
+                            try {
+                              setRegisteringEventId(Number(event.eventId));
+                              await registerForEventMutation.mutateAsync({
+                                eventId: Number(event.eventId),
+                                tokenIndex: Number(bot.tokenIndex),
+                              });
+                              successCount++;
+                            } catch (error: any) {
+                              console.error(`Failed to register for event ${event.eventId}:`, error);
+                              failCount++;
+                            }
+                          }
+                          
+                          setRegisteringEventId(null);
+                          
+                          if (successCount > 0) {
+                            toast.success(`Registered for ${successCount} event${successCount > 1 ? 's' : ''}!`);
+                            onUpdate();
+                          }
+                          if (failCount > 0) {
+                            toast.error(`Failed to register for ${failCount} event${failCount > 1 ? 's' : ''}`);
+                          }
+                        }}
+                        disabled={registeringEventId !== null}
+                        className="text-xs h-7 px-3"
+                      >
+                        {registeringEventId !== null ? 'Registering...' : 'Register All'}
+                      </Button>
+                    )}
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {botEligibleEvents.map((event: any) => {
+                      const divisions = event.metadata?.divisions || [];
+                      const eligibleDivisions = divisions.filter((div: any) => isBotEligibleForClass(div));
+                      const firstEligible = eligibleDivisions[0];
+                      
+                      // Get terrain and distance info from race creation mode
+                      const raceMode = event.raceCreationMode;
+                      const terrains = raceMode?.Automatic?.terrains || raceMode?.Manual?.raceTemplates?.map((t: any) => t.terrain) || [];
+                      const uniqueTerrains = [...new Set(terrains.map((t: any) => {
+                        if ('ScrapHeaps' in t) return '🏚️';
+                        if ('WastelandSand' in t) return '🏜️';
+                        if ('MetalRoads' in t) return '🛣️';
+                        return '🏁';
+                      }))];
+                      
+                      // Get distance info
+                      let distanceText = '';
+                      if (raceMode?.Automatic?.distanceRange) {
+                        const { min, max } = raceMode.Automatic.distanceRange;
+                        distanceText = min === max ? `${min}km` : `${min}-${max}km`;
+                      } else if (raceMode?.Manual?.raceTemplates?.length > 0) {
+                        const distances = raceMode.Manual.raceTemplates.map((t: any) => Number(t.distance));
+                        const minDist = Math.min(...distances);
+                        const maxDist = Math.max(...distances);
+                        distanceText = minDist === maxDist ? `${minDist}km` : `${minDist}-${maxDist}km`;
+                      }
+                      
+                      return (
+                        <div
+                          key={event.eventId}
+                          className="p-2.5 rounded-lg bg-purple-500/5 border border-purple-500/20"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <Link
+                              to={`/schedule/${event.eventId}`}
+                              className="text-sm text-foreground hover:text-primary transition-colors font-medium leading-tight"
+                            >
+                              {event.metadata?.name || `Event #${event.eventId}`}
+                            </Link>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => handleRegisterForEvent(Number(event.eventId))}
+                              disabled={registeringEventId === Number(event.eventId)}
+                              className="text-xs h-7 px-3 shrink-0"
+                            >
+                              {registeringEventId === Number(event.eventId) ? '...' : 'Register'}
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5 text-xs text-muted-foreground">
+                            <span className="text-purple-500 font-medium">{getRaceClassName(firstEligible)}</span>
+                            <span className="text-primary font-medium">{formatICP(calculateBracketEntryFee(BigInt(event.metadata?.entryFee || 0), firstEligible))}</span>
+                            {uniqueTerrains.length > 0 && (
+                              <span>{uniqueTerrains.join('')}</span>
+                            )}
+                            {distanceText && (
+                              <span>{distanceText}</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-amber-500/80 mt-1">
+                            Closes: {formatRelativeTime(BigInt(event.registrationCloses))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>

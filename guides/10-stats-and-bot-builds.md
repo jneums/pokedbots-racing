@@ -14,11 +14,28 @@ Every bot has 4 stats that determine racing performance:
 **What it does:** Your bot's top speed on flat, clear terrain
 
 **How it works:**
-- 70% Universal: Always active baseline speed (√speed × 5.25)
+- 70% Universal: Always active baseline speed (√speed × 4.0)
 - 30% Conditional: +30% bonus on ideal conditions (flat MetalRoads), +15% on downhills
-- **Synergy with Acceleration:** (Speed + Accel) / 200 = 0.80x to 1.0x effectiveness
-  - High Speed + Low Accel = Only 80% of speed is usable
-  - High Speed + High Accel = Full 100% speed potential
+- **Synergy with Acceleration:** Speed needs Acceleration to be fully effective
+  - Formula: `0.80 + ((Speed + Accel) / 200 × 0.20)`
+  - Need combined 200+ for full effectiveness
+  - **Only the SUM matters** - Speed 50 + Accel 50 = Speed 75 + Accel 25 = same synergy
+
+**Example Bot Stats (Speed / Accel):**
+
+| Speed | Accel | Combined | Effectiveness | Analysis |
+|-------|-------|----------|---------------|----------|
+| 20 | 20 | 40 | 84% | Weak bot - losing 16% of speed potential |
+| 30 | 30 | 60 | 86% | Below average - 14% penalty |
+| 40 | 40 | 80 | 88% | Average bot - 12% penalty |
+| 50 | 30 | 80 | 88% | Speed-focused but same result |
+| 50 | 50 | 100 | 90% | Solid coordination - only 10% penalty |
+| 60 | 60 | 120 | 92% | Good synergy - 8% penalty |
+| 75 | 45 | 120 | 92% | High speed build - same synergy! |
+| 70 | 70 | 140 | 94% | Strong synergy - 6% penalty |
+| 100 | 50 | 150 | 95% | Elite speed with moderate accel |
+| 75 | 75 | 150 | 95% | Balanced excellence |
+| 100 | 100 | 200 | 100% | **Perfect synergy - full potential!** |
 
 **Distance Scaling:**
 - Short sprints (<10km): Slight penalty for high speed (speed matters less)
@@ -37,8 +54,25 @@ Every bot has 4 stats that determine racing performance:
   - Example: 20 Power = 1.4x slower time, 100 Power = no extra penalty
 - **Steep uphills (>5° angle):** Additional penalty scales with steepness
 - **Small uphills:** Small additional time penalty
-- **Synergy with Stability:** (Power + Stability) / 200 = 0.85x to 1.0x effectiveness
-  - High endurance needs stability to be fully effective
+- **Synergy with Stability:** Power Core needs Stability to be fully effective
+  - Formula: `0.85 + ((Power + Stability) / 200 × 0.15)`
+  - Need combined 200+ for full effectiveness
+  - **Only the SUM matters** - balanced or imbalanced stats give same synergy
+
+**Example Bot Stats (Power / Stability):**
+
+| Power | Stability | Combined | Effectiveness | Analysis |
+|-------|-----------|----------|---------------|----------|
+| 20 | 20 | 40 | 88% | Weak endurance - 12% penalty |
+| 30 | 30 | 60 | 89.5% | Below average - 10.5% penalty |
+| 40 | 40 | 80 | 91% | Average coordination - 9% penalty |
+| 50 | 50 | 100 | 92.5% | Decent endurance - 7.5% penalty |
+| 60 | 40 | 100 | 92.5% | Power-focused but same result |
+| 60 | 60 | 120 | 94% | Good synergy - 6% penalty |
+| 75 | 50 | 125 | 94.4% | Strong power with moderate stability |
+| 70 | 70 | 140 | 95.5% | Excellent endurance coordination |
+| 75 | 75 | 150 | 96.25% | Elite endurance build |
+| 100 | 100 | 200 | 100% | **Perfect endurance synergy!** |
 
 **Distance Scaling:**
 - Short sprints: Neutral
@@ -130,15 +164,24 @@ Every bot has 4 stats that determine racing performance:
 
 ## STAT SYNERGIES
 
-**Speed ↔ Acceleration:** 
-- Speed effectiveness = 0.80x to 1.0x based on (Speed+Accel)/200
-- High Speed without Accel = wasted potential
+**Speed ↔ Acceleration Synergy:**
+- Formula: `0.80 + ((Speed + Accel) / 200 × 0.20)` = 0.80x to 1.0x multiplier
+- Need **combined 200+** for full effectiveness (100% synergy)
+- **Important:** Only the SUM matters, not the ratio!
+  - Speed 100 + Accel 100 = 1.0x synergy (balanced build)
+  - Speed 150 + Accel 50 = 1.0x synergy (speed-focused build)
+  - Speed 50 + Accel 150 = 1.0x synergy (accel-focused build)
+- At combined 100: 0.90x effectiveness (10% penalty)
+- At combined 50: 0.85x effectiveness (15% penalty)
+- **Key insight:** High Speed without Acceleration = only 80% of speed is usable
 
-**Power Core ↔ Stability:**
-- Effectiveness = 0.85x to 1.0x based on (Power+Stability)/200
-- Endurance needs consistency to shine
-
-## RANDOMNESS & VARIANCE
+**Power Core ↔ Stability Synergy:**
+- Formula: `0.85 + ((Power + Stability) / 200 × 0.15)` = 0.85x to 1.0x multiplier
+- Need **combined 200+** for full effectiveness
+- Same rule: only the SUM matters, not the ratio
+- At combined 100: 0.925x effectiveness (7.5% penalty)
+- At combined 50: 0.8875x effectiveness (11.25% penalty)
+- **Key insight:** Endurance needs consistency to be fully effective
 
 - **Per-Segment RNG:** ±10% time variation per segment
 - **Per-Segment Conditions:** ±6% performance variation (driver errors, debris, wind)

@@ -131,6 +131,25 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
   // Registration hasn't opened yet (based on actual timestamp)
   const isUpcoming = now < registrationOpensDate;
 
+  // Calculate total prize pool from event data
+  const calculateEventPrizePool = (): bigint => {
+    // Entry fees from all registrations
+    const entryFees = event.registrationCounts.total * event.metadata.entryFee;
+    
+    // Platform bonus
+    const platformBonus = event.metadata.prizePoolBonus;
+    
+    // Event bonus prize
+    const eventBonus = event.metadata.eventBonusPrize;
+    
+    // Sum all sponsorships
+    const sponsorships = event.sponsorships.reduce((sum, s) => sum + s.amount, BigInt(0));
+    
+    return entryFees + platformBonus + eventBonus + sponsorships;
+  };
+
+  const totalEventPrizePool = calculateEventPrizePool();
+
   // Get terrain icons
   const getTerrainIcon = (terrain: any): string => {
     if ('ScrapHeaps' in terrain) return '🔩';
@@ -146,20 +165,17 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
     return 'Unknown';
   }))) : [];
 
-  const distanceRange = raceSummary && raceSummary.distances.length > 0 ? 
-    `${Math.min(...raceSummary.distances.map(Number))}${Math.max(...raceSummary.distances.map(Number)) !== Math.min(...raceSummary.distances.map(Number)) ? `-${Math.max(...raceSummary.distances.map(Number))}` : ''}km` : null;
-
   return (
     <Card className={`border-2 ${hasStarted && !isPastEvent ? 'border-orange-500/40 bg-orange-950/20' : 'border-primary/20 bg-card/50'} hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 backdrop-blur`}>
       <CardHeader>
         <div className="flex flex-col gap-4">
           {/* Prize Pool - Mobile First */}
-          {raceSummary?.totalPrizePool !== undefined && Number(raceSummary.totalPrizePool) > 0 && (
+          {totalEventPrizePool > 0n && (
             <div className="text-center p-4 bg-gradient-to-br from-amber-500/20 via-yellow-500/20 to-orange-500/20 border-2 border-amber-500/40 rounded-xl sm:hidden">
               <div className="text-3xl mb-1">💰</div>
               <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1">Total Prize Pool</div>
               <div className="text-2xl font-bold text-amber-500 dark:text-amber-400">
-                {formatICP(raceSummary.totalPrizePool)}
+                {formatICP(totalEventPrizePool)}
               </div>
             </div>
           )}
@@ -186,12 +202,6 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
                   <span>{getEventTypeName(event.eventType)}</span>
                   <span>•</span>
                   <span>{event.raceIds.length} race{event.raceIds.length !== 1 ? 's' : ''}</span>
-                  {distanceRange && (
-                    <>
-                      <span>•</span>
-                      <span className="font-mono">{distanceRange}</span>
-                    </>
-                  )}
                   {uniqueTerrains.length > 0 && (
                     <>
                       <span>•</span>
@@ -204,10 +214,10 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
                       </span>
                     </>
                   )}
-                  {raceSummary && Number(raceSummary.totalParticipants) > 0 && (
+                  {Number(event.registrationCounts.total) > 0 && (
                     <>
                       <span>•</span>
-                      <span>👥 {Number(raceSummary.totalParticipants)}</span>
+                      <span>👥 {Number(event.registrationCounts.total)}</span>
                     </>
                   )}
                 </div>
@@ -236,12 +246,12 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
           </div>
 
           {/* Prize Pool - Desktop Only */}
-          {raceSummary?.totalPrizePool !== undefined && Number(raceSummary.totalPrizePool) > 0 && (
+          {totalEventPrizePool > 0n && (
             <div className="hidden sm:flex flex-shrink-0 text-center p-4 bg-gradient-to-br from-amber-500/20 via-yellow-500/20 to-orange-500/20 border-2 border-amber-500/40 rounded-xl min-w-[160px] flex-col">
               <div className="text-3xl mb-1">💰</div>
               <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1">Total Prize Pool</div>
               <div className="text-2xl font-bold text-amber-500 dark:text-amber-400">
-                {formatICP(raceSummary.totalPrizePool)}
+                {formatICP(totalEventPrizePool)}
               </div>
             </div>
           )}
@@ -252,8 +262,27 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
         {/* Event Details */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
-            <p className="text-xs text-muted-foreground mb-1">Races</p>
-            <p className="text-lg font-bold text-primary">{event.raceIds.length}</p>
+            <p className="text-xs text-muted-foreground mb-1">{event.raceIds.length > 0 ? 'Races' : 'Est. Races'}</p>
+            <p className="text-lg font-bold text-primary">
+              {event.raceIds.length > 0 ? event.raceIds.length : (() => {
+                // Estimate: 1 race per 8 registrants per class
+                let totalRaces = 0;
+                event.registrationCounts.byClass.forEach((classCount: any) => {
+                  const count = Number(classCount[1]);
+                  if (count > 0) {
+                    totalRaces += Math.ceil(count / 8);
+                  }
+                });
+                return totalRaces || '—';
+              })()}
+            </p>
+          </div>
+
+          <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
+            <p className="text-xs text-muted-foreground mb-1">Total Registered</p>
+            <p className="text-lg font-bold text-primary">
+              {Number(event.registrationCounts.total)}
+            </p>
           </div>
 
           <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
@@ -261,46 +290,44 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
             <p className="text-lg font-bold text-primary">{event.metadata.pointsMultiplier}x</p>
           </div>
 
-          {raceSummary && Number(raceSummary.totalParticipants) > 0 && (
-            <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
-              <p className="text-xs text-muted-foreground mb-1">Participants</p>
-              <p className="text-lg font-bold text-primary">👥 {Number(raceSummary.totalParticipants)}</p>
-            </div>
-          )}
-
-          {distanceRange && (
-            <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
-              <p className="text-xs text-muted-foreground mb-1">Distance</p>
-              <p className="text-lg font-bold text-primary font-mono">{distanceRange}</p>
-            </div>
-          )}
+          <div className="text-center p-3 bg-card border-2 border-primary/20 rounded-lg">
+            <p className="text-xs text-muted-foreground mb-1">Min Required</p>
+            <p className="text-lg font-bold text-primary">{Number(event.metadata.minEntries)}</p>
+          </div>
         </div>
 
         {/* Divisions */}
         {event.metadata.divisions.length > 0 && (
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Divisions:</p>
+            <p className="text-sm text-muted-foreground">Divisions (Max {Number(event.metadata.maxEntries)} per class):</p>
             <div className="flex gap-2 flex-wrap">
-              {event.metadata.divisions.map((division, idx) => (
-                <Badge key={idx} variant="outline" className="bg-primary/10">
-                  {getDivisionName(division)}
-                </Badge>
-              ))}
+              {event.metadata.divisions.map((division, idx) => {
+                const className = Object.keys(division)[0];
+                const count = event.registrationCounts.byClass.find((c: any) => Object.keys(c[0])[0] === className)?.[1] || 0;
+                const isFull = Number(count) >= Number(event.metadata.maxEntries);
+                
+                return (
+                  <Badge 
+                    key={idx} 
+                    variant="outline" 
+                    className={isFull ? "bg-red-500/20 border-red-500" : "bg-primary/10"}
+                  >
+                    {getDivisionName(division)} ({Number(count)}/{Number(event.metadata.maxEntries)})
+                  </Badge>
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* Entry Limits */}
-        <div className="flex items-center justify-between text-sm">
-          <div className="text-muted-foreground">
-            Entry Limits: {event.metadata.minEntries.toString()} - {event.metadata.maxEntries.toString()} racers
-          </div>
-          {isUpcoming && (
-            <div className="text-blue-500 font-semibold">
-              Opens {formatRelativeTime(event.registrationOpens)}
+        {/* Min Entry Requirement */}
+        {Number(event.registrationCounts.total) < Number(event.metadata.minEntries) && isRegistrationOpen && (
+          <div className="flex items-center justify-between text-sm bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+            <div className="text-yellow-600">
+              ⚠️ Needs {Number(event.metadata.minEntries) - Number(event.registrationCounts.total)} more {Number(event.metadata.minEntries) - Number(event.registrationCounts.total) === 1 ? 'registration' : 'registrations'} to proceed
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* View Details Button */}
         <Link to={`/schedule/${event.eventId}`} className="block mt-4">

@@ -30,12 +30,28 @@ All tools require ICRC-2 approval for paid operations. The canister uses `transf
 
 ### `garage_list_my_pokedbots`
 
-List all PokedBots in your garage.
+List all PokedBots in your garage with optional filtering.
 
-**Input:** None (auth required)
+**Input:**
+```json
+{
+  "only_starred": true,       // Optional: Only show favorited bots
+  "only_racers": true,         // Optional: Only show bots tagged as racers
+  "only_scavengers": true,     // Optional: Only show bots tagged as scavengers
+  "only_scavenging": true,     // Optional: Only show bots on scavenging missions
+  "only_in_races": true,       // Optional: Only show bots entered in races
+  "only_ready": true           // Optional: Only show race-ready bots (≥30% battery, ≥50% condition, not scavenging)
+}
+```
+
+**Note:** All filters are optional. If no filters are provided, all bots are shown. Multiple filters can be combined (AND logic).
+
+**User Tags:** The "starred", "racers", and "scavengers" filters use your personal bot tags that you set in the Web UI. These are saved preferences that help you organize your fleet.
 
 **Output:** Formatted text showing:
-- Total count of bots in garage
+- Total count of bots in garage (with filter count if applicable)
+- Parts inventory summary
+- Collection bonuses (faction synergies)
 - For each bot:
   - Token index, faction icon, faction name
   - Overall rating (or base rating if never raced)

@@ -577,6 +577,95 @@ module {
       ignore Map.put(seasonBoards, nhash, newSeasonId, newBoard);
     };
 
+    // Adjust points for a bot (can be positive or negative)
+    // Returns the old and new points values
+    public func adjustPoints(
+      lbType : LeaderboardType,
+      tokenIndex : Nat,
+      pointsDelta : Int,
+    ) : ?{ oldPoints : Nat; newPoints : Nat } {
+      let board = getOrCreateBoard(lbType);
+
+      switch (Map.get(board, nhash, tokenIndex)) {
+        case (?entry) {
+          let oldPoints = entry.points;
+          // Calculate new points (ensure non-negative)
+          let newPoints = if (pointsDelta < 0) {
+            let absChange = Int.abs(pointsDelta);
+            if (absChange > entry.points) { 0 } else {
+              entry.points - absChange;
+            };
+          } else {
+            entry.points + Int.abs(pointsDelta);
+          };
+
+          let updatedEntry = {
+            entry with
+            points = newPoints;
+          };
+          ignore Map.put(board, nhash, tokenIndex, updatedEntry);
+          ?{ oldPoints = oldPoints; newPoints = newPoints };
+        };
+        case (null) { null };
+      };
+    };
+
+    // Adjust wins/podiums/stats for a bot (for correcting race results)
+    public func adjustStats(
+      lbType : LeaderboardType,
+      tokenIndex : Nat,
+      winsDelta : Int,
+      podiumsDelta : Int,
+      earningsDelta : Int,
+    ) : Bool {
+      let board = getOrCreateBoard(lbType);
+
+      switch (Map.get(board, nhash, tokenIndex)) {
+        case (?entry) {
+          let newWins = if (winsDelta < 0) {
+            let absChange = Int.abs(winsDelta);
+            if (absChange > entry.wins) { 0 } else { entry.wins - absChange };
+          } else {
+            entry.wins + Int.abs(winsDelta);
+          };
+
+          let newPodiums = if (podiumsDelta < 0) {
+            let absChange = Int.abs(podiumsDelta);
+            if (absChange > entry.podiums) { 0 } else {
+              entry.podiums - absChange;
+            };
+          } else {
+            entry.podiums + Int.abs(podiumsDelta);
+          };
+
+          let newEarnings = if (earningsDelta < 0) {
+            let absChange = Int.abs(earningsDelta);
+            if (absChange > entry.totalEarnings) { 0 } else {
+              entry.totalEarnings - absChange;
+            };
+          } else {
+            entry.totalEarnings + Int.abs(earningsDelta);
+          };
+
+          // Recalculate win rate
+          let newWinRate = if (entry.races > 0) {
+            Float.fromInt(newWins) / Float.fromInt(entry.races);
+          } else { 0.0 };
+
+          let updatedEntry = {
+            entry with
+            wins = newWins;
+            podiums = newPodiums;
+            totalEarnings = newEarnings;
+            winRate = newWinRate;
+          };
+          ignore Map.put(board, nhash, tokenIndex, updatedEntry);
+          true;
+        };
+        case (null) { false };
+      };
+    };
+
     // Clear all leaderboards (used when recalculating from scratch)
     public func clearAllLeaderboards() {
       // Clear all monthly boards

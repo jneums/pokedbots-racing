@@ -8,6 +8,7 @@ import RacingSimulator "../RacingSimulator";
 import ExtIntegration "../ExtIntegration";
 import BettingManager "../BettingManager";
 import RaceCalendar "../RaceCalendar";
+import BotDedication "../BotDedication";
 import TimerTool "mo:timer-tool";
 
 module ToolContext {
@@ -29,6 +30,8 @@ module ToolContext {
     bettingManager : BettingManager.BettingManager;
     /// Event calendar for event-based registration
     eventCalendar : RaceCalendar.EventCalendar;
+    /// Bot dedication manager (per-bot investment/activity tracking for tier benefits)
+    dedicationManager : BotDedication.DedicationManager;
     /// EXT canister interface for ownership verification
     extCanister : ExtIntegration.ExtCanisterInterface;
     /// EXT canister ID (needed for encoding token identifiers)
@@ -58,6 +61,12 @@ module ToolContext {
     checkRegistrationWindow : (raceId : Nat, now : Int) -> Result.Result<(), Text>;
     /// Check if a bot is already entered in any race within the same event
     checkBotInEvent : (raceId : Nat, nftId : Text) -> Result.Result<(), Text>;
+    /// Get user's starred bots (favorites)
+    getUserStarredBots : (Principal) -> [Nat];
+    /// Get user's bots tagged as racers
+    getUserRacerBots : (Principal) -> [Nat];
+    /// Get user's bots tagged as scavengers
+    getUserScavengerBots : (Principal) -> [Nat];
   };
 
   /// Helper function to create an error response and invoke callback

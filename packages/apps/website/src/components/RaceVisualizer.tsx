@@ -138,7 +138,11 @@ const TRACK_NAMES = [
   "Debris Field Dash",
   "Velocity Viaduct",
   "Sandstorm Circuit",
-  "Desert Sprint"
+  "Desert Sprint",
+  "Wasteland Odyssey",
+  "Iron Crucible",
+  "Endless Expanse",
+  "Survival Gauntlet"
 ];
 
 // Track definitions matching backend RacingSimulator.mo
@@ -332,6 +336,138 @@ const TRACK_TEMPLATES: Record<number, { segments: TrackSegment[]; laps: number }
       { length: 300, terrain: 'WastelandSand', angle: -1, difficulty: 1.15 }
     ],
     laps: 3
+  },
+  12: { // Wasteland Odyssey - Epic journey across varied terrain (22.6km)
+    segments: [
+      // Sand section (8km)
+      { length: 1400, terrain: 'WastelandSand', angle: 3, difficulty: 1.18 },
+      { length: 1200, terrain: 'WastelandSand', angle: 8, difficulty: 1.25 },
+      { length: 1300, terrain: 'WastelandSand', angle: 12, difficulty: 1.28 },
+      { length: 1100, terrain: 'WastelandSand', angle: 5, difficulty: 1.22 },
+      { length: 1000, terrain: 'WastelandSand', angle: 0, difficulty: 1.2 },
+      { length: 1200, terrain: 'WastelandSand', angle: -8, difficulty: 1.15 },
+      { length: 1000, terrain: 'WastelandSand', angle: -4, difficulty: 1.12 },
+      // Metal highway section (7km)
+      { length: 1500, terrain: 'MetalRoads', angle: 0, difficulty: 0.85 },
+      { length: 1400, terrain: 'MetalRoads', angle: 0, difficulty: 0.82 },
+      { length: 1200, terrain: 'MetalRoads', angle: -5, difficulty: 0.78 },
+      { length: 1300, terrain: 'MetalRoads', angle: 0, difficulty: 0.88 },
+      { length: 1600, terrain: 'MetalRoads', angle: 0, difficulty: 0.9 },
+      // Scrap mountain finale (7.4km)
+      { length: 900, terrain: 'ScrapHeaps', angle: 8, difficulty: 1.15 },
+      { length: 800, terrain: 'ScrapHeaps', angle: 15, difficulty: 1.25 },
+      { length: 1000, terrain: 'ScrapHeaps', angle: 22, difficulty: 1.32 },
+      { length: 900, terrain: 'ScrapHeaps', angle: 18, difficulty: 1.28 },
+      { length: 1100, terrain: 'ScrapHeaps', angle: -12, difficulty: 1.12 },
+      { length: 1200, terrain: 'ScrapHeaps', angle: -18, difficulty: 1.05 },
+      { length: 1500, terrain: 'ScrapHeaps', angle: -10, difficulty: 1.08 }
+    ],
+    laps: 1
+  },
+  13: { // Iron Crucible - Brutal metal-to-scrap transition (28.8km, 2 laps)
+    segments: [
+      // Fast highway opening (4.5km)
+      { length: 1200, terrain: 'MetalRoads', angle: 0, difficulty: 0.82 },
+      { length: 1100, terrain: 'MetalRoads', angle: -4, difficulty: 0.78 },
+      { length: 1000, terrain: 'MetalRoads', angle: 0, difficulty: 0.85 },
+      { length: 1200, terrain: 'MetalRoads', angle: 0, difficulty: 0.88 },
+      // Technical scrap transition (5.1km)
+      { length: 800, terrain: 'ScrapHeaps', angle: 5, difficulty: 1.12 },
+      { length: 900, terrain: 'ScrapHeaps', angle: 12, difficulty: 1.22 },
+      { length: 700, terrain: 'ScrapHeaps', angle: 18, difficulty: 1.3 },
+      { length: 1000, terrain: 'ScrapHeaps', angle: 15, difficulty: 1.25 },
+      { length: 800, terrain: 'ScrapHeaps', angle: 8, difficulty: 1.18 },
+      { length: 900, terrain: 'ScrapHeaps', angle: 0, difficulty: 1.2 },
+      // Mixed technical section (4.8km)
+      { length: 600, terrain: 'MetalRoads', angle: 0, difficulty: 0.92 },
+      { length: 700, terrain: 'ScrapHeaps', angle: 8, difficulty: 1.15 },
+      { length: 800, terrain: 'ScrapHeaps', angle: 12, difficulty: 1.22 },
+      { length: 900, terrain: 'MetalRoads', angle: -10, difficulty: 0.88 },
+      { length: 1000, terrain: 'MetalRoads', angle: -27, difficulty: 0.85 },
+      { length: 800, terrain: 'ScrapHeaps', angle: -37, difficulty: 1.28 }
+    ],
+    laps: 2
+  },
+  14: { // Endless Expanse - Ultimate power core test (50.5km)
+    segments: [
+      // Opening dune climb (10km)
+      { length: 1800, terrain: 'WastelandSand', angle: 8, difficulty: 1.22 },
+      { length: 1600, terrain: 'WastelandSand', angle: 12, difficulty: 1.28 },
+      { length: 1700, terrain: 'WastelandSand', angle: 15, difficulty: 1.32 },
+      { length: 1500, terrain: 'WastelandSand', angle: 18, difficulty: 1.35 },
+      { length: 1400, terrain: 'WastelandSand', angle: 10, difficulty: 1.25 },
+      { length: 2000, terrain: 'WastelandSand', angle: 5, difficulty: 1.2 },
+      // Mid-expanse rolling (15km)
+      { length: 2000, terrain: 'WastelandSand', angle: 0, difficulty: 1.18 },
+      { length: 1800, terrain: 'WastelandSand', angle: 6, difficulty: 1.22 },
+      { length: 1600, terrain: 'WastelandSand', angle: -4, difficulty: 1.15 },
+      { length: 1700, terrain: 'WastelandSand', angle: 0, difficulty: 1.2 },
+      { length: 1900, terrain: 'WastelandSand', angle: 8, difficulty: 1.25 },
+      { length: 2000, terrain: 'WastelandSand', angle: 10, difficulty: 1.28 },
+      { length: 1800, terrain: 'WastelandSand', angle: 4, difficulty: 1.18 },
+      { length: 1700, terrain: 'WastelandSand', angle: -6, difficulty: 1.12 },
+      // Deep desert crucible (14km)
+      { length: 2200, terrain: 'WastelandSand', angle: 12, difficulty: 1.3 },
+      { length: 2000, terrain: 'WastelandSand', angle: 15, difficulty: 1.32 },
+      { length: 1800, terrain: 'WastelandSand', angle: 8, difficulty: 1.25 },
+      { length: 1900, terrain: 'WastelandSand', angle: 0, difficulty: 1.22 },
+      { length: 2100, terrain: 'WastelandSand', angle: 5, difficulty: 1.2 },
+      { length: 2000, terrain: 'WastelandSand', angle: 10, difficulty: 1.28 },
+      { length: 2000, terrain: 'WastelandSand', angle: -8, difficulty: 1.15 },
+      // Final descent (12km)
+      { length: 1900, terrain: 'WastelandSand', angle: -12, difficulty: 1.1 },
+      { length: 1800, terrain: 'WastelandSand', angle: -15, difficulty: 1.08 },
+      { length: 2000, terrain: 'WastelandSand', angle: -10, difficulty: 1.12 },
+      { length: 1700, terrain: 'WastelandSand', angle: -6, difficulty: 1.15 },
+      { length: 1600, terrain: 'WastelandSand', angle: 0, difficulty: 1.18 },
+      { length: 2000, terrain: 'WastelandSand', angle: -8, difficulty: 1.1 },
+      { length: 1000, terrain: 'WastelandSand', angle: -20, difficulty: 1.05 }
+    ],
+    laps: 1
+  },
+  15: { // Survival Gauntlet - The ultimate test (59km)
+    segments: [
+      // Scrap mountain approach (12km)
+      { length: 1500, terrain: 'ScrapHeaps', angle: 8, difficulty: 1.15 },
+      { length: 1400, terrain: 'ScrapHeaps', angle: 15, difficulty: 1.25 },
+      { length: 1600, terrain: 'ScrapHeaps', angle: 20, difficulty: 1.32 },
+      { length: 1300, terrain: 'ScrapHeaps', angle: 18, difficulty: 1.28 },
+      { length: 1200, terrain: 'ScrapHeaps', angle: 12, difficulty: 1.22 },
+      { length: 1500, terrain: 'ScrapHeaps', angle: -10, difficulty: 1.12 },
+      { length: 1400, terrain: 'ScrapHeaps', angle: -15, difficulty: 1.08 },
+      { length: 1600, terrain: 'ScrapHeaps', angle: -8, difficulty: 1.15 },
+      { length: 1500, terrain: 'ScrapHeaps', angle: 0, difficulty: 1.2 },
+      // Highway speed section (16km)
+      { length: 2000, terrain: 'MetalRoads', angle: 0, difficulty: 0.82 },
+      { length: 1900, terrain: 'MetalRoads', angle: -5, difficulty: 0.78 },
+      { length: 1800, terrain: 'MetalRoads', angle: 0, difficulty: 0.85 },
+      { length: 2100, terrain: 'MetalRoads', angle: 0, difficulty: 0.88 },
+      { length: 2000, terrain: 'MetalRoads', angle: -3, difficulty: 0.8 },
+      { length: 1900, terrain: 'MetalRoads', angle: 0, difficulty: 0.9 },
+      { length: 2200, terrain: 'MetalRoads', angle: 0, difficulty: 0.85 },
+      { length: 2100, terrain: 'MetalRoads', angle: 0, difficulty: 0.88 },
+      // Desert endurance gauntlet (20km)
+      { length: 2200, terrain: 'WastelandSand', angle: 8, difficulty: 1.22 },
+      { length: 2000, terrain: 'WastelandSand', angle: 12, difficulty: 1.28 },
+      { length: 1900, terrain: 'WastelandSand', angle: 15, difficulty: 1.32 },
+      { length: 2100, terrain: 'WastelandSand', angle: 10, difficulty: 1.25 },
+      { length: 2000, terrain: 'WastelandSand', angle: 5, difficulty: 1.2 },
+      { length: 1800, terrain: 'WastelandSand', angle: 0, difficulty: 1.18 },
+      { length: 2000, terrain: 'WastelandSand', angle: -6, difficulty: 1.12 },
+      { length: 1900, terrain: 'WastelandSand', angle: -10, difficulty: 1.08 },
+      { length: 2100, terrain: 'WastelandSand', angle: 8, difficulty: 1.22 },
+      { length: 2000, terrain: 'WastelandSand', angle: 0, difficulty: 1.15 },
+      // Final mixed technical (10km)
+      { length: 1200, terrain: 'MetalRoads', angle: 0, difficulty: 0.92 },
+      { length: 1100, terrain: 'ScrapHeaps', angle: 8, difficulty: 1.18 },
+      { length: 1300, terrain: 'ScrapHeaps', angle: 15, difficulty: 1.28 },
+      { length: 1200, terrain: 'WastelandSand', angle: 10, difficulty: 1.22 },
+      { length: 1100, terrain: 'MetalRoads', angle: -8, difficulty: 0.88 },
+      { length: 1400, terrain: 'WastelandSand', angle: 0, difficulty: 1.15 },
+      { length: 1200, terrain: 'ScrapHeaps', angle: -12, difficulty: 1.1 },
+      { length: 1500, terrain: 'MetalRoads', angle: -6, difficulty: 0.85 }
+    ],
+    laps: 1
   }
 };
 
@@ -618,9 +754,9 @@ function calculateBotSegmentTimes(
   // Calculate distance from track segments (matches backend track.totalDistance)
   const segmentDistance = (track.segments.reduce((sum, seg) => sum + seg.length, 0) * track.laps) / 1000;
   
-  // Backend uses 0 for simulator due to integer division bug (15m / 1000 = 0km)
-  // So we use segment distance when raceDistance is 0 or not provided
-  const distanceKm = (raceDistance && raceDistance > 0) ? raceDistance : segmentDistance;
+  // Backend uses 0 for simulator due to integer division bug (race.distance in km / 1000 = 0)
+  // So we always use segment distance to match backend behavior
+  const distanceKm = segmentDistance;
   
 
   const segmentTimes: SegmentTime[] = [];
@@ -934,6 +1070,8 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     
     const terrainType = getTerrainString(terrain);
     const segmentDistance = (track.segments.reduce((sum, seg) => sum + seg.length, 0) * track.laps) / 1000;
+    // Use race distance if provided, otherwise fall back to segment-calculated distance
+    // race.distance is in km (set from track.totalDistance / 1000 at race creation)
     const distanceKm = (distance && distance > 0) ? distance : segmentDistance;
     
     // Simulate segment by segment for all bots

@@ -75,6 +75,7 @@ export function getTerrainIcon(terrain: 'ScrapHeaps' | 'WastelandSand' | 'MetalR
     case 'MetalRoads':
       return '🛣️';
     default:
+      console.warn('Unknown terrain type:', terrainStr);
       return '🏁';
   }
 }

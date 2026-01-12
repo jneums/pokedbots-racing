@@ -434,32 +434,32 @@ A comprehensive list of event types possible with the event registration system.
   
   raceCreationMode: #Manual({
     raceTemplates: [
-      // Stage 1: Sprint (15km)
+      // Stage 1: Sprint (7km)
       {
         stageName: ?"Stage 1: Sprint";
         raceClass: #Elite;
         terrain: #MetalRoads;
-        distance: 15;
+        distance: 7;
         trackId: ?300;
         startOffset: 0;
       },
-      // Stage 2: Marathon (30km)
+      // Stage 2: Endurance (17km)
       {
-        stageName: ?"Stage 2: Marathon";
+        stageName: ?"Stage 2: Endurance";
         raceClass: #Elite;
         terrain: #WastelandSand;
-        distance: 30;
+        distance: 17;
         trackId: ?301;
-        startOffset: 7_200_000_000_000;  // +2h
+        startOffset: 5_400_000_000_000;  // +90min
       },
-      // Stage 3: Ultra (50km)
+      // Stage 3: Ultra Marathon (29km)
       {
-        stageName: ?"Stage 3: Ultra Distance";
+        stageName: ?"Stage 3: Ultra Marathon";
         raceClass: #Elite;
-        terrain: #ScrapHeaps;
-        distance: 50;
+        terrain: #MetalRoads;
+        distance: 29;
         trackId: ?302;
-        startOffset: 14_400_000_000_000;  // +4h
+        startOffset: 10_800_000_000_000;  // +3h
       }
     ];
     heatAllocation: #SnakeDraft;

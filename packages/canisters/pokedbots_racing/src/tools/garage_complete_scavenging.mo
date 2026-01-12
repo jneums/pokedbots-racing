@@ -72,6 +72,10 @@ module {
           return ToolContext.makeError(e, cb);
         };
         case (#ok(result)) {
+          // Record dedication activity DP for scavenging
+          // 3 DP base + 1 DP per 10 parts collected
+          ctx.dedicationManager.recordScavengingCompletion(tokenIndex, result.totalParts, now);
+
           // Build parts breakdown
           let partsBreakdown = "Speed Chips: " # Nat.toText(result.speedChips) #
           ", Power Cells: " # Nat.toText(result.powerCoreFragments) #

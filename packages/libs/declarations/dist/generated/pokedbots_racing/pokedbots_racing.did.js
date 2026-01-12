@@ -1,5 +1,65 @@
 export const idlFactory = ({ IDL }) => {
   const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
+  const Result_8 = IDL.Variant({
+    'ok' : IDL.Record({
+      'tokenIndex' : IDL.Nat,
+      'owner' : IDL.Opt(IDL.Principal),
+      'isInitialized' : IDL.Bool,
+      'stability' : IDL.Record({
+        'final' : IDL.Nat,
+        'base' : IDL.Nat,
+        'worldBuff' : IDL.Nat,
+        'upgrades' : IDL.Nat,
+        'overcharge' : IDL.Float64,
+        'conditionEffect' : IDL.Int,
+        'dedication' : IDL.Nat,
+        'overchargeEffect' : IDL.Int,
+        'synergy' : IDL.Nat,
+        'conditionPenalty' : IDL.Float64,
+      }),
+      'speed' : IDL.Record({
+        'final' : IDL.Nat,
+        'batteryEffect' : IDL.Int,
+        'base' : IDL.Nat,
+        'worldBuff' : IDL.Nat,
+        'upgrades' : IDL.Nat,
+        'overcharge' : IDL.Float64,
+        'dedication' : IDL.Nat,
+        'overchargeEffect' : IDL.Int,
+        'synergy' : IDL.Nat,
+        'batteryPenalty' : IDL.Float64,
+      }),
+      'acceleration' : IDL.Record({
+        'final' : IDL.Nat,
+        'batteryEffect' : IDL.Int,
+        'base' : IDL.Nat,
+        'worldBuff' : IDL.Nat,
+        'upgrades' : IDL.Nat,
+        'overcharge' : IDL.Float64,
+        'dedication' : IDL.Nat,
+        'overchargeEffect' : IDL.Int,
+        'synergy' : IDL.Nat,
+        'batteryPenalty' : IDL.Float64,
+      }),
+      'powerCore' : IDL.Record({
+        'final' : IDL.Nat,
+        'base' : IDL.Nat,
+        'worldBuff' : IDL.Nat,
+        'upgrades' : IDL.Nat,
+        'overcharge' : IDL.Float64,
+        'conditionEffect' : IDL.Int,
+        'dedication' : IDL.Nat,
+        'overchargeEffect' : IDL.Int,
+        'synergy' : IDL.Nat,
+        'conditionPenalty' : IDL.Float64,
+      }),
+      'battery' : IDL.Nat,
+      'perfectTuneUp' : IDL.Bool,
+      'overchargePercent' : IDL.Nat,
+      'condition' : IDL.Nat,
+    }),
+    'err' : IDL.Text,
+  });
   const Time__1 = IDL.Nat;
   const ActionFilter = IDL.Variant({
     'All' : IDL.Null,
@@ -42,15 +102,76 @@ export const idlFactory = ({ IDL }) => {
     'SilentKlan' : IDL.Null,
     'Raider' : IDL.Null,
   });
+  const RaceTemplate = IDL.Record({
+    'terrain' : Terrain,
+    'distance' : IDL.Nat,
+    'trackId' : IDL.Opt(IDL.Nat),
+    'startOffset' : IDL.Int,
+    'raceClass' : RaceClass,
+    'stageName' : IDL.Opt(IDL.Text),
+  });
+  const HeatAllocationStrategy = IDL.Variant({
+    'SkillTiered' : IDL.Null,
+    'TopBottom' : IDL.Null,
+    'SnakeDraft' : IDL.Null,
+    'Random' : IDL.Null,
+  });
+  const RaceCreationMode = IDL.Variant({
+    'Manual' : IDL.Record({
+      'raceTemplates' : IDL.Vec(RaceTemplate),
+      'heatAllocation' : HeatAllocationStrategy,
+    }),
+    'Automatic' : IDL.Record({
+      'racesPerClass' : IDL.Opt(IDL.Nat),
+      'heatAllocation' : HeatAllocationStrategy,
+      'distanceRange' : IDL.Record({ 'max' : IDL.Nat, 'min' : IDL.Nat }),
+      'terrains' : IDL.Vec(Terrain),
+    }),
+  });
+  const ScoringMode = IDL.Variant({
+    'Cumulative' : IDL.Null,
+    'Individual' : IDL.Null,
+    'TeamAggregate' : IDL.Null,
+    'Elimination' : IDL.Null,
+  });
   const EventMetadata = IDL.Record({
     'pointsMultiplier' : IDL.Float64,
     'minEntries' : IDL.Nat,
     'name' : IDL.Text,
     'description' : IDL.Text,
     'divisions' : IDL.Vec(RaceClass),
+    'eventBonusPrize' : IDL.Nat,
     'prizePoolBonus' : IDL.Nat,
+    'scoringMode' : ScoringMode,
     'entryFee' : IDL.Nat,
     'maxEntries' : IDL.Nat,
+  });
+  const Sponsorship = IDL.Record({
+    'message' : IDL.Opt(IDL.Text),
+    'timestamp' : IDL.Int,
+    'sponsor' : IDL.Principal,
+    'amount' : IDL.Nat,
+    'sponsorName' : IDL.Opt(IDL.Text),
+  });
+  const EventRegistration = IDL.Record({
+    'eventId' : IDL.Nat,
+    'tokenIndex' : IDL.Nat,
+    'owner' : IDL.Principal,
+    'entryFeePaid' : IDL.Nat,
+    'registeredAt' : IDL.Int,
+    'raceClass' : RaceClass,
+  });
+  const EventVisibility = IDL.Variant({
+    'Private' : IDL.Null,
+    'Public' : IDL.Null,
+    'Restricted' : IDL.Record({
+      'allowedPlayers' : IDL.Opt(IDL.Vec(IDL.Principal)),
+      'allowedBots' : IDL.Opt(IDL.Vec(IDL.Nat)),
+      'minElo' : IDL.Opt(IDL.Nat),
+      'requiredFaction' : IDL.Opt(IDL.Text),
+      'requiredAchievement' : IDL.Opt(IDL.Text),
+      'maxElo' : IDL.Opt(IDL.Nat),
+    }),
   });
   const EventType = IDL.Variant({
     'DailySprint' : IDL.Null,
@@ -61,10 +182,28 @@ export const idlFactory = ({ IDL }) => {
   const ScheduledEvent = IDL.Record({
     'status' : EventStatus,
     'eventId' : IDL.Nat,
+    'creator' : IDL.Opt(IDL.Principal),
+    'raceCreationMode' : RaceCreationMode,
     'scheduledTime' : IDL.Int,
     'metadata' : EventMetadata,
     'createdAt' : IDL.Int,
+    'creationFee' : IDL.Nat,
+    'creatorName' : IDL.Opt(IDL.Text),
+    'invitedParticipants' : IDL.Opt(IDL.Vec(IDL.Principal)),
+    'cancellationDeadlines' : IDL.Record({
+      'quarterRefund' : IDL.Int,
+      'fullRefund' : IDL.Int,
+      'halfRefund' : IDL.Int,
+    }),
+    'maxRegistrationsPerClass' : IDL.Nat,
     'raceIds' : IDL.Vec(IDL.Nat),
+    'registrationCounts' : IDL.Record({
+      'total' : IDL.Nat,
+      'byClass' : IDL.Vec(IDL.Tuple(RaceClass, IDL.Nat)),
+    }),
+    'sponsorships' : IDL.Vec(Sponsorship),
+    'registrations' : IDL.Vec(EventRegistration),
+    'visibility' : EventVisibility,
     'registrationCloses' : IDL.Int,
     'registrationOpens' : IDL.Int,
     'eventType' : EventType,
@@ -303,12 +442,16 @@ export const idlFactory = ({ IDL }) => {
     'NotOwner' : IDL.Null,
     'TransferFailed' : TransferError,
   });
-  const Result_6 = IDL.Variant({ 'ok' : IDL.Null, 'err' : TreasuryError });
+  const Result_7 = IDL.Variant({ 'ok' : IDL.Null, 'err' : TreasuryError });
   const HttpHeader = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
   const HttpRequestResult = IDL.Record({
     'status' : IDL.Nat,
     'body' : IDL.Vec(IDL.Nat8),
     'headers' : IDL.Vec(HttpHeader),
+  });
+  const Result_6 = IDL.Variant({
+    'ok' : IDL.Record({ 'refundAmount' : IDL.Nat, 'penalty' : IDL.Nat }),
+    'err' : IDL.Text,
   });
   const PoolStatus = IDL.Variant({
     'Open' : IDL.Null,
@@ -524,10 +667,33 @@ export const idlFactory = ({ IDL }) => {
   });
   const Result = IDL.Variant({ 'ok' : IDL.Nat, 'err' : TreasuryError });
   const McpServer = IDL.Service({
+    'admin_adjust_leaderboard_points' : IDL.Func(
+        [IDL.Vec(IDL.Nat)],
+        [IDL.Text],
+        [],
+      ),
     'admin_clear_active_mission' : IDL.Func([IDL.Nat], [IDL.Text], []),
+    'admin_compensate_resimulated_winners' : IDL.Func(
+        [IDL.Vec(IDL.Nat)],
+        [IDL.Text],
+        [],
+      ),
     'admin_create_betting_pool' : IDL.Func([IDL.Nat], [Result_1], []),
     'admin_get_active_mission' : IDL.Func([IDL.Nat], [IDL.Text], ['query']),
+    'admin_get_stat_breakdown' : IDL.Func([IDL.Nat], [Result_8], ['query']),
+    'admin_rebuild_bot_histories' : IDL.Func(
+        [IDL.Vec(IDL.Nat)],
+        [IDL.Text],
+        [],
+      ),
     'admin_remove_race_entry' : IDL.Func([IDL.Nat, IDL.Nat], [Result_1], []),
+    'admin_resimulate_race' : IDL.Func([IDL.Nat], [Result_1], []),
+    'admin_resimulate_races_batch' : IDL.Func(
+        [IDL.Vec(IDL.Nat)],
+        [IDL.Text],
+        [],
+      ),
+    'admin_update_prize_amounts' : IDL.Func([IDL.Vec(IDL.Nat)], [IDL.Text], []),
     'admin_update_race_min_entries' : IDL.Func(
         [IDL.Nat, IDL.Nat],
         [IDL.Text],
@@ -550,6 +716,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'cleanup_duplicate_race_create_timers' : IDL.Func([], [IDL.Text], []),
     'cleanup_duplicate_recharge_timers' : IDL.Func([], [IDL.Text], []),
+    'clear_event_races' : IDL.Func([IDL.Vec(IDL.Nat)], [IDL.Text], []),
     'clear_reconstitution_traces' : IDL.Func([], [], []),
     'create_my_api_key' : IDL.Func(
         [IDL.Text, IDL.Vec(IDL.Text)],
@@ -796,6 +963,7 @@ export const idlFactory = ({ IDL }) => {
                 'scheduledTime' : IDL.Int,
                 'totalRacers' : IDL.Nat,
                 'finalTime' : IDL.Opt(IDL.Float64),
+                'leaderboardPoints' : IDL.Nat,
                 'raceId' : IDL.Nat,
                 'position' : IDL.Nat,
                 'eventName' : IDL.Text,
@@ -1058,10 +1226,11 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'recalculate_bot_stats' : IDL.Func([], [IDL.Text], []),
+    'register_for_event' : IDL.Func([IDL.Nat, IDL.Nat], [Result_1], []),
     'revoke_my_api_key' : IDL.Func([IDL.Text], [], []),
     'set_ext_canister' : IDL.Func([IDL.Principal], [Result_5], []),
     'set_icp_ledger' : IDL.Func([IDL.Principal], [Result_5], []),
-    'set_owner' : IDL.Func([IDL.Principal], [Result_6], []),
+    'set_owner' : IDL.Func([IDL.Principal], [Result_7], []),
     'transformJwksResponse' : IDL.Func(
         [
           IDL.Record({
@@ -1072,8 +1241,10 @@ export const idlFactory = ({ IDL }) => {
         [HttpRequestResult],
         ['query'],
       ),
+    'trigger_race_creation' : IDL.Func([], [IDL.Text], []),
     'trigger_race_finish' : IDL.Func([IDL.Nat], [IDL.Text], []),
     'trigger_race_start' : IDL.Func([IDL.Nat], [IDL.Text], []),
+    'unregister_from_event' : IDL.Func([IDL.Nat, IDL.Nat], [Result_6], []),
     'upload_base_stats_batch' : IDL.Func(
         [
           IDL.Vec(
@@ -1283,6 +1454,36 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'web_get_dedication_info' : IDL.Func(
+        [IDL.Nat],
+        [
+          IDL.Record({
+            'tierName' : IDL.Text,
+            'totalDP' : IDL.Nat,
+            'tier' : IDL.Nat,
+            'activityDP' : IDL.Nat,
+            'progressPercent' : IDL.Nat,
+            'benefits' : IDL.Record({
+              'accelerationBonus' : IDL.Nat,
+              'stabilityBonus' : IDL.Nat,
+              'scavengingYieldMult' : IDL.Float64,
+              'repairCooldownMult' : IDL.Float64,
+              'rechargeCooldownMult' : IDL.Float64,
+              'powerCoreBonus' : IDL.Nat,
+              'terrainBonusPercent' : IDL.Nat,
+              'upgradeDiscountMult' : IDL.Float64,
+              'speedBonus' : IDL.Nat,
+            }),
+            'investmentDP' : IDL.Nat,
+            'nextTierDP' : IDL.Opt(IDL.Nat),
+            'nextTierName' : IDL.Opt(IDL.Text),
+            'totalInvestedICP' : IDL.Float64,
+          }),
+        ],
+        ['query'],
+      ),
+    'web_get_racer_bots' : IDL.Func([], [IDL.Vec(IDL.Nat)], ['query']),
+    'web_get_scavenger_bots' : IDL.Func([], [IDL.Vec(IDL.Nat)], ['query']),
     'web_get_starred_bots' : IDL.Func([], [IDL.Vec(IDL.Nat)], ['query']),
     'web_get_user_inventory' : IDL.Func([], [UserInventory], ['query']),
     'web_initialize_bot' : IDL.Func(
@@ -1327,6 +1528,14 @@ export const idlFactory = ({ IDL }) => {
                   'raceId' : IDL.Nat,
                   'entryDeadline' : IDL.Int,
                   'entryFee' : IDL.Nat,
+                })
+              ),
+              'dedicationBonuses' : IDL.Opt(
+                IDL.Record({
+                  'stability' : IDL.Nat,
+                  'speed' : IDL.Nat,
+                  'acceleration' : IDL.Nat,
+                  'powerCore' : IDL.Nat,
                 })
               ),
               'currentStats' : IDL.Opt(
@@ -1398,6 +1607,12 @@ export const idlFactory = ({ IDL }) => {
                   'entryFee' : IDL.Nat,
                 })
               ),
+              'dedicationBonuses' : IDL.Record({
+                'stability' : IDL.Nat,
+                'speed' : IDL.Nat,
+                'acceleration' : IDL.Nat,
+                'powerCore' : IDL.Nat,
+              }),
               'currentStats' : IDL.Record({
                 'stability' : IDL.Nat,
                 'speed' : IDL.Nat,
@@ -1431,6 +1646,8 @@ export const idlFactory = ({ IDL }) => {
     'web_recharge_bot' : IDL.Func([IDL.Nat], [Result_1], []),
     'web_repair_bot' : IDL.Func([IDL.Nat], [Result_1], []),
     'web_respec_bot' : IDL.Func([IDL.Nat, IDL.Vec(IDL.Text)], [Result_2], []),
+    'web_set_racer_bots' : IDL.Func([IDL.Vec(IDL.Nat)], [Result_1], []),
+    'web_set_scavenger_bots' : IDL.Func([IDL.Vec(IDL.Nat)], [Result_1], []),
     'web_set_starred_bots' : IDL.Func([IDL.Vec(IDL.Nat)], [Result_1], []),
     'web_start_scavenging' : IDL.Func(
         [IDL.Nat, IDL.Text, IDL.Opt(IDL.Nat)],

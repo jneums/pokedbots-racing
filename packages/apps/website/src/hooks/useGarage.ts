@@ -8,6 +8,10 @@ import {
   fullMaintenanceBot,
   getStarredBots,
   setStarredBots,
+  getRacerBots,
+  setRacerBots,
+  getScavengerBots,
+  setScavengerBots,
   upgradeBot,
   cancelUpgrade,
   enterRace,
@@ -27,10 +31,12 @@ import {
   batchRepairBots,
   batchStartScavenging,
   batchCompleteScavenging,
+  getDedicationInfo,
   type UpgradeType,
   type PaymentMethod,
   type ApiKeyMetadata,
   type UnregisteredNFT,
+  type DedicationInfo,
 } from '@pokedbots-racing/ic-js';
 import { useAuth } from './useAuth';
 
@@ -74,6 +80,23 @@ export function useBotDetails(tokenIndex: number | null) {
     },
     enabled: !!user?.agent && tokenIndex !== null,
     staleTime: 10 * 1000, // 10 seconds,
+  });
+}
+
+/**
+ * Hook to fetch dedication info for a bot (no auth required - anonymous query)
+ */
+export function useDedicationInfo(tokenIndex: number | null) {
+  return useQuery({
+    queryKey: ['dedication-info', tokenIndex],
+    queryFn: async () => {
+      if (tokenIndex === null) {
+        throw new Error('Invalid token');
+      }
+      return getDedicationInfo(tokenIndex);
+    },
+    enabled: tokenIndex !== null,
+    staleTime: 30 * 1000, // 30 seconds
   });
 }
 
@@ -218,6 +241,106 @@ export function useSetStarredBots() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['starred-bots'] });
+    },
+  });
+}
+
+/**
+ * Hook to fetch user's bots tagged as racers from backend
+ */
+export function useRacerBots() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['racer-bots', user?.principal],
+    queryFn: async () => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return getRacerBots(user.agent);
+    },
+    enabled: !!user?.agent,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+}
+
+/**
+ * Hook to update user's bots tagged as racers on backend
+ */
+export function useSetRacerBots() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (tokenIndices: number[]) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return setRacerBots(tokenIndices, user.agent);
+    },
+    onMutate: async (newRacerBots) => {
+      await queryClient.cancelQueries({ queryKey: ['racer-bots', user?.principal] });
+      const previousRacerBots = queryClient.getQueryData(['racer-bots', user?.principal]);
+      queryClient.setQueryData(['racer-bots', user?.principal], newRacerBots);
+      return { previousRacerBots };
+    },
+    onError: (err, newRacerBots, context) => {
+      if (context?.previousRacerBots) {
+        queryClient.setQueryData(['racer-bots', user?.principal], context.previousRacerBots);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['racer-bots'] });
+    },
+  });
+}
+
+/**
+ * Hook to fetch user's bots tagged as scavengers from backend
+ */
+export function useScavengerBots() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['scavenger-bots', user?.principal],
+    queryFn: async () => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return getScavengerBots(user.agent);
+    },
+    enabled: !!user?.agent,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+}
+
+/**
+ * Hook to update user's bots tagged as scavengers on backend
+ */
+export function useSetScavengerBots() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (tokenIndices: number[]) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return setScavengerBots(tokenIndices, user.agent);
+    },
+    onMutate: async (newScavengerBots) => {
+      await queryClient.cancelQueries({ queryKey: ['scavenger-bots', user?.principal] });
+      const previousScavengerBots = queryClient.getQueryData(['scavenger-bots', user?.principal]);
+      queryClient.setQueryData(['scavenger-bots', user?.principal], newScavengerBots);
+      return { previousScavengerBots };
+    },
+    onError: (err, newScavengerBots, context) => {
+      if (context?.previousScavengerBots) {
+        queryClient.setQueryData(['scavenger-bots', user?.principal], context.previousScavengerBots);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scavenger-bots'] });
     },
   });
 }

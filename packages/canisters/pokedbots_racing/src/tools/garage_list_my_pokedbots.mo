@@ -1,4 +1,3 @@
-import Principal "mo:base/Principal";
 import Result "mo:base/Result";
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
@@ -6,6 +5,7 @@ import Int "mo:base/Int";
 import Float "mo:base/Float";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
+import Option "mo:base/Option";
 
 import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
@@ -22,11 +22,11 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_list_my_pokedbots";
     title = ?"List My PokedBots";
-    description = ?"List all PokedBots in your wallet with detailed stats, full power stats, racing status, scavenging status, and overall ratings";
+    description = ?"List all PokedBots in your wallet with detailed stats, full power stats, racing status, scavenging status, and overall ratings. Filter by user tags (starred, racers, scavengers) or activity status.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([])),
+      ("properties", Json.obj([("only_starred", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots you've marked as favorites"))])), ("only_racers", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots you've tagged as racers"))])), ("only_scavengers", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots you've tagged as scavengers"))])), ("only_scavenging", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots currently on scavenging missions"))])), ("only_in_races", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots currently entered in races"))])), ("only_ready", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots ready to race (battery ≥ 30%, condition ≥ 50%, not in active missions)"))]))])),
     ]);
     outputSchema = null;
   };
@@ -43,6 +43,19 @@ module {
           return ToolContext.makeError("Authentication required", cb);
         };
       };
+
+      // Parse filter parameters
+      let onlyStarred = Result.toOption(Json.getAsBool(_args, "only_starred"));
+      let onlyRacers = Result.toOption(Json.getAsBool(_args, "only_racers"));
+      let onlyScavengers = Result.toOption(Json.getAsBool(_args, "only_scavengers"));
+      let onlyScavenging = Result.toOption(Json.getAsBool(_args, "only_scavenging"));
+      let onlyInRaces = Result.toOption(Json.getAsBool(_args, "only_in_races"));
+      let onlyReady = Result.toOption(Json.getAsBool(_args, "only_ready"));
+
+      // Get user's preference lists
+      let starredBots = ctx.getUserStarredBots(userPrincipal);
+      let racerBots = ctx.getUserRacerBots(userPrincipal);
+      let scavengerBots = ctx.getUserScavengerBots(userPrincipal);
 
       // Check user's wallet (non-custodial)
       let walletAccountId = ExtIntegration.principalToAccountIdentifier(userPrincipal, null);
@@ -160,8 +173,6 @@ module {
             };
             msg #= "\n";
 
-            msg #= "Found " # Nat32.toText(Nat32.fromNat(tokens.size())) # " PokedBot(s)\n\n";
-
             // Lazily accumulate rewards for all bots with active scavenging missions BEFORE displaying
             let now = Time.now();
             for (tokenIndex in tokens.vals()) {
@@ -180,8 +191,90 @@ module {
               };
             };
 
+            // Apply filters to token list
+            var filteredTokens = tokens;
+
+            // Filter by user tags
+            if (Option.get(onlyStarred, false)) {
+              filteredTokens := Array.filter<Nat32>(
+                filteredTokens,
+                func(tokenIndex) {
+                  let tokenNat = Nat32.toNat(tokenIndex);
+                  Option.isSome(Array.find<Nat>(starredBots, func(n) { n == tokenNat }));
+                },
+              );
+            };
+
+            if (Option.get(onlyRacers, false)) {
+              filteredTokens := Array.filter<Nat32>(
+                filteredTokens,
+                func(tokenIndex) {
+                  let tokenNat = Nat32.toNat(tokenIndex);
+                  Option.isSome(Array.find<Nat>(racerBots, func(n) { n == tokenNat }));
+                },
+              );
+            };
+
+            if (Option.get(onlyScavengers, false)) {
+              filteredTokens := Array.filter<Nat32>(
+                filteredTokens,
+                func(tokenIndex) {
+                  let tokenNat = Nat32.toNat(tokenIndex);
+                  Option.isSome(Array.find<Nat>(scavengerBots, func(n) { n == tokenNat }));
+                },
+              );
+            };
+
+            // Filter by activity status
+            if (Option.get(onlyScavenging, false)) {
+              filteredTokens := Array.filter<Nat32>(
+                filteredTokens,
+                func(tokenIndex) {
+                  let tokenNat = Nat32.toNat(tokenIndex);
+                  switch (ctx.garageManager.getStats(tokenNat)) {
+                    case (?stats) { Option.isSome(stats.activeMission) };
+                    case (null) { false };
+                  };
+                },
+              );
+            };
+
+            if (Option.get(onlyInRaces, false)) {
+              filteredTokens := Array.filter<Nat32>(
+                filteredTokens,
+                func(tokenIndex) {
+                  let tokenNat = Nat32.toNat(tokenIndex);
+                  ctx.isInActiveRace(tokenNat);
+                },
+              );
+            };
+
+            if (Option.get(onlyReady, false)) {
+              filteredTokens := Array.filter<Nat32>(
+                filteredTokens,
+                func(tokenIndex) {
+                  let tokenNat = Nat32.toNat(tokenIndex);
+                  switch (ctx.garageManager.getStats(tokenNat)) {
+                    case (?stats) {
+                      let hasBattery = stats.battery >= 30;
+                      let hasCondition = stats.condition >= 50;
+                      let notScavenging = Option.isNull(stats.activeMission);
+                      hasBattery and hasCondition and notScavenging;
+                    };
+                    case (null) { false };
+                  };
+                },
+              );
+            };
+
+            msg #= "Found " # Nat32.toText(Nat32.fromNat(filteredTokens.size())) # " PokedBot(s)";
+            if (filteredTokens.size() != tokens.size()) {
+              msg #= " (filtered from " # Nat32.toText(Nat32.fromNat(tokens.size())) # " total)";
+            };
+            msg #= "\n\n";
+
             // Now display bots with updated stats (including accumulated rewards)
-            for (tokenIndex in tokens.vals()) {
+            for (tokenIndex in filteredTokens.vals()) {
               let tokenId = ExtIntegration.encodeTokenIdentifier(tokenIndex, ctx.extCanisterId);
               let thumbnailUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId # "&type=thumbnail";
 

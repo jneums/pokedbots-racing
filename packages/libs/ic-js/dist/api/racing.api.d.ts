@@ -144,4 +144,31 @@ export declare const queryRaces: (filters: {
     nextRaceId: bigint | null;
     totalMatching: bigint;
 }>;
+/**
+ * Register a bot for an event
+ * @param eventId The event ID to register for
+ * @param tokenIndex The bot's token index
+ * @param identity Identity to use for the call
+ * @returns Success message or error
+ */
+export declare const registerForEvent: (eventId: number, tokenIndex: number, identity: Identity) => Promise<{
+    ok: string;
+} | {
+    err: string;
+}>;
+/**
+ * Unregister a bot from an event
+ * @param eventId The event ID to unregister from
+ * @param tokenIndex The bot's token index
+ * @param identity Identity to use for the call
+ * @returns Refund info or error
+ */
+export declare const unregisterFromEvent: (eventId: number, tokenIndex: number, identity: Identity) => Promise<{
+    ok: {
+        refundAmount: bigint;
+        penalty: bigint;
+    };
+} | {
+    err: string;
+}>;
 //# sourceMappingURL=racing.api.d.ts.map

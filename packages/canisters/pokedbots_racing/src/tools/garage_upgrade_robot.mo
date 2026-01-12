@@ -124,7 +124,13 @@ module {
 
       // Calculate cost using V2 formula with Game faction synergy
       let synergies = ctx.garageManager.calculateFactionSynergies(user);
-      let costE8s = ctx.garageManager.calculateUpgradeCostV2(baseStat, currentStatValue, overallRating, synergies.costMultipliers.upgradeCost);
+
+      // Apply Bot Dedication tier upgrade discount (0-15% discount)
+      // upgradeDiscountMult is already a multiplier (0.85 = 15% discount, 1.0 = no discount)
+      let tierBenefits = ctx.dedicationManager.getBenefitsForBot(tokenIndex);
+      let finalSynergyMultiplier = synergies.costMultipliers.upgradeCost * tierBenefits.upgradeDiscountMult;
+
+      let costE8s = ctx.garageManager.calculateUpgradeCostV2(baseStat, currentStatValue, overallRating, finalSynergyMultiplier);
       let totalCost = costE8s + TRANSFER_FEE;
 
       // Determine part type (for parts payment option)
@@ -173,7 +179,10 @@ module {
             case (#Err(_)) {
               return ToolContext.makeError("Payment failed - check ICRC-2 allowance. Cost: " # Nat.toText(totalCost) # " e8s (" # Float.format(#fix 2, Float.fromInt(totalCost) / 100_000_000.0) # " ICP)", cb);
             };
-            case (#Ok(_)) {};
+            case (#Ok(_)) {
+              // Record dedication points for ICP investment (only for ICP payments, not parts)
+              ctx.dedicationManager.recordUpgrade(tokenIndex, costE8s, now);
+            };
           };
         } catch (e) {
           return ToolContext.makeError("Payment failed: " # Error.message(e), cb);

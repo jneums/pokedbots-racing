@@ -207,6 +207,9 @@ module {
             // Payment successful, enter the race
             switch (ctx.raceManager.enterRace(raceId, nftId, user, now)) {
               case (?updatedRace) {
+                // Record dedication points for race entry fee (ICP investment)
+                ctx.dedicationManager.recordRaceEntry(tokenIndex, race.entryFee, now);
+
                 // Update last raced time (battery drain happens after race completes)
                 let updatedStats = {
                   botStats with

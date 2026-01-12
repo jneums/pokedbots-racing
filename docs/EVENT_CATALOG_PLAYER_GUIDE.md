@@ -148,9 +148,9 @@ Two factions enter. One faction leaves victorious! Only specific factions can re
 **Duration:** 4 hours
 
 Can you survive them all? Three races with increasing distances:
-1. **Stage 1:** Sprint (15km) - Get warmed up
-2. **Stage 2:** Marathon (30km) - Real racing begins  
-3. **Stage 3:** Ultra (50km) - Only the strongest survive
+1. **Stage 1:** Sprint (7km) - Get warmed up
+2. **Stage 2:** Endurance (17km) - Real racing begins  
+3. **Stage 3:** Ultra Marathon (29km) - Only the strongest survive
 
 Your total score across all three determines the winner. Battery and condition management is critical!
 

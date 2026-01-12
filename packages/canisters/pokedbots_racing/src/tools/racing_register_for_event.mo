@@ -16,6 +16,7 @@ import Json "mo:json";
 import ToolContext "ToolContext";
 import RaceCalendar "../RaceCalendar";
 import IcpLedger "../IcpLedger";
+import RacingSimulator "../RacingSimulator";
 
 module {
   let TRANSFER_FEE = 10000 : Nat;
@@ -111,8 +112,31 @@ module {
       };
       let adjustedEntryFee = Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
 
+      // Check if bot is already entered in any race within this event BEFORE taking payment
+      let eventRaces = event.raceIds;
+      for (eventRaceId in eventRaces.vals()) {
+        let maybeRace = ctx.raceManager.getRace(eventRaceId);
+        switch (maybeRace) {
+          case (?race) {
+            let tokenIndexText = Nat.toText(tokenIndex);
+            let isAlreadyEntered = Array.find<RacingSimulator.RaceEntry>(
+              race.entries,
+              func(entry : RacingSimulator.RaceEntry) : Bool {
+                entry.nftId == tokenIndexText;
+              },
+            );
+            switch (isAlreadyEntered) {
+              case (?_) {
+                return ToolContext.makeError("This bot is already entered in another race in this event (Race #" # Nat.toText(eventRaceId) # ")", cb);
+              };
+              case (null) {};
+            };
+          };
+          case (null) {};
+        };
+      };
+
       // Process ICRC-2 payment
-      let nftId = Nat.toText(tokenIndex);
       // User pays from their default subaccount (not bot-specific garage)
       let userAccount = { owner = user; subaccount = null };
 
@@ -159,11 +183,44 @@ module {
             // Payment successful, register for event
             switch (ctx.eventCalendar.registerForEvent(eventId, tokenIndex, user, raceClass, adjustedEntryFee, now)) {
               case (#err(msg)) {
-                // Registration failed - need to refund
-                // TODO: Implement refund logic
-                return ToolContext.makeError("Registration failed: " # msg, cb);
+                // Registration failed - refund the payment
+                let refundLedger = actor (Principal.toText(ledgerCanisterId)) : actor {
+                  icrc1_transfer : shared IcpLedger.TransferArg -> async IcpLedger.Result;
+                };
+
+                let refundAmount = if (adjustedEntryFee > TRANSFER_FEE) {
+                  adjustedEntryFee - TRANSFER_FEE; // Deduct one transfer fee from refund
+                } else {
+                  adjustedEntryFee; // Refund full amount even if small
+                };
+
+                try {
+                  let refundResult = await refundLedger.icrc1_transfer({
+                    from_subaccount = null;
+                    to = { owner = user; subaccount = null };
+                    amount = refundAmount;
+                    fee = ?TRANSFER_FEE;
+                    memo = null;
+                    created_at_time = null;
+                  });
+
+                  switch (refundResult) {
+                    case (#Ok(_)) {
+                      return ToolContext.makeError("Registration failed (refunded " # Nat.toText(refundAmount) # " e8s): " # msg, cb);
+                    };
+                    case (#Err(refundErr)) {
+                      // Critical: Payment taken but refund failed
+                      return ToolContext.makeError("Registration failed AND refund failed. Please contact support. Event ID: " # Nat.toText(eventId) # ", Amount: " # Nat.toText(adjustedEntryFee) # " e8s. Error: " # debug_show (refundErr), cb);
+                    };
+                  };
+                } catch (_refundError) {
+                  // Critical: Payment taken but refund failed
+                  return ToolContext.makeError("Registration failed AND refund failed. Please contact support. Event ID: " # Nat.toText(eventId) # ", Amount: " # Nat.toText(adjustedEntryFee) # " e8s", cb);
+                };
               };
-              case (#ok(registration)) {
+              case (#ok(_registration)) {
+                // MCP tools do not record dedication points (rewards manual play)
+
                 let classText = switch (raceClass) {
                   case (#Scrap) { "Scrap" };
                   case (#Junker) { "Junker" };

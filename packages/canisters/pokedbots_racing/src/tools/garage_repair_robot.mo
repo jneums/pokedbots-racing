@@ -76,10 +76,16 @@ module {
       };
 
       let now = Time.now();
+
+      // Apply Bot Dedication tier cooldown reduction (0-40%) to repair cooldown
+      let tierBenefits = ctx.dedicationManager.getTierBenefits(tokenIndex);
+      let adjustedRepairCooldown = Float.toInt(Float.fromInt(REPAIR_COOLDOWN) * tierBenefits.repairCooldownMult);
+
       switch (racingStats.lastRepaired) {
         case (?lastTime) {
-          if (now - lastTime < REPAIR_COOLDOWN) {
-            return ToolContext.makeError("Repair cooldown active", cb);
+          if (now - lastTime < adjustedRepairCooldown) {
+            let hoursLeft = (adjustedRepairCooldown - (now - lastTime)) / (60 * 60 * 1_000_000_000);
+            return ToolContext.makeError("Repair cooldown active. Hours remaining: " # Nat.toText(Int.abs(hoursLeft)), cb);
           };
         };
         case (null) {};
@@ -133,6 +139,12 @@ module {
             };
 
             ctx.garageManager.updateStats(tokenIndex, updatedStats);
+
+            // Record dedication points for ICP investment (actual cost paid after synergy discount)
+            ctx.dedicationManager.recordRepair(tokenIndex, repairCostWithSynergy, now);
+
+            // Record activity DP for condition restoration (1 DP per 10 condition)
+            ctx.dedicationManager.recordConditionRestored(tokenIndex, conditionRestored, now);
 
             let costIcp = Float.fromInt(repairCostWithSynergy) / 100_000_000.0;
 

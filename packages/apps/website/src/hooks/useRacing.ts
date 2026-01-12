@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getUpcomingEvents,
   getUpcomingEventsWithRaces,
@@ -12,9 +12,12 @@ import {
   getBotRaceHistory,
   debugTestSimulation,
   queryRaces,
+  registerForEvent,
+  unregisterFromEvent,
   type ScheduledEvent,
   type Race,
 } from '@pokedbots-racing/ic-js';
+import { useAuth } from './useAuth';
 
 export type { ScheduledEvent, Race };
 
@@ -159,16 +162,20 @@ export const useGetBotProfilesBatch = (tokenIndices: number[]) => {
 /**
  * React Query hook to fetch race history for a specific bot.
  */
-export const useGetBotRaceHistory = (tokenIndex: number | null, limit: number = 10, afterRaceId?: number) => {
-  return useQuery<{ races: Array<any>, hasMore: boolean, nextRaceId: number | null }>({
-    queryKey: ['botRaceHistory', tokenIndex, limit, afterRaceId],
-    queryFn: () => {
+export const useGetBotRaceHistory = (tokenIndex: number | null, limit: number = 10) => {
+  return useInfiniteQuery<{ races: Array<any>, hasMore: boolean, nextRaceId: number | null }>({
+    queryKey: ['botRaceHistory', tokenIndex, limit],
+    queryFn: ({ pageParam }) => {
       if (tokenIndex === null) {
         return { races: [], hasMore: false, nextRaceId: null };
       }
-      return getBotRaceHistory(tokenIndex, limit, afterRaceId);
+      return getBotRaceHistory(tokenIndex, limit, pageParam as number | undefined);
     },
     enabled: tokenIndex !== null,
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage) => {
+      return lastPage.hasMore ? lastPage.nextRaceId : undefined;
+    },
   });
 };
 
@@ -228,5 +235,63 @@ export const useQueryRaces = (filters: {
     refetchInterval: 30000, // Refetch every 30 seconds
     retry: 2, // Reduce retries
     staleTime: 10000, // Consider data stale after 10 seconds
+  });
+};
+
+/**
+ * Mutation hook to register a bot for an event
+ */
+export const useRegisterForEvent = () => {
+  const queryClient = useQueryClient();
+  const { getAgent } = useAuth();
+  
+  return useMutation({
+    mutationFn: async ({ eventId, tokenIndex }: { eventId: number; tokenIndex: number }) => {
+      const agent = getAgent();
+      if (!agent) {
+        throw new Error('Not authenticated');
+      }
+      const result = await registerForEvent(eventId, tokenIndex, agent);
+      if ('err' in result) {
+        throw new Error(result.err);
+      }
+      return result.ok;
+    },
+    onSuccess: (_, variables) => {
+      // Invalidate event details to refetch registration counts
+      queryClient.invalidateQueries({ queryKey: ['eventDetails', variables.eventId] });
+      queryClient.invalidateQueries({ queryKey: ['eventWithRaces', variables.eventId] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingEvents'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingEventsWithRaces'] });
+    },
+  });
+};
+
+/**
+ * Mutation hook to unregister a bot from an event
+ */
+export const useUnregisterFromEvent = () => {
+  const queryClient = useQueryClient();
+  const { getAgent } = useAuth();
+  
+  return useMutation({
+    mutationFn: async ({ eventId, tokenIndex }: { eventId: number; tokenIndex: number }) => {
+      const agent = getAgent();
+      if (!agent) {
+        throw new Error('Not authenticated');
+      }
+      const result = await unregisterFromEvent(eventId, tokenIndex, agent);
+      if ('err' in result) {
+        throw new Error(result.err);
+      }
+      return result.ok;
+    },
+    onSuccess: (_, variables) => {
+      // Invalidate event details to refetch registration counts
+      queryClient.invalidateQueries({ queryKey: ['eventDetails', variables.eventId] });
+      queryClient.invalidateQueries({ queryKey: ['eventWithRaces', variables.eventId] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingEvents'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingEventsWithRaces'] });
+    },
   });
 };

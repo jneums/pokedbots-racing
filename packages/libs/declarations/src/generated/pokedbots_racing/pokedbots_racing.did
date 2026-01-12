@@ -118,6 +118,14 @@ type StreamingCallbackResponse =
  };
 type StreamingCallback = func (StreamingToken) ->
                           (opt StreamingCallbackResponse) query;
+type Sponsorship = 
+ record {
+   amount: nat;
+   message: opt text;
+   sponsor: principal;
+   sponsorName: opt text;
+   timestamp: int;
+ };
 type Sponsor = 
  record {
    amount: nat;
@@ -125,17 +133,47 @@ type Sponsor =
    sponsor: principal;
    timestamp: int;
  };
+type ScoringMode = 
+ variant {
+   Cumulative;
+   Elimination;
+   Individual;
+   TeamAggregate;
+ };
 type ScheduledEvent = 
  record {
+   cancellationDeadlines:
+    record {
+      fullRefund: int;
+      halfRefund: int;
+      quarterRefund: int;
+    };
    createdAt: int;
+   creationFee: nat;
+   creator: opt principal;
+   creatorName: opt text;
    eventId: nat;
    eventType: EventType;
+   invitedParticipants: opt vec principal;
+   maxRegistrationsPerClass: nat;
    metadata: EventMetadata;
+   raceCreationMode: RaceCreationMode;
    raceIds: vec nat;
    registrationCloses: int;
+   registrationCounts:
+    record {
+      byClass: vec record {
+                     RaceClass;
+                     nat;
+                   };
+      total: nat;
+    };
    registrationOpens: int;
+   registrations: vec EventRegistration;
    scheduledTime: int;
+   sponsorships: vec Sponsorship;
    status: EventStatus;
+   visibility: EventVisibility;
  };
 type ScavengingZone = 
  variant {
@@ -164,10 +202,84 @@ type ScavengingMission =
    tokenIndex: nat;
    zone: ScavengingZone;
  };
-type Result_6 = 
+type Result_8 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      acceleration:
+       record {
+         base: nat;
+         batteryEffect: int;
+         batteryPenalty: float64;
+         dedication: nat;
+         final: nat;
+         overcharge: float64;
+         overchargeEffect: int;
+         synergy: nat;
+         upgrades: nat;
+         worldBuff: nat;
+       };
+      battery: nat;
+      condition: nat;
+      isInitialized: bool;
+      overchargePercent: nat;
+      owner: opt principal;
+      perfectTuneUp: bool;
+      powerCore:
+       record {
+         base: nat;
+         conditionEffect: int;
+         conditionPenalty: float64;
+         dedication: nat;
+         final: nat;
+         overcharge: float64;
+         overchargeEffect: int;
+         synergy: nat;
+         upgrades: nat;
+         worldBuff: nat;
+       };
+      speed:
+       record {
+         base: nat;
+         batteryEffect: int;
+         batteryPenalty: float64;
+         dedication: nat;
+         final: nat;
+         overcharge: float64;
+         overchargeEffect: int;
+         synergy: nat;
+         upgrades: nat;
+         worldBuff: nat;
+       };
+      stability:
+       record {
+         base: nat;
+         conditionEffect: int;
+         conditionPenalty: float64;
+         dedication: nat;
+         final: nat;
+         overcharge: float64;
+         overchargeEffect: int;
+         synergy: nat;
+         upgrades: nat;
+         worldBuff: nat;
+       };
+      tokenIndex: nat;
+    };
+ };
+type Result_7 = 
  variant {
    err: TreasuryError;
    ok;
+ };
+type Result_6 = 
+ variant {
+   err: text;
+   ok: record {
+         penalty: nat;
+         refundAmount: nat;
+       };
  };
 type Result_5 = 
  variant {
@@ -263,6 +375,15 @@ type RacingStats =
    speed: nat;
    stability: nat;
  };
+type RaceTemplate = 
+ record {
+   distance: nat;
+   raceClass: RaceClass;
+   stageName: opt text;
+   startOffset: int;
+   terrain: Terrain;
+   trackId: opt nat;
+ };
 type RaceStatus = 
  variant {
    Cancelled;
@@ -331,6 +452,24 @@ type RaceEntry =
    nftId: text;
    owner: principal;
    stats: opt RacingStats;
+ };
+type RaceCreationMode = 
+ variant {
+   Automatic:
+    record {
+      distanceRange: record {
+                       max: nat;
+                       min: nat;
+                     };
+      heatAllocation: HeatAllocationStrategy;
+      racesPerClass: opt nat;
+      terrains: vec Terrain;
+    };
+   Manual:
+    record {
+      heatAllocation: HeatAllocationStrategy;
+      raceTemplates: vec RaceTemplate;
+    };
  };
 type RaceClass = 
  variant {
@@ -440,13 +579,21 @@ type NFTMetadata =
      };
 type McpServer = 
  service {
+   admin_adjust_leaderboard_points: (raceIds: vec nat) -> (text);
    admin_clear_active_mission: (tokenIndex: nat) -> (text);
+   admin_compensate_resimulated_winners: (raceIds: vec nat) -> (text);
    /// Admin function to manually create betting pool for an existing race
    /// Useful for testing and recovery when races are created in advance
    admin_create_betting_pool: (raceId: nat) -> (Result_1);
    admin_get_active_mission: (tokenIndex: nat) -> (text) query;
+   /// Get detailed stat breakdown for debugging (admin only)
+   admin_get_stat_breakdown: (tokenIndex: nat) -> (Result_8) query;
+   admin_rebuild_bot_histories: (tokenIndices: vec nat) -> (text);
    /// Admin method to remove a bot from a race (for fixing bugs/errors)
    admin_remove_race_entry: (raceId: nat, tokenIndex: nat) -> (Result_1);
+   admin_resimulate_race: (raceId: nat) -> (Result_1);
+   admin_resimulate_races_batch: (raceIds: vec nat) -> (text);
+   admin_update_prize_amounts: (raceIds: vec nat) -> (text);
    admin_update_race_min_entries: (raceId: nat, minEntries: nat) -> (text);
    cancel_actions_by_filter: (filter: ActionFilter) -> (CancellationResult);
    cancel_actions_by_ids: (ids: vec nat) -> (CancellationResult);
@@ -456,6 +603,7 @@ type McpServer =
                                                    });
    cleanup_duplicate_race_create_timers: () -> (text);
    cleanup_duplicate_recharge_timers: () -> (text);
+   clear_event_races: (eventIds: vec nat) -> (text);
    clear_reconstitution_traces: () -> ();
    /// * Creates a new API key. This API key is linked to the caller's principal.
    ///    * @param name A human-readable name for the key.
@@ -682,6 +830,7 @@ type McpServer =
            eventId: nat;
            eventName: text;
            finalTime: opt float64;
+           leaderboardPoints: nat;
            position: nat;
            prizeAmount: nat;
            raceId: nat;
@@ -882,6 +1031,8 @@ type McpServer =
        totalMatching: nat;
      }) query;
    recalculate_bot_stats: () -> (text);
+   /// Register a bot for an event (with ICRC-2 payment for entry fee)
+   register_for_event: (eventId: nat, tokenIndex: nat) -> (Result_1);
    /// Revoke (delete) an API key owned by the caller.
    ///    * @param key_id The ID of the key to revoke.
    ///    * @returns True if the key was found and revoked, false otherwise.
@@ -891,14 +1042,17 @@ type McpServer =
    /// Set the ICP ledger canister ID. Only the current owner can call this.
    set_icp_ledger: (ledger_id: principal) -> (Result_5);
    /// Set a new owner for the canister. Only the current owner can call this.
-   set_owner: (new_owner: principal) -> (Result_6);
+   set_owner: (new_owner: principal) -> (Result_7);
    transformJwksResponse:
     (record {
        context: blob;
        response: HttpRequestResult;
      }) -> (HttpRequestResult) query;
+   trigger_race_creation: () -> (text);
    trigger_race_finish: (raceId: nat) -> (text);
    trigger_race_start: (raceId: nat) -> (text);
+   /// Unregister from an event and get a refund based on timing
+   unregister_from_event: (eventId: nat, tokenIndex: nat) -> (Result_6);
    /// Upload a batch of pre-computed base stats
    upload_base_stats_batch: (batch:
     vec
@@ -1088,6 +1242,35 @@ type McpServer =
                            prizes: float64;
                          };
      }) query;
+   /// Get dedication info for a specific bot
+   web_get_dedication_info: (tokenIndex: nat) ->
+    (record {
+       activityDP: nat;
+       benefits:
+        record {
+          accelerationBonus: nat;
+          powerCoreBonus: nat;
+          rechargeCooldownMult: float64;
+          repairCooldownMult: float64;
+          scavengingYieldMult: float64;
+          speedBonus: nat;
+          stabilityBonus: nat;
+          terrainBonusPercent: nat;
+          upgradeDiscountMult: float64;
+        };
+       investmentDP: nat;
+       nextTierDP: opt nat;
+       nextTierName: opt text;
+       progressPercent: nat;
+       tier: nat;
+       tierName: text;
+       totalDP: nat;
+       totalInvestedICP: float64;
+     }) query;
+   /// Get user's bots tagged as racers
+   web_get_racer_bots: () -> (vec nat) query;
+   /// Get user's bots tagged as scavengers
+   web_get_scavenger_bots: () -> (vec nat) query;
    /// Get user's starred bots
    web_get_starred_bots: () -> (vec nat) query;
    /// Get user's parts inventory
@@ -1101,6 +1284,14 @@ type McpServer =
         activeUpgrade: opt UpgradeSession;
         currentOwner: text;
         currentStats:
+         opt
+          record {
+            acceleration: nat;
+            powerCore: nat;
+            speed: nat;
+            stability: nat;
+          };
+        dedicationBonuses:
          opt
           record {
             acceleration: nat;
@@ -1176,6 +1367,13 @@ type McpServer =
            speed: nat;
            stability: nat;
          };
+        dedicationBonuses:
+         record {
+           acceleration: nat;
+           powerCore: nat;
+           speed: nat;
+           stability: nat;
+         };
         eligibleRaces:
          vec
           record {
@@ -1236,6 +1434,10 @@ type McpServer =
    /// statsToStrip: Array of stat names to reset (["speed", "powerCore", "acceleration", "stability"])
    /// Empty array strips all stats (backward compatible)
    web_respec_bot: (tokenIndex: nat, statsToStrip: vec text) -> (Result_2);
+   /// Set user's bots tagged as racers (replaces entire list)
+   web_set_racer_bots: (racerBots: vec nat) -> (Result_1);
+   /// Set user's bots tagged as scavengers (replaces entire list)
+   web_set_scavenger_bots: (scavengerBots: vec nat) -> (Result_1);
    /// Set user's starred bots (replaces entire list)
    web_set_starred_bots: (starredBots: vec nat) -> (Result_1);
    /// Start a scavenging mission (web method)
@@ -1304,6 +1506,13 @@ type HttpHeader =
    name: text;
    value: text;
  };
+type HeatAllocationStrategy = 
+ variant {
+   Random;
+   SkillTiered;
+   SnakeDraft;
+   TopBottom;
+ };
 type Header = 
  record {
    text;
@@ -1336,6 +1545,20 @@ type FactionType =
    UltimateMaster;
    Wild;
  };
+type EventVisibility = 
+ variant {
+   Private;
+   Public;
+   Restricted:
+    record {
+      allowedBots: opt vec nat;
+      allowedPlayers: opt vec principal;
+      maxElo: opt nat;
+      minElo: opt nat;
+      requiredAchievement: opt text;
+      requiredFaction: opt text;
+    };
+ };
 type EventType = 
  variant {
    DailySprint;
@@ -1352,16 +1575,27 @@ type EventStatus =
    RegistrationClosed;
    RegistrationOpen;
  };
+type EventRegistration = 
+ record {
+   entryFeePaid: nat;
+   eventId: nat;
+   owner: principal;
+   raceClass: RaceClass;
+   registeredAt: int;
+   tokenIndex: nat;
+ };
 type EventMetadata = 
  record {
    description: text;
    divisions: vec RaceClass;
    entryFee: nat;
+   eventBonusPrize: nat;
    maxEntries: nat;
    minEntries: nat;
    name: text;
    pointsMultiplier: float64;
    prizePoolBonus: nat;
+   scoringMode: ScoringMode;
  };
 type Distance = 
  variant {

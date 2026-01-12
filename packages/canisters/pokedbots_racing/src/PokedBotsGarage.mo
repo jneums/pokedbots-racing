@@ -13,6 +13,7 @@ import Debug "mo:base/Debug";
 import Result "mo:base/Result";
 import Buffer "mo:base/Buffer";
 import Map "mo:map/Map";
+import BotDedication "BotDedication";
 import { nhash; phash } "mo:map/Map";
 import RacingSimulator "./RacingSimulator";
 import ELO "./ELO";
@@ -248,6 +249,9 @@ module {
         stability : Nat;
         faction : FactionType;
       };
+      // Bot Dedication tier benefits callback
+      getTierBenefits : (Nat) -> BotDedication.TierBenefits;
+      getBenefitsForBot : (Nat) -> BotDedication.TierBenefits;
     },
   ) {
     private let stats = initStats;
@@ -277,7 +281,8 @@ module {
     // ===== RACING STATS PROVIDER IMPLEMENTATION =====
 
     /// Apply faction terrain bonuses for racing
-    private func applyTerrainBonus(stats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }, faction : FactionType, terrain : Terrain, condition : Nat) : {
+    /// Also applies Bot Dedication tier terrain bonus (+1% per tier, up to +5%)
+    private func applyTerrainBonus(stats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }, faction : FactionType, terrain : Terrain, condition : Nat, tokenIndex : Nat) : {
       speed : Nat;
       powerCore : Nat;
       acceleration : Nat;
@@ -287,6 +292,16 @@ module {
       var powerCore = stats.powerCore;
       var acceleration = stats.acceleration;
       var stability = stats.stability;
+
+      // Apply Bot Dedication tier terrain bonus FIRST (flat % bonus to all stats)
+      let tierBenefits = statsProvider.getBenefitsForBot(tokenIndex);
+      if (tierBenefits.terrainBonusPercent > 0) {
+        let terrainMultiplier = 1.0 + (Float.fromInt(tierBenefits.terrainBonusPercent) / 100.0);
+        speed := Int.abs(Float.toInt(Float.fromInt(speed) * terrainMultiplier));
+        powerCore := Int.abs(Float.toInt(Float.fromInt(powerCore) * terrainMultiplier));
+        acceleration := Int.abs(Float.toInt(Float.fromInt(acceleration) * terrainMultiplier));
+        stability := Int.abs(Float.toInt(Float.fromInt(stability) * terrainMultiplier));
+      };
 
       // Apply faction bonuses
       switch (faction) {
@@ -414,7 +429,7 @@ module {
               // No special handling needed here - proceed with normal stat calculation
 
               let current = getCurrentStats(botStats);
-              let boosted = applyTerrainBonus(current, botStats.faction, terrain, botStats.condition);
+              let boosted = applyTerrainBonus(current, botStats.faction, terrain, botStats.condition, idx);
 
               // Apply preferred terrain bonus (+5% if racing on preferred terrain)
               let finalStats = if (botStats.preferredTerrain == terrain) {
@@ -460,7 +475,7 @@ module {
               };
 
               // Apply faction terrain bonuses (condition=100 for Golden faction bonus)
-              let boosted = applyTerrainBonus(statsAt100, botStats.faction, terrain, 100);
+              let boosted = applyTerrainBonus(statsAt100, botStats.faction, terrain, 100, idx);
 
               // Apply preferred terrain bonus (+5% if racing on preferred terrain)
               let finalStats = if (botStats.preferredTerrain == terrain) {
@@ -528,7 +543,8 @@ module {
               };
 
               // Apply faction terrain bonuses (condition=100 for Golden faction bonus)
-              let boosted = applyTerrainBonus(baseStats, faction, terrain, 100);
+              // Note: For uninitialized bots, dedication tier is 0 (no terrain bonus)
+              let boosted = applyTerrainBonus(baseStats, faction, terrain, 100, idx);
 
               // Apply preferred terrain bonus (+5% if racing on preferred terrain)
               let finalStats = if (preferredTerrain == terrain) {
@@ -1198,11 +1214,231 @@ module {
       let powerCoreWithPenalty = Float.toInt(Float.fromInt(base.powerCore + botStats.powerCoreBonus) * conditionPenalty * powerCoreOvercharge) + powerCoreBuff + synergyPowerCore;
       let stabilityWithPenalty = Float.toInt(Float.fromInt(base.stability + botStats.stabilityBonus) * conditionPenalty * stabilityOvercharge) + stabilityBuff + synergyStability;
 
+      // Apply Bot Dedication tier bonuses (flat stat bonuses that stack)
+      let tierBenefits = statsProvider.getBenefitsForBot(botStats.tokenIndex);
+      let dedicationSpeed = tierBenefits.speedBonus;
+      let dedicationPowerCore = tierBenefits.powerCoreBonus;
+      let dedicationAcceleration = tierBenefits.accelerationBonus;
+      let dedicationStability = tierBenefits.stabilityBonus;
+
       {
-        speed = Nat.min(100, Int.abs(speedWithPenalty));
-        powerCore = Nat.min(100, Int.abs(powerCoreWithPenalty));
-        acceleration = Nat.min(100, Int.abs(accelerationWithPenalty));
-        stability = Nat.min(100, Int.abs(stabilityWithPenalty));
+        speed = Nat.min(100, Int.abs(speedWithPenalty) + dedicationSpeed);
+        powerCore = Nat.min(100, Int.abs(powerCoreWithPenalty) + dedicationPowerCore);
+        acceleration = Nat.min(100, Int.abs(accelerationWithPenalty) + dedicationAcceleration);
+        stability = Nat.min(100, Int.abs(stabilityWithPenalty) + dedicationStability);
+      };
+    };
+
+    /// Get detailed stat breakdown for debugging
+    public func getStatBreakdown(botStats : PokedBotRacingStats) : {
+      speed : {
+        base : Nat;
+        upgrades : Nat;
+        batteryPenalty : Float;
+        batteryEffect : Int;
+        overcharge : Float;
+        overchargeEffect : Int;
+        synergy : Nat;
+        worldBuff : Nat;
+        dedication : Nat;
+        final : Nat;
+      };
+      powerCore : {
+        base : Nat;
+        upgrades : Nat;
+        conditionPenalty : Float;
+        conditionEffect : Int;
+        overcharge : Float;
+        overchargeEffect : Int;
+        synergy : Nat;
+        worldBuff : Nat;
+        dedication : Nat;
+        final : Nat;
+      };
+      acceleration : {
+        base : Nat;
+        upgrades : Nat;
+        batteryPenalty : Float;
+        batteryEffect : Int;
+        overcharge : Float;
+        overchargeEffect : Int;
+        synergy : Nat;
+        worldBuff : Nat;
+        dedication : Nat;
+        final : Nat;
+      };
+      stability : {
+        base : Nat;
+        upgrades : Nat;
+        conditionPenalty : Float;
+        conditionEffect : Int;
+        overcharge : Float;
+        overchargeEffect : Int;
+        synergy : Nat;
+        worldBuff : Nat;
+        dedication : Nat;
+        final : Nat;
+      };
+      battery : Nat;
+      condition : Nat;
+      overchargePercent : Nat;
+      perfectTuneUp : Bool;
+    } {
+      let base = getBaseStats(botStats.tokenIndex);
+
+      // Calculate faction synergy bonuses
+      let synergies = calculateFactionSynergies(botStats.ownerPrincipal);
+      var synergySpeed : Nat = 0;
+      var synergyPowerCore : Nat = 0;
+      var synergyAcceleration : Nat = 0;
+      var synergyStability : Nat = 0;
+
+      for ((faction, bonusStats) in synergies.statBonuses.vals()) {
+        synergySpeed := Nat.max(synergySpeed, bonusStats.speed);
+        synergyPowerCore := Nat.max(synergyPowerCore, bonusStats.powerCore);
+        synergyAcceleration := Nat.max(synergyAcceleration, bonusStats.acceleration);
+        synergyStability := Nat.max(synergyStability, bonusStats.stability);
+      };
+
+      // Battery penalty calculation
+      let batteryPenalty = if (botStats.battery >= 80) {
+        1.0;
+      } else if (botStats.battery >= 50) {
+        0.85 + ((Float.fromInt(botStats.battery) - 50.0) / 30.0) * 0.15;
+      } else if (botStats.battery >= 25) {
+        0.60 + ((Float.fromInt(botStats.battery) - 25.0) / 25.0) * 0.25;
+      } else if (botStats.battery >= 10) {
+        0.30 + ((Float.fromInt(botStats.battery) - 10.0) / 15.0) * 0.30;
+      } else {
+        0.10 + (Float.fromInt(botStats.battery) / 10.0) * 0.20;
+      };
+
+      // Condition penalty calculation
+      let conditionPenalty = if (botStats.condition >= 90) {
+        1.0;
+      } else if (botStats.condition >= 70) {
+        0.80 + ((Float.fromInt(botStats.condition) - 70.0) / 20.0) * 0.20;
+      } else if (botStats.condition >= 50) {
+        0.60 + ((Float.fromInt(botStats.condition) - 50.0) / 20.0) * 0.20;
+      } else if (botStats.condition >= 25) {
+        0.30 + ((Float.fromInt(botStats.condition) - 25.0) / 25.0) * 0.30;
+      } else {
+        0.10 + (Float.fromInt(botStats.condition) / 25.0) * 0.20;
+      };
+
+      // Overcharge calculations
+      let overchargeBonus = Float.fromInt(botStats.overcharge) / 100.0;
+      let speedOvercharge = 1.0 + (overchargeBonus * 0.125);
+      let accelOvercharge = 1.0 + (overchargeBonus * 0.125);
+      let stabilityOvercharge = if (botStats.perfectTuneUp) { 1.0 } else {
+        1.0 - (overchargeBonus * 0.083);
+      };
+      let powerCoreOvercharge = if (botStats.perfectTuneUp) { 1.0 } else {
+        1.0 - (overchargeBonus * 0.083);
+      };
+
+      // World buff bonuses
+      var speedBuff : Nat = 0;
+      var powerCoreBuff : Nat = 0;
+      var accelerationBuff : Nat = 0;
+      var stabilityBuff : Nat = 0;
+
+      switch (botStats.worldBuff) {
+        case (?buff) {
+          for ((stat, value) in buff.stats.vals()) {
+            switch (stat) {
+              case ("speed") { speedBuff := value };
+              case ("powerCore") { powerCoreBuff := value };
+              case ("acceleration") { accelerationBuff := value };
+              case ("stability") { stabilityBuff := value };
+              case (_) {};
+            };
+          };
+        };
+        case (null) {};
+      };
+
+      // Dedication bonuses
+      let tierBenefits = statsProvider.getTierBenefits(botStats.tokenIndex);
+      let dedicationSpeed = tierBenefits.speedBonus;
+      let dedicationPowerCore = tierBenefits.powerCoreBonus;
+      let dedicationAcceleration = tierBenefits.accelerationBonus;
+      let dedicationStability = tierBenefits.stabilityBonus;
+
+      // Calculate intermediate values
+      let speedBeforePenalty = base.speed + botStats.speedBonus;
+      let speedAfterBattery = Float.toInt(Float.fromInt(speedBeforePenalty) * batteryPenalty * speedOvercharge);
+      let speedBatteryEffect = speedAfterBattery - speedBeforePenalty;
+      let speedFinal = Nat.min(100, Int.abs(speedAfterBattery) + speedBuff + synergySpeed + dedicationSpeed);
+
+      let accelBeforePenalty = base.acceleration + botStats.accelerationBonus;
+      let accelAfterBattery = Float.toInt(Float.fromInt(accelBeforePenalty) * batteryPenalty * accelOvercharge);
+      let accelBatteryEffect = accelAfterBattery - accelBeforePenalty;
+      let accelFinal = Nat.min(100, Int.abs(accelAfterBattery) + accelerationBuff + synergyAcceleration + dedicationAcceleration);
+
+      let powerCoreBeforePenalty = base.powerCore + botStats.powerCoreBonus;
+      let powerCoreAfterCondition = Float.toInt(Float.fromInt(powerCoreBeforePenalty) * conditionPenalty * powerCoreOvercharge);
+      let powerCoreConditionEffect = powerCoreAfterCondition - powerCoreBeforePenalty;
+      let powerCoreFinal = Nat.min(100, Int.abs(powerCoreAfterCondition) + powerCoreBuff + synergyPowerCore + dedicationPowerCore);
+
+      let stabilityBeforePenalty = base.stability + botStats.stabilityBonus;
+      let stabilityAfterCondition = Float.toInt(Float.fromInt(stabilityBeforePenalty) * conditionPenalty * stabilityOvercharge);
+      let stabilityConditionEffect = stabilityAfterCondition - stabilityBeforePenalty;
+      let stabilityFinal = Nat.min(100, Int.abs(stabilityAfterCondition) + stabilityBuff + synergyStability + dedicationStability);
+
+      {
+        speed = {
+          base = base.speed;
+          upgrades = botStats.speedBonus;
+          batteryPenalty = batteryPenalty;
+          batteryEffect = speedBatteryEffect;
+          overcharge = speedOvercharge;
+          overchargeEffect = Float.toInt(Float.fromInt(speedBeforePenalty) * (speedOvercharge - 1.0));
+          synergy = synergySpeed;
+          worldBuff = speedBuff;
+          dedication = dedicationSpeed;
+          final = speedFinal;
+        };
+        powerCore = {
+          base = base.powerCore;
+          upgrades = botStats.powerCoreBonus;
+          conditionPenalty = conditionPenalty;
+          conditionEffect = powerCoreConditionEffect;
+          overcharge = powerCoreOvercharge;
+          overchargeEffect = Float.toInt(Float.fromInt(powerCoreBeforePenalty) * (powerCoreOvercharge - 1.0));
+          synergy = synergyPowerCore;
+          worldBuff = powerCoreBuff;
+          dedication = dedicationPowerCore;
+          final = powerCoreFinal;
+        };
+        acceleration = {
+          base = base.acceleration;
+          upgrades = botStats.accelerationBonus;
+          batteryPenalty = batteryPenalty;
+          batteryEffect = accelBatteryEffect;
+          overcharge = accelOvercharge;
+          overchargeEffect = Float.toInt(Float.fromInt(accelBeforePenalty) * (accelOvercharge - 1.0));
+          synergy = synergyAcceleration;
+          worldBuff = accelerationBuff;
+          dedication = dedicationAcceleration;
+          final = accelFinal;
+        };
+        stability = {
+          base = base.stability;
+          upgrades = botStats.stabilityBonus;
+          conditionPenalty = conditionPenalty;
+          conditionEffect = stabilityConditionEffect;
+          overcharge = stabilityOvercharge;
+          overchargeEffect = Float.toInt(Float.fromInt(stabilityBeforePenalty) * (stabilityOvercharge - 1.0));
+          synergy = synergyStability;
+          worldBuff = stabilityBuff;
+          dedication = dedicationStability;
+          final = stabilityFinal;
+        };
+        battery = botStats.battery;
+        condition = botStats.condition;
+        overchargePercent = botStats.overcharge;
+        perfectTuneUp = botStats.perfectTuneUp;
       };
     };
 
@@ -2154,7 +2390,7 @@ module {
         case (#Game) {
           if (count >= 6) {
             {
-              upgradeCost = 0.80;
+              upgradeCost = 0.85; // 15% discount
               repairCost = 1.0;
               rechargeCooldown = 1.0;
               scavengingParts = 1.0;
@@ -2163,7 +2399,7 @@ module {
             };
           } else if (count >= 4) {
             {
-              upgradeCost = 0.88;
+              upgradeCost = 0.90; // 10% discount
               repairCost = 1.0;
               rechargeCooldown = 1.0;
               scavengingParts = 1.0;
@@ -2172,7 +2408,7 @@ module {
             };
           } else if (count >= 2) {
             {
-              upgradeCost = 0.95;
+              upgradeCost = 0.95; // 5% discount
               repairCost = 1.0;
               rechargeCooldown = 1.0;
               scavengingParts = 1.0;
@@ -2204,7 +2440,7 @@ module {
           if (count >= 6) {
             {
               upgradeCost = 1.0;
-              repairCost = 0.40; // 60% discount - reliable workhorse maintenance
+              repairCost = 0.70; // 30% discount
               rechargeCooldown = 1.0;
               scavengingParts = 1.0;
               racePrizes = 1.0;
@@ -2213,7 +2449,7 @@ module {
           } else if (count >= 4) {
             {
               upgradeCost = 1.0;
-              repairCost = 0.60; // 40% discount
+              repairCost = 0.80; // 20% discount
               rechargeCooldown = 1.0;
               scavengingParts = 1.0;
               racePrizes = 1.0;
@@ -2222,7 +2458,7 @@ module {
           } else if (count >= 2) {
             {
               upgradeCost = 1.0;
-              repairCost = 0.80; // 20% discount
+              repairCost = 0.90; // 10% discount
               rechargeCooldown = 1.0;
               scavengingParts = 1.0;
               racePrizes = 1.0;
@@ -2244,7 +2480,7 @@ module {
             {
               upgradeCost = 1.0;
               repairCost = 1.0;
-              rechargeCooldown = 0.55;
+              rechargeCooldown = 0.70; // 30% reduction
               scavengingParts = 1.0;
               racePrizes = 1.0;
               scavengingDrain = 1.0;
@@ -2253,7 +2489,7 @@ module {
             {
               upgradeCost = 1.0;
               repairCost = 1.0;
-              rechargeCooldown = 0.70;
+              rechargeCooldown = 0.80; // 20% reduction
               scavengingParts = 1.0;
               racePrizes = 1.0;
               scavengingDrain = 1.0;
@@ -2262,7 +2498,7 @@ module {
             {
               upgradeCost = 1.0;
               repairCost = 1.0;
-              rechargeCooldown = 0.85;
+              rechargeCooldown = 0.90; // 10% reduction
               scavengingParts = 1.0;
               racePrizes = 1.0;
               scavengingDrain = 1.0;
@@ -2284,7 +2520,7 @@ module {
               upgradeCost = 1.0;
               repairCost = 1.0;
               rechargeCooldown = 1.0;
-              scavengingParts = 1.45;
+              scavengingParts = 1.30; // 30% bonus
               racePrizes = 1.0;
               scavengingDrain = 1.0;
             };
@@ -2293,7 +2529,7 @@ module {
               upgradeCost = 1.0;
               repairCost = 1.0;
               rechargeCooldown = 1.0;
-              scavengingParts = 1.30;
+              scavengingParts = 1.20; // 20% bonus
               racePrizes = 1.0;
               scavengingDrain = 1.0;
             };
@@ -2302,7 +2538,7 @@ module {
               upgradeCost = 1.0;
               repairCost = 1.0;
               rechargeCooldown = 1.0;
-              scavengingParts = 1.15;
+              scavengingParts = 1.10; // 10% bonus
               racePrizes = 1.0;
               scavengingDrain = 1.0;
             };
@@ -2870,7 +3106,9 @@ module {
               // Calculate rewards for elapsed hours (fractional)
               // Duration bonus: increases parts yield, reduces battery/condition costs
               // Synergy bonuses: apply collection-wide bonuses to parts and drain
-              let partsThisAccumulation = rates.basePartsPerHour * hoursElapsed * zoneMultipliers.parts * factionBonus.partsMultiplier * speedBonus * durationBonus * synergies.yieldMultipliers.scavengingParts;
+              // Also apply Bot Dedication tier scavenging yield bonus (1.0-1.30 multiplier)
+              let tierBenefits = statsProvider.getBenefitsForBot(tokenIndex);
+              let partsThisAccumulation = rates.basePartsPerHour * hoursElapsed * zoneMultipliers.parts * factionBonus.partsMultiplier * speedBonus * durationBonus * synergies.yieldMultipliers.scavengingParts * tierBenefits.scavengingYieldMult;
 
               // Charging curve: INVERTED - slower at low, faster at high
               // Rewards keeping battery topped up, punishes letting it drain

@@ -198,3 +198,27 @@ export const queryRaces = async (filters, identity) => {
         totalMatching: result.totalMatching,
     };
 };
+/**
+ * Register a bot for an event
+ * @param eventId The event ID to register for
+ * @param tokenIndex The bot's token index
+ * @param identity Identity to use for the call
+ * @returns Success message or error
+ */
+export const registerForEvent = async (eventId, tokenIndex, identity) => {
+    const racingActor = await getActor(identity);
+    const result = await racingActor.register_for_event(BigInt(eventId), BigInt(tokenIndex));
+    return result;
+};
+/**
+ * Unregister a bot from an event
+ * @param eventId The event ID to unregister from
+ * @param tokenIndex The bot's token index
+ * @param identity Identity to use for the call
+ * @returns Refund info or error
+ */
+export const unregisterFromEvent = async (eventId, tokenIndex, identity) => {
+    const racingActor = await getActor(identity);
+    const result = await racingActor.unregister_from_event(BigInt(eventId), BigInt(tokenIndex));
+    return result;
+};

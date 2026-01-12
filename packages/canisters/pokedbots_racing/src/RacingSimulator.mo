@@ -906,13 +906,14 @@ module {
             Debug.print("LOOP_VALUES: i=" # Nat.toText(i) # " segmentIdx=" # Nat.toText(segmentIdx));
           };
 
-          // Calculate base segment time (convert distance from meters to km)
+          // Calculate base segment time
+          // race.distance is already in km (set from track.totalDistance / 1000 at race creation)
           let baseSegmentTime = calculateSegmentTime(
             segment,
             racer.participant.stats,
             segmentSeed,
             racer.previousDifficulty,
-            race.distance / 1000, // Convert meters to km
+            race.distance, // Already in km
           );
 
           // === SLIPSTREAM MECHANIC ===
@@ -1799,6 +1800,21 @@ module {
           let updatedRace = {
             race with
             status = newStatus;
+          };
+          ignore Map.put(races, nhash, raceId, updatedRace);
+          ?updatedRace;
+        };
+        case (null) { null };
+      };
+    };
+
+    /// Update race name (used for multi-stage events to include stage name)
+    public func updateRaceName(raceId : Nat, newName : Text) : ?Race {
+      switch (getRace(raceId)) {
+        case (?race) {
+          let updatedRace = {
+            race with
+            name = newName;
           };
           ignore Map.put(races, nhash, raceId, updatedRace);
           ?updatedRace;

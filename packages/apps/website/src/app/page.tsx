@@ -23,13 +23,34 @@ function formatDate(timestamp: bigint): string {
   });
 }
 
+// Calculate event-level total prize pool
+function calculateEventPrizePool(event: any): bigint {
+  // Entry fees from all registrations
+  const entryFees = event.registrationCounts.total * event.metadata.entryFee;
+  
+  // Platform bonus
+  const platformBonus = event.metadata.prizePoolBonus;
+  
+  // Event bonus prize
+  const eventBonus = event.metadata.eventBonusPrize;
+  
+  // Sum all sponsorships
+  const sponsorships = event.sponsorships.reduce((sum: bigint, s: any) => sum + s.amount, BigInt(0));
+  
+  return entryFees + platformBonus + eventBonus + sponsorships;
+}
+
 export default function Home() {
   const { data: eventsWithRaces, isLoading } = useGetUpcomingEventsWithRaces(14);
   
-  // Get top 3 events by prize pool
+  // Get top 3 events by prize pool (calculated from event data)
   const topEvents = eventsWithRaces
-    ?.filter(e => e.raceSummary.totalPrizePool && Number(e.raceSummary.totalPrizePool) > 0)
-    .sort((a, b) => Number(b.raceSummary.totalPrizePool) - Number(a.raceSummary.totalPrizePool))
+    ?.map(e => ({
+      ...e,
+      eventPrizePool: calculateEventPrizePool(e.event)
+    }))
+    .filter(e => e.eventPrizePool > 0n)
+    .sort((a, b) => Number(b.eventPrizePool - a.eventPrizePool))
     .slice(0, 3) || [];
 
   return (
@@ -161,7 +182,7 @@ export default function Home() {
                             <div className="text-3xl mb-1">💰</div>
                             <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1">Prize Pool</div>
                             <div className="text-2xl font-bold text-amber-500 dark:text-amber-400">
-                              {formatICP(raceSummary.totalPrizePool!)}
+                              {formatICP(eventData.eventPrizePool)}
                             </div>
                           </div>
                           

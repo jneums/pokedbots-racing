@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useMyBots, useUserInventory, useCollectionBonuses, useUserWalletNFTs, useRechargeBot, useRepairBot, useBatchRechargeBots, useBatchRepairBots, useBatchCompleteScavenging, useBatchStartScavenging, useStarredBots, useSetStarredBots } from '../../hooks/useGarage';
+import { useMyBots, useUserInventory, useCollectionBonuses, useUserWalletNFTs, useRechargeBot, useRepairBot, useBatchRechargeBots, useBatchRepairBots, useBatchCompleteScavenging, useBatchStartScavenging, useStarredBots, useSetStarredBots, useRacerBots, useSetRacerBots, useScavengerBots, useSetScavengerBots } from '../../hooks/useGarage';
+import { useGetUpcomingEventsWithRaces } from '../../hooks/useRacing';
 import { useBackgrounds } from '../../hooks/useBackgrounds';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { ToggleGroup, ToggleGroupItem } from '../../components/ui/toggle-group';
 import { WalletConnect } from '../../components/WalletConnect';
 import { BotCard } from '../../components/BotCard';
 import { PartsConverter } from '../../components/PartsConverter';
@@ -18,7 +20,7 @@ import { Progress } from '../../components/ui/progress';
 import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
 import { generatetokenIdentifier, completeScavenging } from '@pokedbots-racing/ic-js';
 import { toast } from 'sonner';
-import { getTerrainIcon, getTerrainPreference } from '../../lib/utils';
+import { getTerrainIcon, getTerrainPreference, getFactionSpecialTerrain } from '../../lib/utils';
 import { Input } from '../../components/ui/input';
 import { Checkbox } from '../../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
@@ -134,14 +136,20 @@ export default function GaragePage() {
     const saved = localStorage.getItem('garage_collapsed_brackets');
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
-  const [groupBy, setGroupBy] = useState<'none' | 'class' | 'terrain' | 'faction'>(() => {
+  const [groupBy, setGroupBy] = useState<'none' | 'class' | 'terrain' | 'faction' | 'role'>(() => {
     const saved = localStorage.getItem('garage_group_by');
     // Default: 'class' (grouped by race class)
     return saved ? JSON.parse(saved) : 'class';
   });
+  const [orderBy, setOrderBy] = useState<'rating' | 'tokenIndex' | 'winRate' | 'condition' | 'battery'>(() => {
+    const saved = localStorage.getItem('garage_order_by');
+    // Default: 'rating' (sorted by overall rating)
+    return saved ? JSON.parse(saved) : 'rating';
+  });
   
-  // Per-bot loading states (keyed by tokenIndex) - only tracking entering races now
+  // Per-bot loading states (keyed by tokenIndex)
   const [botEnteringRacesStates, setBotEnteringRacesStates] = useState<Map<string, boolean>>(new Map());
+  const [botStarringStates, setBotStarringStates] = useState<Map<string, boolean>>(new Map());
   
   // Use React Query hooks - isFetching is true during both initial load and refetch
   const { data: bots = [], isLoading, isFetching, error: botsError } = useMyBots();
@@ -149,6 +157,7 @@ export default function GaragePage() {
   const { data: bonuses, isLoading: bonusesLoading } = useCollectionBonuses();
   const { data: walletNFTs = [], isLoading: walletNFTsLoading, error: walletNFTsError } = useUserWalletNFTs();
   const { data: backgroundData } = useBackgrounds();
+  const { data: upcomingEvents = [] } = useGetUpcomingEventsWithRaces(7); // Next 7 days
   
   // Starred bots from backend
   const { data: starredBotsArray = [], isLoading: starredBotsLoading } = useStarredBots();
@@ -156,6 +165,16 @@ export default function GaragePage() {
   
   // Convert array to Set for easy lookup
   const favorites = useMemo(() => new Set(starredBotsArray.map(String)), [starredBotsArray]);
+  
+  // Racer and Scavenger bot tags from backend
+  const { data: racerBotsArray = [] } = useRacerBots();
+  const setRacerBotsMutation = useSetRacerBots();
+  const { data: scavengerBotsArray = [] } = useScavengerBots();
+  const setScavengerBotsMutation = useSetScavengerBots();
+  
+  // Convert arrays to Sets for easy lookup
+  const racerBots = useMemo(() => new Set(racerBotsArray.map(String)), [racerBotsArray]);
+  const scavengerBots = useMemo(() => new Set(scavengerBotsArray.map(String)), [scavengerBotsArray]);
   
   // Use isFetching for loading state (shows on both initial load and manual refetch)
   const loading = isFetching;
@@ -195,8 +214,17 @@ export default function GaragePage() {
     localStorage.setItem('garage_group_by', JSON.stringify(groupBy));
   }, [groupBy]);
 
+  useEffect(() => {
+    localStorage.setItem('garage_order_by', JSON.stringify(orderBy));
+  }, [orderBy]);
+
   // Toggle favorite - syncs to backend
   const toggleFavorite = async (tokenIndex: string) => {
+    // Prevent multiple concurrent requests for the same bot
+    if (botStarringStates.get(tokenIndex)) return;
+    
+    setBotStarringStates(prev => new Map(prev).set(tokenIndex, true));
+    
     const currentFavorites = Array.from(favorites);
     const newFavorites = favorites.has(tokenIndex)
       ? currentFavorites.filter(id => id !== tokenIndex)
@@ -207,6 +235,42 @@ export default function GaragePage() {
     } catch (err) {
       console.error('Failed to update starred bots:', err);
       toast.error('Failed to update favorites');
+    } finally {
+      setBotStarringStates(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(tokenIndex);
+        return newMap;
+      });
+    }
+  };
+
+  // Toggle racer role - syncs to backend
+  const toggleRacer = async (tokenIndex: string) => {
+    const currentRacers = Array.from(racerBots);
+    const newRacers = racerBots.has(tokenIndex)
+      ? currentRacers.filter(id => id !== tokenIndex)
+      : [...currentRacers, tokenIndex];
+    
+    try {
+      await setRacerBotsMutation.mutateAsync(newRacers.map(Number));
+    } catch (err) {
+      console.error('Failed to update racer bots:', err);
+      toast.error('Failed to update racer tag');
+    }
+  };
+
+  // Toggle scavenger role - syncs to backend
+  const toggleScavenger = async (tokenIndex: string) => {
+    const currentScavengers = Array.from(scavengerBots);
+    const newScavengers = scavengerBots.has(tokenIndex)
+      ? currentScavengers.filter(id => id !== tokenIndex)
+      : [...currentScavengers, tokenIndex];
+    
+    try {
+      await setScavengerBotsMutation.mutateAsync(newScavengers.map(Number));
+    } catch (err) {
+      console.error('Failed to update scavenger bots:', err);
+      toast.error('Failed to update scavenger tag');
     }
   };
 
@@ -376,7 +440,45 @@ export default function GaragePage() {
       }
     }
     if (activeQuickFilters.has('scavenging')) {
-      filtered = filtered.filter(bot => !!bot.activeMission);
+      filtered = filtered.filter(bot => {
+        if (!bot.activeMission) return false;
+        const zone = Object.keys(bot.activeMission.zone)[0];
+        // Exclude maintenance zones (RepairBay, ChargingStation)
+        return zone !== 'RepairBay' && zone !== 'ChargingStation';
+      });
+    }
+    if (activeQuickFilters.has('repairBay')) {
+      filtered = filtered.filter(bot => {
+        if (!bot.activeMission) return false;
+        const zone = Object.keys(bot.activeMission.zone)[0];
+        return zone === 'RepairBay';
+      });
+    }
+    if (activeQuickFilters.has('chargingStation')) {
+      filtered = filtered.filter(bot => {
+        if (!bot.activeMission) return false;
+        const zone = Object.keys(bot.activeMission.zone)[0];
+        return zone === 'ChargingStation';
+      });
+    }
+    if (activeQuickFilters.has('favorited')) {
+      filtered = filtered.filter(bot => favorites.has(bot.tokenIndex.toString()));
+    }
+    if (activeQuickFilters.has('racers')) {
+      filtered = filtered.filter(bot => racerBots.has(bot.tokenIndex.toString()));
+    }
+    if (activeQuickFilters.has('scavengers')) {
+      filtered = filtered.filter(bot => scavengerBots.has(bot.tokenIndex.toString()));
+    }
+    if (activeQuickFilters.has('needsBattery')) {
+      filtered = filtered.filter(bot => 
+        bot.stats && Number(bot.stats.battery) < 100
+      );
+    }
+    if (activeQuickFilters.has('needsCondition')) {
+      filtered = filtered.filter(bot => 
+        bot.stats && Number(bot.stats.condition) < 100
+      );
     }
     if (activeQuickFilters.has('needsUpgrade')) {
       filtered = filtered.filter(bot => 
@@ -428,7 +530,7 @@ export default function GaragePage() {
     }
     
     return filtered;
-  }, [sortedBots, searchQuery, activeQuickFilters, classFilter, factionFilter, terrainFilter, batteryRange, conditionRange, backgroundData]);
+  }, [sortedBots, searchQuery, activeQuickFilters, classFilter, factionFilter, terrainFilter, batteryRange, conditionRange, backgroundData, favorites]);
 
   // Selection handlers
   const toggleBotSelection = (tokenIndex: string) => {
@@ -750,17 +852,52 @@ export default function GaragePage() {
 
   const error = botsError ? (botsError instanceof Error ? botsError.message : 'Failed to load bots') : null;
 
-  // Helper: Get next race info including time and terrain
-  const getNextRaceInfo = (bot: BotListItem): { time: string; terrain: any } | null => {
-    if (!bot.upcomingRaces || bot.upcomingRaces.length === 0) return null;
+  // Helper: Get next event info for a bot - prioritizes upcoming races, falls back to event registrations
+  const getNextEventInfo = (bot: BotListItem): { time: string; terrain: any; eventName: string } | null => {
+    // First priority: Check if bot has any upcoming races
+    if (bot.upcomingRaces && bot.upcomingRaces.length > 0) {
+      // Get the next race (earliest start time)
+      const nextRace = bot.upcomingRaces.reduce((closest, race) => {
+        return Number(race.startTime) < Number(closest.startTime) ? race : closest;
+      });
+      
+      const timeUntil = (Number(nextRace.startTime) / 1_000_000) - Date.now();
+      let timeStr: string;
+      if (timeUntil < 0) {
+        timeStr = 'Now';
+      } else {
+        const hours = Math.floor(timeUntil / (1000 * 60 * 60));
+        const minutes = Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60));
+        
+        if (hours > 24) timeStr = `${Math.floor(hours / 24)}d`;
+        else if (hours > 0) timeStr = `${hours}h ${minutes}m`;
+        else timeStr = `${minutes}m`;
+      }
+      
+      return { time: timeStr, terrain: nextRace.terrain, eventName: nextRace.name };
+    }
     
-    const nextRace = bot.upcomingRaces.reduce((closest, race) => {
-      const raceStart = Number(race.startTime) / 1_000_000;
-      const closestStart = Number(closest.startTime) / 1_000_000;
-      return raceStart < closestStart ? race : closest;
+    // Second priority: Fall back to event registrations if no upcoming races
+    if (!user?.principal || !upcomingEvents || upcomingEvents.length === 0) return null;
+    
+    // Find events where this bot is registered
+    const registeredEvents = upcomingEvents.filter(eventData => 
+      eventData.event.registrations?.some((reg: any) => 
+        reg.tokenIndex === bot.tokenIndex && 
+        reg.owner.toString() === user.principal
+      )
+    );
+    
+    if (registeredEvents.length === 0) return null;
+    
+    // Get the next event (earliest scheduled time)
+    const nextEventData = registeredEvents.reduce((closest, eventData) => {
+      const eventTime = Number(eventData.event.scheduledTime) / 1_000_000;
+      const closestTime = Number(closest.event.scheduledTime) / 1_000_000;
+      return eventTime < closestTime ? eventData : closest;
     });
     
-    const timeUntil = (Number(nextRace.startTime) / 1_000_000) - Date.now();
+    const timeUntil = (Number(nextEventData.event.scheduledTime) / 1_000_000) - Date.now();
     let timeStr: string;
     if (timeUntil < 0) {
       timeStr = 'Now';
@@ -773,22 +910,69 @@ export default function GaragePage() {
       else timeStr = `${minutes}m`;
     }
     
-    return { time: timeStr, terrain: nextRace.terrain };
+    // Get terrain from race creation mode (use first terrain if available, otherwise default to ScrapHeaps)
+    let terrain: any = { ScrapHeaps: null };
+    if ('Automatic' in nextEventData.event.raceCreationMode) {
+      const terrains = nextEventData.event.raceCreationMode.Automatic.terrains;
+      if (terrains && terrains.length > 0) {
+        terrain = terrains[0];
+      }
+    } else if ('Manual' in nextEventData.event.raceCreationMode) {
+      const templates = nextEventData.event.raceCreationMode.Manual.raceTemplates;
+      if (templates && templates.length > 0 && templates[0].terrain) {
+        terrain = templates[0].terrain;
+      }
+    }
+    const eventName = nextEventData.event.metadata?.name || 'Event';
+    
+    return { time: timeStr, terrain, eventName };
   };
 
-  // Helper: Get next race start time as relative string (for backwards compatibility)
-  const getNextRaceStartTime = (bot: BotListItem): string | null => {
-    const info = getNextRaceInfo(bot);
+  // Helper: Get next event start time as relative string (for backwards compatibility)
+  const getNextEventStartTime = (bot: BotListItem): string | null => {
+    const info = getNextEventInfo(bot);
     return info ? info.time : null;
   };
 
   // Group bots by selected criteria
   const groupedBots = useMemo(() => {
-    if (groupBy === 'none') return null;
-    
     const groups: Record<string, BotListItem[]> = {};
     
-    if (groupBy === 'class') {
+    // Helper function to sort bots based on orderBy
+    const sortBots = (bots: BotListItem[]) => {
+      return [...bots].sort((a, b) => {
+        switch (orderBy) {
+          case 'rating': {
+            // Calculate base rating from maxStats (base + upgrades, determines race class)
+            const aRating = a.maxStats 
+              ? (Number(a.maxStats.speed) + Number(a.maxStats.powerCore) + Number(a.maxStats.acceleration) + Number(a.maxStats.stability)) / 4
+              : 0;
+            const bRating = b.maxStats 
+              ? (Number(b.maxStats.speed) + Number(b.maxStats.powerCore) + Number(b.maxStats.acceleration) + Number(b.maxStats.stability)) / 4
+              : 0;
+            return bRating - aRating;
+          }
+          case 'tokenIndex':
+            return Number(a.tokenIndex) - Number(b.tokenIndex);
+          case 'winRate': {
+            const aWinRate = (a.stats?.careerWins || 0) / Math.max((a.stats?.careerRaces || 0), 1);
+            const bWinRate = (b.stats?.careerWins || 0) / Math.max((b.stats?.careerRaces || 0), 1);
+            return bWinRate - aWinRate;
+          }
+          case 'condition':
+            return Number(b.stats?.condition || 0) - Number(a.stats?.condition || 0);
+          case 'battery':
+            return Number(b.stats?.battery || 0) - Number(a.stats?.battery || 0);
+          default:
+            return 0;
+        }
+      });
+    };
+    
+    if (groupBy === 'none') {
+      // When groupBy is 'none', create a single group with all bots
+      groups['All Bots'] = sortBots(filteredBots);
+    } else if (groupBy === 'class') {
       // Group by race class
       groups['SilentKlan'] = [];
       groups['Elite'] = [];
@@ -801,6 +985,11 @@ export default function GaragePage() {
         const bracket = getBotBracket(bot);
         groups[bracket].push(bot);
       });
+      
+      // Sort bots within each class
+      Object.keys(groups).forEach(key => {
+        groups[key] = sortBots(groups[key]);
+      });
     } else if (groupBy === 'terrain') {
       // Group by terrain bonus (derived from background color)
       groups['ScrapHeaps'] = [];
@@ -812,6 +1001,11 @@ export default function GaragePage() {
         const factionKey = bot.stats?.faction ? Object.keys(bot.stats.faction)[0] : '';
         const terrain = getTerrainPreference(bg, factionKey);
         groups[terrain].push(bot);
+      });
+      
+      // Sort bots within each terrain group
+      Object.keys(groups).forEach(key => {
+        groups[key] = sortBots(groups[key]);
       });
     } else if (groupBy === 'faction') {
       // Group by faction
@@ -829,10 +1023,42 @@ export default function GaragePage() {
           groups['None'].push(bot);
         }
       });
+      
+      // Sort bots within each faction group
+      Object.keys(groups).forEach(key => {
+        groups[key] = sortBots(groups[key]);
+      });
+    } else if (groupBy === 'role') {
+      // Group by role tags (Racers, Scavengers, Both, Untagged)
+      groups['Both'] = [];
+      groups['Racers'] = [];
+      groups['Scavengers'] = [];
+      groups['Untagged'] = [];
+      
+      filteredBots.forEach(bot => {
+        const tokenKey = bot.tokenIndex.toString();
+        const isRacer = racerBots.has(tokenKey);
+        const isScavenger = scavengerBots.has(tokenKey);
+        
+        if (isRacer && isScavenger) {
+          groups['Both'].push(bot);
+        } else if (isRacer) {
+          groups['Racers'].push(bot);
+        } else if (isScavenger) {
+          groups['Scavengers'].push(bot);
+        } else {
+          groups['Untagged'].push(bot);
+        }
+      });
+      
+      // Sort bots within each role group
+      Object.keys(groups).forEach(key => {
+        groups[key] = sortBots(groups[key]);
+      });
     }
     
     return groups;
-  }, [filteredBots, groupBy]);
+  }, [filteredBots, groupBy, orderBy, backgroundData, racerBots, scavengerBots]);
 
   // Get the selected bot
   const selectedBot = selectedBotIndex !== null 
@@ -942,6 +1168,11 @@ export default function GaragePage() {
                     🔧 -{Math.round((1 - bonuses.costMultipliers.repair) * 100)}% Repair
                   </Badge>
                 )}
+                {bonuses.costMultipliers.upgrade < 1 && (
+                  <Badge variant="outline" className="text-xs">
+                    🎮 -{Math.round((1 - bonuses.costMultipliers.upgrade) * 100)}% Upgrade
+                  </Badge>
+                )}
                 {bonuses.costMultipliers.rechargeCooldown < 1 && (
                   <Badge variant="outline" className="text-xs">
                     🔋 -{Math.round((1 - bonuses.costMultipliers.rechargeCooldown) * 100)}% Recharge Time
@@ -967,11 +1198,10 @@ export default function GaragePage() {
       <div className="flex gap-6">
         {/* Main Content Column */}
         <div className="flex-1 min-w-0">
-
-      {/* Filter and Selection Toolbar */}
-      {bots.length > 0 && (
-        <Card className="border-2 border-primary/20 bg-card/80 backdrop-blur mb-6">
-          <CardContent className="pt-6">
+          {/* Filter and Selection Toolbar */}
+          {bots.length > 0 && (
+            <Card className="border-2 border-primary/20 bg-card/80 backdrop-blur mb-6">
+              <CardContent className="pt-6">
             {/* Search and Selection Mode */}
             <div className="flex flex-col sm:flex-row gap-3 mb-4">
               <div className="relative flex-1">
@@ -1025,6 +1255,27 @@ export default function GaragePage() {
                   ✅ Ready to Race
                 </Badge>
                 <Badge
+                  variant={activeQuickFilters.has('favorited') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('favorited')}
+                >
+                  ⭐ Favorited
+                </Badge>
+                <Badge
+                  variant={activeQuickFilters.has('racers') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('racers')}
+                >
+                  🏎️ Racers
+                </Badge>
+                <Badge
+                  variant={activeQuickFilters.has('scavengers') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('scavengers')}
+                >
+                  ⛏️ Scavengers
+                </Badge>
+                <Badge
                   variant={activeQuickFilters.has('inRaces') ? "default" : "outline"}
                   className="cursor-pointer"
                   onClick={() => toggleQuickFilter('inRaces')}
@@ -1039,6 +1290,20 @@ export default function GaragePage() {
                   🔍 Scavenging
                 </Badge>
                 <Badge
+                  variant={activeQuickFilters.has('repairBay') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('repairBay')}
+                >
+                  🔧 Repair Bay
+                </Badge>
+                <Badge
+                  variant={activeQuickFilters.has('chargingStation') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('chargingStation')}
+                >
+                  🔋 Charging Station
+                </Badge>
+                <Badge
                   variant={activeQuickFilters.has('fullBattery') ? "default" : "outline"}
                   className="cursor-pointer"
                   onClick={() => toggleQuickFilter('fullBattery')}
@@ -1046,11 +1311,25 @@ export default function GaragePage() {
                   🔋 100% Battery
                 </Badge>
                 <Badge
+                  variant={activeQuickFilters.has('needsBattery') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('needsBattery')}
+                >
+                  🔋 Battery &lt;100%
+                </Badge>
+                <Badge
                   variant={activeQuickFilters.has('fullCondition') ? "default" : "outline"}
                   className="cursor-pointer"
                   onClick={() => toggleQuickFilter('fullCondition')}
                 >
                   🔧 100% Condition
+                </Badge>
+                <Badge
+                  variant={activeQuickFilters.has('needsCondition') ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleQuickFilter('needsCondition')}
+                >
+                  🔧 Condition &lt;100%
                 </Badge>
                 <Badge
                   variant={activeQuickFilters.has('inNextRace') ? "default" : "outline"}
@@ -1369,19 +1648,37 @@ export default function GaragePage() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-lg">Your Bots ({bots.length})</CardTitle>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground hidden sm:inline">Group by:</span>
-                  <Select value={groupBy} onValueChange={(value) => setGroupBy(value as 'none' | 'class' | 'terrain' | 'faction')}>
-                    <SelectTrigger className="w-[160px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Grouping</SelectItem>
-                      <SelectItem value="class">Class</SelectItem>
-                      <SelectItem value="terrain">Terrain</SelectItem>
-                      <SelectItem value="faction">Faction</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground hidden sm:inline">Group by:</span>
+                    <Select value={groupBy} onValueChange={(value) => setGroupBy(value as 'none' | 'class' | 'terrain' | 'faction' | 'role')}>
+                      <SelectTrigger className="w-[160px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">All Bots</SelectItem>
+                        <SelectItem value="class">Class</SelectItem>
+                        <SelectItem value="terrain">Terrain</SelectItem>
+                        <SelectItem value="faction">Faction</SelectItem>
+                        <SelectItem value="role">Role</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground hidden sm:inline">Order by:</span>
+                    <Select value={orderBy} onValueChange={(value) => setOrderBy(value as 'rating' | 'tokenIndex' | 'winRate' | 'condition' | 'battery')}>
+                      <SelectTrigger className="w-[160px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="rating">Rating</SelectItem>
+                        <SelectItem value="tokenIndex">Token #</SelectItem>
+                        <SelectItem value="winRate">Win Rate</SelectItem>
+                        <SelectItem value="condition">Condition</SelectItem>
+                        <SelectItem value="battery">Battery</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -1390,12 +1687,11 @@ export default function GaragePage() {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => e.preventDefault()}
               >
-                {groupedBots ? (
-                  // Grouped view
-                  <>
-                    {(() => {
-                      let globalIndex = 0; // Track global index across all groups
-                      return Object.entries(groupedBots).map(([groupName, botsInGroup]) => {
+                {/* Always use grouped view (groupBy='none' shows single 'All Bots' group) */}
+                <>
+                  {(() => {
+                    let globalIndex = 0; // Track global index across all groups
+                    return Object.entries(groupedBots).map(([groupName, botsInGroup]) => {
                         if (botsInGroup.length === 0) return null;
                         const isGroupCollapsed = collapsedBrackets.has(groupName);
                         
@@ -1433,7 +1729,10 @@ export default function GaragePage() {
                             const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.tokenIndex));
                             const imageUrl = `https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=${tokenId}&type=thumbnail`;
                             const isFavorite = favorites.has(bot.tokenIndex.toString());
+                            const isRacer = racerBots.has(bot.tokenIndex.toString());
+                            const isScavenger = scavengerBots.has(bot.tokenIndex.toString());
                             const isCollapsed = collapsedBots.has(bot.tokenIndex.toString());
+                            const isStarring = botStarringStates.get(bot.tokenIndex.toString()) || false;
                             
                             // Render unregistered bots differently
                             if (isUnregistered) {
@@ -1526,6 +1825,28 @@ export default function GaragePage() {
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setSelectedBotIndex(bot.tokenIndex);
+                                    console.log('🤖 Bot Card Opened:', {
+                                      tokenIndex: bot.tokenIndex.toString(),
+                                      name: bot.name || 'Unnamed',
+                                      dedicationBonuses: bot.dedicationBonuses ? {
+                                        speed: Number(bot.dedicationBonuses.speed),
+                                        powerCore: Number(bot.dedicationBonuses.powerCore),
+                                        acceleration: Number(bot.dedicationBonuses.acceleration),
+                                        stability: Number(bot.dedicationBonuses.stability),
+                                      } : 'Not initialized',
+                                      currentStats: bot.currentStats ? {
+                                        speed: Number(bot.currentStats.speed),
+                                        powerCore: Number(bot.currentStats.powerCore),
+                                        acceleration: Number(bot.currentStats.acceleration),
+                                        stability: Number(bot.currentStats.stability),
+                                      } : null,
+                                      maxStats: bot.maxStats ? {
+                                        speed: Number(bot.maxStats.speed),
+                                        powerCore: Number(bot.maxStats.powerCore),
+                                        acceleration: Number(bot.maxStats.acceleration),
+                                        stability: Number(bot.maxStats.stability),
+                                      } : null,
+                                    });
                                     // Open sheet on mobile, dialog on desktop
                                     if (window.innerWidth < 1024) {
                                       setMobileSheetOpen(true);
@@ -1546,17 +1867,31 @@ export default function GaragePage() {
                                           <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
                                         </Avatar>
                                         {(() => {
-                                          const raceInfo = getNextRaceInfo(bot);
-                                          return raceInfo && (
+                                          const eventInfo = getNextEventInfo(bot);
+                                          return eventInfo && (
                                             <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-[9px] font-bold shadow-md border border-primary-foreground/20 flex items-center gap-0.5 whitespace-nowrap leading-none">
-                                              {getTerrainIcon(raceInfo.terrain)}{raceInfo.time}
+                                              {eventInfo.time}
                                             </div>
                                           );
                                         })()}
                                       </div>
                                       <div className="flex-1 min-w-0">
-                                        <div className="font-semibold truncate text-sm text-foreground">
-                                          #{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}
+                                        <div className="font-semibold truncate text-sm text-foreground flex items-center gap-1">
+                                          <span className="truncate">#{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}</span>
+                                          {(() => {
+                                            const bg = backgroundData?.backgrounds[bot.tokenIndex.toString()];
+                                            const bgTerrain = getTerrainPreference(bg, factionName);
+                                            const factionTerrain = getFactionSpecialTerrain(factionName);
+                                            
+                                            return (
+                                              <span className="flex-shrink-0 text-xs flex items-center gap-0.5">
+                                                {getTerrainIcon(bgTerrain)}
+                                                {factionTerrain && factionTerrain.terrain !== bgTerrain && (
+                                                  getTerrainIcon(factionTerrain.terrain)
+                                                )}
+                                              </span>
+                                            );
+                                          })()}
                                         </div>
                                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1 min-w-0">
                                           <span className="truncate">{factionName}</span>
@@ -1682,10 +2017,10 @@ export default function GaragePage() {
                                         <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
                                       </Avatar>
                                       {(() => {
-                                        const raceInfo = getNextRaceInfo(bot);
-                                        return raceInfo && (
+                                        const eventInfo = getNextEventInfo(bot);
+                                        return eventInfo && (
                                           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-[9px] font-bold shadow-md border border-primary-foreground/20 flex items-center gap-0.5 whitespace-nowrap leading-none">
-                                            {getTerrainIcon(raceInfo.terrain)}{raceInfo.time}
+                                            {eventInfo.time}
                                           </div>
                                         );
                                       })()}
@@ -1693,8 +2028,22 @@ export default function GaragePage() {
 
                                     {/* Bot Info Column */}
                                     <div className="w-[240px] flex-shrink-0">
-                                      <div className="font-semibold truncate text-sm text-foreground">
-                                        #{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}
+                                      <div className="font-semibold truncate text-sm text-foreground flex items-center gap-1">
+                                        <span className="truncate">#{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}</span>
+                                        {(() => {
+                                          const bg = backgroundData?.backgrounds[bot.tokenIndex.toString()];
+                                          const bgTerrain = getTerrainPreference(bg, factionName);
+                                          const factionTerrain = getFactionSpecialTerrain(factionName);
+                                          
+                                          return (
+                                            <span className="flex-shrink-0 text-xs flex items-center gap-0.5">
+                                              {getTerrainIcon(bgTerrain)}
+                                              {factionTerrain && factionTerrain.terrain !== bgTerrain && (
+                                                getTerrainIcon(factionTerrain.terrain)
+                                              )}
+                                            </span>
+                                          );
+                                        })()}
                                       </div>
                                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
                                         <span className="truncate">{factionName}</span>
@@ -1792,9 +2141,39 @@ export default function GaragePage() {
                                         </div>
                                       )}
 
+                                      {/* Role Tags - Racer/Scavenger */}
+                                      {bot.isInitialized && (
+                                        <div className="flex items-center gap-1 ml-auto flex-shrink-0 mr-4">
+                                          <ToggleGroup type="multiple" value={[...(isRacer ? ['racer'] : []), ...(isScavenger ? ['scavenger'] : [])]} size="xs" variant="outline">
+                                            <ToggleGroupItem
+                                              value="racer"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleRacer(bot.tokenIndex.toString());
+                                              }}
+                                              className={isRacer ? 'data-[state=on]:bg-green-500/20 data-[state=on]:text-green-400 data-[state=on]:border-green-500' : ''}
+                                              title={isRacer ? 'Remove racer tag' : 'Tag as racer'}
+                                            >
+                                              🏎️
+                                            </ToggleGroupItem>
+                                            <ToggleGroupItem
+                                              value="scavenger"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleScavenger(bot.tokenIndex.toString());
+                                              }}
+                                              className={isScavenger ? 'data-[state=on]:bg-amber-500/20 data-[state=on]:text-amber-400 data-[state=on]:border-amber-500' : ''}
+                                              title={isScavenger ? 'Remove scavenger tag' : 'Tag as scavenger'}
+                                            >
+                                              ⛏️
+                                            </ToggleGroupItem>
+                                          </ToggleGroup>
+                                        </div>
+                                      )}
+
                                       {/* Mini Resource Bars - Stacked Vertically */}
                                       {bot.isInitialized && bot.stats && (
-                                        <div className="flex flex-col gap-1.5 ml-auto flex-shrink-0">
+                                        <div className="flex flex-col gap-1.5 flex-shrink-0">
                                           {/* Battery Bar */}
                                           <div className="flex items-center gap-1.5">
                                             <Battery className={`h-3.5 w-3.5 ${Number(bot.stats.battery) < 30 ? 'text-destructive' : 'text-blue-500'}`} />
@@ -1851,558 +2230,32 @@ export default function GaragePage() {
                                   e.stopPropagation();
                                   toggleFavorite(bot.tokenIndex.toString());
                                 }}
-                                className="px-3 text-muted-foreground hover:text-yellow-500 transition-colors"
-                                title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                                disabled={isStarring}
+                                className="px-3 text-muted-foreground hover:text-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={isStarring ? 'Updating...' : (isFavorite ? 'Remove from favorites' : 'Add to favorites')}
                               >
-                                <Star className={`h-4 w-4 ${isFavorite ? 'fill-yellow-500 text-yellow-500' : ''}`} />
+                                {isStarring ? (
+                                  <Star className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Star className={`h-4 w-4 ${isFavorite ? 'fill-yellow-500 text-yellow-500' : ''}`} />
+                                )}
                               </button>
                             </div>
-                            );
-                          })}
-                          </div>
-                        );
-                      });
-                    })()}
-                  </>
-                ) : (
-                  // Flat view (original rendering)
-                  <>
-                {filteredBots.map((bot, index) => {
-                  const isUnregistered = !bot.isInitialized;
-                  const faction = bot.stats?.faction;
-                  const factionName = faction ? Object.keys(faction)[0] : 'Unknown';
-                  const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.tokenIndex));
-                  const imageUrl = `https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=${tokenId}&type=thumbnail`;
-                  const isFavorite = favorites.has(bot.tokenIndex.toString());
-                  
-                  // Render unregistered bots differently
-                  if (isUnregistered) {
-                    const isSelected = selectedBotIndex === bot.tokenIndex;
-                    return (
-                      <button
-                        key={bot.tokenIndex.toString()}
-                        onClick={() => {
-                          setSelectedBotIndex(bot.tokenIndex);
-                          // Open sheet on mobile, dialog on desktop
-                          if (window.innerWidth < 1024) {
-                            setMobileSheetOpen(true);
-                          } else {
-                            setDialogOpen(true);
-                          }
-                        }}
-                        className={`w-full text-left border-b border-dashed border-muted-foreground/20 hover:bg-muted/30 transition-colors ${
-                          isSelected ? 'bg-muted/50 border-l-4 border-l-amber-500' : ''
-                        }`}
-                      >
-                        <div className="flex items-center gap-4 p-4">
-                          <div className="relative">
-                            <Avatar className="h-16 w-16 border-2 border-dashed border-amber-500/30">
-                              <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
-                              <AvatarFallback className="bg-amber-500/10 text-amber-600">
-                                #{bot.tokenIndex.toString().slice(-2)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="absolute -top-1 -right-1 bg-amber-500/20 border border-amber-500/50 rounded-full p-1">
-                              <Plus className="h-3 w-3 text-amber-500" />
-                            </div>
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-semibold text-base">
-                                PokedBot #{bot.tokenIndex.toString()}
-                              </p>
-                              <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 bg-amber-500/10">
-                                Unregistered
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              Click to register for racing
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Cost: 0.1 ICP (one-time fee)
-                            </p>
-                          </div>
+                          );
+                        })}
                         </div>
-                      </button>
-                    );
-                  }
-                  
-                  // Render registered bots normally
-                  const isCollapsed = collapsedBots.has(bot.tokenIndex.toString());
-                  
-                  return (
-                    <div
-                      key={bot.tokenIndex.toString()}
-                      draggable={!selectionMode}
-                      onDragStart={() => !selectionMode && handleDragStart(index)}
-                      onDragEnd={handleDragEnd}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => !selectionMode && handleDrop(e, index)}
-                      className={`flex items-center border-b transition-colors ${
-                        !selectionMode ? 'cursor-grab active:cursor-grabbing' : ''
-                      } ${
-                        selectedBotIndex === bot.tokenIndex
-                          ? 'bg-primary/10 border-l-4 border-l-primary'
-                          : 'hover:bg-muted/50 border-l-4 border-l-transparent'
-                      } ${draggedIndex === index ? 'opacity-50' : ''} relative`}
-                    >
-                      {/* Selection Checkbox (when in selection mode) */}
-                      {selectionMode && (
-                        <div className="px-3" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedBots.has(bot.tokenIndex.toString())}
-                            onCheckedChange={() => toggleBotSelection(bot.tokenIndex.toString())}
-                          />
-                        </div>
-                      )}
-                      
-                      {/* Drag Handle (when not in selection mode) */}
-                      {!selectionMode && (
-                        <div className="px-2 text-muted-foreground hover:text-foreground flex items-center">
-                          <GripVertical className="h-4 w-4" />
-                        </div>
-                      )}
-                      
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedBotIndex(bot.tokenIndex);
-                          // Open sheet on mobile, dialog on desktop
-                          if (window.innerWidth < 1024) {
-                            setMobileSheetOpen(true);
-                          } else {
-                            setDialogOpen(true);
-                          }
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        className="flex-1 text-left px-2 py-4"
-                      >
-                        {/* Mobile/Tablet Layout (< md) */}
-                        <div className="md:hidden space-y-2">
-                          {/* Header with Avatar and Name */}
-                          <div className="flex items-center gap-3">
-                            <div className="relative">
-                              <Avatar className="h-12 w-12">
-                                <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
-                                <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
-                              </Avatar>
-                              {(() => {
-                                const raceInfo = getNextRaceInfo(bot);
-                                return raceInfo && (
-                                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-[9px] font-bold shadow-md border border-primary-foreground/20 flex items-center gap-0.5 whitespace-nowrap leading-none">
-                                    {getTerrainIcon(raceInfo.terrain)}{raceInfo.time}
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-semibold truncate text-sm text-foreground">
-                                #{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}
-                              </div>
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1 min-w-0">
-                                <span className="truncate">{factionName}</span>
-                                {bot.stats?.eloRating !== undefined && (
-                                  <>
-                                    <span className="flex-shrink-0">•</span>
-                                    <span className="flex-shrink-0">
-                                      {(() => {
-                                        // Calculate overall rating (average of max stats)
-                                        const rating = bot.maxStats 
-                                          ? Math.floor((
-                                              Number(bot.maxStats.speed) + 
-                                              Number(bot.maxStats.powerCore) + 
-                                              Number(bot.maxStats.acceleration) + 
-                                              Number(bot.maxStats.stability)
-                                            ) / 4)
-                                          : 0;
-                                        
-                                        // Determine class based on rating (not ELO)
-                                        return rating >= 50 ? 'SilentKlan' :
-                                               rating >= 40 ? 'Elite' :
-                                               rating >= 30 ? 'Raider' :
-                                               rating >= 20 ? 'Junker' : 'Scrap';
-                                      })()}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                              
-                              {!isCollapsed && bot.stats && (
-                                <>
-                                  {/* Stats Row */}
-                                  <div className="flex flex-wrap items-center gap-2 text-xs mb-1">
-                                    <div className="flex items-center gap-0.5">
-                                      <span className="text-yellow-500">⚡</span>
-                                      <span className="font-mono text-yellow-500">{Number(bot.currentStats?.speed || bot.stats.baseStats.speed)}</span>
-                                      <span className="text-muted-foreground/40">/{Number(bot.maxStats?.speed || 24)}</span>
-                                    </div>
-                                    <div className="flex items-center gap-0.5">
-                                      <span className="text-orange-500">💪</span>
-                                      <span className="font-mono text-orange-500">{Number(bot.currentStats?.powerCore || bot.stats.baseStats.powerCore)}</span>
-                                      <span className="text-muted-foreground/40">/{Number(bot.maxStats?.powerCore || 24)}</span>
-                                    </div>
-                                    <div className="flex items-center gap-0.5">
-                                      <span className="text-blue-500">🚀</span>
-                                      <span className="font-mono text-blue-500">{Number(bot.currentStats?.acceleration || bot.stats.baseStats.acceleration)}</span>
-                                      <span className="text-muted-foreground/40">/{Number(bot.maxStats?.acceleration || 20)}</span>
-                                    </div>
-                                    <div className="flex items-center gap-0.5">
-                                      <span className="text-red-500">🎯</span>
-                                      <span className="font-mono text-red-500">{Number(bot.currentStats?.stability || bot.stats.baseStats.stability)}</span>
-                                      <span className="text-muted-foreground/40">/{Number(bot.maxStats?.stability || 23)}</span>
-                                    </div>
-                                  </div>
-                                  {/* Battery and Condition Row */}
-                                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                    <div className="flex items-center gap-1">
-                                      <Battery className="h-3 w-3" />
-                                      <span className="font-mono">{Number(bot.stats.battery)}%</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <Wrench className="h-3 w-3" />
-                                      <span className="font-mono">{Number(bot.stats.condition)}%</span>
-                                    </div>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        
-                          {!isCollapsed && bot.isInitialized && bot.stats && (
-                            <>
-                              {/* Cooldowns and Status */}
-                              <div className="flex flex-col gap-1">
-                                  {(() => {
-                                    const now = Date.now();
-                                    const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
-                                    const rechargeReady = bot.stats.lastRecharged 
-                                      ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
-                                      : 0;
-                                    const repairReady = bot.stats.lastRepaired
-                                      ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
-                                      : 0;
-                                    
-                                    const rechargeTime = bot.stats.lastRecharged 
-                                      ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + BigInt(Math.round(rechargeCooldownMs * 1_000_000)))
-                                      : null;
-                                    const repairTime = bot.stats.lastRepaired
-                                      ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)
-                                      : null;
-                                    
-                                    return (
-                                      <>
-                                        {rechargeReady > now && rechargeTime && (
-                                          <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                            <Zap className="h-3 w-3" />
-                                            Recharge: {rechargeTime}
-                                          </Badge>
-                                        )}
-                                        {repairReady > now && repairTime && (
-                                          <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                            <Hammer className="h-3 w-3" />
-                                            Repair: {repairTime}
-                                          </Badge>
-                                        )}
-                                        {bot.activeUpgrade && (
-                                          <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                                            <Clock className="h-3 w-3" />
-                                            {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])} Upgrade: {formatTimeRemaining(bot.activeUpgrade.endsAt)}
-                                          </Badge>
-                                        )}
-                                        {bot.activeMission && (() => {
-                                          const zone = Object.keys(bot.activeMission.zone)[0];
-                                          const timeRemaining = getScavengingTimeRemaining(bot);
-                                          return (
-                                            <Badge 
-                                              variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
-                                              className="text-xs"
-                                            >
-                                              {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}🔍 {formatScavengingZone(zone)}{timeRemaining ? ` • ${timeRemaining}` : ''}
-                                            </Badge>
-                                          );
-                                        })()}
-                                      </>
-                                    );
-                                  })()}
-                              </div>
-                            </>
-                          )}
-                          {!bot.isInitialized && (
-                            <Badge variant="outline" className="text-xs">Not Initialized</Badge>
-                          )}
-                        </div>
-
-                        {/* Desktop Layout (>= md) */}
-                        <div className="hidden md:flex items-center gap-4">
-                          {/* Avatar */}
-                          <div className="relative flex-shrink-0">
-                            <Avatar className="h-12 w-12">
-                              <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
-                              <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
-                            </Avatar>
-                            {(() => {
-                              const raceInfo = getNextRaceInfo(bot);
-                              return raceInfo && (
-                                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-[9px] font-bold shadow-md border border-primary-foreground/20 flex items-center gap-0.5 whitespace-nowrap leading-none">
-                                  {getTerrainIcon(raceInfo.terrain)}{raceInfo.time}
-                                </div>
-                              );
-                            })()}
-                          </div>
-
-                          {/* Bot Info Column */}
-                          <div className="w-[180px] flex-shrink-0">
-                            <div className="font-semibold truncate text-sm text-foreground">
-                              #{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}
-                            </div>
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
-                              <span className="truncate">{factionName}</span>
-                              {bot.stats?.eloRating !== undefined && (
-                                <>
-                                  <span className="flex-shrink-0">•</span>
-                                  <span className="flex-shrink-0">
-                                    {(() => {
-                                      const rating = bot.maxStats 
-                                        ? Math.floor((
-                                            Number(bot.maxStats.speed) + 
-                                            Number(bot.maxStats.powerCore) + 
-                                            Number(bot.maxStats.acceleration) + 
-                                            Number(bot.maxStats.stability)
-                                          ) / 4)
-                                        : 0;
-                                      
-                                      return rating >= 50 ? 'SilentKlan' :
-                                             rating >= 40 ? 'Elite' :
-                                             rating >= 30 ? 'Raider' :
-                                             rating >= 20 ? 'Junker' : 'Scrap';
-                                    })()}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                            {/* Stats Strip */}
-                            {bot.stats && bot.currentStats && bot.maxStats && (
-                              <div className="flex items-center gap-1.5 text-[10px] mt-0.5 opacity-80">
-                                <div className="flex items-center gap-0.5">
-                                  <span className="text-yellow-500 text-[11px]">⚡</span>
-                                  <span className="font-mono text-yellow-500">{Number(bot.currentStats.speed)}</span>
-                                  <span className="text-muted-foreground/40">/{Number(bot.maxStats.speed)}</span>
-                                </div>
-                                <div className="flex items-center gap-0.5">
-                                  <span className="text-orange-500 text-[11px]">💪</span>
-                                  <span className="font-mono text-orange-500">{Number(bot.currentStats.powerCore)}</span>
-                                  <span className="text-muted-foreground/40">/{Number(bot.maxStats.powerCore)}</span>
-                                </div>
-                                <div className="flex items-center gap-0.5">
-                                  <span className="text-blue-500 text-[11px]">🚀</span>
-                                  <span className="font-mono text-blue-500">{Number(bot.currentStats.acceleration)}</span>
-                                  <span className="text-muted-foreground/40">/{Number(bot.maxStats.acceleration)}</span>
-                                </div>
-                                <div className="flex items-center gap-0.5">
-                                  <span className="text-red-500 text-[11px]">🎯</span>
-                                  <span className="font-mono text-red-500">{Number(bot.currentStats.stability)}</span>
-                                  <span className="text-muted-foreground/40">/{Number(bot.maxStats.stability)}</span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Middle Section: Cooldowns/Status + Resource Bars */}
-                          <div className="flex-1 min-w-0 flex items-center gap-6">
-                            {/* Cooldown Chips - Stacked Vertically */}
-                            {bot.isInitialized && bot.stats && (
-                              <div className="flex flex-col gap-1">
-                                {(() => {
-                                  const now = Date.now();
-                                  const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
-                                  const rechargeReady = bot.stats.lastRecharged 
-                                    ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
-                                    : 0;
-                                  const repairReady = bot.stats.lastRepaired
-                                    ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
-                                    : 0;
-                                  
-                                  const rechargeTime = bot.stats.lastRecharged 
-                                    ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + BigInt(Math.round(rechargeCooldownMs * 1_000_000)))
-                                    : null;
-                                  const repairTime = bot.stats.lastRepaired
-                                    ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)
-                                    : null;
-                                  
-                                  return (
-                                    <>
-                                      {rechargeReady > now && rechargeTime && (
-                                        <Badge variant="outline" className="text-xs flex items-center gap-1 w-fit">
-                                          <Zap className="h-3 w-3" />
-                                          {rechargeTime}
-                                        </Badge>
-                                      )}
-                                      {repairReady > now && repairTime && (
-                                        <Badge variant="outline" className="text-xs flex items-center gap-1 w-fit">
-                                          <Hammer className="h-3 w-3" />
-                                          {repairTime}
-                                        </Badge>
-                                      )}
-                                      {bot.activeUpgrade && (
-                                        <Badge variant="secondary" className="text-xs flex items-center gap-1 w-fit">
-                                          <Clock className="h-3 w-3" />
-                                          {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])}: {formatTimeRemaining(bot.activeUpgrade.endsAt)}
-                                        </Badge>
-                                      )}
-                                      {bot.activeMission && (() => {
-                                        const zone = Object.keys(bot.activeMission.zone)[0];
-                                        const timeRemaining = getScavengingTimeRemaining(bot);
-                                        return (
-                                          <Badge 
-                                            variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
-                                            className="text-xs w-fit"
-                                          >
-                                            {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}🔍 {formatScavengingZone(zone)}{timeRemaining ? ` • ${timeRemaining}` : ''}
-                                          </Badge>
-                                        );
-                                      })()}
-                                    </>
-                                  );
-                                })()}
-                              </div>
-                            )}
-
-                            {/* Mini Resource Bars - Stacked Vertically */}
-                            {bot.isInitialized && bot.stats && (
-                              <div className="flex flex-col gap-1.5 ml-auto flex-shrink-0">
-                                {/* Battery Bar */}
-                                <div className="flex items-center gap-1.5">
-                                  <Battery className={`h-3.5 w-3.5 ${Number(bot.stats.battery) < 30 ? 'text-destructive' : 'text-blue-500'}`} />
-                                  <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
-                                    <div
-                                      className={`h-full transition-all ${Number(bot.stats.battery) < 30 ? 'bg-destructive' : 'bg-blue-500'}`}
-                                      style={{ width: `${Number(bot.stats.battery)}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-xs font-mono w-8 text-right">{Number(bot.stats.battery)}%</span>
-                                </div>
-
-                                {/* Condition Bar */}
-                                <div className="flex items-center gap-1.5">
-                                  <Wrench className={`h-3.5 w-3.5 ${Number(bot.stats.condition) < 30 ? 'text-destructive' : 'text-green-500'}`} />
-                                  <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
-                                    <div
-                                      className={`h-full transition-all ${Number(bot.stats.condition) < 30 ? 'bg-destructive' : 'bg-green-500'}`}
-                                      style={{ width: `${Number(bot.stats.condition)}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-xs font-mono w-8 text-right">{Number(bot.stats.condition)}%</span>
-                                </div>
-                              </div>
-                            )}
-
-                            {!bot.isInitialized && (
-                              <Badge variant="outline" className="text-xs">Not Initialized</Badge>
-                            )}
-                          </div>
-                        </div>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCollapsedBots(prev => {
-                          const newSet = new Set(prev);
-                          const key = bot.tokenIndex.toString();
-                          if (newSet.has(key)) {
-                            newSet.delete(key);
-                            } else {
-                              newSet.add(key);
-                            }
-                            return newSet;
-                        });
-                      }}
-                      className="px-2 text-muted-foreground hover:text-foreground transition-colors"
-                      title={isCollapsed ? 'Expand bot' : 'Collapse bot'}
-                    >
-                      {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(bot.tokenIndex.toString());
-                      }}
-                      className="px-3 text-muted-foreground hover:text-yellow-500 transition-colors"
-                      title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                    >
-                      <Star className={`h-4 w-4 ${isFavorite ? 'fill-yellow-500 text-yellow-500' : ''}`} />
-                    </button>
-                  </div>
-                  );
-                })}
+                      );
+                    });
+                  })()}
                 </>
-                )}
               </div>
             </CardContent>
           </Card>
-
-          {/* Desktop Dialog - Bot Details */}
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogContent className="max-w-4xl">
-              <DialogHeader>
-                <DialogTitle>
-                  {selectedBot ? `${selectedBot.name || `Bot #${selectedBot.tokenIndex}`}` : 'Bot Details'}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="mt-2">
-                {selectedBot ? (
-                  <BotCard 
-                    key={selectedBot.tokenIndex.toString()}
-                    bot={selectedBot} 
-                    onUpdate={() => refetchBots()}
-                    enteringRaces={botEnteringRacesStates.get(selectedBot.tokenIndex.toString()) || false}
-                    setEnteringRaces={(val) => setBotEnteringRacesStates(new Map(botEnteringRacesStates.set(selectedBot.tokenIndex.toString(), val)))}
-                    rechargeCooldownMultiplier={bonuses?.costMultipliers.rechargeCooldown}
-                    backgroundColor={backgroundData?.backgrounds[selectedBot.tokenIndex.toString()]}
-                    inventory={inventory}
-                  />
-                ) : (
-                  <p className="text-muted-foreground text-center py-12">
-                    Select a bot from the list to view details
-                  </p>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Mobile Sheet - Bot Details */}
-          <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
-            <SheetContent side="bottom" className="h-[90vh] overflow-y-auto lg:hidden">
-              <SheetHeader>
-                <SheetTitle>
-                  {selectedBot ? `${selectedBot.name || `Bot #${selectedBot.tokenIndex}`}` : 'Bot Details'}
-                </SheetTitle>
-              </SheetHeader>
-              <div className="mt-4">
-                {selectedBot ? (
-                  <BotCard 
-                    key={selectedBot.tokenIndex.toString()}
-                    bot={selectedBot} 
-                    onUpdate={() => refetchBots()}
-                    enteringRaces={botEnteringRacesStates.get(selectedBot.tokenIndex.toString()) || false}
-                    setEnteringRaces={(val) => setBotEnteringRacesStates(new Map(botEnteringRacesStates.set(selectedBot.tokenIndex.toString(), val)))}
-                    rechargeCooldownMultiplier={bonuses?.costMultipliers.rechargeCooldown}
-                    backgroundColor={backgroundData?.backgrounds[selectedBot.tokenIndex.toString()]}
-                    inventory={inventory}
-                  />
-                ) : (
-                  <p className="text-muted-foreground text-center py-12">
-                    Select a bot from the list to view details
-                  </p>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
         </div>
       )}
 
-        </div>
-        {/* End Main Content Column */}
+      </div>
+      {/* End Main Content Column */}
 
         {/* Sticky Sidebar */}
         <div className="hidden xl:block w-80 flex-shrink-0">
@@ -2493,12 +2346,17 @@ export default function GaragePage() {
                     {/* Economic Bonuses */}
                     <div className="pb-3 border-b border-border space-y-2">
                       <h4 className="text-xs font-semibold text-muted-foreground uppercase">Economic Bonuses</h4>
-                      {(bonuses.costMultipliers.repair < 1 || bonuses.costMultipliers.rechargeCooldown < 1 || 
+                      {(bonuses.costMultipliers.repair < 1 || bonuses.costMultipliers.upgrade < 1 || bonuses.costMultipliers.rechargeCooldown < 1 || 
                         bonuses.yieldMultipliers.parts > 1 || bonuses.yieldMultipliers.prizes > 1) ? (
                         <div className="flex flex-wrap gap-1.5 text-xs">
                           {bonuses.costMultipliers.repair < 1 && (
                             <Badge variant="outline" className="text-xs">
                               🔧 -{Math.round((1 - bonuses.costMultipliers.repair) * 100)}%
+                            </Badge>
+                          )}
+                          {bonuses.costMultipliers.upgrade < 1 && (
+                            <Badge variant="outline" className="text-xs">
+                              🎮 -{Math.round((1 - bonuses.costMultipliers.upgrade) * 100)}%
                             </Badge>
                           )}
                           {bonuses.costMultipliers.rechargeCooldown < 1 && (
@@ -2602,6 +2460,65 @@ export default function GaragePage() {
 
       </div>
       {/* End Two-column layout */}
+
+      {/* Desktop Dialog - Bot Details */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedBot ? `${selectedBot.name || `Bot #${selectedBot.tokenIndex}`}` : 'Bot Details'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">
+            {selectedBot ? (
+              <BotCard 
+                key={selectedBot.tokenIndex.toString()}
+                bot={selectedBot} 
+                onUpdate={() => refetchBots()}
+                enteringRaces={botEnteringRacesStates.get(selectedBot.tokenIndex.toString()) || false}
+                setEnteringRaces={(val) => setBotEnteringRacesStates(new Map(botEnteringRacesStates.set(selectedBot.tokenIndex.toString(), val)))}
+                rechargeCooldownMultiplier={bonuses?.costMultipliers.rechargeCooldown}
+                backgroundColor={backgroundData?.backgrounds[selectedBot.tokenIndex.toString()]}
+                inventory={inventory}
+              />
+            ) : (
+              <p className="text-muted-foreground text-center py-12">
+                Select a bot from the list to view details
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mobile Sheet - Bot Details */}
+      <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
+        <SheetContent side="bottom" className="h-[90vh] overflow-y-auto lg:hidden">
+          <SheetHeader>
+            <SheetTitle>
+              {selectedBot ? `${selectedBot.name || `Bot #${selectedBot.tokenIndex}`}` : 'Bot Details'}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            {selectedBot ? (
+              <BotCard 
+                key={selectedBot.tokenIndex.toString()}
+                bot={selectedBot} 
+                onUpdate={() => refetchBots()}
+                enteringRaces={botEnteringRacesStates.get(selectedBot.tokenIndex.toString()) || false}
+                setEnteringRaces={(val) => setBotEnteringRacesStates(new Map(botEnteringRacesStates.set(selectedBot.tokenIndex.toString(), val)))}
+                rechargeCooldownMultiplier={bonuses?.costMultipliers.rechargeCooldown}
+                backgroundColor={backgroundData?.backgrounds[selectedBot.tokenIndex.toString()]}
+                inventory={inventory}
+              />
+            ) : (
+              <p className="text-muted-foreground text-center py-12">
+                Select a bot from the list to view details
+              </p>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
     </div>
   );
 }

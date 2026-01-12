@@ -256,6 +256,9 @@ module {
           let thumbnailUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId # "&type=thumbnail";
           let fullImageUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId;
 
+          // Get dedication tier info for this bot
+          let dedicationSummary = ctx.dedicationManager.getDedicationSummary(tokenIndex);
+
           // Build JSON response - different fields based on ownership
           let response = if (isOwner) {
             // Full details for owned bots
@@ -312,6 +315,20 @@ module {
               ("preferred_terrain", Json.str(terrainText)),
               ("terrain_bonus_note", Json.str(terrainBonusNote)),
               ("experience", Json.int(racingStats.experience)),
+              // Bot Dedication tier info
+              (
+                "dedication",
+                Json.obj([
+                  ("tier", Json.int(dedicationSummary.tier)),
+                  ("tier_name", Json.str(dedicationSummary.tierName)),
+                  ("total_dp", Json.int(dedicationSummary.totalDP)),
+                  ("investment_dp", Json.int(dedicationSummary.investmentDP)),
+                  ("activity_dp", Json.int(dedicationSummary.activityDP)),
+                  ("next_tier_dp", switch (dedicationSummary.nextTierDP) { case (?dp) { Json.int(dp) }; case (null) { Json.nullable() } }),
+                  ("next_tier_name", switch (dedicationSummary.nextTierName) { case (?n) { Json.str(n) }; case (null) { Json.nullable() } }),
+                  ("benefits", Json.obj([("stat_bonus_speed", Json.int(dedicationSummary.benefits.speedBonus)), ("stat_bonus_powerCore", Json.int(dedicationSummary.benefits.powerCoreBonus)), ("stat_bonus_acceleration", Json.int(dedicationSummary.benefits.accelerationBonus)), ("stat_bonus_stability", Json.int(dedicationSummary.benefits.stabilityBonus)), ("terrain_bonus_percent", Json.int(dedicationSummary.benefits.terrainBonusPercent)), ("scavenging_yield_mult", Json.float(dedicationSummary.benefits.scavengingYieldMult)), ("upgrade_discount_mult", Json.float(dedicationSummary.benefits.upgradeDiscountMult)), ("recharge_cooldown_mult", Json.float(dedicationSummary.benefits.rechargeCooldownMult)), ("repair_cooldown_mult", Json.float(dedicationSummary.benefits.repairCooldownMult))])),
+                ]),
+              ),
               ("thumbnail", Json.str(thumbnailUrl)),
               ("image", Json.str(fullImageUrl)),
               (
@@ -372,6 +389,14 @@ module {
               ("stats", Json.obj([("speed", Json.int(statsAt100.speed)), ("power_core", Json.int(statsAt100.powerCore)), ("acceleration", Json.int(statsAt100.acceleration)), ("stability", Json.int(statsAt100.stability)), ("total_at_100", Json.int(totalStatsAt100))])),
               ("career", Json.obj([("races_entered", Json.int(racingStats.racesEntered)), ("wins", Json.int(racingStats.wins)), ("places", Json.int(racingStats.places)), ("shows", Json.int(racingStats.shows)), ("faction_reputation", Json.int(racingStats.factionReputation)), ("reputation_tier", Json.str(reputationTier)), ("elo_rating", Json.int(racingStats.eloRating))])),
               ("overall_rating", Json.int(ratingAt100)),
+              // Bot Dedication tier info (public)
+              (
+                "dedication",
+                Json.obj([
+                  ("tier", Json.int(dedicationSummary.tier)),
+                  ("tier_name", Json.str(dedicationSummary.tierName)),
+                ]),
+              ),
               ("preferred_distance", Json.str(distanceText)),
               ("preferred_terrain", Json.str(terrainText)),
               ("thumbnail", Json.str(thumbnailUrl)),

@@ -320,3 +320,37 @@ export const queryRaces = async (
     totalMatching: result.totalMatching,
   };
 };
+
+/**
+ * Register a bot for an event
+ * @param eventId The event ID to register for
+ * @param tokenIndex The bot's token index
+ * @param identity Identity to use for the call
+ * @returns Success message or error
+ */
+export const registerForEvent = async (
+  eventId: number,
+  tokenIndex: number,
+  identity: Identity
+): Promise<{ ok: string } | { err: string }> => {
+  const racingActor = await getActor(identity);
+  const result = await racingActor.register_for_event(BigInt(eventId), BigInt(tokenIndex));
+  return result;
+};
+
+/**
+ * Unregister a bot from an event
+ * @param eventId The event ID to unregister from
+ * @param tokenIndex The bot's token index
+ * @param identity Identity to use for the call
+ * @returns Refund info or error
+ */
+export const unregisterFromEvent = async (
+  eventId: number,
+  tokenIndex: number,
+  identity: Identity
+): Promise<{ ok: { refundAmount: bigint; penalty: bigint } } | { err: string }> => {
+  const racingActor = await getActor(identity);
+  const result = await racingActor.unregister_from_event(BigInt(eventId), BigInt(tokenIndex));
+  return result;
+};
