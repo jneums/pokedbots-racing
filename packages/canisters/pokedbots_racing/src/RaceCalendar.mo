@@ -205,23 +205,26 @@ module {
   public func getNextDailySprintTime(fromTime : Int) : Int {
     let NANOS_PER_SECOND : Int = 1_000_000_000;
     let SECONDS_PER_HOUR : Int = 3600;
-    let SPRINT_INTERVAL : Int = 6 * SECONDS_PER_HOUR; // 6 hours
+    let SPRINT_INTERVAL : Int = 6 * SECONDS_PER_HOUR; // 6 hours (21600 seconds)
 
     let currentSeconds = fromTime / NANOS_PER_SECOND;
-    let secondsToday = Int.abs(currentSeconds % (24 * SECONDS_PER_HOUR));
 
-    // Find next 6-hour mark
-    let currentInterval = secondsToday / SPRINT_INTERVAL;
-    let nextInterval = currentInterval + 1;
-    let nextIntervalSeconds = nextInterval * SPRINT_INTERVAL;
+    // Find the next 6-hour boundary after fromTime
+    // Daily sprints happen at: 00:00, 06:00, 12:00, 18:00 UTC
+    // We need to find which boundary comes next
 
-    let secondsUntilNext = if (nextIntervalSeconds >= 24 * SECONDS_PER_HOUR) {
-      // Next day's first sprint
-      (24 * SECONDS_PER_HOUR) - secondsToday;
+    // Calculate how many seconds into the current 6-hour interval we are
+    let secondsIntoInterval = Int.abs(currentSeconds % SPRINT_INTERVAL);
+
+    // Calculate seconds until the next 6-hour boundary
+    // If we're exactly at a boundary (secondsIntoInterval == 0), move to the next one
+    let secondsUntilNext = if (secondsIntoInterval == 0) {
+      SPRINT_INTERVAL;
     } else {
-      nextIntervalSeconds - secondsToday;
+      SPRINT_INTERVAL - secondsIntoInterval;
     };
 
+    // Return the next sprint time
     (currentSeconds + secondsUntilNext) * NANOS_PER_SECOND;
   };
 

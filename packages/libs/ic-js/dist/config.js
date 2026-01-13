@@ -17,8 +17,6 @@ export function configure(config) {
     _canisterIds = config.canisterIds;
     _host = config.host || MAINNET_URL;
     _isConfigured = true;
-    if (config.verbose)
-        console.log('[ic-js] Configured with canister IDs:', _canisterIds);
 }
 /**
  * A type-safe helper to get a canister ID.

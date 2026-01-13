@@ -16,7 +16,6 @@ function isPlugAgent(identityOrAgent) {
 async function getActor(identityOrAgent) {
     // Check if this is a Plug user with pre-created actors
     if (isPlugAgent(identityOrAgent) && identityOrAgent._plugRacingActor) {
-        console.log('[getActor] Using pre-created Plug racing actor');
         return identityOrAgent._plugRacingActor;
     }
     // Fallback: standard Identity

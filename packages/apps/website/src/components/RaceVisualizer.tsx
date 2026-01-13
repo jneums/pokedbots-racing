@@ -1353,7 +1353,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
   
   const getTerrainIcon = (terrain: any): string => {
     const terrainStr = getTerrainString(terrain);
-    if (terrainStr === 'ScrapHeaps') return '🏚️';
+    if (terrainStr === 'ScrapHeaps') return '🔩';
     if (terrainStr === 'WastelandSand') return '🏜️';
     if (terrainStr === 'MetalRoads') return '🛣️';
     return '🏁';

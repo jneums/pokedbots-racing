@@ -31,6 +31,7 @@ import { Label } from './ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
+import { Slider } from './ui/slider';
 import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionBonus, getFactionSpecialTerrain } from '../lib/utils';
 
 interface BotCardProps {
@@ -117,24 +118,15 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   const [upgradeType, setUpgradeType] = useState<'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro'>('Velocity');
   const [paymentMethod, setPaymentMethod] = useState<'icp' | 'parts'>('parts');
   const [scavengingZone, setScavengingZone] = useState<'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields' | 'RepairBay' | 'ChargingStation'>('ScrapHeaps');
-  const [scavengingDuration, setScavengingDuration] = useState<number | undefined>(undefined);
+  const [scavengingDuration, setScavengingDuration] = useState<number | undefined>(15);
   const [botName, setBotName] = useState('');
   const [listPrice, setListPrice] = useState('');
   const [transferTo, setTransferTo] = useState('');
   const [statsToStrip, setStatsToStrip] = useState<Set<string>>(new Set());
   
-  // Racing section state - must be at top level
-  const [selectedRaces, setSelectedRaces] = useState<Set<number>>(new Set());
-  
   // Event registration state
   const [registeringEventId, setRegisteringEventId] = useState<number | null>(null);
   const [unregisteringEventId, setUnregisteringEventId] = useState<number | null>(null);
-
-  // Clear selected races when bot changes to prevent selecting races for one bot
-  // then switching to another bot and accidentally entering wrong races
-  useEffect(() => {
-    setSelectedRaces(new Set());
-  }, [bot.tokenIndex]);
 
   const handleInitialize = () => {
     initializeMutation.mutate(
@@ -511,18 +503,95 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   const stats = bot.stats!;
   const dedicationBadge = dedicationInfo ? getDedicationBadge(dedicationInfo.tier) : null;
 
+  // Check for active world buff (full circle when active)
+  const hasWorldBuff = stats?.worldBuff && stats.worldBuff.length > 0;
+  
+  // Check for overcharge/perfect tune-up
+  const overcharge = Number(stats.overcharge);
+  const maxOvercharge = 40;
+  const overchargePercent = Math.round((overcharge / maxOvercharge) * 100);
+  const isPerfectTuneUp = stats.perfectTuneUp === true;
+  const hasOvercharge = overcharge > 0 || isPerfectTuneUp;
+
   return (
     <Card className="border-2 border-primary/20 bg-card/80 backdrop-blur">
       <CardHeader>
         <CardTitle className="flex items-center gap-3">
-          <div className="relative">
-            <Avatar className="h-16 w-16">
-              <AvatarImage src={imageUrl} alt={bot.name || `Bot #${bot.tokenIndex}`} />
-              <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
-            </Avatar>
+          <div className="relative overflow-visible">
+            {/* Avatar with animated borders */}
+            <div className="relative h-16 w-16 overflow-visible">
+              {/* World Buff full circle border */}
+              {hasWorldBuff && (
+                <svg className="absolute w-[68px] h-[68px] z-20" style={{ left: '-2px', top: '-2px', filter: 'drop-shadow(0 0 4px rgba(168, 85, 247, 0.6))' }}>
+                  <circle
+                    cx="34"
+                    cy="34"
+                    r="33"
+                    fill="none"
+                    stroke="rgb(168, 85, 247)"
+                    strokeWidth="3"
+                    className="animate-pulse"
+                    style={{ animationDuration: '2s' }}
+                  />
+                </svg>
+              )}
+              
+              {/* Overcharge/Perfect Tune-Up radial progress border */}
+              {hasOvercharge && (
+                <>
+                  <svg className="absolute w-[68px] h-[68px] -rotate-90 z-20 pointer-events-none" style={{ left: '-2px', top: '-2px' }}>
+                    {/* Background ring */}
+                    <circle
+                      cx="34"
+                      cy="34"
+                      r="33"
+                      fill="none"
+                      stroke={isPerfectTuneUp ? "rgba(251, 191, 36, 0.3)" : "rgba(6, 182, 212, 0.3)"}
+                      strokeWidth="4"
+                    />
+                    {/* Progress ring */}
+                    <circle
+                      cx="34"
+                      cy="34"
+                      r="33"
+                      fill="none"
+                      stroke={isPerfectTuneUp ? "url(#goldGradient)" : "rgb(6, 182, 212)"}
+                      strokeWidth="4"
+                      strokeDasharray={`${(overchargePercent / 100) * 207.3} 207.3`}
+                      strokeLinecap="round"
+                      className={isPerfectTuneUp ? "animate-pulse" : "transition-all duration-1000"}
+                      style={isPerfectTuneUp ? { animationDuration: '1.5s', filter: 'drop-shadow(0 0 6px rgba(251, 191, 36, 0.8))' } : { filter: 'drop-shadow(0 0 4px rgba(6, 182, 212, 0.6))' }}
+                    />
+                    {isPerfectTuneUp && (
+                      <defs>
+                        <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="rgb(251, 191, 36)" />
+                          <stop offset="50%" stopColor="rgb(249, 115, 22)" />
+                          <stop offset="100%" stopColor="rgb(251, 191, 36)" />
+                        </linearGradient>
+                      </defs>
+                    )}
+                  </svg>
+                  {isPerfectTuneUp && (
+                    <div className="absolute w-[68px] h-[68px] rounded-full animate-pulse z-20 pointer-events-none" style={{ 
+                      left: '-2px',
+                      top: '-2px',
+                      boxShadow: '0 0 20px rgba(251, 191, 36, 0.5), inset 0 0 20px rgba(251, 191, 36, 0.2)',
+                      animationDuration: '2s'
+                    }} />
+                  )}
+                </>
+              )}
+              
+              <Avatar className="h-16 w-16 relative z-10">
+                <AvatarImage src={imageUrl} alt={bot.name || `Bot #${bot.tokenIndex}`} />
+                <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
+              </Avatar>
+            </div>
+            
             {dedicationBadge && (
               <div 
-                className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ${dedicationBadge.bgColor} border-2 ${dedicationBadge.borderColor} flex items-center justify-center text-xs shadow-lg`}
+                className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ${dedicationBadge.bgColor} border-2 ${dedicationBadge.borderColor} flex items-center justify-center text-xs shadow-lg z-20`}
                 title={`${dedicationInfo?.tierName} - ${dedicationInfo?.totalDP.toLocaleString()} DP`}
               >
                 {dedicationBadge.emoji}
@@ -1056,10 +1125,6 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                     <span className="text-muted-foreground">Zone:</span>
                     <span className="font-medium">{Object.keys(mission.zone)[0]}</span>
                   </div>
-                  {(() => {
-                    console.log('[SCAVENGE DEBUG] Bot', bot.tokenIndex, 'Zone:', Object.keys(mission.zone)[0], 'Start:', new Date(Number(mission.startTime) / 1_000_000), 'LastAccum:', new Date(Number(mission.lastAccumulation) / 1_000_000), 'PendingCondition:', Number(mission.pendingConditionRestored), 'PendingBattery:', Number(mission.pendingBatteryRestored), 'Elapsed mins:', Math.floor((Date.now() - Number(mission.startTime) / 1_000_000) / 60000), 'Since last accum mins:', Math.floor((Date.now() - Number(mission.lastAccumulation) / 1_000_000) / 60000));
-                    return null;
-                  })()}
                   {mission.durationMinutes && mission.durationMinutes.length > 0 && (() => {
                     const duration = Number(mission.durationMinutes[0]);
                     const endTime = Number(mission.startTime) / 1_000_000 + (duration * 60 * 1000);
@@ -1223,183 +1288,6 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                   </div>
                 )}
               </div>
-            </div>
-          );
-        })()}
-
-        {/* Racing Section */}
-        {(() => {
-          const handleToggleRace = (raceId: number) => {
-            const newSelected = new Set(selectedRaces);
-            if (newSelected.has(raceId)) {
-              newSelected.delete(raceId);
-            } else {
-              newSelected.add(raceId);
-            }
-            setSelectedRaces(newSelected);
-          };
-
-          const handleToggleAll = () => {
-            if (bot.eligibleRaces && selectedRaces.size === bot.eligibleRaces.length) {
-              setSelectedRaces(new Set());
-            } else if (bot.eligibleRaces) {
-              setSelectedRaces(new Set(bot.eligibleRaces.map(r => r.raceId)));
-            }
-          };
-
-          const handleEnterSelected = () => {
-            if (selectedRaces.size === 0) return;
-            
-            setEnteringRaces(true);
-            let successCount = 0;
-            let failCount = 0;
-            const racesToEnter = Array.from(selectedRaces);
-            let currentIndex = 0;
-
-            const enterNext = () => {
-              if (currentIndex >= racesToEnter.length) {
-                // All done
-                setEnteringRaces(false);
-                setSelectedRaces(new Set());
-
-                if (successCount > 0) {
-                  toast.success(`Entered ${successCount} race${successCount > 1 ? 's' : ''}!`);
-                  onUpdate();
-                }
-                if (failCount > 0) {
-                  toast.error(`Failed to enter ${failCount} race${failCount > 1 ? 's' : ''}`);
-                }
-                return;
-              }
-
-              const raceId = racesToEnter[currentIndex];
-              currentIndex++;
-
-              enterRaceMutation.mutate(
-                { raceId, tokenIndex: Number(bot.tokenIndex) },
-                {
-                  onSuccess: () => {
-                    successCount++;
-                    enterNext();
-                  },
-                  onError: (error) => {
-                    console.error(`Failed to enter race ${raceId}:`, error);
-                    failCount++;
-                    enterNext();
-                  },
-                }
-              );
-            };
-
-            enterNext();
-          };
-
-          const hasEnteredRaces = bot.upcomingRaces && bot.upcomingRaces.length > 0;
-          const hasEligibleRaces = bot.eligibleRaces && bot.eligibleRaces.length > 0;
-
-          if (!hasEnteredRaces && !hasEligibleRaces) {
-            // No races at all - show empty state
-            return (
-              <div className="p-3 bg-muted/30 border border-muted rounded-lg space-y-2">
-                <p className="text-sm font-semibold text-muted-foreground">🏁 Racing</p>
-                <p className="text-xs text-muted-foreground">
-                  No races available. Check the schedule for upcoming races!
-                </p>
-                <Button
-                  className="w-full"
-                  size="sm"
-                  variant="default"
-                  onClick={() => window.location.href = '/schedule'}
-                >
-                  🏁 Find Race
-                </Button>
-              </div>
-            );
-          }
-
-          return (
-            <div className="space-y-2">
-              {/* Entered Races (informational, read-only) */}
-              {hasEnteredRaces && (
-                <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg space-y-2">
-                  <p className="text-sm font-semibold text-green-600 dark:text-green-400">
-                    ✓ Entered Races ({bot.upcomingRaces!.length})
-                  </p>
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                    {bot.upcomingRaces!.map((race) => (
-                      <div
-                        key={race.raceId}
-                        className="p-2 rounded bg-green-500/5"
-                      >
-                        <Link
-                          to={`/race/${race.raceId}`}
-                          className="text-xs text-foreground hover:text-primary transition-colors block truncate font-medium"
-                        >
-                          {getTerrainIcon(race.terrain)} {race.name}
-                        </Link>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>Entry Closes: {formatRelativeTime(race.entryDeadline)}</span>
-                          <span>•</span>
-                          <span>{Number(race.entryFee) / 100_000_000} ICP</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Eligible Races (with checkboxes for entry) */}
-              {hasEligibleRaces && (
-                <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-2">
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm font-semibold text-primary">
-                      🏁 Available Races ({bot.eligibleRaces!.length})
-                    </p>
-                    <button
-                      onClick={handleToggleAll}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      {selectedRaces.size === bot.eligibleRaces!.length ? 'None' : 'All'}
-                    </button>
-                  </div>
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                    {bot.eligibleRaces!.map((race) => (
-                      <div
-                        key={race.raceId}
-                        className="flex items-center gap-2 p-2 rounded hover:bg-primary/5 transition-colors"
-                      >
-                        <Checkbox
-                          checked={selectedRaces.has(race.raceId)}
-                          onCheckedChange={() => handleToggleRace(race.raceId)}
-                          disabled={enteringRaces}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <Link
-                            to={`/race/${race.raceId}`}
-                            className="text-xs text-foreground hover:text-primary transition-colors block truncate"
-                          >
-                            {getTerrainIcon(race.terrain)} {race.name}
-                          </Link>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>Entry Closes: {formatRelativeTime(race.entryDeadline)}</span>
-                            <span>•</span>
-                            <span>{Number(race.entryFee) / 100_000_000} ICP</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    className="w-full"
-                    size="sm"
-                    variant="default"
-                    onClick={handleEnterSelected}
-                    disabled={selectedRaces.size === 0 || enteringRaces}
-                  >
-                    {enteringRaces ? 'Entering...' : `Enter Selected (${selectedRaces.size})`}
-                  </Button>
-                </div>
-              )}
             </div>
           );
         })()}
@@ -1653,7 +1541,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                       const raceMode = event.raceCreationMode;
                       const terrains = raceMode?.Automatic?.terrains || raceMode?.Manual?.raceTemplates?.map((t: any) => t.terrain) || [];
                       const uniqueTerrains = [...new Set(terrains.map((t: any) => {
-                        if ('ScrapHeaps' in t) return '🏚️';
+                        if ('ScrapHeaps' in t) return '🔩';
                         if ('WastelandSand' in t) return '🏜️';
                         if ('MetalRoads' in t) return '🛣️';
                         return '🏁';
@@ -1920,68 +1808,66 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Mission Duration (Optional)</Label>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant={scavengingDuration === undefined ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setScavengingDuration(undefined)}
-                  className="flex-1"
-                >
-                  ♾️ Continuous
-                </Button>
-                <Button
-                  type="button"
-                  variant={scavengingDuration === 15 ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setScavengingDuration(15)}
-                  className="flex-1"
-                >
-                  15 min
-                </Button>
-                <Button
-                  type="button"
-                  variant={scavengingDuration === 30 ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setScavengingDuration(30)}
-                  className="flex-1"
-                >
-                  30 min
-                </Button>
-                <Button
-                  type="button"
-                  variant={scavengingDuration === 60 ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setScavengingDuration(60)}
-                  className="flex-1"
-                >
-                  1 hr
-                </Button>
-                <Button
-                  type="button"
-                  variant={scavengingDuration === 120 ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setScavengingDuration(120)}
-                  className="flex-1"
-                >
-                  2 hrs
-                </Button>
-                <Button
-                  type="button"
-                  variant={scavengingDuration === 180 ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setScavengingDuration(180)}
-                  className="flex-1"
-                >
-                  3 hrs
-                </Button>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Mission Duration</Label>
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="continuous-mode"
+                    checked={scavengingDuration === undefined}
+                    onCheckedChange={(checked) => setScavengingDuration(checked ? undefined : 30)}
+                  />
+                  <label 
+                    htmlFor="continuous-mode"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    ♾️ Continuous
+                  </label>
+                </div>
               </div>
+              
+              {scavengingDuration !== undefined && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Duration:</span>
+                    <span className="text-sm font-semibold">
+                      {scavengingDuration < 60 
+                        ? `${scavengingDuration} min` 
+                        : scavengingDuration % 60 === 0
+                        ? `${scavengingDuration / 60} hr${scavengingDuration > 60 ? 's' : ''}`
+                        : `${Math.floor(scavengingDuration / 60)}h ${scavengingDuration % 60}m`}
+                    </span>
+                  </div>
+                  <Slider
+                    min={5}
+                    max={360}
+                    step={5}
+                    value={[scavengingDuration]}
+                    onValueChange={(value) => setScavengingDuration(value[0])}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground -mt-1">
+                    <span>5m</span>
+                    <span>1h</span>
+                    <span>2h</span>
+                    <span>3h</span>
+                    <span>4h</span>
+                    <span>5h</span>
+                    <span>6h</span>
+                  </div>
+                </div>
+              )}
+              
               <p className="text-xs text-muted-foreground">
                 {scavengingDuration === undefined 
                   ? 'Bot will scavenge until you manually collect rewards'
-                  : `Bot will auto-collect after ${scavengingDuration < 60 ? scavengingDuration + ' min' : (scavengingDuration / 60) + ' hr' + (scavengingDuration > 60 ? 's' : '')}`
+                  : `Bot will auto-collect after ${
+                      scavengingDuration < 60 
+                        ? scavengingDuration + ' min' 
+                        : scavengingDuration % 60 === 0
+                        ? (scavengingDuration / 60) + ' hr' + (scavengingDuration > 60 ? 's' : '')
+                        : `${Math.floor(scavengingDuration / 60)}h ${scavengingDuration % 60}m`
+                    }`
                 }
               </p>
             </div>
@@ -1994,7 +1880,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                     {scavengingZone === 'AbandonedSettlements' && '🏭 Abandoned Settlements'}
                     {scavengingZone === 'DeadMachineFields' && '⚠️ Dead Machine Fields'}
                     {scavengingZone === 'RepairBay' && '🔧 Repair Bay'}
-                    {scavengingZone === 'ChargingStation' && '🔌 Charging Station'}
+                    {scavengingZone === 'ChargingStation' && '🔌 Charging'}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>

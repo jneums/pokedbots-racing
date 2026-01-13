@@ -43,7 +43,6 @@ export const useAuthStore = create<AuthStore>((set: any, get: any) => ({
       
       // For Plug users, attach pre-created actors to the agent for API functions
       if (user.provider === 'plug' && user.plugActors) {
-        console.log('[Auth] Attaching Plug actors to agent');
         (user.agent as any)._plugRacingActor = user.plugActors.racing;
         (user.agent as any)._plugNFTsActor = user.plugActors.nfts;
         (user.agent as any)._plugLedgerActor = user.plugActors.ledger;
@@ -103,7 +102,6 @@ export const useAuthStore = create<AuthStore>((set: any, get: any) => ({
   
   // Handle session expiry (called when API detects expired session)
   handleSessionExpired: () => {
-    console.log('[Auth] Session expired, logging out');
     const currentUser = get().user;
     if (currentUser?.provider === 'plug') {
       // Don't call Plug disconnect as it may trigger popup
@@ -135,7 +133,6 @@ export const useAuthStore = create<AuthStore>((set: any, get: any) => ({
       
       // For Plug users, attach pre-created actors to the agent
       if (user.provider === 'plug' && user.plugActors) {
-        console.log('[Auth] Attaching Plug actors to agent during init');
         (user.agent as any)._plugRacingActor = user.plugActors.racing;
         (user.agent as any)._plugNFTsActor = user.plugActors.nfts;
         (user.agent as any)._plugLedgerActor = user.plugActors.ledger;
@@ -170,7 +167,6 @@ export const useAuth = () => {
   if (!store.invalidateQueries) {
     useAuthStore.setState({
       invalidateQueries: () => {
-        console.log('[Auth] Invalidating all React Query caches after auth change');
         queryClient.invalidateQueries();
       }
     });

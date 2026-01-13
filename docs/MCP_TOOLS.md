@@ -10,6 +10,10 @@ order: 7
 
 ---
 
+> **⚠️ IMPORTANT - DEDICATION POINTS:** Actions performed through MCP tools **do not earn dedication points (DP)**. Dedication points are **only earned through the website UI**. If you want to build your bot's dedication level and unlock loyalty bonuses, you must use the PokedBots website for racing, scavenging, repairs, recharges, and upgrades. See the [Dedication System Guide](/guides/13-dedication-system) for more details.
+
+---
+
 ## Navigation
 
 📖 <a href="/docs/MARKETPLACE">← Marketplace</a> | 📚 <a href="/docs/TECHNICAL_REFERENCE">Technical Reference →</a>

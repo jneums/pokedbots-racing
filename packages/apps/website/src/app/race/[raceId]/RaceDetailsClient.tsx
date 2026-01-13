@@ -240,8 +240,9 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
     );
   }
 
-  const prizePool = Number(race.prizePool) + Number(race.platformBonus);
   const entryCount = race.entries.length;
+  // Calculate estimated prize pool: (entry fee × current entries) + platform bonus
+  const estimatedPrizePool = (Number(race.entryFee) * entryCount) + Number(race.platformBonus);
   const isAuthenticated = !!user;
   const isUpcoming = 'Upcoming' in race.status;
   const isFull = race.entries.length >= Number(race.maxEntries);
@@ -363,11 +364,13 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
                 </div>
                 <div className="text-center p-4 bg-card/50 border border-primary/20 rounded-lg">
                   <p className="text-xs text-muted-foreground mb-1">Prize Pool</p>
-                  <p className="text-lg font-bold text-primary">{formatICP(BigInt(prizePool))}</p>
+                  <p className="text-lg font-bold text-primary">{formatICP(BigInt(estimatedPrizePool))}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Est. {entryCount} × {formatICP(race.entryFee)}</p>
                 </div>
                 <div className="text-center p-4 bg-card/50 border border-primary/20 rounded-lg">
                   <p className="text-xs text-muted-foreground mb-1">Entries</p>
-                  <p className="text-lg font-bold text-primary">{entryCount}/{Number(race.maxEntries)}</p>
+                  <p className="text-lg font-bold text-primary">{entryCount}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Participants</p>
                 </div>
               </div>
 
@@ -425,7 +428,7 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
               
               {isFull && (
                 <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
-                  <p className="text-sm text-destructive">Race is full ({Number(race.maxEntries)} entries)</p>
+                  <p className="text-sm text-destructive">Race is full ({entryCount} entries)</p>
                 </div>
               )}
               
@@ -449,7 +452,7 @@ export function RaceDetailsClient({ raceId }: { raceId: string }) {
             <CardContent className="pt-6">
               {'Upcoming' in race.status && (
                 <div className="space-y-3">
-                  <p className="text-sm font-semibold">Racers ({entryCount}/{Number(race.maxEntries)}):</p>
+                  <p className="text-sm font-semibold">Racers ({entryCount}):</p>
                   {entryCount === 0 ? (
                     <div className="flex flex-col items-center justify-center p-8 bg-card/30 border-2 border-dashed border-primary/20 rounded-lg">
                       <div className="text-6xl mb-4">🏁</div>

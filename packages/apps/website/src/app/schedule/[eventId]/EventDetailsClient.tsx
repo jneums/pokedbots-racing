@@ -41,7 +41,7 @@ function getTerrainName(terrain: any): string {
 }
 
 function getTerrainIcon(terrain: any): string {
-  if ('ScrapHeaps' in terrain) return '🏚️';
+  if ('ScrapHeaps' in terrain) return '🔩';
   if ('WastelandSand' in terrain) return '🏜️';
   if ('MetalRoads' in terrain) return '🛣️';
   return '🏁';
@@ -746,8 +746,9 @@ function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolea
     );
   }
 
-  const prizePool = Number(race.prizePool) + Number(race.platformBonus);
   const entryCount = race.entries.length;
+  // Calculate estimated prize pool: (entry fee × current entries) + platform bonus
+  const estimatedPrizePool = (Number(race.entryFee) * entryCount) + Number(race.platformBonus);
 
   // Check if user is authenticated
   const isAuthenticated = !!user;
@@ -863,12 +864,13 @@ function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolea
           </div>
           <div className="text-center p-3 bg-card/50 border border-primary/20 rounded-lg">
             <p className="text-xs text-muted-foreground mb-1">Prize Pool</p>
-            <p className="text-base font-bold text-primary">{formatICP(BigInt(prizePool))}</p>
+            <p className="text-base font-bold text-primary">{formatICP(BigInt(estimatedPrizePool))}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Est. {entryCount} × {formatICP(race.entryFee)}</p>
           </div>
           <div className="text-center p-3 bg-card/50 border border-primary/20 rounded-lg">
             <p className="text-xs text-muted-foreground mb-1">Entries</p>
-            <p className="text-base font-bold text-primary">{entryCount}/{Number(race.maxEntries)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Min: {Number(race.minEntries)}</p>
+            <p className="text-base font-bold text-primary">{entryCount}</p>
+            <p className="text-xs text-muted-foreground mt-1">Participants</p>
           </div>
         </div>
 
@@ -932,12 +934,6 @@ function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolea
         {isAuthenticated && isUpcoming && !botsLoading && availableBots.length === 0 && userEnteredBots.length === 0 && (
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
             <p className="text-sm text-yellow-600">You don't have any available bots. Visit your garage to initialize a bot!</p>
-          </div>
-        )}
-        
-        {isFull && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-            <p className="text-sm text-destructive">Race is full ({Number(race.maxEntries)} entries)</p>
           </div>
         )}
         

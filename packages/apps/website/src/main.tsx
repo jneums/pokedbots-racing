@@ -20,17 +20,6 @@ const queryClient = new QueryClient({
         return failureCount < 1;
       },
     },
-    mutations: {
-      retry: (failureCount, error) => {
-        // Don't retry on Plug session expiry
-        if (error instanceof Error && error.message.includes('Plug session expired')) {
-          // Trigger session expiry handler
-          useAuthStore.getState().handleSessionExpired?.();
-          return false;
-        }
-        return failureCount < 1;
-      },
-    },
   },
 });
 

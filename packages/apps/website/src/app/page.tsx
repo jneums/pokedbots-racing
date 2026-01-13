@@ -23,32 +23,26 @@ function formatDate(timestamp: bigint): string {
   });
 }
 
-// Calculate event-level total prize pool
-function calculateEventPrizePool(event: any): bigint {
-  // Entry fees from all registrations
-  const entryFees = event.registrationCounts.total * event.metadata.entryFee;
-  
-  // Platform bonus
-  const platformBonus = event.metadata.prizePoolBonus;
-  
-  // Event bonus prize
-  const eventBonus = event.metadata.eventBonusPrize;
-  
-  // Sum all sponsorships
-  const sponsorships = event.sponsorships.reduce((sum: bigint, s: any) => sum + s.amount, BigInt(0));
-  
-  return entryFees + platformBonus + eventBonus + sponsorships;
-}
-
 export default function Home() {
   const { data: eventsWithRaces, isLoading } = useGetUpcomingEventsWithRaces(14);
   
-  // Get top 3 events by prize pool (calculated from event data)
+  // Get top 3 events by prize pool - use backend's raceSummary.totalPrizePool which sums all individual race prize pools
   const topEvents = eventsWithRaces
-    ?.map(e => ({
-      ...e,
-      eventPrizePool: calculateEventPrizePool(e.event)
-    }))
+    ?.map(e => {
+      // Backend calculates accurate totalPrizePool by summing individual race pools (entry fees + platform bonuses + sponsorships)
+      // Fall back to manual calculation only if raceSummary is missing
+      const totalPrizePool = e.raceSummary?.totalPrizePool 
+        ? BigInt(e.raceSummary.totalPrizePool)
+        : (BigInt(e.event.registrationCounts.total) * BigInt(e.event.metadata.entryFee)) + 
+          BigInt(e.event.metadata.prizePoolBonus) + 
+          BigInt(e.event.metadata.eventBonusPrize) + 
+          e.event.sponsorships.reduce((sum: bigint, s: any) => sum + BigInt(s.amount), 0n);
+      
+      return {
+        ...e,
+        eventPrizePool: totalPrizePool
+      };
+    })
     .filter(e => e.eventPrizePool > 0n)
     .sort((a, b) => Number(b.eventPrizePool - a.eventPrizePool))
     .slice(0, 3) || [];
@@ -189,12 +183,24 @@ export default function Home() {
                           {/* Race Stats */}
                           <div className="grid grid-cols-2 gap-3 text-sm">
                             <div className="text-center p-2 bg-card/50 border border-primary/20 rounded">
-                              <div className="text-muted-foreground mb-1">Races</div>
-                              <div className="font-bold text-primary">{Number(raceSummary.totalRaces)}</div>
+                              <div className="text-muted-foreground mb-1">Est. Races</div>
+                              <div className="font-bold text-primary">
+                                {event.raceIds.length > 0 ? event.raceIds.length : (() => {
+                                  // Estimate: 1 race per 8 registrants per class
+                                  let totalRaces = 0;
+                                  event.registrationCounts.byClass.forEach((classCount: any) => {
+                                    const count = Number(classCount[1]);
+                                    if (count > 0) {
+                                      totalRaces += Math.ceil(count / 8);
+                                    }
+                                  });
+                                  return totalRaces || 0;
+                                })()}
+                              </div>
                             </div>
                             <div className="text-center p-2 bg-card/50 border border-primary/20 rounded">
                               <div className="text-muted-foreground mb-1">Racers</div>
-                              <div className="font-bold text-primary">{Number(raceSummary.totalParticipants)}</div>
+                              <div className="font-bold text-primary">{Number(event.registrationCounts.total)}</div>
                             </div>
                           </div>
                           

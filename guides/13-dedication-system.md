@@ -6,6 +6,8 @@ order: 13
 
 # Bot Dedication System - Complete Guide
 
+> **⚠️ IMPORTANT:** Dedication points are **only earned through the website UI**. Actions performed via MCP tools (Claude, ChatGPT, or other AI assistants) **do not count** toward dedication. You must use the PokedBots website to earn DP from racing, scavenging, and maintenance activities.
+
 ## WHAT IS DEDICATION?
 
 The Dedication System rewards you for the time and effort you put into your bots. Whether you're racing competitively, scavenging for parts, or investing ICP in upgrades - every action builds your bot's dedication and unlocks permanent bonuses.
@@ -13,6 +15,8 @@ The Dedication System rewards you for the time and effort you put into your bots
 Think of it as a **loyalty program** - your most active bots earn special perks that make them even better at racing and scavenging.
 
 ## HOW IT WORKS
+
+> **Note:** All DP must be earned through the website interface. MCP tool actions do not generate dedication points.
 
 Your bots earn **Dedication Points (DP)** from both **activities** and **investments**:
 

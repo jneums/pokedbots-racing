@@ -34,7 +34,6 @@ const canisterIds = {
 const network = process.env.DFX_NETWORK || 'local'; // 'ic' for mainnet, 'local' for local dev
 const host = network === 'ic' ? 'https://icp0.io' : 'http://127.0.0.1:4943';
 
-console.log('[PokedBots] Initializing with:', { network, host, canisterIds });
 
 // Pass the static, build-time configuration to the shared library.
 configureIcJs({ canisterIds, host, verbose: true });
@@ -124,6 +123,7 @@ export default function App() {
           position="top-right" 
           richColors 
           theme="dark"
+          closeButton
           toastOptions={{
             className: '',
             style: {

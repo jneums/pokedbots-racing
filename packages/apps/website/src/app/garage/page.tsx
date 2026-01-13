@@ -66,7 +66,7 @@ function formatScavengingZone(zone: string): string {
     'AbandonedSettlements': 'Settlements',
     'DeadMachineFields': 'Machine Fields',
     'RepairBay': 'Repair Bay',
-    'ChargingStation': 'Charging Station',
+    'ChargingStation': 'Charging',
   };
   return zoneMap[zone] || zone;
 }
@@ -1231,8 +1231,9 @@ export default function GaragePage() {
 
             {/* Quick Filters */}
             <div className="space-y-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-semibold text-muted-foreground">Quick Filters:</span>
+              <div className="space-y-2">
+                <span className="text-sm font-semibold text-muted-foreground block">Quick Filters:</span>
+                <div className="flex gap-2 flex-wrap">
                 <Badge
                   variant={activeQuickFilters.has('lowBattery') ? "default" : "outline"}
                   className="cursor-pointer"
@@ -1301,7 +1302,7 @@ export default function GaragePage() {
                   className="cursor-pointer"
                   onClick={() => toggleQuickFilter('chargingStation')}
                 >
-                  🔋 Charging Station
+                  🔋 Charging
                 </Badge>
                 <Badge
                   variant={activeQuickFilters.has('fullBattery') ? "default" : "outline"}
@@ -1338,30 +1339,37 @@ export default function GaragePage() {
                 >
                   🏁 In Next Race
                 </Badge>
-                {activeQuickFilters.size > 0 && (
+                </div>
+              </div>
+
+              {/* Clear button row */}
+              {activeQuickFilters.size > 0 && (
+                <div className="flex justify-end">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setActiveQuickFilters(new Set())}
-                    className="h-6 px-2"
+                    className="h-8 px-3"
                   >
                     <X className="h-3 w-3 mr-1" />
                     Clear
                   </Button>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Advanced Filters Toggle */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="text-sm"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Advanced Filters
-                <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
-              </Button>
+              <div className="pt-2 border-t border-border/50">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  className="text-sm w-full sm:w-auto"
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  Advanced Filters
+                  <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
+                </Button>
+              </div>
 
               {/* Advanced Filters - Collapsible */}
               {showAdvancedFilters && (
@@ -1646,13 +1654,13 @@ export default function GaragePage() {
               </div>
             </div>
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <CardTitle className="text-lg">Your Bots ({bots.length})</CardTitle>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground hidden sm:inline">Group by:</span>
                     <Select value={groupBy} onValueChange={(value) => setGroupBy(value as 'none' | 'class' | 'terrain' | 'faction' | 'role')}>
-                      <SelectTrigger className="w-[160px]">
+                      <SelectTrigger className="w-full sm:w-[160px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1667,7 +1675,7 @@ export default function GaragePage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground hidden sm:inline">Order by:</span>
                     <Select value={orderBy} onValueChange={(value) => setOrderBy(value as 'rating' | 'tokenIndex' | 'winRate' | 'condition' | 'battery')}>
-                      <SelectTrigger className="w-[160px]">
+                      <SelectTrigger className="w-full sm:w-[160px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1814,9 +1822,9 @@ export default function GaragePage() {
                                   </div>
                                 )}
                                 
-                                {/* Drag Handle (when not in selection mode) */}
+                                {/* Drag Handle (when not in selection mode) - Hidden on mobile */}
                                 {!selectionMode && (
-                                  <div className="px-2 text-muted-foreground hover:text-foreground flex items-center">
+                                  <div className="hidden lg:flex px-2 text-muted-foreground hover:text-foreground items-center">
                                     <GripVertical className="h-4 w-4" />
                                   </div>
                                 )}
@@ -1825,28 +1833,6 @@ export default function GaragePage() {
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setSelectedBotIndex(bot.tokenIndex);
-                                    console.log('🤖 Bot Card Opened:', {
-                                      tokenIndex: bot.tokenIndex.toString(),
-                                      name: bot.name || 'Unnamed',
-                                      dedicationBonuses: bot.dedicationBonuses ? {
-                                        speed: Number(bot.dedicationBonuses.speed),
-                                        powerCore: Number(bot.dedicationBonuses.powerCore),
-                                        acceleration: Number(bot.dedicationBonuses.acceleration),
-                                        stability: Number(bot.dedicationBonuses.stability),
-                                      } : 'Not initialized',
-                                      currentStats: bot.currentStats ? {
-                                        speed: Number(bot.currentStats.speed),
-                                        powerCore: Number(bot.currentStats.powerCore),
-                                        acceleration: Number(bot.currentStats.acceleration),
-                                        stability: Number(bot.currentStats.stability),
-                                      } : null,
-                                      maxStats: bot.maxStats ? {
-                                        speed: Number(bot.maxStats.speed),
-                                        powerCore: Number(bot.maxStats.powerCore),
-                                        acceleration: Number(bot.maxStats.acceleration),
-                                        stability: Number(bot.maxStats.stability),
-                                      } : null,
-                                    });
                                     // Open sheet on mobile, dialog on desktop
                                     if (window.innerWidth < 1024) {
                                       setMobileSheetOpen(true);
@@ -1857,34 +1843,111 @@ export default function GaragePage() {
                                   onMouseDown={(e) => e.stopPropagation()}
                                   className="flex-1 text-left px-2 py-4"
                                 >
-                                  {/* Mobile/Tablet Layout (< md) */}
-                                  <div className="md:hidden space-y-2">
+                                  {/* Mobile/Tablet Layout (< lg) */}
+                                  <div className="lg:hidden space-y-2">
                                     {/* Header with Avatar and Name */}
                                     <div className="flex items-center gap-3">
-                                      <div className="relative">
-                                        <Avatar className="h-12 w-12">
-                                          <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
-                                          <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
-                                        </Avatar>
+                                      <div className="relative overflow-visible">
+                                        {/* Avatar with buff indicators */}
+                                        <div className="relative h-12 w-12 overflow-visible">
+                                          {/* World Buff circle */}
+                                          {bot.stats?.worldBuff && bot.stats.worldBuff.length > 0 && (
+                                            <svg className="absolute w-[52px] h-[52px] z-20" style={{ left: '-2px', top: '-2px', filter: 'drop-shadow(0 0 3px rgba(168, 85, 247, 0.6))' }}>
+                                              <circle
+                                                cx="26"
+                                                cy="26"
+                                                r="25"
+                                                fill="none"
+                                                stroke="rgb(168, 85, 247)"
+                                                strokeWidth="2"
+                                                className="animate-pulse"
+                                                style={{ animationDuration: '2s' }}
+                                              />
+                                            </svg>
+                                          )}
+                                          
+                                          {/* Overcharge/Perfect Tune-Up radial */}
+                                          {(() => {
+                                            const overcharge = Number(bot.stats?.overcharge || 0);
+                                            const maxOvercharge = 40;
+                                            const overchargePercent = Math.round((overcharge / maxOvercharge) * 100);
+                                            const isPerfectTuneUp = bot.stats?.perfectTuneUp === true;
+                                            const hasOvercharge = overcharge > 0 || isPerfectTuneUp;
+                                            
+                                            return hasOvercharge && (
+                                              <>
+                                                <svg className="absolute w-[52px] h-[52px] -rotate-90 z-20 pointer-events-none" style={{ overflow: 'visible', left: '-2px', top: '-2px' }}>
+                                                  {/* Background ring */}
+                                                  <circle
+                                                    cx="26"
+                                                    cy="26"
+                                                    r="25"
+                                                    fill="none"
+                                                    stroke={isPerfectTuneUp ? "rgba(251, 191, 36, 0.3)" : "rgba(6, 182, 212, 0.3)"}
+                                                    strokeWidth="3"
+                                                  />
+                                                  {/* Progress ring */}
+                                                  <circle
+                                                    cx="26"
+                                                    cy="26"
+                                                    r="25"
+                                                    fill="none"
+                                                    stroke={isPerfectTuneUp ? "url(#goldGradient-mobile-" + bot.tokenIndex + ")" : "rgb(6, 182, 212)"}
+                                                    strokeWidth="3"
+                                                    strokeDasharray={`${(overchargePercent / 100) * 157.1} 157.1`}
+                                                    strokeLinecap="round"
+                                                    className={isPerfectTuneUp ? "animate-pulse" : "transition-all duration-1000"}
+                                                    style={isPerfectTuneUp ? { animationDuration: '1.5s', filter: 'drop-shadow(0 0 4px rgba(251, 191, 36, 0.8))' } : { filter: 'drop-shadow(0 0 3px rgba(6, 182, 212, 0.6))' }}
+                                                  />
+                                                  {isPerfectTuneUp && (
+                                                    <defs>
+                                                      <linearGradient id={`goldGradient-mobile-${bot.tokenIndex}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                                                        <stop offset="0%" stopColor="rgb(251, 191, 36)" />
+                                                        <stop offset="50%" stopColor="rgb(249, 115, 22)" />
+                                                        <stop offset="100%" stopColor="rgb(251, 191, 36)" />
+                                                      </linearGradient>
+                                                    </defs>
+                                                  )}
+                                                </svg>
+                                                {isPerfectTuneUp && (
+                                                  <div className="absolute w-[52px] h-[52px] rounded-full animate-pulse z-20 pointer-events-none" style={{ 
+                                                    left: '-2px',
+                                                    top: '-2px',
+                                                    boxShadow: '0 0 15px rgba(251, 191, 36, 0.5)',
+                                                    animationDuration: '2s'
+                                                  }} />
+                                                )}
+                                              </>
+                                            );
+                                          })()}
+                                          
+                                          <Avatar className="h-12 w-12 relative z-10">
+                                            <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
+                                            <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
+                                          </Avatar>
+                                        </div>
                                         {(() => {
                                           const eventInfo = getNextEventInfo(bot);
                                           return eventInfo && (
-                                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-[9px] font-bold shadow-md border border-primary-foreground/20 flex items-center gap-0.5 whitespace-nowrap leading-none">
+                                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-[9px] font-bold shadow-md border border-primary-foreground/20 flex items-center gap-0.5 whitespace-nowrap leading-none z-20">
                                               {eventInfo.time}
                                             </div>
                                           );
                                         })()}
                                       </div>
                                       <div className="flex-1 min-w-0">
-                                        <div className="font-semibold truncate text-sm text-foreground flex items-center gap-1">
-                                          <span className="truncate">#{bot.tokenIndex.toString()} {bot.name || 'Unnamed'}</span>
+                                        <div className="font-semibold text-sm text-foreground flex items-start gap-1 min-w-0">
+                                          <span className="truncate">
+                                            <span className="hidden lg:inline">#{bot.tokenIndex.toString()} </span>
+                                            {bot.name || 'Unnamed'}
+                                          </span>
                                           {(() => {
                                             const bg = backgroundData?.backgrounds[bot.tokenIndex.toString()];
                                             const bgTerrain = getTerrainPreference(bg, factionName);
                                             const factionTerrain = getFactionSpecialTerrain(factionName);
                                             
                                             return (
-                                              <span className="flex-shrink-0 text-xs flex items-center gap-0.5">
+                                              <span className="flex-shrink-0 text-xs flex items-center gap-0.5 mt-0.5">
                                                 {getTerrainIcon(bgTerrain)}
                                                 {factionTerrain && factionTerrain.terrain !== bgTerrain && (
                                                   getTerrainIcon(factionTerrain.terrain)
@@ -1906,7 +1969,7 @@ export default function GaragePage() {
                                         {!isCollapsed && bot.stats && (
                                           <>
                                             {/* Stats Row */}
-                                            <div className="flex flex-wrap items-center gap-2 text-xs mb-1">
+                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs mb-1">
                                               <div className="flex items-center gap-0.5">
                                                 <span className="text-yellow-500">⚡</span>
                                                 <span className="font-mono text-yellow-500">{Number(bot.currentStats?.speed || bot.stats.baseStats.speed)}</span>
@@ -1947,7 +2010,7 @@ export default function GaragePage() {
                                     {!isCollapsed && bot.isInitialized && bot.stats && (
                                       <>      
                                         {/* Cooldowns and Status */}
-                                        <div className="flex flex-col gap-1">
+                                        <div className="flex flex-wrap gap-1.5">
                                             {(() => {
                                               const now = Date.now();
                                               const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
@@ -2008,18 +2071,92 @@ export default function GaragePage() {
                                     )}
                                   </div>
 
-                                  {/* Desktop Layout (>= md) */}
-                                  <div className="hidden md:flex items-center gap-4">
+                                  {/* Desktop Layout (>= lg) */}
+                                  <div className="hidden lg:flex items-center gap-4">
                                     {/* Avatar */}
-                                    <div className="relative flex-shrink-0">
-                                      <Avatar className="h-12 w-12">
-                                        <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
-                                        <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
-                                      </Avatar>
+                                    <div className="relative flex-shrink-0 overflow-visible">
+                                      {/* Avatar with buff indicators */}
+                                      <div className="relative h-12 w-12 overflow-visible">
+                                        {/* World Buff circle */}
+                                        {bot.stats?.worldBuff && bot.stats.worldBuff.length > 0 && (
+                                          <svg className="absolute w-[52px] h-[52px] z-20" style={{ left: '-2px', top: '-2px', filter: 'drop-shadow(0 0 3px rgba(168, 85, 247, 0.6))' }}>
+                                            <circle
+                                              cx="26"
+                                              cy="26"
+                                              r="25"
+                                              fill="none"
+                                              stroke="rgb(168, 85, 247)"
+                                              strokeWidth="2"
+                                              className="animate-pulse"
+                                              style={{ animationDuration: '2s' }}
+                                            />
+                                          </svg>
+                                        )}
+                                        
+                                        {/* Overcharge/Perfect Tune-Up radial */}
+                                        {(() => {
+                                          const overcharge = Number(bot.stats?.overcharge || 0);
+                                          const maxOvercharge = 40;
+                                          const overchargePercent = Math.round((overcharge / maxOvercharge) * 100);
+                                          const isPerfectTuneUp = bot.stats?.perfectTuneUp === true;
+                                          const hasOvercharge = overcharge > 0 || isPerfectTuneUp;
+                                          
+                                          return hasOvercharge && (
+                                            <>
+                                              <svg className="absolute w-[52px] h-[52px] -rotate-90 z-20 pointer-events-none" style={{ overflow: 'visible', left: '-2px', top: '-2px' }}>
+                                                {/* Background ring */}
+                                                <circle
+                                                  cx="26"
+                                                  cy="26"
+                                                  r="25"
+                                                  fill="none"
+                                                  stroke={isPerfectTuneUp ? "rgba(251, 191, 36, 0.3)" : "rgba(6, 182, 212, 0.3)"}
+                                                  strokeWidth="3"
+                                                />
+                                                {/* Progress ring */}
+                                                <circle
+                                                  cx="26"
+                                                  cy="26"
+                                                  r="25"
+                                                  fill="none"
+                                                  stroke={isPerfectTuneUp ? "url(#goldGradient-desktop-" + bot.tokenIndex + ")" : "rgb(6, 182, 212)"}
+                                                  strokeWidth="3"
+                                                  strokeDasharray={`${(overchargePercent / 100) * 157.1} 157.1`}
+                                                  strokeLinecap="round"
+                                                  className={isPerfectTuneUp ? "animate-pulse" : "transition-all duration-1000"}
+                                                  style={isPerfectTuneUp ? { animationDuration: '1.5s', filter: 'drop-shadow(0 0 4px rgba(251, 191, 36, 0.8))' } : { filter: 'drop-shadow(0 0 3px rgba(6, 182, 212, 0.6))' }}
+                                                />
+                                                {isPerfectTuneUp && (
+                                                  <defs>
+                                                    <linearGradient id={`goldGradient-desktop-${bot.tokenIndex}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                                                      <stop offset="0%" stopColor="rgb(251, 191, 36)" />
+                                                      <stop offset="50%" stopColor="rgb(249, 115, 22)" />
+                                                      <stop offset="100%" stopColor="rgb(251, 191, 36)" />
+                                                    </linearGradient>
+                                                  </defs>
+                                                )}
+                                              </svg>
+                                              {isPerfectTuneUp && (
+                                                <div className="absolute w-[52px] h-[52px] rounded-full animate-pulse z-20 pointer-events-none" style={{ 
+                                                  left: '-2px',
+                                                  top: '-2px',
+                                                  boxShadow: '0 0 15px rgba(251, 191, 36, 0.5)',
+                                                  animationDuration: '2s'
+                                                }} />
+                                              )}
+                                            </>
+                                          );
+                                        })()}
+                                        
+                                        <Avatar className="h-12 w-12 relative z-10">
+                                          <AvatarImage src={imageUrl} alt={`Bot #${bot.tokenIndex}`} />
+                                          <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
+                                        </Avatar>
+                                      </div>
                                       {(() => {
                                         const eventInfo = getNextEventInfo(bot);
                                         return eventInfo && (
-                                          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-[9px] font-bold shadow-md border border-primary-foreground/20 flex items-center gap-0.5 whitespace-nowrap leading-none">
+                                          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 bg-primary text-primary-foreground rounded px-1.5 py-0.5 text-[9px] font-bold shadow-md border border-primary-foreground/20 flex items-center gap-0.5 whitespace-nowrap leading-none z-20">
                                             {eventInfo.time}
                                           </div>
                                         );

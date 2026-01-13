@@ -1842,6 +1842,11 @@ module {
         return #err("Universal Parts cannot be converted (they work for any upgrade)");
       };
 
+      // Can't convert TO Universal Parts (they are more valuable)
+      if (toType == #UniversalPart) {
+        return #err("Cannot convert to Universal Parts (they are only obtainable through scavenging)");
+      };
+
       if (amount == 0) {
         return #err("Amount must be greater than 0");
       };
@@ -3113,15 +3118,33 @@ module {
               // Charging curve: INVERTED - slower at low, faster at high
               // Rewards keeping battery topped up, punishes letting it drain
               // 1x at <25% (slowest) → 2x at <50% → 3x at <75% → 4x at 75-100% (fastest)
+              // FIXED: Calculate weighted average across tiers to properly accelerate as battery increases
               let chargingCurve = if (mission.zone == #ChargingStation) {
-                if (botStats.battery < 25) {
-                  1.0;
-                } else if (botStats.battery < 50) {
-                  2.0;
-                } else if (botStats.battery < 75) {
-                  3.0;
+                // Calculate base restoration rate (without curve)
+                let baseRestoration = Float.abs(rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus / durationBonus * synergies.drainMultipliers.scavengingDrain);
+
+                // Calculate how much battery would be restored in each tier
+                let startBattery = Float.fromInt(botStats.battery);
+                let tier1End = Float.min(25.0, startBattery + baseRestoration); // 0-25%: 1.0x
+                let tier2End = Float.min(50.0, Float.max(25.0, startBattery + baseRestoration)); // 25-50%: 2.0x
+                let tier3End = Float.min(75.0, Float.max(50.0, startBattery + baseRestoration)); // 50-75%: 3.0x
+                let tier4End = Float.min(100.0, Float.max(75.0, startBattery + baseRestoration)); // 75-100%: 4.0x
+
+                // Calculate battery restored in each tier (accounting for starting position)
+                let inTier1 = Float.max(0.0, tier1End - startBattery);
+                let inTier2 = Float.max(0.0, tier2End - Float.max(25.0, startBattery));
+                let inTier3 = Float.max(0.0, tier3End - Float.max(50.0, startBattery));
+                let inTier4 = Float.max(0.0, tier4End - Float.max(75.0, startBattery));
+
+                // Weighted average multiplier based on time spent in each tier
+                let totalRestoration = inTier1 + inTier2 + inTier3 + inTier4;
+                if (totalRestoration > 0.0) {
+                  (inTier1 * 1.0 + inTier2 * 2.0 + inTier3 * 3.0 + inTier4 * 4.0) / totalRestoration;
                 } else {
-                  4.0;
+                  // Default to current tier if no restoration
+                  if (botStats.battery < 25) { 1.0 } else if (botStats.battery < 50) {
+                    2.0;
+                  } else if (botStats.battery < 75) { 3.0 } else { 4.0 };
                 };
               } else {
                 1.0; // No curve for non-charging zones
@@ -3422,15 +3445,33 @@ module {
           // Charging curve: INVERTED - slower at low, faster at high
           // Rewards keeping battery topped up, punishes letting it drain
           // 1x at <25% (slowest) → 2x at <50% → 3x at <75% → 4x at 75-100% (fastest)
+          // FIXED: Calculate weighted average across tiers to properly accelerate as battery increases
           let chargingCurve = if (mission.zone == #ChargingStation) {
-            if (botStats.battery < 25) {
-              1.0;
-            } else if (botStats.battery < 50) {
-              2.0;
-            } else if (botStats.battery < 75) {
-              3.0;
+            // Calculate base restoration rate (without curve)
+            let baseRestoration = Float.abs(rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus / durationBonus * synergies.drainMultipliers.scavengingDrain);
+
+            // Calculate how much battery would be restored in each tier
+            let startBattery = Float.fromInt(botStats.battery);
+            let tier1End = Float.min(25.0, startBattery + baseRestoration); // 0-25%: 1.0x
+            let tier2End = Float.min(50.0, Float.max(25.0, startBattery + baseRestoration)); // 25-50%: 2.0x
+            let tier3End = Float.min(75.0, Float.max(50.0, startBattery + baseRestoration)); // 50-75%: 3.0x
+            let tier4End = Float.min(100.0, Float.max(75.0, startBattery + baseRestoration)); // 75-100%: 4.0x
+
+            // Calculate battery restored in each tier (accounting for starting position)
+            let inTier1 = Float.max(0.0, tier1End - startBattery);
+            let inTier2 = Float.max(0.0, tier2End - Float.max(25.0, startBattery));
+            let inTier3 = Float.max(0.0, tier3End - Float.max(50.0, startBattery));
+            let inTier4 = Float.max(0.0, tier4End - Float.max(75.0, startBattery));
+
+            // Weighted average multiplier based on time spent in each tier
+            let totalRestoration = inTier1 + inTier2 + inTier3 + inTier4;
+            if (totalRestoration > 0.0) {
+              (inTier1 * 1.0 + inTier2 * 2.0 + inTier3 * 3.0 + inTier4 * 4.0) / totalRestoration;
             } else {
-              4.0;
+              // Default to current tier if no restoration
+              if (botStats.battery < 25) { 1.0 } else if (botStats.battery < 50) {
+                2.0;
+              } else if (botStats.battery < 75) { 3.0 } else { 4.0 };
             };
           } else {
             1.0; // No curve for non-charging zones

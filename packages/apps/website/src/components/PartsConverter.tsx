@@ -134,7 +134,7 @@ export function PartsConverter({ inventory, identityOrAgent, onConversionComplet
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent>
-                {PART_TYPES.map(part => (
+                {PART_TYPES.filter(p => p.value !== 'UniversalPart').map(part => (
                   <SelectItem 
                     key={part.value} 
                     value={part.value}

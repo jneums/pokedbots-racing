@@ -125,7 +125,6 @@ export class AuthService {
           isConnected = await window.ic.plug.isConnected();
         } catch (error) {
           // If isConnected fails (e.g., Plug locked/disconnected), silently clear storage
-          console.log('[Auth] Plug isConnected check failed, clearing storage:', error);
           this.clearStorage();
           return;
         }
@@ -134,7 +133,6 @@ export class AuthService {
           // Use existing agent without recreating (createAgent can trigger popup)
           const agent = window.ic.plug.agent;
           if (!agent) {
-            console.log('[Auth] Plug connected but no agent available, clearing storage');
             this.clearStorage();
             return;
           }
@@ -142,7 +140,6 @@ export class AuthService {
           try {
             const principal = await agent.getPrincipal();
             
-            console.log('[Auth] Re-creating Plug actors for restored session...');
             
             // Re-create actors for restored session
             const [PokedBotsRacing, PokedBotsNFTs, Ledger] = await Promise.all([
@@ -172,20 +169,16 @@ export class AuthService {
               provider: 'plug',
               plugActors,
             };
-            console.log('[Auth] Restored Plug session:', this.currentUser.principal);
             return;
           } catch (error) {
-            console.log('[Auth] Failed to get principal from Plug agent:', error);
             this.clearStorage();
             return;
           }
         } else {
           // Plug says not connected, clear storage
-          console.log('[Auth] Plug not connected, clearing storage');
           this.clearStorage();
         }
       } catch (error) {
-        console.log('[Auth] Failed to restore Plug session:', error);
         this.clearStorage();
       }
     }
@@ -205,7 +198,6 @@ export class AuthService {
         agent: identity,
         provider,
       };
-      console.log('[Auth] Restored AuthClient session:', this.currentUser.principal);
     }
   }
 
@@ -341,7 +333,6 @@ export class AuthService {
 
     const principal = await agent.getPrincipal();
 
-    console.log('[Auth] Creating Plug actors once during login...');
     
     // Pre-create actors for all canisters we'll need
     // This prevents duplicate createActor calls later
@@ -370,7 +361,6 @@ export class AuthService {
       }),
     };
 
-    console.log('[Auth] Plug actors created successfully');
 
     this.currentUser = {
       principal: principal.toText(),
@@ -391,7 +381,6 @@ export class AuthService {
     // For Plug: Don't call disconnect() as it triggers popup
     // Just clear local state - user can disconnect from Plug extension directly
     if (this.currentUser?.provider === 'plug') {
-      console.log('[Auth] Logging out Plug user (clearing local state only)');
       this.currentUser = null;
       this.clearStorage();
     } else if (this.authClient) {

@@ -365,6 +365,11 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
                     {dedicationInfo.tierName}
                   </Badge>
                 </div>
+                <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    ⚠️ <strong>Important:</strong> Dedication points are only earned through the website UI. Actions performed via MCP tools (Claude, ChatGPT, etc.) do not count toward dedication.
+                  </p>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">

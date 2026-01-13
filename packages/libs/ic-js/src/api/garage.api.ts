@@ -32,7 +32,6 @@ function isPlugAgent(identityOrAgent: any): boolean {
 async function getActor(identityOrAgent: IdentityOrAgent): Promise<PokedBotsRacing._SERVICE> {
   // Check if this is a Plug user with pre-created actors
   if (isPlugAgent(identityOrAgent) && (identityOrAgent as any)._plugRacingActor) {
-    console.log('[getActor] Using pre-created Plug racing actor');
     return (identityOrAgent as any)._plugRacingActor;
   }
   
@@ -43,7 +42,6 @@ async function getActor(identityOrAgent: IdentityOrAgent): Promise<PokedBotsRaci
 async function getNFTsActorFromAgent(identityOrAgent: IdentityOrAgent): Promise<PokedBotsNFTs._SERVICE> {
   // Check if this is a Plug user with pre-created actors
   if (isPlugAgent(identityOrAgent) && (identityOrAgent as any)._plugNFTsActor) {
-    console.log('[getNFTsActor] Using pre-created Plug NFTs actor');
     return (identityOrAgent as any)._plugNFTsActor;
   }
   

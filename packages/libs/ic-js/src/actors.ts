@@ -19,28 +19,22 @@ const createActor = async <T>(
   canisterId: string,
   identity?: Identity,
 ): Promise<T> => {
-  console.log('[createActor] Starting for canister:', canisterId);
   const host = getHost();
   const isLocal =
     host.includes('localhost') ||
     host.includes('127.0.0.1') ||
     host.includes('host.docker.internal');
-
-  console.log('[createActor] Creating HttpAgent, host:', host, 'isLocal:', isLocal);
   
   const agent = await HttpAgent.create({
     host,
     identity,
     shouldFetchRootKey: isLocal,
   });
-  console.log('[createActor] HttpAgent created successfully');
 
-  console.log('[createActor] Creating actor...');
   const actor = Actor.createActor<T>(idlFactoryFn, {
     agent,
     canisterId,
   });
-  console.log('[createActor] Actor created successfully');
   
   return actor;
 };

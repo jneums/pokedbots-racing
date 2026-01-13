@@ -35,7 +35,6 @@ function isPlugAgent(identityOrAgent: any): boolean {
 async function createLedgerActor(identityOrAgent?: IdentityOrAgent): Promise<ICPLedger> {
   // Check if this is a Plug user with pre-created actors
   if (isPlugAgent(identityOrAgent) && (identityOrAgent as any)._plugLedgerActor) {
-    console.log('[createLedgerActor] Using pre-created Plug ledger actor');
     return (identityOrAgent as any)._plugLedgerActor;
   }
 

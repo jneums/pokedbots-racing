@@ -1188,17 +1188,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     // Schedule Daily Sprints to ensure at least 8 in next 48 hours (one every 6 hours)
     if (sprintsIn48h.size() < 8) {
-      // Start from the last existing sprint time, or now if none exist
-      var scheduleTime = if (sprintsIn48h.size() > 0) {
-        // Sort by scheduledTime to find the latest
-        let sorted = Array.sort<RaceCalendar.ScheduledEvent>(
-          sprintsIn48h,
-          func(a, b) { Int.compare(a.scheduledTime, b.scheduledTime) },
-        );
-        sorted[sorted.size() - 1].scheduledTime + 1_000_000_000; // Start after the last one
-      } else {
-        now;
-      };
+      // Always start from now to fill gaps in the 48-hour window
+      var scheduleTime = now;
 
       for (i in Iter.range(0, 7 - sprintsIn48h.size())) {
         let nextSprint = RaceCalendar.getNextDailySprintTime(scheduleTime);
