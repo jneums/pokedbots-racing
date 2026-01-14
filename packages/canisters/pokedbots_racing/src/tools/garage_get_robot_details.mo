@@ -176,6 +176,7 @@ module {
                   case (#PowerCore) { "Power Core" };
                   case (#Thruster) { "Thruster (Acceleration)" };
                   case (#Gyro) { "Gyro (Stability)" };
+                  case (#Luck) { "Luck (Fortune)" };
                 };
 
                 ?Json.obj([

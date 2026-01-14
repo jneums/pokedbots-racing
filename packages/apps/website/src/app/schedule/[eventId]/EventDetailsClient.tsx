@@ -641,7 +641,7 @@ function EventRegistrationSection({ event }: { event: any }) {
   );
 }
 
-function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrain, botOrder, raceStartTime, raceStatus, events, startAtEnd, disableAutoplay }: {
+function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrain, botOrder, raceStartTime, raceCreatedAt, raceStatus, events, startAtEnd, disableAutoplay, raceId }: {
   results: any[];
   trackSeed: bigint;
   trackId: number;
@@ -649,10 +649,12 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
   terrain: any;
   botOrder?: string[];
   raceStartTime?: bigint;
+  raceCreatedAt?: bigint;
   raceStatus?: any;
   events?: any[];
   startAtEnd?: boolean;
   disableAutoplay?: boolean;
+  raceId?: number;
 }) {
   // Fetch bot profiles in a single batch query
   const botIndices = results.map(r => Number(r.nftId));
@@ -668,25 +670,59 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
     );
   }
 
+  // Helper to extract faction string from Candid variant (handles optional array wrapper)
+  const getFactionString = (faction: any): string => {
+    if (!faction) return 'Unknown';
+    // Handle Candid optional: [] for None, [value] for Some(value)
+    const unwrapped = Array.isArray(faction) && faction.length > 0 ? faction[0] : faction;
+    if (!unwrapped) return 'Unknown';
+    if (typeof unwrapped === 'string') return unwrapped;
+    const keys = Object.keys(unwrapped);
+    return keys.length > 0 ? keys[0] : 'Unknown';
+  };
+
+  // Helper to extract terrain string from Candid variant (handles optional array wrapper)
+  const getTerrainString = (terrain: any): string => {
+    if (!terrain) return 'ScrapHeaps';
+    // Handle Candid optional: [] for None, [value] for Some(value)
+    const unwrapped = Array.isArray(terrain) && terrain.length > 0 ? terrain[0] : terrain;
+    if (!unwrapped) return 'ScrapHeaps';
+    if (typeof unwrapped === 'string') return unwrapped;
+    const keys = Object.keys(unwrapped);
+    return keys.length > 0 ? keys[0] : 'ScrapHeaps';
+  };
+
   // Map results with stats from entries and faction/terrain from profiles
   const resultsWithStats = results.map((r: any, idx: number) => {
     // Backend might return stats as optional array [stats] or direct object
     const statsData = r.stats && r.stats.length > 0 && r.stats[0] ? r.stats[0] : r.stats;
+    const nftId = Number(r.nftId);
+    
+    // Get faction and preferredTerrain from bot profile for daily affinity calculation
+    const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === nftId);
+    
+    // DEBUG: Log faction for bot 4247
+    if (nftId === 4247) {
+      console.log('=== BOT 4247 FACTION DEBUG ===');
+      console.log('profile:', profile);
+      console.log('profile?.faction:', profile?.faction);
+      console.log('getFactionString result:', getFactionString(profile?.faction));
+    }
     
     const finalStats = statsData ? {
       speed: Number(statsData.speed),
       stability: Number(statsData.stability),
       powerCore: Number(statsData.powerCore),
       acceleration: Number(statsData.acceleration),
+      luck: Number(statsData.luck ?? 10), // Default luck of 10 if not present
     } : undefined;
     
     return {
       nftId: r.nftId,
       finalTime: r.finalTime,
       position: r.position || 0,
-      // Don't pass faction/preferredTerrain since bonuses are already applied in stats
-      faction: 'Unknown', // Dummy value, won't be used
-      preferredTerrain: 'ScrapHeaps', // Dummy value, won't be used
+      faction: getFactionString(profile?.faction),
+      preferredTerrain: getTerrainString(profile?.preferredTerrain),
       stats: finalStats,
     };
   });
@@ -700,11 +736,13 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
       terrain={terrain}
       botOrder={botOrder}
       raceStartTime={raceStartTime}
+      raceCreatedAt={raceCreatedAt}
       raceStatus={raceStatus}
       bonusesAlreadyApplied={true}
       events={events}
       startAtEnd={startAtEnd}
       disableAutoplay={disableAutoplay}
+      raceId={raceId}
     />
   );
 }
@@ -1045,9 +1083,11 @@ function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolea
               terrain={race.terrain}
               botOrder={race.entries.map((entry: any) => entry.nftId)}
               raceStartTime={race.startTime}
+              raceCreatedAt={race.createdAt}
               raceStatus={race.status}
               events={(race as any).events || []}
               disableAutoplay={!isFirstRace}
+              raceId={Number(raceId)}
             />
           </div>
         )}

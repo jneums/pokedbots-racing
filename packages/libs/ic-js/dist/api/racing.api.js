@@ -142,17 +142,20 @@ export const getBotRaceHistory = async (tokenIndex, limit = 10, afterRaceId, ide
  * @param tokenIndexes Array of bot token indexes to simulate
  * @param trackId The track ID to use
  * @param trackSeed The seed for randomness
+ * @param phenomenonIndex Optional phenomenon index (0-12) to override daily phenomenon
  * @param identity Optional identity to use for the actor
- * @returns Simulation results with final times
+ * @returns Simulation results with final times and events
  */
-export const debugTestSimulation = async (tokenIndexes, trackId, trackSeed, distanceKm, identity) => {
+export const debugTestSimulation = async (tokenIndexes, trackId, trackSeed, distanceKm, phenomenonIndex, identity) => {
     const racingActor = await getActor(identity);
-    const result = await racingActor.debug_test_simulation(tokenIndexes.map(BigInt), BigInt(trackId), BigInt(trackSeed), BigInt(distanceKm));
+    const result = await racingActor.debug_test_simulation(tokenIndexes.map(BigInt), BigInt(trackId), BigInt(trackSeed), BigInt(distanceKm), phenomenonIndex !== undefined ? [BigInt(phenomenonIndex)] : []);
     if (result.length === 0 || !result[0]) {
         return null;
     }
     const data = result[0];
-    return data.results.map((r) => ({
+    const createdAt = BigInt(data.createdAt);
+    // Parse results
+    const results = data.results.map((r) => ({
         tokenIndex: Number(r.tokenIndex),
         finalTime: Number(r.finalTime),
         stats: {
@@ -160,8 +163,18 @@ export const debugTestSimulation = async (tokenIndexes, trackId, trackSeed, dist
             powerCore: Number(r.stats.powerCore),
             acceleration: Number(r.stats.acceleration),
             stability: Number(r.stats.stability),
+            luck: Number(r.stats.luck),
         },
+        createdAt,
     }));
+    // Parse events
+    const events = data.events.map((e) => ({
+        eventType: e.eventType,
+        timestamp: Number(e.timestamp),
+        segmentIndex: BigInt(e.segmentIndex),
+        description: e.description,
+    }));
+    return { results, events };
 };
 /**
  * Query races with advanced filtering and pagination

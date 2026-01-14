@@ -192,6 +192,7 @@ module {
       case (#PowerCore) { "🔋 **POWER CORE**" };
       case (#Thruster) { "🚀 **THRUSTER ARRAY**" };
       case (#Gyro) { "🎯 **GYRO STABILIZER**" };
+      case (#Luck) { "🍀 **FORTUNE CAPACITOR**" };
     };
 
     let factionNote = switch (faction) {

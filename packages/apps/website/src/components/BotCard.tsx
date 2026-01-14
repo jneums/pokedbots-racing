@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { BotListItem, generatetokenIdentifier } from '@pokedbots-racing/ic-js';
 import { useAuth } from '../hooks/useAuth';
+import { calculateDailyAffinity, getAffinityColor, getDailyPhenomenon } from './DailyPhenomenonBanner';
 import { 
   useInitializeBot,
   useRechargeBot,
@@ -62,6 +63,8 @@ function getUpgradeDisplayName(upgradeType: string): string {
     'thruster': 'Acceleration',
     'Gyro': 'Stability',
     'gyro': 'Stability',
+    'Luck': 'Luck',
+    'luck': 'Luck',
   };
   return nameMap[upgradeType] || upgradeType;
 }
@@ -115,7 +118,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   const [showScavenging, setShowScavenging] = useState(false);
   const [showRespec, setShowRespec] = useState(false);
   const [showCancelUpgradeConfirm, setShowCancelUpgradeConfirm] = useState(false);
-  const [upgradeType, setUpgradeType] = useState<'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro'>('Velocity');
+  const [upgradeType, setUpgradeType] = useState<'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro' | 'Luck'>('Velocity');
   const [paymentMethod, setPaymentMethod] = useState<'icp' | 'parts'>('parts');
   const [scavengingZone, setScavengingZone] = useState<'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields' | 'RepairBay' | 'ChargingStation'>('ScrapHeaps');
   const [scavengingDuration, setScavengingDuration] = useState<number | undefined>(15);
@@ -259,11 +262,25 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
 
     const typeKey = upgradeType === 'Velocity' ? 'speed' : 
                     upgradeType === 'PowerCore' ? 'powerCore' : 
-                    upgradeType === 'Thruster' ? 'acceleration' : 'stability';
+                    upgradeType === 'Thruster' ? 'acceleration' : 
+                    upgradeType === 'Luck' ? 'luck' : 'stability';
     
-    const costData = bot.upgradeCostsV2[typeKey];
+    const costData = bot.upgradeCostsV2[typeKey as keyof typeof bot.upgradeCostsV2];
     const currentCount = getCurrentUpgradeCount(upgradeType);
     const pityCounter = Number(bot.upgradeCostsV2.pityCounter || 0n);
+    
+    // Handle luck not being in upgradeCostsV2 yet (pre-deploy compatibility)
+    if (!costData || typeof costData === 'bigint') {
+      const partsCost = getUpgradeCostInParts(currentCount);
+      const icpCost = partsCost / 100;
+      return {
+        currentCount,
+        icpCost: icpCost.toFixed(2),
+        partsCost,
+        successRate: '85%',
+        pityBonus: '+' + (pityCounter * 5) + '%',
+      };
+    }
     
     return {
       currentCount,
@@ -274,7 +291,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
     };
   };
 
-  const getCurrentUpgradeCount = (type: 'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro'): number => {
+  const getCurrentUpgradeCount = (type: 'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro' | 'Luck'): number => {
     if (!bot.isInitialized || !bot.stats) return 0;
     const stats = bot.stats as any;
     switch (type) {
@@ -282,6 +299,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
       case 'PowerCore': return Number(stats.powerCoreUpgrades || stats.power_core_upgrades || 0n);
       case 'Thruster': return Number(stats.accelerationUpgrades || stats.acceleration_upgrades || 0n);
       case 'Gyro': return Number(stats.stabilityUpgrades || stats.stability_upgrades || 0n);
+      case 'Luck': return Number(stats.luckUpgrades || 0n);
       default: return 0;
     }
   };
@@ -722,6 +740,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
             const powerUp = Number(stats.powerCoreUpgrades || 0);
             const accelUp = Number(stats.accelerationUpgrades || 0);
             const stabUp = Number(stats.stabilityUpgrades || 0);
+            const luck = Number(stats.luckBase || 0n) + Number(stats.luckBonus || 0n) || Math.floor((Number(bot.tokenIndex) % 100) / 2) + 10;
             
             return (
               <div className="space-y-2">
@@ -745,6 +764,10 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                     <span className="text-muted-foreground">🎯 Stability</span>
                     <span className="font-bold">{stabUp > 0 ? `${stabUp} upgrades` : 'Base'}</span>
                   </div>
+                  <div className="col-span-2 flex justify-between items-center p-2 bg-card/80 border border-primary/20 rounded">
+                    <span className="text-muted-foreground">🍀 Luck</span>
+                    <span className="font-bold">{luck}</span>
+                  </div>
                 </div>
               </div>
             );
@@ -761,47 +784,121 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           const maxAccel = Number(bot.maxStats.acceleration);
           const maxStability = Number(bot.maxStats.stability);
           
-          const isPenalized = currentSpeed < maxSpeed || currentPower < maxPower || 
-                              currentAccel < maxAccel || currentStability < maxStability;
+          // Calculate luck from stats (not affected by battery/condition)
+          const luck = bot.stats ? Number(bot.stats.luckBase || 0n) + Number(bot.stats.luckBonus || 0n) : Math.floor((Number(bot.tokenIndex) % 100) / 2) + 10;
+          
+          // Get faction from stats (Candid enum format)
+          let factionName = 'Unknown';
+          if (bot.stats?.faction) {
+            const factionKeys = Object.keys(bot.stats.faction);
+            if (factionKeys.length > 0) {
+              factionName = factionKeys[0];
+            }
+          }
+          
+          // Calculate daily affinity (needed for effective luck)
+          const affinity = calculateDailyAffinity(
+            Number(bot.tokenIndex),
+            { speed: maxSpeed, powerCore: maxPower, acceleration: maxAccel, stability: maxStability, luck },
+            factionName
+          );
+          
+          // Effective luck tier = (luck + affinity) / 2, as used in simulator
+          const effectiveLuck = Math.floor((luck + affinity) / 2);
+          
+          // Penalty detection based on battery/condition thresholds (not stat comparisons)
+          // Battery < 80 = speed/acceleration penalties
+          // Condition < 90 = powerCore/stability penalties
+          const battery = bot.stats ? Number(bot.stats.battery) : 100;
+          const condition = bot.stats ? Number(bot.stats.condition) : 100;
+          const isPenalized = battery < 80 || condition < 90;
           
           return (
             <div className="space-y-2">
-              <div className="grid grid-cols-4 gap-3">
-                <div className="flex flex-col items-center p-3 bg-card/80 border border-primary/20 rounded-lg">
-                  <span className="text-2xl mb-1">⚡</span>
+              {/* Racing Stats (used for rating) */}
+              <div className="grid grid-cols-4 gap-2">
+                <div className="flex flex-col items-center p-2 bg-card/80 border border-primary/20 rounded-lg">
+                  <span className="text-xl mb-1">⚡</span>
                   <span className="text-xs text-muted-foreground">Speed</span>
-                  <span className={`text-lg font-bold ${currentSpeed < maxSpeed ? 'text-yellow-500' : ''}`}>
+                  <span className={`text-base font-bold ${battery < 80 ? 'text-yellow-500' : ''}`}>
                     {currentSpeed}
                   </span>
                   <span className="text-xs text-muted-foreground">/{maxSpeed}</span>
                 </div>
-                <div className="flex flex-col items-center p-3 bg-card/80 border border-primary/20 rounded-lg">
-                  <span className="text-2xl mb-1">💪</span>
+                <div className="flex flex-col items-center p-2 bg-card/80 border border-primary/20 rounded-lg">
+                  <span className="text-xl mb-1">💪</span>
                   <span className="text-xs text-muted-foreground">Power</span>
-                  <span className={`text-lg font-bold ${currentPower < maxPower ? 'text-yellow-500' : ''}`}>
+                  <span className={`text-base font-bold ${condition < 90 ? 'text-yellow-500' : ''}`}>
                     {currentPower}
                   </span>
                   <span className="text-xs text-muted-foreground">/{maxPower}</span>
                 </div>
-                <div className="flex flex-col items-center p-3 bg-card/80 border border-primary/20 rounded-lg">
-                  <span className="text-2xl mb-1">🚀</span>
+                <div className="flex flex-col items-center p-2 bg-card/80 border border-primary/20 rounded-lg">
+                  <span className="text-xl mb-1">🚀</span>
                   <span className="text-xs text-muted-foreground">Accel</span>
-                  <span className={`text-lg font-bold ${currentAccel < maxAccel ? 'text-yellow-500' : ''}`}>
+                  <span className={`text-base font-bold ${battery < 80 ? 'text-yellow-500' : ''}`}>
                     {currentAccel}
                   </span>
                   <span className="text-xs text-muted-foreground">/{maxAccel}</span>
                 </div>
-                <div className="flex flex-col items-center p-3 bg-card/80 border border-primary/20 rounded-lg">
-                  <span className="text-2xl mb-1">🎯</span>
+                <div className="flex flex-col items-center p-2 bg-card/80 border border-primary/20 rounded-lg">
+                  <span className="text-xl mb-1">🎯</span>
                   <span className="text-xs text-muted-foreground">Stability</span>
-                  <span className={`text-lg font-bold ${currentStability < maxStability ? 'text-yellow-500' : ''}`}>
+                  <span className={`text-base font-bold ${condition < 90 ? 'text-yellow-500' : ''}`}>
                     {currentStability}
                   </span>
                   <span className="text-xs text-muted-foreground">/{maxStability}</span>
                 </div>
               </div>
+
+              {/* Luck Section (separate - not part of rating) */}
+              <div className="p-2 rounded-lg border border-green-500/30 bg-gradient-to-r from-green-500/5 to-emerald-500/10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🍀</span>
+                    <div>
+                      <span className="text-xs font-medium text-green-400">Luck</span>
+                      <span className="text-[10px] text-muted-foreground ml-1">(not in rating)</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <span className="text-xs text-muted-foreground">Base: </span>
+                      <span className="font-bold">{luck}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs text-muted-foreground">Effective: </span>
+                      <span className={`font-bold ${effectiveLuck > luck ? 'text-green-400' : effectiveLuck < luck ? 'text-orange-400' : ''}`}>
+                        {effectiveLuck}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Daily Affinity Display */}
+              {(() => {
+                const phenomenon = getDailyPhenomenon();
+                return (
+                  <div className={`p-2 rounded-lg border border-primary/20 bg-gradient-to-r ${phenomenon.color}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span>{phenomenon.emoji}</span>
+                        <span className="text-xs font-medium">{phenomenon.name}</span>
+                      </div>
+                      <span className={`font-bold ${getAffinityColor(affinity)}`}>
+                        {affinity}%
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">{phenomenon.description}</p>
+                  </div>
+                );
+              })()}
+              
               {isPenalized && (
-                <p className="text-xs text-yellow-500 text-center">⚠️ Stats penalized by low battery/condition</p>
+                <p className="text-xs text-yellow-500 text-center">
+                  ⚠️ Stats penalized by low {battery < 80 && condition < 90 ? 'battery & condition' : battery < 80 ? 'battery' : 'condition'}
+                </p>
               )}
             </div>
           );
@@ -2079,10 +2176,11 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Velocity">Speed (Current: {formatBigInt(stats.speedUpgrades)} upgrades)</SelectItem>
-                  <SelectItem value="PowerCore">Power Core (Current: {formatBigInt(stats.powerCoreUpgrades)} upgrades)</SelectItem>
-                  <SelectItem value="Thruster">Acceleration (Current: {formatBigInt(stats.accelerationUpgrades)} upgrades)</SelectItem>
-                  <SelectItem value="Gyro">Stability (Current: {formatBigInt(stats.stabilityUpgrades)} upgrades)</SelectItem>
+                  <SelectItem value="Velocity">⚡ Speed ({formatBigInt(stats.speedUpgrades)} upgrades)</SelectItem>
+                  <SelectItem value="PowerCore">🔋 Power Core ({formatBigInt(stats.powerCoreUpgrades)} upgrades)</SelectItem>
+                  <SelectItem value="Thruster">🚀 Acceleration ({formatBigInt(stats.accelerationUpgrades)} upgrades)</SelectItem>
+                  <SelectItem value="Gyro">🎯 Stability ({formatBigInt(stats.stabilityUpgrades)} upgrades)</SelectItem>
+                  <SelectItem value="Luck">🍀 Luck ({formatBigInt(stats.luckUpgrades || 0n)} upgrades)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

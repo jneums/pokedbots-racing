@@ -399,44 +399,44 @@ export default function GaragePage() {
       );
     }
     if (activeQuickFilters.has('inNextRace')) {
-      // Find the next event (earliest start time) and get all race IDs from that event
-      // Events have multiple races (one per class), so we need to group races by start time
-      const racesByStartTime = new Map<string, Set<number>>();
-      
-      for (const bot of sortedBots) {
-        if (bot.upcomingRaces && bot.upcomingRaces.length > 0) {
-          for (const race of bot.upcomingRaces) {
-            const startTimeKey = race.startTime.toString();
-            if (!racesByStartTime.has(startTimeKey)) {
-              racesByStartTime.set(startTimeKey, new Set());
+      // Find bots registered for the next upcoming event
+      // Events have registrations that include tokenIndex and owner
+      if (!user?.principal || !upcomingEvents || upcomingEvents.length === 0) {
+        filtered = [];
+      } else {
+        // Find the next event (earliest scheduledTime that's in the future)
+        const nowNanos = BigInt(Date.now()) * 1_000_000n;
+        const futureEvents = upcomingEvents.filter(eventData => 
+          BigInt(eventData.event.scheduledTime) > nowNanos
+        );
+        
+        if (futureEvents.length === 0) {
+          filtered = [];
+        } else {
+          // Sort by scheduledTime to find the next event
+          const nextEvent = futureEvents.reduce((earliest, eventData) => {
+            const eventTime = BigInt(eventData.event.scheduledTime);
+            const earliestTime = BigInt(earliest.event.scheduledTime);
+            return eventTime < earliestTime ? eventData : earliest;
+          });
+          
+          // Get all registered token indices for this event
+          const registeredTokens = new Set<number>();
+          if (nextEvent.event.registrations) {
+            for (const reg of nextEvent.event.registrations) {
+              registeredTokens.add(Number(reg.tokenIndex));
             }
-            racesByStartTime.get(startTimeKey)!.add(Number(race.raceId));
+          }
+          
+          // Filter bots that are registered for the next event
+          if (registeredTokens.size > 0) {
+            filtered = filtered.filter(bot => 
+              registeredTokens.has(Number(bot.tokenIndex))
+            );
+          } else {
+            filtered = [];
           }
         }
-      }
-      
-      // Find the earliest start time (next event)
-      let earliestStartTime: bigint | null = null;
-      let nextEventRaceIds: Set<number> | null = null;
-      
-      for (const [startTimeKey, raceIds] of racesByStartTime.entries()) {
-        const startTime = BigInt(startTimeKey);
-        if (earliestStartTime === null || startTime < earliestStartTime) {
-          earliestStartTime = startTime;
-          nextEventRaceIds = raceIds;
-        }
-      }
-      
-      // Filter bots that are in ANY race from the next event
-      if (nextEventRaceIds !== null && nextEventRaceIds.size > 0) {
-        filtered = filtered.filter(bot => 
-          bot.upcomingRaces && bot.upcomingRaces.some(race => 
-            nextEventRaceIds!.has(Number(race.raceId))
-          )
-        );
-      } else {
-        // If no next event found, show no bots
-        filtered = [];
       }
     }
     if (activeQuickFilters.has('scavenging')) {
@@ -530,7 +530,7 @@ export default function GaragePage() {
     }
     
     return filtered;
-  }, [sortedBots, searchQuery, activeQuickFilters, classFilter, factionFilter, terrainFilter, batteryRange, conditionRange, backgroundData, favorites]);
+  }, [sortedBots, searchQuery, activeQuickFilters, classFilter, factionFilter, terrainFilter, batteryRange, conditionRange, backgroundData, favorites, upcomingEvents, user]);
 
   // Selection handlers
   const toggleBotSelection = (tokenIndex: string) => {
@@ -1337,7 +1337,7 @@ export default function GaragePage() {
                   className="cursor-pointer"
                   onClick={() => toggleQuickFilter('inNextRace')}
                 >
-                  🏁 In Next Race
+                  🏁 In Next Event
                 </Badge>
                 </div>
               </div>

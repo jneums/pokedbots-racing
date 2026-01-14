@@ -73,6 +73,7 @@ export interface BotListItem {
     powerCore: { costE8s: bigint; successRate: number };
     acceleration: { costE8s: bigint; successRate: number };
     stability: { costE8s: bigint; successRate: number };
+    luck?: { costE8s: bigint; successRate: number };
     pityCounter: bigint;
   };
   dedicationBonuses?: {

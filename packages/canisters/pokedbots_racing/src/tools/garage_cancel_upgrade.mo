@@ -134,6 +134,7 @@ module {
           case (#PowerCore) { #PowerCoreFragment };
           case (#Thruster) { #ThrusterKit };
           case (#Gyro) { #GyroModule };
+          case (#Luck) { #UniversalPart };
         };
         ctx.garageManager.addParts(user, partType, upgradeSession.partsUsed);
         "Refunded " # Nat.toText(upgradeSession.partsUsed) # " parts to your inventory";
@@ -157,6 +158,7 @@ module {
         case (#PowerCore) { "Power Core" };
         case (#Thruster) { "Thruster" };
         case (#Gyro) { "Gyro" };
+        case (#Luck) { "Luck" };
       };
 
       let botName = switch (racingStats.name) {

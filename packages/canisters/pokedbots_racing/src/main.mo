@@ -56,6 +56,8 @@ import GarageStartScavenging "tools/garage_start_scavenging";
 import GarageCompleteScavenging "tools/garage_complete_scavenging";
 import GarageConvertParts "tools/garage_convert_parts";
 import RacingListRaces "tools/racing_list_races";
+import RacingListEvents "tools/racing_list_events";
+import RacingGetMyRegistrations "tools/racing_get_my_registrations";
 import RacingEnterRace "tools/racing_enter_race";
 import RacingSponsorRace "tools/racing_sponsor_race";
 import RacingGetRaceDetails "tools/racing_get_race_details";
@@ -87,8 +89,168 @@ import BotDedication "BotDedication";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
 
-// Migration completed - stable_events now has scoringMode and eventBonusPrize fields
-// DO NOT UNCOMMENT - this would reset all events to #Individual scoring mode
+// // Migration function for luck system features
+// // Adds luck tracking fields and BadLuck event type
+// (with migration =
+//   func(old : {
+//     var stable_racing_stats : Map.Map<Nat, {
+//       tokenIndex : Nat;
+//       ownerPrincipal : Principal;
+//       faction : PokedBotsGarage.FactionType;
+//       name : ?Text;
+//       luckBase : Nat;
+//       speedBonus : Nat;
+//       powerCoreBonus : Nat;
+//       accelerationBonus : Nat;
+//       stabilityBonus : Nat;
+//       luckBonus : Nat;
+//       speedUpgrades : Nat;
+//       powerCoreUpgrades : Nat;
+//       accelerationUpgrades : Nat;
+//       stabilityUpgrades : Nat;
+//       luckUpgrades : Nat;
+//       respecCount : Nat;
+//       battery : Nat;
+//       condition : Nat;
+//       experience : Nat;
+//       overcharge : Nat;
+//       perfectTuneUp : Bool;
+//       preferredDistance : PokedBotsGarage.Distance;
+//       preferredTerrain : PokedBotsGarage.Terrain;
+//       racesEntered : Nat;
+//       wins : Nat;
+//       places : Nat;
+//       shows : Nat;
+//       totalScrapEarned : Nat;
+//       factionReputation : Nat;
+//       eloRating : Nat;
+//       activatedAt : Int;
+//       lastDecayed : Int;
+//       lastRecharged : ?Int;
+//       lastRepaired : ?Int;
+//       lastDiagnostics : ?Int;
+//       lastRaced : ?Int;
+//       upgradeEndsAt : ?Int;
+//       listedForSale : Bool;
+//       scavengingMissions : Nat;
+//       totalPartsScavenged : Nat;
+//       scavengingReputation : Nat;
+//       bestHaul : Nat;
+//       activeMission : ?PokedBotsGarage.ScavengingMission;
+//       worldBuff : ?PokedBotsGarage.WorldBuff;
+//       lastMissionRewards : ?{
+//         totalParts : Nat;
+//         speedChips : Nat;
+//         powerCoreFragments : Nat;
+//         thrusterKits : Nat;
+//         gyroModules : Nat;
+//         universalParts : Nat;
+//         conditionRestored : Nat;
+//         batteryRestored : Nat;
+//         hoursOut : Nat;
+//         completedAt : Int;
+//         zone : PokedBotsGarage.ScavengingZone;
+//       };
+//     }>;
+//     var stable_races : Map.Map<Nat, {
+//       raceId : Nat;
+//       name : Text;
+//       distance : Nat;
+//       terrain : RacingSimulator.Terrain;
+//       trackId : Nat;
+//       trackSeed : Nat;
+//       raceClass : RacingSimulator.RaceClass;
+//       entryFee : Nat;
+//       maxEntries : Nat;
+//       minEntries : Nat;
+//       startTime : Int;
+//       duration : Nat;
+//       entryDeadline : Int;
+//       createdAt : Int;
+//       entries : [RacingSimulator.RaceEntry];
+//       status : RacingSimulator.RaceStatus;
+//       results : ?[RacingSimulator.RaceResult];
+//       events : [{
+//         eventType : {
+//           #Overtake : { overtaker : Text; overtaken : Text };
+//           #LeadChange : { newLeader : Text; previousLeader : Text };
+//           #LargeGap : { leader : Text; gapSeconds : Float };
+//           #CloseRacing : { bots : [Text]; gapSeconds : Float };
+//           #ExceptionalPerformance : { bot : Text; performancePct : Float };
+//           #PoorPerformance : { bot : Text; performancePct : Float };
+//           #SegmentComplete : { segmentIndex : Nat; leader : Text };
+//           #LuckProc : { bot : Text; procType : Text; boost : Float };
+//         };
+//         timestamp : Float;
+//         segmentIndex : Nat;
+//         description : Text;
+//       }];
+//       prizePool : Nat;
+//       platformTax : Nat;
+//       platformBonus : Nat;
+//       sponsors : [RacingSimulator.Sponsor];
+//     }>;
+//   }) : {
+//     var stable_racing_stats : Map.Map<Nat, PokedBotsGarage.PokedBotRacingStats>;
+//     var stable_races : Map.Map<Nat, RacingSimulator.Race>;
+//   } {
+//     Debug.print("Migration: Adding luck tracking fields and BadLuck events");
+
+//     // Migrate racing stats - add luck tracking fields
+//     let migratedStats = Map.new<Nat, PokedBotsGarage.PokedBotRacingStats>();
+//     var count = 0;
+//     for ((tokenIndex, oldStats) in Map.entries(old.stable_racing_stats)) {
+//       let newStats : PokedBotsGarage.PokedBotRacingStats = {
+//         oldStats with
+//         totalLuckProcs = 0;
+//         majorLuckProcs = 0;
+//         legendaryLuckProcs = 0;
+//         totalBadLuckIncidents = 0;
+//         cosmicAlignmentDays = 0;
+//       };
+//       ignore Map.put(migratedStats, Map.nhash, tokenIndex, newStats);
+//       count += 1;
+//     };
+//     Debug.print("Migration complete: " # Nat.toText(count) # " bot stats migrated");
+
+//     // Migrate races - convert old events to new format
+//     let migratedRaces = Map.new<Nat, RacingSimulator.Race>();
+//     var raceCount = 0;
+//     for ((raceId, oldRace) in Map.entries(old.stable_races)) {
+//       let newEvents = Array.map(oldRace.events, func(e : { eventType : { #Overtake : { overtaker : Text; overtaken : Text }; #LeadChange : { newLeader : Text; previousLeader : Text }; #LargeGap : { leader : Text; gapSeconds : Float }; #CloseRacing : { bots : [Text]; gapSeconds : Float }; #ExceptionalPerformance : { bot : Text; performancePct : Float }; #PoorPerformance : { bot : Text; performancePct : Float }; #SegmentComplete : { segmentIndex : Nat; leader : Text }; #LuckProc : { bot : Text; procType : Text; boost : Float } }; timestamp : Float; segmentIndex : Nat; description : Text }) : RacingSimulator.RaceEvent {
+//         let newEventType : RacingSimulator.RaceEventType = switch(e.eventType) {
+//           case (#Overtake(data)) { #Overtake(data) };
+//           case (#LeadChange(data)) { #LeadChange(data) };
+//           case (#LargeGap(data)) { #LargeGap(data) };
+//           case (#CloseRacing(data)) { #CloseRacing(data) };
+//           case (#ExceptionalPerformance(data)) { #ExceptionalPerformance(data) };
+//           case (#PoorPerformance(data)) { #PoorPerformance(data) };
+//           case (#SegmentComplete(data)) { #SegmentComplete(data) };
+//           case (#LuckProc(data)) { #LuckProc(data) };
+//         };
+//         {
+//           eventType = newEventType;
+//           timestamp = e.timestamp;
+//           segmentIndex = e.segmentIndex;
+//           description = e.description;
+//         }
+//       });
+
+//       let newRace : RacingSimulator.Race = {
+//         oldRace with
+//         events = newEvents;
+//       };
+//       ignore Map.put(migratedRaces, Map.nhash, raceId, newRace);
+//       raceCount += 1;
+//     };
+//     Debug.print("Races migrated: " # Nat.toText(raceCount));
+
+//     {
+//       var stable_racing_stats = migratedStats;
+//       var stable_races = migratedRaces;
+//     };
+//   }
+// )
 shared ({ caller = deployer }) persistent actor class McpServer(
   args : ?{
     owner : ?Principal;
@@ -455,6 +617,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   case (#Gyro) {
                     (currentStats.stability, stats.stabilityUpgrades);
                   };
+                  case (#Luck) {
+                    // Current luck = luckBase (set at init) + luckBonus (from upgrades)
+                    (stats.luckBase + stats.luckBonus, stats.luckUpgrades);
+                  };
                 };
 
                 // Get base stat for attempt calculation
@@ -467,6 +633,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                     currentStats.acceleration - stats.accelerationBonus;
                   };
                   case (#Gyro) { currentStats.stability - stats.stabilityBonus };
+                  case (#Luck) { stats.luckBase };
                 };
 
                 let attemptNumber = currentStatValue - baseStat;
@@ -543,6 +710,17 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                         listedForSale = false;
                       };
                     };
+                    case (#Luck) {
+                      {
+                        stats with
+                        luckBonus = stats.luckBonus + pointsAwarded;
+                        luckUpgrades = stats.luckUpgrades + 1;
+                        experience = stats.experience + 5;
+                        factionReputation = stats.factionReputation + 2;
+                        upgradeEndsAt = null;
+                        listedForSale = false;
+                      };
+                    };
                   };
 
                   garageManager.updateStats(tokenIndex, updatedStats);
@@ -598,6 +776,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                         case (#PowerCore) { #PowerCoreFragment };
                         case (#Thruster) { #ThrusterKit };
                         case (#Gyro) { #GyroModule };
+                        case (#Luck) { #UniversalPart }; // Luck upgrades would use universal parts
                       };
                       garageManager.refundParts(stats.ownerPrincipal, partType, partsToRefund);
                       Debug.print("Refunded " # debug_show (partsToRefund) # " " # debug_show (partType) # " to " # Principal.toText(stats.ownerPrincipal));
@@ -1939,10 +2118,28 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             for (entry in entriesWithStats.vals()) {
               switch (entry.stats) {
                 case (?stats) {
+                  // Parse tokenIndex from nftId string and get faction for luck system
+                  let tokenIdx = switch (Nat.fromText(entry.nftId)) {
+                    case (?idx) { idx };
+                    case (null) { 0 };
+                  };
+                  let (faction, baseAvgRating) : (RacingSimulator.FactionType, ?Nat) = switch (garageManager.getStats(tokenIdx)) {
+                    case (?botStats) {
+                      // Calculate base avg rating from raw stats (without terrain/faction bonuses)
+                      // This is used for MomentumShift to prevent buffed bots appearing as underdogs
+                      let baseStats = garageManager.getBaseStats(tokenIdx);
+                      let baseAvg = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
+                      (botStats.faction, ?baseAvg);
+                    };
+                    case (null) { (#Industrial, null) }; // Default faction, no base rating
+                  };
                   let participant : RacingSimulator.RacingParticipant = {
                     nftId = entry.nftId;
                     owner = entry.owner;
                     stats = stats;
+                    tokenIndex = tokenIdx;
+                    faction = faction;
+                    baseAvgRating = baseAvgRating;
                   };
                   participants := Array.append(participants, [participant]);
                 };
@@ -2654,6 +2851,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     GarageCompleteScavenging.config(),
     GarageConvertParts.config(),
     RacingListRaces.config(),
+    RacingListEvents.config(),
+    RacingGetMyRegistrations.config(),
     RacingEnterRace.config(),
     RacingSponsorRace.config(),
     RacingGetRaceDetails.config(),
@@ -2697,6 +2896,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       ("garage_complete_scavenging", GarageCompleteScavenging.handle(toolContext)),
       ("garage_convert_parts", GarageConvertParts.handle(toolContext)),
       ("racing_list_races", RacingListRaces.handle(toolContext)),
+      ("racing_list_events", RacingListEvents.handle(toolContext)),
+      ("racing_get_my_registrations", RacingGetMyRegistrations.handle(toolContext)),
       ("racing_enter_race", RacingEnterRace.handle(toolContext)),
       ("racing_sponsor_race", RacingSponsorRace.handle(toolContext)),
       ("racing_get_race_details", RacingGetRaceDetails.handle(toolContext)),
@@ -3321,6 +3522,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     trackId : Nat,
     trackSeed : Nat,
     distanceKm : Nat,
+    phenomenonIndex : ?Nat, // Optional: 0-12 to override daily phenomenon (null = use current day)
   ) : async ?{
     results : [{
       tokenIndex : Nat;
@@ -3330,8 +3532,16 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         powerCore : Nat;
         acceleration : Nat;
         stability : Nat;
+        luck : Nat;
       };
     }];
+    events : [{
+      eventType : RacingSimulator.RaceEventType;
+      timestamp : Float;
+      segmentIndex : Nat;
+      description : Text;
+    }];
+    createdAt : Int; // Timestamp used for luck system daily phenomenon
   } {
     // Get track to determine terrain
     let trackOpt = RacingSimulator.getTrack(trackId);
@@ -3347,10 +3557,23 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         let nftId = Nat.toText(tokenIndex);
         switch (garageManager.getStatsAt100WithTerrain(nftId, terrain)) {
           case (?stats) {
+            // Get faction and base stats for luck system
+            let (faction, baseAvgRating) : (RacingSimulator.FactionType, ?Nat) = switch (garageManager.getStats(tokenIndex)) {
+              case (?botStats) {
+                // Calculate base avg rating without terrain/faction bonuses (for MomentumShift)
+                let baseStats = garageManager.getBaseStats(tokenIndex);
+                let baseAvg = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
+                (botStats.faction, ?baseAvg);
+              };
+              case (null) { (#Industrial, null) }; // Default faction
+            };
             ?{
               nftId = nftId;
               owner = Principal.fromText("aaaaa-aa"); // Dummy owner for test
               stats = stats;
+              tokenIndex = tokenIndex;
+              faction = faction;
+              baseAvgRating = baseAvgRating;
             };
           };
           case null { null };
@@ -3363,8 +3586,22 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
 
     // Create a test race
-    let distance = distanceKm * 1000; // Convert km to meters (Race.distance is in meters)
+    let distance = distanceKm; // Keep as km (calculateSegmentTime expects km)
     let duration = raceSimulator.calculateRaceDuration(distanceKm, terrain);
+
+    // Calculate timestamp for phenomenon - either use override or current time
+    let nanosPerDay : Int = 86_400_000_000_000;
+    let raceTimestamp : Int = switch (phenomenonIndex) {
+      case (?idx) {
+        // Create a timestamp that will result in the desired phenomenon index
+        // Phenomenon is calculated as: (timestamp / nanosPerDay) % 13
+        // So we set timestamp = idx * nanosPerDay to get that index
+        idx * nanosPerDay;
+      };
+      case null {
+        Time.now(); // Use current time
+      };
+    };
 
     let testRace : RacingSimulator.Race = {
       raceId = 0;
@@ -3380,13 +3617,13 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       platformTax = 0;
       maxEntries = 20;
       minEntries = 2;
-      startTime = 0;
+      startTime = raceTimestamp;
       entryDeadline = 0;
       status = #InProgress;
       entries = [];
       results = null;
       events = [];
-      createdAt = 0;
+      createdAt = raceTimestamp;
       raceClass = #Junker;
       sponsors = [];
     };
@@ -3394,8 +3631,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     // Simulate the race
     Debug.print("MAIN_BEFORE_SIMULATE trackId=" # Nat.toText(trackId) # " participants=" # Nat.toText(participants.size()));
     switch (raceSimulator.simulateRaceSegmented(testRace, participants)) {
-      case (?(results, _events)) {
-        let formattedResults = Array.map<RacingSimulator.RaceResult, { tokenIndex : Nat; finalTime : Float; stats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat } }>(
+      case (?(results, events)) {
+        let formattedResults = Array.map<RacingSimulator.RaceResult, { tokenIndex : Nat; finalTime : Float; stats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat; luck : Nat } }>(
           results,
           func(result : RacingSimulator.RaceResult) : {
             tokenIndex : Nat;
@@ -3405,6 +3642,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               powerCore : Nat;
               acceleration : Nat;
               stability : Nat;
+              luck : Nat;
             };
           } {
             let tokenIndex = switch (Nat.fromText(result.nftId)) {
@@ -3420,6 +3658,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   powerCore = 50;
                   acceleration = 50;
                   stability = 50;
+                  luck = 10;
                 };
               };
             };
@@ -3430,9 +3669,188 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             };
           },
         );
-        ?{ results = formattedResults };
+        ?{
+          results = formattedResults;
+          events = events;
+          createdAt = raceTimestamp;
+        };
       };
       case null { null };
+    };
+  };
+
+  /// Debug: Re-simulate an existing race using its stored data
+  /// This helps debug mismatches between frontend and backend simulations
+  public shared ({ caller }) func debug_resimulate_race(raceId : Nat) : async ?{
+    originalResults : [{
+      nftId : Text;
+      position : Nat;
+      finalTime : Float;
+      stats : ?RacingSimulator.RacingStats;
+    }];
+    resimulatedResults : [{
+      nftId : Text;
+      position : Nat;
+      finalTime : Float;
+    }];
+    raceParams : {
+      trackId : Nat;
+      trackSeed : Nat;
+      distance : Nat;
+      terrain : RacingSimulator.Terrain;
+      createdAt : Int;
+      participantOrder : [Text]; // Entry order for participantIndex calculation
+    };
+  } {
+    // Admin check
+    if (caller != owner) {
+      Debug.print("debug_resimulate_race: unauthorized caller");
+      return null;
+    };
+
+    // Get the race
+    let race = switch (raceManager.getRace(raceId)) {
+      case (?r) { r };
+      case null {
+        Debug.print("debug_resimulate_race: race not found");
+        return null;
+      };
+    };
+
+    // Check race has results
+    let originalResults = switch (race.results) {
+      case (?results) { results };
+      case null {
+        Debug.print("debug_resimulate_race: race has no results");
+        return null;
+      };
+    };
+
+    Debug.print("=== DEBUG RESIMULATE RACE " # Nat.toText(raceId) # " ===");
+    Debug.print("Track: " # Nat.toText(race.trackId) # ", Seed: " # Nat.toText(race.trackSeed) # ", Distance: " # Nat.toText(race.distance) # "km");
+    Debug.print("Terrain: " # debug_show (race.terrain) # ", CreatedAt: " # Int.toText(race.createdAt));
+    Debug.print("Entries: " # Nat.toText(race.entries.size()));
+
+    // Build participants from entries (same order as original race)
+    var participants : [RacingSimulator.RacingParticipant] = [];
+    var entryOrder : [Text] = [];
+
+    for (entry in race.entries.vals()) {
+      entryOrder := Array.append(entryOrder, [entry.nftId]);
+
+      // Use the stats snapshot from entry if available, otherwise from results
+      let stats : RacingSimulator.RacingStats = switch (entry.stats) {
+        case (?s) { s };
+        case null {
+          // Fall back to result stats
+          switch (Array.find<RacingSimulator.RaceResult>(originalResults, func(r) { r.nftId == entry.nftId })) {
+            case (?result) {
+              switch (result.stats) {
+                case (?s) { s };
+                case null {
+                  {
+                    speed = 50;
+                    powerCore = 50;
+                    acceleration = 50;
+                    stability = 50;
+                    luck = 10;
+                  };
+                };
+              };
+            };
+            case null {
+              {
+                speed = 50;
+                powerCore = 50;
+                acceleration = 50;
+                stability = 50;
+                luck = 10;
+              };
+            };
+          };
+        };
+      };
+
+      Debug.print("Entry " # entry.nftId # ": speed=" # Nat.toText(stats.speed) # " power=" # Nat.toText(stats.powerCore) # " accel=" # Nat.toText(stats.acceleration) # " stab=" # Nat.toText(stats.stability) # " luck=" # Nat.toText(stats.luck));
+
+      let tokenIdx = switch (Nat.fromText(entry.nftId)) {
+        case (?idx) { idx };
+        case null { 0 };
+      };
+
+      // Get faction and baseAvgRating for luck system
+      let (faction, baseAvgRating) : (RacingSimulator.FactionType, ?Nat) = switch (garageManager.getStats(tokenIdx)) {
+        case (?botStats) {
+          let baseStats = garageManager.getBaseStats(tokenIdx);
+          let baseAvg = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
+          (botStats.faction, ?baseAvg);
+        };
+        case (null) { (#Industrial, null) };
+      };
+
+      let participant : RacingSimulator.RacingParticipant = {
+        nftId = entry.nftId;
+        owner = entry.owner;
+        stats = stats;
+        tokenIndex = tokenIdx;
+        faction = faction;
+        baseAvgRating = baseAvgRating;
+      };
+      participants := Array.append(participants, [participant]);
+    };
+
+    Debug.print("Built " # Nat.toText(participants.size()) # " participants from entries");
+    Debug.print("Entry order: " # debug_show (entryOrder));
+
+    // Re-simulate the race with the EXACT same parameters
+    switch (raceSimulator.simulateRaceSegmented(race, participants)) {
+      case (?(newResults, events)) {
+        Debug.print("=== RESIMULATION RESULTS ===");
+
+        let formattedOriginal = Array.map<RacingSimulator.RaceResult, { nftId : Text; position : Nat; finalTime : Float; stats : ?RacingSimulator.RacingStats }>(
+          originalResults,
+          func(r) {
+            {
+              nftId = r.nftId;
+              position = r.position;
+              finalTime = r.finalTime;
+              stats = r.stats;
+            };
+          },
+        );
+
+        let formattedNew = Array.map<RacingSimulator.RaceResult, { nftId : Text; position : Nat; finalTime : Float }>(
+          newResults,
+          func(r) {
+            { nftId = r.nftId; position = r.position; finalTime = r.finalTime };
+          },
+        );
+
+        // Compare results
+        for (i in Iter.range(0, Nat.min(originalResults.size(), newResults.size()) - 1)) {
+          let orig = originalResults[i];
+          let new_ = newResults[i];
+          let diff = Float.abs(orig.finalTime - new_.finalTime);
+          Debug.print("Bot " # orig.nftId # ": Original=" # Float.toText(orig.finalTime) # "s, Resim=" # Float.toText(new_.finalTime) # "s, Diff=" # Float.toText(diff) # "s");
+        };
+
+        ?{
+          originalResults = formattedOriginal;
+          resimulatedResults = formattedNew;
+          raceParams = {
+            trackId = race.trackId;
+            trackSeed = race.trackSeed;
+            distance = race.distance;
+            terrain = race.terrain;
+            createdAt = race.createdAt;
+            participantOrder = entryOrder;
+          };
+        };
+      };
+      case null {
+        Debug.print("Resimulation failed!");
+        null;
+      };
     };
   };
 
@@ -3512,7 +3930,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   // --- SIMULATION TESTING ---
 
   /// Test/debug: Simulate a race with specific bots on a specific track
-  /// Returns detailed results for balance testing
+  /// Returns detailed results for balance testing, including race events for replay
   public shared func debug_simulate_race(
     trackId : Nat,
     tokenIndices : [Nat],
@@ -3540,6 +3958,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       position : Nat;
       finalTime : Float;
       avgSegmentTime : Float;
+    }];
+    events : [{
+      eventType : Text;
+      timestamp : Float;
+      segmentIndex : Nat;
+      description : Text;
     }];
     analysis : {
       winner : Nat;
@@ -3578,10 +4002,23 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       // Get stats at 100% with terrain bonuses (matches actual race simulation)
       switch (garageManager.getStatsAt100WithTerrain(nftId, track.primaryTerrain)) {
         case (?statsAt100) {
+          // Get faction and base stats for luck system
+          let (faction, baseAvgRating) : (RacingSimulator.FactionType, ?Nat) = switch (garageManager.getStats(tokenIndex)) {
+            case (?botStats) {
+              // Calculate base avg rating without terrain/faction bonuses (for MomentumShift)
+              let baseStats = garageManager.getBaseStats(tokenIndex);
+              let baseAvg = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
+              (botStats.faction, ?baseAvg);
+            };
+            case (null) { (#Industrial, null) }; // Default faction
+          };
           let participant : RacingSimulator.RacingParticipant = {
             nftId = nftId;
             owner = Principal.fromText("aaaaa-aa"); // Dummy principal for simulation
             stats = statsAt100;
+            tokenIndex = tokenIndex;
+            faction = faction;
+            baseAvgRating = baseAvgRating;
           };
 
           participants := Array.append(participants, [participant]);
@@ -3632,7 +4069,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     // Simulate the race
     let simulator = RacingSimulator.RaceSimulator();
     switch (simulator.simulateRaceSegmented(mockRace, participants)) {
-      case (?(results, _events)) {
+      case (?(results, raceEvents)) {
         // Calculate analysis
         var totalTime : Float = 0.0;
         var fastestTime : Float = 999999.0;
@@ -3683,6 +4120,30 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           totalTime / Float.fromInt(results.size());
         } else { 0.0 };
 
+        // Convert race events to serializable format
+        let eventData = Array.map<RacingSimulator.RaceEvent, { eventType : Text; timestamp : Float; segmentIndex : Nat; description : Text }>(
+          raceEvents,
+          func(event) {
+            let eventTypeText = switch (event.eventType) {
+              case (#Overtake(_)) { "Overtake" };
+              case (#LeadChange(_)) { "LeadChange" };
+              case (#LargeGap(_)) { "LargeGap" };
+              case (#CloseRacing(_)) { "CloseRacing" };
+              case (#ExceptionalPerformance(_)) { "ExceptionalPerformance" };
+              case (#PoorPerformance(_)) { "PoorPerformance" };
+              case (#SegmentComplete(_)) { "SegmentComplete" };
+              case (#LuckProc(_)) { "LuckProc" };
+              case (#BadLuck(_)) { "BadLuck" };
+            };
+            {
+              eventType = eventTypeText;
+              timestamp = event.timestamp;
+              segmentIndex = event.segmentIndex;
+              description = event.description;
+            };
+          },
+        );
+
         ?{
           track = {
             trackId = track.trackId;
@@ -3694,6 +4155,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           };
           participants = participantData;
           results = resultData;
+          events = eventData;
           analysis = {
             winner = winnerIndex;
             winnerTime = fastestTime;
@@ -3774,6 +4236,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       powerCore : Nat;
       acceleration : Nat;
       stability : Nat;
+      luck : Nat;
       overallRating : Nat;
     };
     career : {
@@ -3795,7 +4258,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           acceleration = baseStats.acceleration + botStats.accelerationBonus;
           stability = baseStats.stability + botStats.stabilityBonus;
         };
-        // Calculate rating based on stats at 100%
+        // Calculate rating based on stats at 100% (luck not included in rating)
         let totalStats = statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability;
         let rating = totalStats / 4;
         let raceClass = getRaceClassFromRating(rating);
@@ -3812,6 +4275,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             powerCore = statsAt100.powerCore;
             acceleration = statsAt100.acceleration;
             stability = statsAt100.stability;
+            luck = botStats.luckBase + botStats.luckBonus;
             overallRating = rating;
           };
           career = {
@@ -3829,6 +4293,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         let baseStats = garageManager.getBaseStats(tokenIndex);
         let totalBaseStats = baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability;
         let baseRating = totalBaseStats / 4;
+        let baseLuck = RacingSimulator.deriveBaseLuck(tokenIndex);
 
         // Get faction from precomputed stats
         let precomputedStats = Map.get(stable_base_stats, Map.nhash, tokenIndex);
@@ -3849,6 +4314,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             powerCore = baseStats.powerCore;
             acceleration = baseStats.acceleration;
             stability = baseStats.stability;
+            luck = baseLuck;
             overallRating = baseRating;
           };
           career = {
@@ -3877,6 +4343,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       powerCore : Nat;
       acceleration : Nat;
       stability : Nat;
+      luck : Nat;
       overallRating : Nat;
     };
     career : {
@@ -3888,7 +4355,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     eloRating : ?Nat;
     isInitialized : Bool;
   }] {
-    let buffer = Buffer.Buffer<{ tokenIndex : Nat; name : ?Text; owner : ?Principal; faction : ?PokedBotsGarage.FactionType; raceClass : ?RacingSimulator.RaceClass; preferredTerrain : ?RacingSimulator.Terrain; stats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat; overallRating : Nat }; career : { racesEntered : Nat; wins : Nat; podiums : Nat; totalEarnings : Nat }; eloRating : ?Nat; isInitialized : Bool }>(tokenIndices.size());
+    let buffer = Buffer.Buffer<{ tokenIndex : Nat; name : ?Text; owner : ?Principal; faction : ?PokedBotsGarage.FactionType; raceClass : ?RacingSimulator.RaceClass; preferredTerrain : ?RacingSimulator.Terrain; stats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat; luck : Nat; overallRating : Nat }; career : { racesEntered : Nat; wins : Nat; podiums : Nat; totalEarnings : Nat }; eloRating : ?Nat; isInitialized : Bool }>(tokenIndices.size());
 
     for (tokenIndex in tokenIndices.vals()) {
       switch (garageManager.getStats(tokenIndex)) {
@@ -3901,7 +4368,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             acceleration = baseStats.acceleration + botStats.accelerationBonus;
             stability = baseStats.stability + botStats.stabilityBonus;
           };
-          // Calculate rating based on stats at 100%
+          // Calculate rating based on stats at 100% (luck not included in rating)
           let totalStats = statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability;
           let rating = totalStats / 4;
           let raceClass = getRaceClassFromRating(rating);
@@ -3918,6 +4385,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               powerCore = statsAt100.powerCore;
               acceleration = statsAt100.acceleration;
               stability = statsAt100.stability;
+              luck = botStats.luckBase + botStats.luckBonus;
               overallRating = rating;
             };
             career = {
@@ -3935,6 +4403,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           let baseStats = garageManager.getBaseStats(tokenIndex);
           let totalBaseStats = baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability;
           let baseRating = totalBaseStats / 4;
+          let baseLuck = RacingSimulator.deriveBaseLuck(tokenIndex);
 
           // Get faction from precomputed stats
           let precomputedStats = Map.get(stable_base_stats, Map.nhash, tokenIndex);
@@ -3955,6 +4424,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               powerCore = baseStats.powerCore;
               acceleration = baseStats.acceleration;
               stability = baseStats.stability;
+              luck = baseLuck;
               overallRating = baseRating;
             };
             career = {
@@ -4339,10 +4809,27 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     let participants = Array.map<RacingSimulator.RaceEntry, RacingSimulator.RacingParticipant>(
       race.entries,
       func(entry) : RacingSimulator.RacingParticipant {
+        // Parse tokenIndex from nftId string and get faction for luck system
+        let tokenIdx = switch (Nat.fromText(entry.nftId)) {
+          case (?idx) { idx };
+          case (null) { 0 };
+        };
+        let (faction, baseAvgRating) : (RacingSimulator.FactionType, ?Nat) = switch (garageManager.getStats(tokenIdx)) {
+          case (?botStats) {
+            // Calculate base avg rating without terrain/faction bonuses (for MomentumShift)
+            let baseStats = garageManager.getBaseStats(tokenIdx);
+            let baseAvg = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
+            (botStats.faction, ?baseAvg);
+          };
+          case (null) { (#Industrial, null) }; // Default faction
+        };
         {
           nftId = entry.nftId;
           owner = entry.owner;
-          stats = Option.get(entry.stats, { speed = 100; stability = 100; powerCore = 100; acceleration = 100 });
+          stats = Option.get(entry.stats, { speed = 100; stability = 100; powerCore = 100; acceleration = 100; luck = 30 });
+          tokenIndex = tokenIdx;
+          faction = faction;
+          baseAvgRating = baseAvgRating;
         };
       },
     );
@@ -4412,10 +4899,27 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     let participants = Array.map<RacingSimulator.RaceEntry, RacingSimulator.RacingParticipant>(
       race.entries,
       func(entry) : RacingSimulator.RacingParticipant {
+        // Parse tokenIndex from nftId string and get faction for luck system
+        let tokenIdx = switch (Nat.fromText(entry.nftId)) {
+          case (?idx) { idx };
+          case (null) { 0 };
+        };
+        let (faction, baseAvgRating) : (RacingSimulator.FactionType, ?Nat) = switch (garageManager.getStats(tokenIdx)) {
+          case (?botStats) {
+            // Calculate base avg rating without terrain/faction bonuses (for MomentumShift)
+            let baseStats = garageManager.getBaseStats(tokenIdx);
+            let baseAvg = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
+            (botStats.faction, ?baseAvg);
+          };
+          case (null) { (#Industrial, null) }; // Default faction
+        };
         {
           nftId = entry.nftId;
           owner = entry.owner;
-          stats = Option.get(entry.stats, { speed = 100; stability = 100; powerCore = 100; acceleration = 100 });
+          stats = Option.get(entry.stats, { speed = 100; stability = 100; powerCore = 100; acceleration = 100; luck = 30 });
+          tokenIndex = tokenIdx;
+          faction = faction;
+          baseAvgRating = baseAvgRating;
         };
       },
     );
@@ -4919,14 +5423,17 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             ownerPrincipal = botStats.ownerPrincipal;
             faction = botStats.faction;
             name = botStats.name;
+            luckBase = botStats.luckBase;
             speedBonus = botStats.speedBonus;
             powerCoreBonus = botStats.powerCoreBonus;
             accelerationBonus = botStats.accelerationBonus;
             stabilityBonus = botStats.stabilityBonus;
+            luckBonus = botStats.luckBonus;
             speedUpgrades = botStats.speedUpgrades;
             powerCoreUpgrades = botStats.powerCoreUpgrades;
             accelerationUpgrades = botStats.accelerationUpgrades;
             stabilityUpgrades = botStats.stabilityUpgrades;
+            luckUpgrades = botStats.luckUpgrades;
             respecCount = botStats.respecCount;
             battery = botStats.battery;
             condition = botStats.condition;
@@ -4942,6 +5449,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             totalScrapEarned = newTotalEarnings;
             factionReputation = botStats.factionReputation;
             eloRating = botStats.eloRating;
+
+            // Luck tracking stats
+            totalLuckProcs = botStats.totalLuckProcs;
+            majorLuckProcs = botStats.majorLuckProcs;
+            legendaryLuckProcs = botStats.legendaryLuckProcs;
+            totalBadLuckIncidents = botStats.totalBadLuckIncidents;
+            cosmicAlignmentDays = botStats.cosmicAlignmentDays;
+
             activatedAt = botStats.activatedAt;
             lastDecayed = botStats.lastDecayed;
             lastRecharged = botStats.lastRecharged;
@@ -6820,6 +7335,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       powerCore : { costE8s : Nat; successRate : Float };
       acceleration : { costE8s : Nat; successRate : Float };
       stability : { costE8s : Nat; successRate : Float };
+      luck : { costE8s : Nat; successRate : Float };
       pityCounter : Nat;
     };
     dedicationBonuses : {
@@ -6858,7 +7374,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     );
 
     // Iterate through all registered bots and filter by owner
-    let registeredBots = Buffer.Buffer<{ tokenIndex : Nat; name : ?Text; stats : PokedBotsGarage.PokedBotRacingStats; currentStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; maxStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; upgradeCostsV2 : { speed : { costE8s : Nat; successRate : Float }; powerCore : { costE8s : Nat; successRate : Float }; acceleration : { costE8s : Nat; successRate : Float }; stability : { costE8s : Nat; successRate : Float }; pityCounter : Nat }; dedicationBonuses : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; activeUpgrade : ?PokedBotsGarage.UpgradeSession; upcomingRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }]; eligibleRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }] }>(10);
+    let registeredBots = Buffer.Buffer<{ tokenIndex : Nat; name : ?Text; stats : PokedBotsGarage.PokedBotRacingStats; currentStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; maxStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; upgradeCostsV2 : { speed : { costE8s : Nat; successRate : Float }; powerCore : { costE8s : Nat; successRate : Float }; acceleration : { costE8s : Nat; successRate : Float }; stability : { costE8s : Nat; successRate : Float }; luck : { costE8s : Nat; successRate : Float }; pityCounter : Nat }; dedicationBonuses : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; activeUpgrade : ?PokedBotsGarage.UpgradeSession; upcomingRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }]; eligibleRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }] }>(10);
 
     for ((tokenIndex, botStats) in Map.entries(stable_racing_stats)) {
       // Only include bots owned by the caller (compare principals)
@@ -6896,11 +7412,15 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         let accelerationCost = garageManager.calculateUpgradeCostV2(baseStats.acceleration, maxStats.acceleration, overallRating, synergies.costMultipliers.upgradeCost);
         let stabilityCost = garageManager.calculateUpgradeCostV2(baseStats.stability, maxStats.stability, overallRating, synergies.costMultipliers.upgradeCost);
 
+        // Calculate luck upgrade cost (uses luckBase as base stat, luckBase + luckBonus as current)
+        let luckCost = garageManager.calculateUpgradeCostV2(botStats.luckBase, botStats.luckBase + botStats.luckBonus, overallRating, synergies.costMultipliers.upgradeCost);
+
         // Calculate success rates
         let speedRate = garageManager.calculateSuccessRate(botStats.speedUpgrades, pityCounter);
         let powerCoreRate = garageManager.calculateSuccessRate(botStats.powerCoreUpgrades, pityCounter);
         let accelerationRate = garageManager.calculateSuccessRate(botStats.accelerationUpgrades, pityCounter);
         let stabilityRate = garageManager.calculateSuccessRate(botStats.stabilityUpgrades, pityCounter);
+        let luckRate = garageManager.calculateSuccessRate(botStats.luckUpgrades, pityCounter);
 
         let activeUpgrade = Map.get(stable_active_upgrades, Map.nhash, tokenIndex);
 
@@ -6980,6 +7500,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               successRate = accelerationRate;
             };
             stability = { costE8s = stabilityCost; successRate = stabilityRate };
+            luck = { costE8s = luckCost; successRate = luckRate };
             pityCounter = pityCounter;
           };
           dedicationBonuses = {
@@ -7911,6 +8432,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     let currentPowerCore = baseStats.powerCore + stats.powerCoreBonus;
     let currentAcceleration = baseStats.acceleration + stats.accelerationBonus;
     let currentStability = baseStats.stability + stats.stabilityBonus;
+    let currentLuck = stats.luckBase + stats.luckBonus;
     let overallRating = (currentSpeed + currentPowerCore + currentAcceleration + currentStability) / 4;
 
     // Calculate current stat and base stat for the upgrade type
@@ -7919,6 +8441,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       case (#PowerCore) { (baseStats.powerCore, currentPowerCore) };
       case (#Thruster) { (baseStats.acceleration, currentAcceleration) };
       case (#Gyro) { (baseStats.stability, currentStability) };
+      case (#Luck) { (stats.luckBase, currentLuck) };
     };
 
     // Use V2 dynamic cost calculation with Game faction synergy and Bot Dedication tier discount
@@ -8003,6 +8526,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           case (#PowerCore) { #PowerCoreFragment };
           case (#Thruster) { #ThrusterKit };
           case (#Gyro) { #GyroModule };
+          case (#Luck) { #UniversalPart }; // Luck upgrades would use universal parts
         };
 
         if (not garageManager.removeParts(caller, partType, partsCost)) {
@@ -8100,6 +8624,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         case (#PowerCore) { #PowerCoreFragment };
         case (#Thruster) { #ThrusterKit };
         case (#Gyro) { #GyroModule };
+        case (#Luck) { #UniversalPart }; // Luck upgrades would use universal parts
       };
       garageManager.addParts(caller, partType, upgradeSession.partsUsed);
     };
@@ -8113,6 +8638,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       case (#PowerCore) { "Power Core" };
       case (#Thruster) { "Thruster" };
       case (#Gyro) { "Gyro" };
+      case (#Luck) { "Luck" };
     };
 
     let refundText = if (upgradeSession.paymentMethod == "icp") {

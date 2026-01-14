@@ -30,7 +30,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("The token index of the PokedBot"))])), ("upgrade_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Velocity"), Json.str("PowerCore"), Json.str("Thruster"), Json.str("Gyro")])), ("description", Json.str("The type of upgrade"))])), ("payment_method", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("parts"), Json.str("icp")])), ("description", Json.str("Payment method: parts (from inventory) or icp (ICRC-2 approval required)"))]))])),
+      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("The token index of the PokedBot"))])), ("upgrade_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Velocity"), Json.str("PowerCore"), Json.str("Thruster"), Json.str("Gyro"), Json.str("Luck")])), ("description", Json.str("The type of upgrade. Luck uses Universal Parts only."))])), ("payment_method", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("parts"), Json.str("icp")])), ("description", Json.str("Payment method: parts (from inventory) or icp (ICRC-2 approval required)"))]))])),
       ("required", Json.arr([Json.str("token_index"), Json.str("upgrade_type")])),
     ]);
     outputSchema = null;
@@ -94,11 +94,13 @@ module {
         case "PowerCore" { #PowerCore };
         case "Thruster" { #Thruster };
         case "Gyro" { #Gyro };
+        case "Luck" { #Luck };
         // Fallback for lowercase
         case "velocity" { #Velocity };
         case "power_core" { #PowerCore };
         case "thruster" { #Thruster };
         case "gyro" { #Gyro };
+        case "luck" { #Luck };
         case _ { #Velocity }; // default
       };
 
@@ -120,6 +122,9 @@ module {
         case (#Gyro) {
           (currentStats.stability - racingStats.stabilityBonus, currentStats.stability);
         };
+        case (#Luck) {
+          (racingStats.luckBase, racingStats.luckBase + racingStats.luckBonus);
+        };
       };
 
       // Calculate cost using V2 formula with Game faction synergy
@@ -139,6 +144,7 @@ module {
         case (#PowerCore) { #PowerCoreFragment };
         case (#Thruster) { #ThrusterKit };
         case (#Gyro) { #GyroModule };
+        case (#Luck) { #UniversalPart };
       };
 
       // Handle payment

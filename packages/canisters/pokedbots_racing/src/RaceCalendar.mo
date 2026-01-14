@@ -698,11 +698,11 @@ module {
         name = "Daily Sprint Challenge";
         description = "Fast-paced wasteland action for racers of all skill levels. These daily scrambles keep the circuits hot and the prize pools flowing.";
         entryFee = 20_000_000; // 0.2 ICP base (Junker)
-        maxEntries = 12;
+        maxEntries = 100; // No practical cap - heats handle overflow
         minEntries = 2;
         prizePoolBonus = 50_000_000; // Platform adds 0.5 ICP (Junker base)
         pointsMultiplier = 1.0; // Standard points
-        divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan]; // All tiers
+        divisions = [#Scrap, #Junker, #Raider, #Elite]; // Scrap through Elite (no Silent Klan)
         scoringMode = #Individual;
         eventBonusPrize = 0;
       };

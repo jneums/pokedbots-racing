@@ -187,13 +187,14 @@ export const useDebugTestSimulation = (
   trackId: number,
   trackSeed: number,
   distanceKm: number,
+  phenomenonIndex: number | undefined,
   enabled: boolean = true
 ) => {
   return useQuery({
-    queryKey: ['debugTestSimulation', tokenIndexes, trackId, trackSeed, distanceKm],
+    queryKey: ['debugTestSimulation', tokenIndexes, trackId, trackSeed, distanceKm, phenomenonIndex],
     queryFn: async () => {
       if (tokenIndexes.length === 0) return null;
-      return debugTestSimulation(tokenIndexes, trackId, trackSeed, distanceKm);
+      return debugTestSimulation(tokenIndexes, trackId, trackSeed, distanceKm, phenomenonIndex);
     },
     enabled: enabled && tokenIndexes.length > 0,
   });

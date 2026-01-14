@@ -56,12 +56,12 @@ Send your bots into the wasteland to gather upgrade parts. **No ICP cost** - onl
 - Best for: Free repairs, damaged bots under 50% condition, dead bots (0% battery/condition)
 
 **ChargingStation - Free Battery Restore**
-- 0x parts, **RESTORES battery** (stepped charging curve - faster at low battery)
+- 0x parts, **RESTORES battery** (stepped charging curve - slower at low battery)
 - **NO condition penalty** - completely free!
 - Bypasses 6h recharge cooldown and 0.1 ICP cost
-- **Charging speeds:** 4x at <25% → 3x at <50% → 2x at <75% → 1x at 75-100%
-- ~16/hour at 0%, ~12/hour at 30%, ~8/hour at 60%, ~4/hour at 80%
-- **0% to 100% takes ~6-7 hours** (much faster than before!)
+- **Charging speeds:** 1x at <25% → 2x at <50% → 3x at <75% → 4x at 75-100%
+- ~5/hour at 0%, ~10/hour at 30%, ~15/hour at 60%, ~20/hour at 80%
+- **0% to 100% takes ~10-15 hours** (punishes low battery, rewards keeping it topped up)
 - **✅ NEW: No battery depletion penalty!** Safe zone for reviving dead bots
 - Best for: Patient players, saving ICP, low-priority bots, dead bots
 
@@ -141,7 +141,7 @@ Each faction excels at finding specific parts:
 - **High Stability = durability** - Survive dangerous zones longer
 - **Monitor your bot!** - Check condition/battery regularly to avoid death
 - **Use RepairBay** - Free alternative to 0.05 ICP repairs (slow but FREE)
-- **Use ChargingStation** - Free alternative to 0.1 ICP recharge (~6-7h for full charge, no condition penalty!)
+- **Use ChargingStation** - Free alternative to 0.1 ICP recharge (~10-15h for full charge from 0%, no condition penalty!)
 - **Faction matters** - Dead/Master/Murder = best for Universal Parts
 - **Racing while scavenging** - Bot pulled when race starts, partial rewards + penalties applied
 

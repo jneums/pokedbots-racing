@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shuffle, Play, Loader2, X, Plus, ChevronUp, ChevronDown } from "lucide-react";
-import { RaceVisualizer } from "@/components/RaceVisualizer";
+import { RaceVisualizer, PhenomenonType } from "@/components/RaceVisualizer";
 import { useDebugTestSimulation } from "@/hooks/useRacing";
 import { getBotProfile } from "@pokedbots-racing/ic-js";
 
@@ -32,16 +32,17 @@ interface Track {
 }
 
 // Wrapper component to handle backend query
-const RaceVisualizerWithBackend = ({ raceData }: { raceData: any }) => {
+const RaceVisualizerWithBackend = ({ raceData, overridePhenomenon, phenomenonIndex }: { raceData: any; overridePhenomenon?: PhenomenonType; phenomenonIndex?: number }) => {
   const botIndexes = raceData.botOrder?.map((id: string) => parseInt(id)) || [];
   const hasEditedStats = raceData.hasEditedStats || false; // Check if any stats were edited
   
   // Only query backend if stats haven't been edited
-  const { data: backendResults, isLoading } = useDebugTestSimulation(
+  const { data: backendData, isLoading } = useDebugTestSimulation(
     botIndexes,
     raceData.trackId,
     raceData.trackSeed,
     raceData.distance,
+    phenomenonIndex,
     botIndexes.length > 0 && !hasEditedStats // Disable backend query if stats are edited
   );
 
@@ -53,18 +54,23 @@ const RaceVisualizerWithBackend = ({ raceData }: { raceData: any }) => {
         trackId: raceData.trackId,
         trackSeed: raceData.trackSeed,
         distance: raceData.distance,
+        phenomenonIndex,
         hasEditedStats,
         isLoading,
-        hasResults: !!backendResults
+        hasResults: !!backendData
       });
     }
-  }, [botIndexes, raceData.trackId, raceData.trackSeed, raceData.distance, hasEditedStats, isLoading, backendResults]);
+  }, [botIndexes, raceData.trackId, raceData.trackSeed, raceData.distance, phenomenonIndex, hasEditedStats, isLoading, backendData]);
 
   useEffect(() => {
-    if (backendResults) {
-      console.log('[Simulator] Backend results received:', backendResults);
+    if (backendData) {
+      console.log('[Simulator] Backend results received:', backendData);
     }
-  }, [backendResults]);
+  }, [backendData]);
+
+  // Extract results and events from backend data
+  const backendResults = backendData?.results;
+  const backendEvents = backendData?.events;
 
   // If stats are edited, use local stats; otherwise merge backend results
   const resultsWithBackend = hasEditedStats ? raceData.results : raceData.results.map((result: any) => {
@@ -75,12 +81,15 @@ const RaceVisualizerWithBackend = ({ raceData }: { raceData: any }) => {
       return { 
         ...result, 
         finalTime: backendResult.finalTime,
-        stats: backendResult.stats, // Use backend stats with all bonuses applied
+        stats: backendResult.stats, // Use backend stats with all bonuses applied (includes luck)
         bonusesAlreadyApplied: true,
       };
     }
     return result;
   });
+
+  // Get createdAt from backend results (all results have the same createdAt)
+  const raceCreatedAt = backendResults?.[0]?.createdAt;
 
   return (
     <RaceVisualizer
@@ -93,6 +102,9 @@ const RaceVisualizerWithBackend = ({ raceData }: { raceData: any }) => {
       isValidating={isLoading}
       startAtEnd={true}
       bonusesAlreadyApplied={true}
+      raceCreatedAt={raceCreatedAt}
+      overridePhenomenon={overridePhenomenon}
+      events={backendEvents || []}
     />
   );
 };
@@ -170,9 +182,34 @@ const TRACKS: Track[] = [
   }
 ];
 
+// Luck phenomena that affect daily affinity (order matches backend 13-day cycle)
+const PHENOMENA = [
+  { id: 'current', name: 'Current Day', description: 'Use real-time phenomenon', index: undefined },
+  { id: 'SolarFlare', name: '☀️ Solar Flare', description: 'Power Core digit 7 = +60%, even token IDs = +30%', index: 0 },
+  { id: 'RustStorm', name: '🌪️ Rust Storm', description: 'Stability digit 2/8 = +60%, digit 4/6 = +40%', index: 1 },
+  { id: 'MetalResonance', name: '🔊 Metal Resonance', description: 'Speed digit 3 = +60%, prime tokens = +45%', index: 2 },
+  { id: 'GravityFlux', name: '🌀 Gravity Flux', description: 'Accel digit 4 = +60%, digit 0/8 = +40%', index: 3 },
+  { id: 'ScrapTornado', name: '🌀 Scrap Tornado', description: 'Wild faction = +70%, token%100<20 = +40%', index: 4 },
+  { id: 'DeadZone', name: '💀 Dead Zone', description: 'Dead faction = +60%, token has 6/13/66/666 = +45%', index: 5 },
+  { id: 'GoldenHour', name: '✨ Golden Hour', description: 'Golden faction = +65%, token%7 = +40%', index: 6 },
+  { id: 'MachineGhost', name: '👻 Machine Ghost', description: 'Master/Ultimate = +55%, token>5000 = +40%', index: 7 },
+  { id: 'BloodMoon', name: '🌑 Blood Moon', description: 'Murder faction = +50%, token%9 = +40%', index: 8 },
+  { id: 'BinarySurge', name: '⚡ Binary Surge', description: 'Balanced stats (spread≤5) = +70%, spread≤10 = +45%', index: 9 },
+  { id: 'ChaosPulse', name: '🎲 Chaos Pulse', description: 'Token%11 = +70%, luck stat gives bonus', index: 10 },
+  { id: 'MomentumShift', name: '💨 Momentum Shift', description: 'Bracket underdogs (avg%10≤2) = +60%, token%12 = +40%', index: 11 },
+  { id: 'BlackholeSingularity', name: '🕳️ Blackhole Singularity', description: 'Blackhole faction = +60%, token%13 = +40%', index: 12 },
+] as const;
+
+// Helper to get phenomenon index from ID
+const getPhenomenonIndex = (id: string): number | undefined => {
+  const phenomenon = PHENOMENA.find(p => p.id === id);
+  return phenomenon?.index;
+};
+
 export default function SimulatorPage() {
   const [selectedTrack, setSelectedTrack] = useState<number>(1);
   const [trackSeed, setTrackSeed] = useState<string>("");
+  const [selectedPhenomenon, setSelectedPhenomenon] = useState<string>("current");
   const [selectedBots, setSelectedBots] = useState<Bot[]>([]);
   const [editedStats, setEditedStats] = useState<Record<number, Partial<Bot>>>({});
   const [simulating, setSimulating] = useState(false);
@@ -190,7 +227,7 @@ export default function SimulatorPage() {
     if (selectedBots.length >= 2 && trackSeed) {
       startSimulation();
     }
-  }, [selectedBots, selectedTrack, trackSeed, editedStats]);
+  }, [selectedBots, selectedTrack, trackSeed, editedStats, selectedPhenomenon]);
 
   const randomizeSeed = () => {
     const seed = Math.floor(Math.random() * 1000000);
@@ -386,7 +423,7 @@ export default function SimulatorPage() {
       results,
       trackSeed: parseInt(trackSeed) || 0,
       trackId: selectedTrack,
-      distance: track?.distanceKm || 15, // Use actual track distance
+      distance: track?.distanceKm || 15, // Distance in km for simulator
       terrain: track?.terrain || "ScrapHeaps",
       botOrder: participants.map(p => p.tokenIndex.toString()), // Store original bot order for participant index calculation
       hasEditedStats, // Flag to indicate stats were manually edited
@@ -484,6 +521,32 @@ export default function SimulatorPage() {
                 <p className="text-xs text-muted-foreground">
                   The seed determines track variation and race randomness
                 </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Luck Phenomenon</Label>
+                <Select value={selectedPhenomenon} onValueChange={setSelectedPhenomenon}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select phenomenon" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PHENOMENA.map((phenomenon) => (
+                      <SelectItem key={phenomenon.id} value={phenomenon.id}>
+                        {phenomenon.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedPhenomenon && selectedPhenomenon !== 'current' && (
+                  <p className="text-xs text-muted-foreground">
+                    {PHENOMENA.find(p => p.id === selectedPhenomenon)?.description}
+                  </p>
+                )}
+                {selectedPhenomenon === 'current' && (
+                  <p className="text-xs text-muted-foreground">
+                    Uses the current day&apos;s phenomenon for luck calculations
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -688,6 +751,8 @@ export default function SimulatorPage() {
               {raceData ? (
                 <RaceVisualizerWithBackend
                   raceData={raceData}
+                  overridePhenomenon={selectedPhenomenon === 'current' ? undefined : selectedPhenomenon as PhenomenonType}
+                  phenomenonIndex={getPhenomenonIndex(selectedPhenomenon)}
                 />
               ) : (
                 <div className="flex items-center justify-center h-[500px] bg-muted/20 rounded-lg border-2 border-dashed">

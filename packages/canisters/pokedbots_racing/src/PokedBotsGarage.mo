@@ -61,17 +61,22 @@ module {
     faction : FactionType;
     name : ?Text; // Optional custom name for the bot
 
+    // Base stats (immutable, set during initialization/migration)
+    luckBase : Nat; // Base luck derived from tokenIndex (10-59 range), set once
+
     // Upgrade bonuses
     speedBonus : Nat;
     powerCoreBonus : Nat;
     accelerationBonus : Nat;
     stabilityBonus : Nat;
+    luckBonus : Nat; // Luck upgrade bonus (added to luckBase)
 
     // Upgrade counts (for progressive costs)
     speedUpgrades : Nat;
     powerCoreUpgrades : Nat;
     accelerationUpgrades : Nat;
     stabilityUpgrades : Nat;
+    luckUpgrades : Nat; // Number of luck upgrades applied
 
     // Respec system
     respecCount : Nat; // Number of times bot has been respecced (affects cost)
@@ -95,6 +100,13 @@ module {
     totalScrapEarned : Nat; // Total ICP earnings from races (legacy naming)
     factionReputation : Nat;
     eloRating : Nat; // ELO rating for skill-based matchmaking (default 1500)
+
+    // Luck tracking stats
+    totalLuckProcs : Nat; // Total luck procs triggered
+    majorLuckProcs : Nat; // Major luck procs triggered
+    legendaryLuckProcs : Nat; // Legendary luck procs triggered
+    totalBadLuckIncidents : Nat; // Total bad luck incidents suffered
+    cosmicAlignmentDays : Nat; // Days with >75% daily affinity
 
     // Timestamps
     activatedAt : Int;
@@ -134,6 +146,7 @@ module {
     #PowerCore;
     #Thruster;
     #Gyro;
+    #Luck; // NEW: Upgrade luck stat
   };
 
   public type UpgradeSession = {
@@ -409,6 +422,7 @@ module {
                 powerCore = current.powerCore;
                 acceleration = current.acceleration;
                 stability = current.stability;
+                luck = botStats.luckBase + botStats.luckBonus;
               };
             };
             case (null) { null };
@@ -448,6 +462,7 @@ module {
                 powerCore = finalStats.powerCore;
                 acceleration = finalStats.acceleration;
                 stability = finalStats.stability;
+                luck = botStats.luckBase + botStats.luckBonus;
               };
             };
             case (null) { null };
@@ -494,6 +509,7 @@ module {
                 powerCore = finalStats.powerCore;
                 acceleration = finalStats.acceleration;
                 stability = finalStats.stability;
+                luck = botStats.luckBase + botStats.luckBonus;
               };
             };
             case (null) {
@@ -563,6 +579,7 @@ module {
                 powerCore = finalStats.powerCore;
                 acceleration = finalStats.acceleration;
                 stability = finalStats.stability;
+                luck = RacingSimulator.deriveBaseLuck(idx); // Base luck from tokenIndex
               };
             };
           };
@@ -921,14 +938,17 @@ module {
         ownerPrincipal = owner;
         faction = faction;
         name = customName;
+        luckBase = RacingSimulator.deriveBaseLuck(tokenIndex); // Set once at init
         speedBonus = 0;
         powerCoreBonus = 0;
         accelerationBonus = 0;
         stabilityBonus = 0;
+        luckBonus = 0;
         speedUpgrades = 0;
         powerCoreUpgrades = 0;
         accelerationUpgrades = 0;
         stabilityUpgrades = 0;
+        luckUpgrades = 0;
         respecCount = 0;
         battery = 100;
         condition = 100;
@@ -953,6 +973,14 @@ module {
         totalScrapEarned = 0;
         factionReputation = 0;
         eloRating = startingElo; // Start based on bot quality (1200-1800)
+
+        // Luck tracking stats (initialized to 0)
+        totalLuckProcs = 0;
+        majorLuckProcs = 0;
+        legendaryLuckProcs = 0;
+        totalBadLuckIncidents = 0;
+        cosmicAlignmentDays = 0;
+
         activatedAt = now;
         lastDecayed = now; // Initialize decay tracking
         lastRecharged = null;
@@ -1947,6 +1975,7 @@ module {
             case (#PowerCore) { stats.powerCoreUpgrades };
             case (#Thruster) { stats.accelerationUpgrades };
             case (#Gyro) { stats.stabilityUpgrades };
+            case (#Luck) { stats.luckUpgrades };
           };
         };
         case (null) { 0 };
@@ -3177,8 +3206,9 @@ module {
               // E.g., 1.9 = 90% chance of 2, 10% chance of 1
               // This preserves the exact expected value over many ticks
               // Use lastAccumulation in seed for deterministic results
+              // IMPORTANT: Use Float.abs for fraction to handle negative values (battery restoration)
               let batteryFloor = Int.abs(Float.toInt(batteryDrainWithVariance));
-              let batteryFraction = batteryDrainWithVariance - Float.fromInt(batteryFloor);
+              let batteryFraction = Float.abs(batteryDrainWithVariance) - Float.fromInt(batteryFloor);
               let batteryRng = Float.fromInt(hashNat(tokenIndex + Int.abs(mission.lastAccumulation) + 2) % 100) / 100.0;
               let batteryDrainRounded = if (batteryRng < batteryFraction) {
                 batteryFloor + 1;
@@ -3499,8 +3529,9 @@ module {
 
           // Probabilistic rounding for battery (MATCH UPDATE FUNCTION)
           // Use lastAccumulation in seed for deterministic results
+          // IMPORTANT: Use Float.abs for fraction to handle negative values (battery restoration)
           let batteryFloor = Int.abs(Float.toInt(batteryDrainWithVariance));
-          let batteryFraction = batteryDrainWithVariance - Float.fromInt(batteryFloor);
+          let batteryFraction = Float.abs(batteryDrainWithVariance) - Float.fromInt(batteryFloor);
           let batteryRng = Float.fromInt(hashNat(tokenIndex + Int.abs(mission.lastAccumulation) + 2) % 100) / 100.0;
           let batteryDrainRounded = if (batteryRng < batteryFraction) {
             batteryFloor + 1;

@@ -18,11 +18,11 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_list_races";
     title = ?"List Available Races";
-    description = ?"View upcoming wasteland races. Returns 5 races per page. Filter by class, terrain, status, distance, or bot eligibility. Use after_race_id for pagination.\n\n**TIMESTAMP FORMAT:** All timestamps (start_time_utc, entry_deadline_utc) are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z').";
+    description = ?"View wasteland races. Returns 5 races per page. Filter by class, terrain, status, distance, or bot eligibility. Use after_race_id for pagination.\n\n**TIMESTAMP FORMAT:** All timestamps (start_time_utc, entry_deadline_utc) are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z').\n\n**STATUS OPTIONS:** open (accepting entries), full (max entries reached), closed (past deadline but not started), in_progress (currently racing), completed (finished races)";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Your bot's token index. When provided, only shows races this bot is eligible to enter."))])), ("after_race_id", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Race ID to start after. Returns the next 5 races after this ID."))])), ("race_class", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Scrap"), Json.str("Junker"), Json.str("Raider"), Json.str("Elite"), Json.str("SilentKlan")])), ("description", Json.str("Optional: Filter by race class"))])), ("terrain", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("ScrapHeaps"), Json.str("WastelandSand"), Json.str("MetalRoads")])), ("description", Json.str("Optional: Filter by terrain type"))])), ("status", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("open"), Json.str("full"), Json.str("closed")])), ("description", Json.str("Optional: Filter by entry status - open (accepting entries), full (max entries reached), closed (past deadline)"))])), ("min_distance", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Minimum race distance in km"))])), ("max_distance", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Maximum race distance in km"))])), ("has_spots", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show races with available spots (true) or full races (false)"))])), ("sort_by", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("prize_pool"), Json.str("start_time"), Json.str("entry_fee"), Json.str("distance")])), ("description", Json.str("Optional: Sort races by prize_pool (highest first), start_time (soonest first), entry_fee (lowest first), or distance (shortest first). Default: start_time"))]))])),
+      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Your bot's token index. When provided, only shows races this bot is eligible to enter."))])), ("after_race_id", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Race ID to start after. Returns the next 5 races after this ID."))])), ("race_class", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Scrap"), Json.str("Junker"), Json.str("Raider"), Json.str("Elite"), Json.str("SilentKlan")])), ("description", Json.str("Optional: Filter by race class"))])), ("terrain", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("ScrapHeaps"), Json.str("WastelandSand"), Json.str("MetalRoads")])), ("description", Json.str("Optional: Filter by terrain type"))])), ("status", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("open"), Json.str("full"), Json.str("closed"), Json.str("in_progress"), Json.str("completed")])), ("description", Json.str("Optional: Filter by status - open (accepting entries), full (max entries reached), closed (past deadline), in_progress (currently racing), completed (finished races)"))])), ("min_distance", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Minimum race distance in km"))])), ("max_distance", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Maximum race distance in km"))])), ("has_spots", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show races with available spots (true) or full races (false)"))])), ("sort_by", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("prize_pool"), Json.str("start_time"), Json.str("entry_fee"), Json.str("distance")])), ("description", Json.str("Optional: Sort races by prize_pool (highest first), start_time (soonest first), entry_fee (lowest first), or distance (shortest first). Default: start_time"))]))])),
     ]);
     outputSchema = null;
   };
@@ -55,8 +55,13 @@ module {
 
       let pageSize = 5;
 
-      // Get all upcoming races (bot eligibility filtering happens below)
-      var allRaces = ctx.raceManager.getUpcomingRaces();
+      // Get races based on status filter - if looking for completed/in_progress, get all races
+      // Otherwise get upcoming races (for open/full/closed filters)
+      var allRaces = switch (statusFilter) {
+        case (?"completed") { ctx.raceManager.getAllRaces() };
+        case (?"in_progress") { ctx.raceManager.getAllRaces() };
+        case (_) { ctx.raceManager.getUpcomingRaces() };
+      };
 
       // If token_index provided, verify bot exists (ownership check only, no filtering needed)
       let _botStats : ?PokedBotsGarage.PokedBotRacingStats = switch (tokenIndexOpt) {
@@ -133,11 +138,15 @@ module {
               let isOpen = r.status == #Upcoming and now < r.entryDeadline and r.entries.size() < r.maxEntries;
               let isFull = r.status == #Upcoming and r.entries.size() >= r.maxEntries;
               let isClosed = r.status == #Upcoming and now >= r.entryDeadline;
+              let isInProgress = r.status == #InProgress;
+              let isCompleted = r.status == #Completed;
 
               switch (status) {
                 case ("open") { isOpen };
                 case ("full") { isFull };
                 case ("closed") { isClosed };
+                case ("in_progress") { isInProgress };
+                case ("completed") { isCompleted };
                 case _ { true };
               };
             },
@@ -179,6 +188,9 @@ module {
         return ToolContext.makeTextSuccess("🏜️ No races match your filters. Try adjusting your search criteria.", cb);
       };
 
+      // For completed races, default to reverse chronological (newest first)
+      let isCompletedFilter = statusFilter == ?"completed";
+
       // Apply sorting
       let sortedRaces = switch (sortByOpt) {
         case (?"prize_pool") {
@@ -214,25 +226,48 @@ module {
           );
         };
         case (?"start_time") {
-          Array.sort<RacingSimulator.Race>(
-            filteredRaces,
-            func(a, b) {
-              if (a.startTime < b.startTime) { #less } else if (a.startTime > b.startTime) {
-                #greater;
-              } else { #equal };
-            },
-          );
+          // For completed races, sort newest first; otherwise soonest first
+          if (isCompletedFilter) {
+            Array.sort<RacingSimulator.Race>(
+              filteredRaces,
+              func(a, b) {
+                if (a.startTime > b.startTime) { #less } else if (a.startTime < b.startTime) {
+                  #greater;
+                } else { #equal };
+              },
+            );
+          } else {
+            Array.sort<RacingSimulator.Race>(
+              filteredRaces,
+              func(a, b) {
+                if (a.startTime < b.startTime) { #less } else if (a.startTime > b.startTime) {
+                  #greater;
+                } else { #equal };
+              },
+            );
+          };
         };
         case (_) {
-          // Default: sort by start time (soonest first)
-          Array.sort<RacingSimulator.Race>(
-            filteredRaces,
-            func(a, b) {
-              if (a.startTime < b.startTime) { #less } else if (a.startTime > b.startTime) {
-                #greater;
-              } else { #equal };
-            },
-          );
+          // Default: for completed races, newest first; otherwise soonest first
+          if (isCompletedFilter) {
+            Array.sort<RacingSimulator.Race>(
+              filteredRaces,
+              func(a, b) {
+                if (a.startTime > b.startTime) { #less } else if (a.startTime < b.startTime) {
+                  #greater;
+                } else { #equal };
+              },
+            );
+          } else {
+            Array.sort<RacingSimulator.Race>(
+              filteredRaces,
+              func(a, b) {
+                if (a.startTime < b.startTime) { #less } else if (a.startTime > b.startTime) {
+                  #greater;
+                } else { #equal };
+              },
+            );
+          };
         };
       };
 

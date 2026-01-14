@@ -2,6 +2,7 @@ import { Routes, Route, useLocation, Link } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Toaster } from 'sonner';
 import Navigation from './app/navigation';
+import { DailyPhenomenonBanner } from './components/DailyPhenomenonBanner';
 import HomePage from './app/page';
 import MarketplacePage from './app/marketplace/page';
 import GaragePage from './app/garage/page';
@@ -136,6 +137,7 @@ export default function App() {
         <SessionExpirationHandler />
         <ScrollToTop />
         <Navigation />
+        <DailyPhenomenonBanner />
         <WalletDrawer />
         <main className="flex-1">
           <Routes>

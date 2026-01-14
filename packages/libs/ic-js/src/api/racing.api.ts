@@ -226,22 +226,28 @@ export const getBotRaceHistory = async (
  * @param tokenIndexes Array of bot token indexes to simulate
  * @param trackId The track ID to use
  * @param trackSeed The seed for randomness
+ * @param phenomenonIndex Optional phenomenon index (0-12) to override daily phenomenon
  * @param identity Optional identity to use for the actor
- * @returns Simulation results with final times
+ * @returns Simulation results with final times and events
  */
 export const debugTestSimulation = async (
   tokenIndexes: number[],
   trackId: number,
   trackSeed: number,
   distanceKm: number,
+  phenomenonIndex?: number,
   identity?: Identity
-): Promise<{ tokenIndex: number; finalTime: number; stats: { speed: number; powerCore: number; acceleration: number; stability: number } }[] | null> => {
+): Promise<{ 
+  results: { tokenIndex: number; finalTime: number; stats: { speed: number; powerCore: number; acceleration: number; stability: number; luck: number }; createdAt: bigint }[];
+  events: { eventType: any; timestamp: number; segmentIndex: bigint; description: string }[];
+} | null> => {
   const racingActor = await getActor(identity);
   const result = await racingActor.debug_test_simulation(
     tokenIndexes.map(BigInt),
     BigInt(trackId),
     BigInt(trackSeed),
-    BigInt(distanceKm)
+    BigInt(distanceKm),
+    phenomenonIndex !== undefined ? [BigInt(phenomenonIndex)] : []
   );
   
   if (result.length === 0 || !result[0]) {
@@ -249,7 +255,10 @@ export const debugTestSimulation = async (
   }
   
   const data = result[0];
-  return data.results.map((r: any) => ({
+  const createdAt = BigInt(data.createdAt);
+  
+  // Parse results
+  const results = data.results.map((r: any) => ({
     tokenIndex: Number(r.tokenIndex),
     finalTime: Number(r.finalTime),
     stats: {
@@ -257,8 +266,20 @@ export const debugTestSimulation = async (
       powerCore: Number(r.stats.powerCore),
       acceleration: Number(r.stats.acceleration),
       stability: Number(r.stats.stability),
+      luck: Number(r.stats.luck),
     },
+    createdAt,
   }));
+  
+  // Parse events
+  const events = data.events.map((e: any) => ({
+    eventType: e.eventType,
+    timestamp: Number(e.timestamp),
+    segmentIndex: BigInt(e.segmentIndex),
+    description: e.description,
+  }));
+  
+  return { results, events };
 };
 
 /**

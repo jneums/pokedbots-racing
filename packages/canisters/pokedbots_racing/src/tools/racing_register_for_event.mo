@@ -85,18 +85,19 @@ module {
         };
       };
 
-      // Calculate overall rating
-      let currentStats = ctx.garageManager.getCurrentStats(botStats);
-      let overallRating = (currentStats.speed + currentStats.powerCore + currentStats.acceleration + currentStats.stability) / 4;
+      // Calculate overall rating using unbuffed stats (base + upgrades only)
+      // This ensures race class is determined by permanent stats, not temporary buffs like garage auras
+      let overallRating = ctx.garageManager.calculateRatingAt100(botStats);
 
       // Determine race class from overall rating (bracket system)
-      let raceClass : RaceCalendar.RaceClass = if (overallRating < 30) {
+      // Rating brackets: Scrap <20, Junker 20-29, Raider 30-39, Elite 40-49, SilentKlan 50+
+      let raceClass : RaceCalendar.RaceClass = if (overallRating < 20) {
         #Scrap;
-      } else if (overallRating < 50) {
+      } else if (overallRating < 30) {
         #Junker;
-      } else if (overallRating < 70) {
+      } else if (overallRating < 40) {
         #Raider;
-      } else if (overallRating < 90) {
+      } else if (overallRating < 50) {
         #Elite;
       } else {
         #SilentKlan;

@@ -186,6 +186,7 @@ export interface McpServer {
   'admin_remove_race_entry' : ActorMethod<[bigint, bigint], Result_1>,
   'admin_resimulate_race' : ActorMethod<[bigint], Result_1>,
   'admin_resimulate_races_batch' : ActorMethod<[Array<bigint>], string>,
+  'admin_update_event_heat_allocation' : ActorMethod<[string, string], string>,
   'admin_update_prize_amounts' : ActorMethod<[Array<bigint>], string>,
   'admin_update_race_min_entries' : ActorMethod<[bigint, bigint], string>,
   'cancel_actions_by_filter' : ActorMethod<[ActionFilter], CancellationResult>,
@@ -297,6 +298,14 @@ export interface McpServer {
             'position' : bigint,
           }
         >,
+        'events' : Array<
+          {
+            'description' : string,
+            'timestamp' : number,
+            'segmentIndex' : bigint,
+            'eventType' : string,
+          }
+        >,
         'analysis' : {
           'lastPlaceTime' : number,
           'winner' : bigint,
@@ -308,19 +317,29 @@ export interface McpServer {
     ]
   >,
   'debug_test_simulation' : ActorMethod<
-    [Array<bigint>, bigint, bigint, bigint],
+    [Array<bigint>, bigint, bigint, bigint, [] | [bigint]],
     [] | [
       {
+        'createdAt' : bigint,
         'results' : Array<
           {
             'tokenIndex' : bigint,
             'stats' : {
+              'luck' : bigint,
               'stability' : bigint,
               'speed' : bigint,
               'acceleration' : bigint,
               'powerCore' : bigint,
             },
             'finalTime' : number,
+          }
+        >,
+        'events' : Array<
+          {
+            'description' : string,
+            'timestamp' : number,
+            'segmentIndex' : bigint,
+            'eventType' : RaceEventType,
           }
         >,
       }
@@ -347,6 +366,7 @@ export interface McpServer {
         'name' : [] | [string],
         'eloRating' : [] | [bigint],
         'stats' : {
+          'luck' : bigint,
           'stability' : bigint,
           'speed' : bigint,
           'overallRating' : bigint,
@@ -375,6 +395,7 @@ export interface McpServer {
         'name' : [] | [string],
         'eloRating' : [] | [bigint],
         'stats' : {
+          'luck' : bigint,
           'stability' : bigint,
           'speed' : bigint,
           'overallRating' : bigint,
@@ -928,6 +949,7 @@ export interface McpServer {
           'powerCore' : bigint,
         },
         'upgradeCostsV2' : {
+          'luck' : { 'successRate' : number, 'costE8s' : bigint },
           'stability' : { 'successRate' : number, 'costE8s' : bigint },
           'speed' : { 'successRate' : number, 'costE8s' : bigint },
           'acceleration' : { 'successRate' : number, 'costE8s' : bigint },
@@ -957,10 +979,12 @@ export type NFTMetadata = Array<[string, string]>;
 export type NFTStats = Array<bigint>;
 export interface PokedBotRacingStats {
   'accelerationBonus' : bigint,
+  'majorLuckProcs' : bigint,
   'preferredDistance' : Distance,
   'totalPartsScavenged' : bigint,
   'stabilityBonus' : bigint,
   'lastRepaired' : [] | [bigint],
+  'totalLuckProcs' : bigint,
   'lastRaced' : [] | [bigint],
   'tokenIndex' : bigint,
   'places' : bigint,
@@ -968,6 +992,7 @@ export interface PokedBotRacingStats {
   'ownerPrincipal' : Principal,
   'bestHaul' : bigint,
   'name' : [] | [string],
+  'luckBonus' : bigint,
   'scavengingReputation' : bigint,
   'lastRecharged' : [] | [bigint],
   'worldBuff' : [] | [WorldBuff],
@@ -993,9 +1018,12 @@ export interface PokedBotRacingStats {
   'scavengingMissions' : bigint,
   'accelerationUpgrades' : bigint,
   'overcharge' : bigint,
+  'legendaryLuckProcs' : bigint,
+  'luckUpgrades' : bigint,
   'speedUpgrades' : bigint,
   'experience' : bigint,
   'shows' : bigint,
+  'luckBase' : bigint,
   'lastDiagnostics' : [] | [bigint],
   'preferredTerrain' : Terrain,
   'lastDecayed' : bigint,
@@ -1004,12 +1032,14 @@ export interface PokedBotRacingStats {
   'powerCoreBonus' : bigint,
   'faction' : FactionType,
   'battery' : bigint,
+  'totalBadLuckIncidents' : bigint,
   'perfectTuneUp' : boolean,
   'respecCount' : bigint,
   'speedBonus' : bigint,
   'totalScrapEarned' : bigint,
   'activeMission' : [] | [ScavengingMission],
   'powerCoreUpgrades' : bigint,
+  'cosmicAlignmentDays' : bigint,
   'upgradeEndsAt' : [] | [bigint],
   'condition' : bigint,
 }
@@ -1079,7 +1109,11 @@ export type RaceEventType = {
   } |
   { 'LeadChange' : { 'newLeader' : string, 'previousLeader' : string } } |
   { 'ExceptionalPerformance' : { 'bot' : string, 'performancePct' : number } } |
+  {
+    'BadLuck' : { 'bot' : string, 'penalty' : number, 'incidentType' : string }
+  } |
   { 'CloseRacing' : { 'bots' : Array<string>, 'gapSeconds' : number } } |
+  { 'LuckProc' : { 'bot' : string, 'procType' : string, 'boost' : number } } |
   { 'SegmentComplete' : { 'leader' : string, 'segmentIndex' : bigint } } |
   { 'LargeGap' : { 'gapSeconds' : number, 'leader' : string } } |
   { 'PoorPerformance' : { 'bot' : string, 'performancePct' : number } };
@@ -1110,6 +1144,7 @@ export interface RaceTemplate {
   'stageName' : [] | [string],
 }
 export interface RacingStats {
+  'luck' : bigint,
   'stability' : bigint,
   'speed' : bigint,
   'acceleration' : bigint,
@@ -1376,6 +1411,7 @@ export interface UpgradeSession {
   'endsAt' : bigint,
 }
 export type UpgradeType = { 'Gyro' : null } |
+  { 'Luck' : null } |
   { 'PowerCore' : null } |
   { 'Thruster' : null } |
   { 'Velocity' : null };

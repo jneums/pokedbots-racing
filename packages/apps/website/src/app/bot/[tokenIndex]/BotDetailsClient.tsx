@@ -245,6 +245,7 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
               )}
             </CardHeader>
             <CardContent>
+              {/* Racing Stats (used for rating) */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center p-4 bg-card/50 border border-primary/20 rounded-lg">
                   <p className="text-sm text-muted-foreground mb-2">Speed</p>
@@ -289,6 +290,29 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
                       ({baseStats.stability})
                     </p>
                   )}
+                </div>
+              </div>
+
+              {/* Luck Section (separate - not part of rating) */}
+              <div className="mt-4 p-4 rounded-lg border border-green-500/30 bg-gradient-to-r from-green-500/5 to-emerald-500/10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🍀</span>
+                    <div>
+                      <p className="text-sm font-medium text-green-400">Luck</p>
+                      <p className="text-xs text-muted-foreground">Not included in rating</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-3xl font-bold text-primary">
+                      {profile.stats.luck !== undefined ? Number(profile.stats.luck) : Math.floor((Number(tokenIndex) % 100) / 2) + 10}
+                    </p>
+                    {isInitialized && (
+                      <p className="text-xs text-muted-foreground">
+                        Base: {Math.floor((Number(tokenIndex) % 100) / 2) + 10}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
               {!isInitialized && (

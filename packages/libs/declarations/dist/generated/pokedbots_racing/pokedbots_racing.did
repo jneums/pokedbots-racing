@@ -19,6 +19,7 @@ type UserInventory =
 type UpgradeType = 
  variant {
    Gyro;
+   Luck;
    PowerCore;
    Thruster;
    Velocity;
@@ -371,6 +372,7 @@ type ReconstitutionTrace =
 type RacingStats = 
  record {
    acceleration: nat;
+   luck: nat;
    powerCore: nat;
    speed: nat;
    stability: nat;
@@ -409,6 +411,11 @@ type RaceResult =
  };
 type RaceEventType = 
  variant {
+   BadLuck: record {
+              bot: text;
+              incidentType: text;
+              penalty: float64;
+            };
    CloseRacing: record {
                   bots: vec text;
                   gapSeconds: float64;
@@ -425,6 +432,11 @@ type RaceEventType =
                  newLeader: text;
                  previousLeader: text;
                };
+   LuckProc: record {
+               boost: float64;
+               bot: text;
+               procType: text;
+             };
    Overtake: record {
                overtaken: text;
                overtaker: text;
@@ -521,6 +533,7 @@ type PokedBotRacingStats =
    battery: nat;
    bestHaul: nat;
    condition: nat;
+   cosmicAlignmentDays: nat;
    eloRating: nat;
    experience: nat;
    faction: FactionType;
@@ -545,7 +558,12 @@ type PokedBotRacingStats =
    lastRaced: opt int;
    lastRecharged: opt int;
    lastRepaired: opt int;
+   legendaryLuckProcs: nat;
    listedForSale: bool;
+   luckBase: nat;
+   luckBonus: nat;
+   luckUpgrades: nat;
+   majorLuckProcs: nat;
    name: opt text;
    overcharge: nat;
    ownerPrincipal: principal;
@@ -565,6 +583,8 @@ type PokedBotRacingStats =
    stabilityBonus: nat;
    stabilityUpgrades: nat;
    tokenIndex: nat;
+   totalBadLuckIncidents: nat;
+   totalLuckProcs: nat;
    totalPartsScavenged: nat;
    totalScrapEarned: nat;
    upgradeEndsAt: opt int;
@@ -593,6 +613,8 @@ type McpServer =
    admin_remove_race_entry: (raceId: nat, tokenIndex: nat) -> (Result_1);
    admin_resimulate_race: (raceId: nat) -> (Result_1);
    admin_resimulate_races_batch: (raceIds: vec nat) -> (text);
+   admin_update_event_heat_allocation: (eventType: text, newStrategy:
+    text) -> (text);
    admin_update_prize_amounts: (raceIds: vec nat) -> (text);
    admin_update_race_min_entries: (raceId: nat, minEntries: nat) -> (text);
    cancel_actions_by_filter: (filter: ActionFilter) -> (CancellationResult);
@@ -687,7 +709,7 @@ type McpServer =
          };
       }) query;
    /// Test/debug: Simulate a race with specific bots on a specific track
-   /// Returns detailed results for balance testing
+   /// Returns detailed results for balance testing, including race events for replay
    debug_simulate_race: (trackId: nat, tokenIndices: vec nat, seed: nat) ->
     (opt
       record {
@@ -699,6 +721,14 @@ type McpServer =
            winner: nat;
            winnerTime: float64;
          };
+        events:
+         vec
+          record {
+            description: text;
+            eventType: text;
+            segmentIndex: nat;
+            timestamp: float64;
+          };
         participants:
          vec
           record {
@@ -732,9 +762,18 @@ type McpServer =
    /// Debug: Test simulate a race with specific bots and track
    /// Returns backend-calculated times for validation
    debug_test_simulation: (tokenIndexes: vec nat, trackId: nat, trackSeed:
-    nat, distanceKm: nat) ->
+    nat, distanceKm: nat, phenomenonIndex: opt nat) ->
     (opt
       record {
+        createdAt: int;
+        events:
+         vec
+          record {
+            description: text;
+            eventType: RaceEventType;
+            segmentIndex: nat;
+            timestamp: float64;
+          };
         results:
          vec
           record {
@@ -742,12 +781,14 @@ type McpServer =
             stats:
              record {
                acceleration: nat;
+               luck: nat;
                powerCore: nat;
                speed: nat;
                stability: nat;
              };
             tokenIndex: nat;
-          };});
+          };
+      });
    /// Decode EXT token identifier to get token index (public query)
    decode_token_identifier: (tokenIdentifier: text) -> (nat) query;
    delete_events_and_races: (eventIds: vec nat) -> (text);
@@ -784,6 +825,7 @@ type McpServer =
         stats:
          record {
            acceleration: nat;
+           luck: nat;
            overallRating: nat;
            powerCore: nat;
            speed: nat;
@@ -812,6 +854,7 @@ type McpServer =
         stats:
          record {
            acceleration: nat;
+           luck: nat;
            overallRating: nat;
            powerCore: nat;
            speed: nat;
@@ -1410,6 +1453,10 @@ type McpServer =
                            costE8s: nat;
                            successRate: float64;
                          };
+           luck: record {
+                   costE8s: nat;
+                   successRate: float64;
+                 };
            pityCounter: nat;
            powerCore: record {
                         costE8s: nat;

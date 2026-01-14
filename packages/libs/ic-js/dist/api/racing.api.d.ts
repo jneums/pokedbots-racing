@@ -106,19 +106,30 @@ export declare const getBotRaceHistory: (tokenIndex: number, limit?: number, aft
  * @param tokenIndexes Array of bot token indexes to simulate
  * @param trackId The track ID to use
  * @param trackSeed The seed for randomness
+ * @param phenomenonIndex Optional phenomenon index (0-12) to override daily phenomenon
  * @param identity Optional identity to use for the actor
- * @returns Simulation results with final times
+ * @returns Simulation results with final times and events
  */
-export declare const debugTestSimulation: (tokenIndexes: number[], trackId: number, trackSeed: number, distanceKm: number, identity?: Identity) => Promise<{
-    tokenIndex: number;
-    finalTime: number;
-    stats: {
-        speed: number;
-        powerCore: number;
-        acceleration: number;
-        stability: number;
-    };
-}[] | null>;
+export declare const debugTestSimulation: (tokenIndexes: number[], trackId: number, trackSeed: number, distanceKm: number, phenomenonIndex?: number, identity?: Identity) => Promise<{
+    results: {
+        tokenIndex: number;
+        finalTime: number;
+        stats: {
+            speed: number;
+            powerCore: number;
+            acceleration: number;
+            stability: number;
+            luck: number;
+        };
+        createdAt: bigint;
+    }[];
+    events: {
+        eventType: any;
+        timestamp: number;
+        segmentIndex: bigint;
+        description: string;
+    }[];
+} | null>;
 /**
  * Query races with advanced filtering and pagination
  * @param filters Object containing filter criteria
