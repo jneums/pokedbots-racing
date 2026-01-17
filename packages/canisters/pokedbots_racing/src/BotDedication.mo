@@ -532,6 +532,43 @@ module {
       };
     };
 
+    // Batch get dedication summaries for multiple bots (for garage list)
+    public func getBatchDedicationSummaries(tokenIndices : [Nat]) : [(
+      Nat,
+      {
+        tier : Nat;
+        tierName : Text;
+        totalDP : Nat;
+        benefits : TierBenefits;
+      },
+    )] {
+      let buffer = Buffer.Buffer<(Nat, { tier : Nat; tierName : Text; totalDP : Nat; benefits : TierBenefits })>(tokenIndices.size());
+
+      for (tokenIndex in tokenIndices.vals()) {
+        let summary = switch (getProfile(tokenIndex)) {
+          case (?profile) {
+            let tier = calculateTier(profile.totalDP);
+            {
+              tier = tier;
+              tierName = getTierName(tier);
+              totalDP = profile.totalDP;
+              benefits = getTierBenefits(tier);
+            };
+          };
+          case (null) {
+            {
+              tier = 0;
+              tierName = "Rookie";
+              totalDP = 0;
+              benefits = getTierBenefits(0);
+            };
+          };
+        };
+        buffer.add((tokenIndex, summary));
+      };
+      Buffer.toArray(buffer);
+    };
+
     // Get all profiles (for admin/debug)
     public func getAllProfiles() : [(Nat, BotDedicationProfile)] {
       let buffer = Buffer.Buffer<(Nat, BotDedicationProfile)>(Map.size(dedicationMap));

@@ -203,71 +203,18 @@ type ScavengingMission =
    tokenIndex: nat;
    zone: ScavengingZone;
  };
+type Result_9 = 
+ variant {
+   err: text;
+   ok: nat;
+ };
 type Result_8 = 
  variant {
    err: text;
-   ok:
-    record {
-      acceleration:
-       record {
-         base: nat;
-         batteryEffect: int;
-         batteryPenalty: float64;
-         dedication: nat;
-         final: nat;
-         overcharge: float64;
-         overchargeEffect: int;
-         synergy: nat;
-         upgrades: nat;
-         worldBuff: nat;
+   ok: record {
+         id: nat;
+         time: nat;
        };
-      battery: nat;
-      condition: nat;
-      isInitialized: bool;
-      overchargePercent: nat;
-      owner: opt principal;
-      perfectTuneUp: bool;
-      powerCore:
-       record {
-         base: nat;
-         conditionEffect: int;
-         conditionPenalty: float64;
-         dedication: nat;
-         final: nat;
-         overcharge: float64;
-         overchargeEffect: int;
-         synergy: nat;
-         upgrades: nat;
-         worldBuff: nat;
-       };
-      speed:
-       record {
-         base: nat;
-         batteryEffect: int;
-         batteryPenalty: float64;
-         dedication: nat;
-         final: nat;
-         overcharge: float64;
-         overchargeEffect: int;
-         synergy: nat;
-         upgrades: nat;
-         worldBuff: nat;
-       };
-      stability:
-       record {
-         base: nat;
-         conditionEffect: int;
-         conditionPenalty: float64;
-         dedication: nat;
-         final: nat;
-         overcharge: float64;
-         overchargeEffect: int;
-         synergy: nat;
-         upgrades: nat;
-         worldBuff: nat;
-       };
-      tokenIndex: nat;
-    };
  };
 type Result_7 = 
  variant {
@@ -349,6 +296,99 @@ type Result_2 =
       totalRefunded: nat;
     };
  };
+type Result_11 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      currentBattery: opt nat;
+      currentCondition: opt nat;
+      currentTime: int;
+      recharge:
+       record {
+         hoursUntilDrift: nat;
+         inGoodZone: bool;
+         inPeakZone: bool;
+         optimalPoint: nat;
+         resonanceStatus: text;
+       };
+      repair:
+       record {
+         hoursUntilDrift: nat;
+         inGoodZone: bool;
+         inPeakZone: bool;
+         optimalPoint: nat;
+         resonanceStatus: text;
+       };
+      tokenIndex: nat;
+    };
+ };
+type Result_10 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      acceleration:
+       record {
+         base: nat;
+         batteryEffect: int;
+         batteryPenalty: float64;
+         dedication: nat;
+         final: nat;
+         overcharge: float64;
+         overchargeEffect: int;
+         synergy: nat;
+         upgrades: nat;
+         worldBuff: nat;
+       };
+      battery: nat;
+      condition: nat;
+      isInitialized: bool;
+      overchargePercent: nat;
+      owner: opt principal;
+      perfectTuneUp: bool;
+      powerCore:
+       record {
+         base: nat;
+         conditionEffect: int;
+         conditionPenalty: float64;
+         dedication: nat;
+         final: nat;
+         overcharge: float64;
+         overchargeEffect: int;
+         synergy: nat;
+         upgrades: nat;
+         worldBuff: nat;
+       };
+      speed:
+       record {
+         base: nat;
+         batteryEffect: int;
+         batteryPenalty: float64;
+         dedication: nat;
+         final: nat;
+         overcharge: float64;
+         overchargeEffect: int;
+         synergy: nat;
+         upgrades: nat;
+         worldBuff: nat;
+       };
+      stability:
+       record {
+         base: nat;
+         conditionEffect: int;
+         conditionPenalty: float64;
+         dedication: nat;
+         final: nat;
+         overcharge: float64;
+         overchargeEffect: int;
+         synergy: nat;
+         upgrades: nat;
+         worldBuff: nat;
+       };
+      tokenIndex: nat;
+    };
+ };
 type Result_1 = 
  variant {
    err: text;
@@ -373,6 +413,8 @@ type RacingStats =
  record {
    acceleration: nat;
    luck: nat;
+   overcharge: nat;
+   perfectTuneUp: bool;
    powerCore: nat;
    speed: nat;
    stability: nat;
@@ -605,9 +647,13 @@ type McpServer =
    /// Admin function to manually create betting pool for an existing race
    /// Useful for testing and recovery when races are created in advance
    admin_create_betting_pool: (raceId: nat) -> (Result_1);
+   admin_create_event_for_orphaned_races: (scheduledTimeNanos: int, raceIds:
+    vec nat) -> (text);
    admin_get_active_mission: (tokenIndex: nat) -> (text) query;
+   /// Get resonance info for a bot (admin only) - for verifying the resonance system
+   admin_get_resonance: (tokenIndex: nat) -> (Result_11) query;
    /// Get detailed stat breakdown for debugging (admin only)
-   admin_get_stat_breakdown: (tokenIndex: nat) -> (Result_8) query;
+   admin_get_stat_breakdown: (tokenIndex: nat) -> (Result_10) query;
    admin_rebuild_bot_histories: (tokenIndices: vec nat) -> (text);
    /// Admin method to remove a bot from a race (for fixing bugs/errors)
    admin_remove_race_entry: (raceId: nat, tokenIndex: nat) -> (Result_1);
@@ -624,8 +670,9 @@ type McpServer =
                                                      text;
                                                    });
    cleanup_duplicate_race_create_timers: () -> (text);
-   cleanup_duplicate_recharge_timers: () -> (text);
    clear_event_races: (eventIds: vec nat) -> (text);
+   /// Clear race_create timer diagnostic logs (owner only)
+   clear_race_create_diagnostics: () -> (Result_9);
    clear_reconstitution_traces: () -> ();
    /// * Creates a new API key. This API key is linked to the caller's principal.
    ///    * @param name A human-readable name for the key.
@@ -644,6 +691,35 @@ type McpServer =
         trackId: nat;
       }) query;
    debug_regenerate_race_commentary: (raceId: nat) -> (Result_1);
+   /// Debug: Re-simulate an existing race using its stored data
+   /// This helps debug mismatches between frontend and backend simulations
+   debug_resimulate_race: (raceId: nat) ->
+    (opt
+      record {
+        originalResults:
+         vec
+          record {
+            finalTime: float64;
+            nftId: text;
+            position: nat;
+            stats: opt RacingStats;
+          };
+        raceParams:
+         record {
+           createdAt: int;
+           distance: nat;
+           participantOrder: vec text;
+           terrain: Terrain;
+           trackId: nat;
+           trackSeed: nat;
+         };
+        resimulatedResults:
+         vec record {
+               finalTime: float64;
+               nftId: text;
+               position: nat;
+             };
+      });
    /// Debug: Get detailed scavenging calculations for a bot
    /// Shows all intermediate values for battery/condition accumulation
    debug_scavenging_calculation: (tokenIndex: nat) ->
@@ -797,6 +873,8 @@ type McpServer =
    encode_token_identifier: (tokenIndex: nat32) -> (text) query;
    force_finish_race: (raceId: nat) -> (text);
    force_release_lock: () -> (opt Time);
+   /// Manually trigger a race_create timer if none exist (owner only, emergency recovery)
+   force_schedule_race_create: () -> (Result_8);
    force_system_timer_cancel: () -> (bool);
    get_actions_by_filter: (filter: ActionFilter) -> (vec ActionDetail) query;
    get_all_scheduled_events: () -> (vec ScheduledEvent) query;
@@ -906,6 +984,36 @@ type McpServer =
                                  seasonId: nat;
                                }) query;
    get_event_details: (eventId: nat) -> (opt ScheduledEvent) query;
+   get_event_results: (eventId: nat) ->
+    (opt
+      record {
+        cumulativeStandings: opt vec EventStandingEntry;
+        event: ScheduledEvent;
+        factionStandings: opt vec FactionStandingEntry;
+        isMultiStage: bool;
+        raceResultsSummary:
+         vec
+          record {
+            distance: nat;
+            raceClass: RaceClass;
+            raceId: nat;
+            results:
+             opt
+              vec
+               record {
+                 finalTime: float64;
+                 owner: principal;
+                 position: nat;
+                 prizeAmount: nat;
+                 tokenIndex: nat;
+               };
+            stageName: text;
+            status: RaceStatus;
+            terrain: Terrain;
+          };
+        scoringMode: ScoringMode;
+        totalPrizePool: nat;
+      }) query;
    get_event_with_races: (eventId: nat) ->
     (opt
       record {
@@ -1013,6 +1121,46 @@ type McpServer =
        totalWins: nat;
      }) query;
    get_race_by_id: (raceId: nat) -> (opt Race) query;
+   /// Get race_create timer handler diagnostic logs
+   get_race_create_diagnostics: () ->
+    (record {
+       currentRaceCreateTimers: nat;
+       entries:
+        vec
+         record {
+           actionId: record {
+                       id: nat;
+                       time: nat;
+                     };
+           existingTimerCount: nat;
+           handlerType: text;
+           message: text;
+           nextTimerTime: opt nat;
+           scheduledNextTimer: bool;
+           timestamp: int;
+         };
+       totalCount: nat;
+     }) query;
+   /// Get detailed timer state for race_create debugging
+   get_race_create_timer_state: () ->
+    (record {
+       allTimerCount: nat;
+       raceCreateTimers: vec record {
+                               actionType: text;
+                               id: nat;
+                               time: nat;
+                             };
+       raceFinishTimers: vec record {
+                               actionType: text;
+                               id: nat;
+                               time: nat;
+                             };
+       raceStartTimers: vec record {
+                              actionType: text;
+                              id: nat;
+                              time: nat;
+                            };
+     }) query;
    get_reconstitution_traces: () -> (vec ReconstitutionTrace) query;
    get_timer_diagnostics: () -> (TimerDiagnostics) query;
    /// Get total count of NFTs with metadata stored
@@ -1028,7 +1176,10 @@ type McpServer =
         event: ScheduledEvent;
         raceSummary:
          record {
+           completedRaces: nat;
            distances: vec nat;
+           nextRaceStartTime: opt int;
+           pendingRaces: nat;
            terrains: vec Terrain;
            totalParticipants: nat;
            totalPrizePool: nat;
@@ -1231,7 +1382,9 @@ type McpServer =
    /// Place a bet for UI
    web_betting_place_bet: (raceId: nat, tokenIndex: nat, betType: BetType,
     amountE8s: nat) -> (Result_4);
-   /// Cancel an in-progress upgrade and receive a full refund
+   /// Cancel an in-progress upgrade (DEPRECATED - upgrades are now instant)
+   /// Settle a legacy upgrade that was in progress when we switched to instant upgrades
+   /// This runs the RNG and completes the upgrade for users who were mid-upgrade
    web_cancel_upgrade: (tokenIndex: nat) -> (Result_1);
    /// Complete a scavenging mission and collect rewards (web method)
    web_complete_scavenging: (tokenIndex: nat) -> (Result_1);
@@ -1244,6 +1397,29 @@ type McpServer =
    web_enter_race: (raceId: nat, tokenIndex: nat) -> (Result_1);
    /// Full Maintenance - combines recharge and repair in a single transaction (0.15 ICP + fee via ICRC-2)
    web_full_maintenance: (tokenIndex: nat) -> (Result_1);
+   /// Get batch dedication info for multiple bots (optimized for garage list)
+   web_get_batch_dedication_info: (tokenIndices: vec nat) ->
+    (vec
+      record {
+        nat;
+        record {
+          benefits:
+           record {
+             accelerationBonus: nat;
+             powerCoreBonus: nat;
+             rechargeCooldownMult: float64;
+             repairCooldownMult: float64;
+             scavengingYieldMult: float64;
+             speedBonus: nat;
+             stabilityBonus: nat;
+             terrainBonusPercent: nat;
+             upgradeDiscountMult: float64;
+           };
+          tier: nat;
+          tierName: text;
+          totalDP: nat;
+        };
+      }) query;
    /// Get detailed stats for a specific bot
    web_get_bot_details: (tokenIndex: nat) -> (Result_3);
    /// Get bot details for multiple token indices (query call for performance)
@@ -1309,6 +1485,18 @@ type McpServer =
        tierName: text;
        totalDP: nat;
        totalInvestedICP: float64;
+     }) query;
+   /// Get garage power grid status for the caller
+   /// Shows total capacity, current draw, number of bots charging, and efficiency
+   web_get_garage_power_status: () ->
+    (record {
+       basePowerWatts: nat;
+       botsCharging: nat;
+       currentDrawWatts: nat;
+       efficiency: float64;
+       totalCapacityWatts: nat;
+       wattsPerBot: nat;
+       wattsPerBotRequired: nat;
      }) query;
    /// Get user's bots tagged as racers
    web_get_racer_bots: () -> (vec nat) query;
@@ -1477,7 +1665,7 @@ type McpServer =
    /// Repair a bot to restore condition (0.05 ICP + fee via ICRC-2)
    web_repair_bot: (tokenIndex: nat) -> (Result_1);
    /// Respec a bot - reset selected stat upgrades and refund parts (with penalty)
-   /// Cost: 1 ICP (flat rate)
+   /// Cost: FREE
    /// statsToStrip: Array of stat names to reset (["speed", "powerCore", "acceleration", "stability"])
    /// Empty array strips all stats (backward compatible)
    web_respec_bot: (tokenIndex: nat, statsToStrip: vec text) -> (Result_2);
@@ -1592,6 +1780,19 @@ type FactionType =
    UltimateMaster;
    Wild;
  };
+type FactionStandingEntry = 
+ record {
+   faction: text;
+   memberCount: nat;
+   members: vec record {
+                  owner: principal;
+                  points: nat;
+                  tokenIndex: nat;
+                };
+   position: nat;
+   prizePerMember: nat;
+   totalPoints: nat;
+ };
 type EventVisibility = 
  variant {
    Private;
@@ -1621,6 +1822,21 @@ type EventStatus =
    InProgress;
    RegistrationClosed;
    RegistrationOpen;
+ };
+type EventStandingEntry = 
+ record {
+   cumulativePoints: nat;
+   owner: principal;
+   position: nat;
+   prizeAmount: nat;
+   raceResults:
+    vec record {
+          points: nat;
+          position: nat;
+          raceId: nat;
+          stageName: text;
+        };
+   tokenIndex: nat;
  };
 type EventRegistration = 
  record {

@@ -47,6 +47,9 @@ module {
     acceleration : Nat; // Base: 11-73, max with upgrades: 100+
     stability : Nat; // Base: 6-69, max with upgrades: 100+
     luck : Nat; // Base: 10-50 (derived from tokenIndex % 100 / 2), max with upgrades: 100+
+    // Maintenance buffs (snapshotted at race start for visualization)
+    overcharge : Nat; // 0-40, consumed in race for stat boost
+    perfectTuneUp : Bool; // True if repaired at resonance, removes overcharge penalties
   };
 
   // ===== DAILY PHENOMENA SYSTEM =====
@@ -1042,54 +1045,76 @@ module {
     totalRacers : Nat,
     segmentSeed : Nat,
   ) : ?LuckProcType {
-    // QUADRATIC scaling: (luck/100)^2 * 30% max
-    // This rewards high luck exponentially:
-    //   20 luck = 1.2%, 40 luck = 4.8%, 60 luck = 10.8%, 80 luck = 19.2%
-    let luckNorm = Float.fromInt(luck) / 100.0;
-    let baseLuckChance = luckNorm * luckNorm * 0.30;
+    // POSITION-GATED: Only underdogs can proc luck
+    // Leaders don't need luck - they're already winning
+    // This creates comeback potential without rewarding the already-ahead
 
-    // Underdog bonus: lower positions get more luck chance (up to +50%)
-    let underdogMultiplier = if (totalRacers > 1 and position > (totalRacers / 2)) {
-      1.0 + (Float.fromInt(position - (totalRacers / 2)) / Float.fromInt(totalRacers)) * 0.5;
-    } else { 1.0 };
+    // Calculate position threshold: bottom half of field can proc
+    let halfField = if (totalRacers <= 2) { 1 } else { totalRacers / 2 };
 
-    // Daily affinity bonus (also quadratic)
+    // If in top half (leading), no luck procs
+    if (position <= halfField) {
+      return null;
+    };
+
+    // UNDERDOG SCALING: How far back determines proc chance
+    // Position 4/6 (barely behind): low chance
+    // Position 6/6 (dead last): highest chance
+    let positionsBehind = position - halfField; // 1 to halfField
+    let underdogFactor = Float.fromInt(positionsBehind) / Float.fromInt(halfField);
+
+    // FLAT BASELINE: Everyone gets the same base chance (10%)
+    // Position is the ONLY multiplier - luck stat is ignored
+    // This creates pure Mario Kart style rubber banding
+    let baseLuckChance = 0.10; // 10% flat for everyone
+
+    // Underdog multiplier: 1x at barely behind, up to 2.5x at dead last
+    let underdogMultiplier = 1.0 + (underdogFactor * 1.5);
+
+    // Daily affinity bonus (up to +5%) - small flavor bonus
     let affNorm = Float.fromInt(dailyAffinity) / 100.0;
-    let affinityBonus = affNorm * affNorm * 0.30;
+    let affinityBonus = affNorm * 0.05;
 
-    // Total luck chance (capped at 35%)
-    let totalLuckChance = Float.min(0.35, (baseLuckChance * underdogMultiplier) + affinityBonus);
+    // Total luck chance (capped at 30%)
+    let totalLuckChance = Float.min(0.30, (baseLuckChance * underdogMultiplier) + affinityBonus);
 
     // Roll the dice using segment seed
     let roll = Float.fromInt(segmentSeed % 1000) / 1000.0; // 0.0 to 1.0
 
     if (roll < totalLuckChance) {
-      ?determineLuckProc(luck, dailyAffinity, segmentSeed);
+      ?determineLuckProc(luck, dailyAffinity, position, totalRacers, segmentSeed);
     } else { null };
   };
 
   /// Determine which type of luck proc occurred
-  /// Uses spectrum approach: higher luckTier shifts probability toward better procs
+  /// POSITION-BASED: Worse position = better tier chance
+  /// This rewards true underdogs with better procs
   private func determineLuckProc(
     luck : Nat,
     affinity : Nat,
+    position : Nat,
+    totalRacers : Nat,
     seed : Nat,
   ) : LuckProcType {
-    let luckTier = (luck + affinity) / 2; // 0-100 combined score
+    // Position-based tier calculation
+    // Dead last gets best odds, barely-behind gets worst
+    let halfField = if (totalRacers <= 2) { 1 } else { totalRacers / 2 };
+    let positionsBehind = if (position > halfField) { position - halfField } else {
+      1;
+    };
+    let underdogRatio = Float.fromInt(positionsBehind) / Float.fromInt(halfField); // 0.0 to 1.0
+
     let tierRoll = seed % 100;
 
-    // Spectrum-based probability:
-    // Legendary chance: 1% base + luckTier/5 (1-21% range)
-    // Major chance: 10% base + luckTier/3 (10-43% range)
-    // Minor: remainder
+    // Position-based probability:
+    // Dead last (ratio=1.0): 15% Legendary, 40% Major, 45% Minor
+    // Barely behind (ratio~0.2): 3% Legendary, 20% Major, 77% Minor
     //
-    // Examples:
-    //   luckTier 20: 5% Legendary, 16% Major, 79% Minor
-    //   luckTier 40: 9% Legendary, 23% Major, 68% Minor
-    //   luckTier 60: 13% Legendary, 30% Major, 57% Minor
-    //   luckTier 80: 17% Legendary, 36% Major, 47% Minor
-    let legendaryChance = 1 + luckTier / 5; // 1-21%
-    let majorChance = 10 + luckTier / 3; // 10-43%
+    // Luck stat gives small bonus to tier (up to +5% Legendary, +10% Major)
+    let luckBonus = Float.fromInt(luck) / 100.0; // 0.0 to 1.0
+
+    let legendaryChance = Int.abs(Float.toInt((3.0 + underdogRatio * 12.0 + luckBonus * 5.0))); // 3-20%
+    let majorChance = Int.abs(Float.toInt((20.0 + underdogRatio * 20.0 + luckBonus * 10.0))); // 20-50%
 
     if (tierRoll < legendaryChance) {
       let descIndex = seed % 4;
@@ -1101,7 +1126,7 @@ module {
       };
 
       #Legendary({
-        boost = 1.40; // +40% speed this segment
+        boost = 1.20; // +20% speed this segment (catchup, not slingshot)
         description = desc;
       });
     } else if (tierRoll < legendaryChance + majorChance) {
@@ -1114,7 +1139,7 @@ module {
       };
 
       #Major({
-        boost = 1.25; // +25% speed
+        boost = 1.12; // +12% speed (catchup, not slingshot)
         description = desc;
       });
     } else {
@@ -1127,7 +1152,7 @@ module {
       };
 
       #Minor({
-        boost = 1.15; // +15% speed
+        boost = 1.06; // +6% speed (catchup, not slingshot)
         description = desc;
       });
     };
@@ -1252,23 +1277,23 @@ module {
 
       // Speed + Acceleration synergy (high speed needs good accel to maintain)
       let speedAccelRatio = (speed + acceleration) / 200.0; // 0.30 to 1.0
-      let speedSynergyMod = 0.80 + (speedAccelRatio * 0.20); // 0.80x to 1.0x
+      let speedSynergyMod = 0.85 + (speedAccelRatio * 0.15); // 0.85x to 1.0x (reduced from 0.80-1.0)
       let synergisticSpeed = (speedUniversal + speedBonus) * speedSynergyMod;
 
       // Power + Stability synergy (endurance needs stability)
       let powerStabilityRatio = (powerCore + stability) / 200.0; // 0.30 to 1.0
-      let powerSynergyMod = 0.85 + (powerStabilityRatio * 0.15); // 0.85x to 1.0x
+      let powerSynergyMod = 0.82 + (powerStabilityRatio * 0.18); // 0.82x to 1.0x (buffed from 0.85-1.0)
 
       // === PART 3: UNIVERSAL PENALTIES (all stats matter everywhere) ===
 
-      // Power Core: Universal endurance (25% penalty range)
-      let powerUniversal = 1.0 + ((100.0 - powerCore) / 400.0);
+      // Power Core: Universal endurance (28% penalty range, buffed from 25%)
+      let powerUniversal = 1.0 + ((100.0 - powerCore) / 350.0);
 
-      // Acceleration: Universal responsiveness (20% penalty range)
+      // Acceleration: Universal responsiveness (28% penalty range)
       let accelUniversal = 1.0 + ((100.0 - acceleration) / 350.0);
 
-      // Stability: Universal consistency (17% penalty range)
-      let stabilityUniversal = 1.0 + ((100.0 - stability) / 400.0);
+      // Stability: Universal consistency (28% penalty range, buffed from 25%)
+      let stabilityUniversal = 1.0 + ((100.0 - stability) / 350.0);
 
       // === PART 4: SITUATIONAL MODIFIERS ===
 
@@ -1287,7 +1312,7 @@ module {
       // Acceleration: Bonus on roads, momentum recovery
       let accelSituational = switch (segment.terrain) {
         case (#MetalRoads) {
-          1.0 + ((100.0 - acceleration) / 160.0); // +44% penalty on roads
+          1.0 + ((100.0 - acceleration) / 200.0); // +50% penalty on roads (reduced from 62%)
         };
         case _ { 1.0 };
       };
@@ -1533,7 +1558,14 @@ module {
 
           // Calculate segment performance: centerPoint ± varianceRange
           let rawRoll = Float.fromInt(segmentConditionSeed) / 500.0 - 1.0; // -1.0 to +1.0
-          let segmentPerformance = centerPoint + (rawRoll * varianceRange);
+          var segmentPerformance = centerPoint + (rawRoll * varianceRange);
+
+          // RUBBER BAND: Leaders can't get exceptional performance
+          // If in 1st place and rolled better than 0.95 (fast), cap at 0.98 (slightly fast)
+          // This prevents runaway leaders while still allowing decent performance
+          if (racer.currentPosition == 1 and segmentPerformance < 0.95) {
+            segmentPerformance := 0.98;
+          };
 
           // === LUCK SYSTEM ===
           // Luck boost reduces time (faster = lower time multiplier)
@@ -1616,43 +1648,53 @@ module {
                   );
                 };
                 case (null) {
-                  // No luck proc - check for bad luck incident (only if no positive luck buff)
-                  let badLuckSeed = (segmentSeed * 8887 + i * 3331 + lap * 77777) % 10000;
-                  let badLuckCheck = checkBadLuckIncident(
-                    racer.participant.stats.luck,
-                    badLuckSeed,
-                  );
-
-                  switch (badLuckCheck) {
-                    case (?incident) {
-                      // Bad luck incident! Apply penalty
-                      luckBoost := incident.penalty;
-
-                      // Determine incident type for event
-                      let incidentType = if (incident.penalty <= 1.10) {
-                        "Minor";
-                      } else if (incident.penalty <= 1.15) {
-                        "Medium";
-                      } else {
-                        "Severe";
-                      };
-
-                      events := Array.append(
-                        events,
-                        [{
-                          eventType = #BadLuck {
-                            bot = racer.participant.nftId;
-                            incidentType = incidentType;
-                            penalty = incident.penalty;
-                          };
-                          timestamp = racer.cumulativeTime;
-                          segmentIndex = segmentIdx;
-                          description = "💥 Bot " # racer.participant.nftId # ": " # incident.description;
-                        }],
-                      );
-                    };
-                    case (null) {};
+                  // No luck proc - check for bad luck incident
+                  // RUBBER BAND: Bad luck ONLY affects leaders (top half of field)
+                  // This is the opposite of good luck procs which only help underdogs
+                  let halfField = if (participants.size() <= 2) { 1 } else {
+                    participants.size() / 2;
                   };
+
+                  if (racer.currentPosition <= halfField) {
+                    // Leader is vulnerable to bad luck
+                    let badLuckSeed = (segmentSeed * 8887 + i * 3331 + lap * 77777) % 10000;
+                    let badLuckCheck = checkBadLuckIncident(
+                      racer.participant.stats.luck,
+                      badLuckSeed,
+                    );
+
+                    switch (badLuckCheck) {
+                      case (?incident) {
+                        // Bad luck incident! Apply penalty
+                        luckBoost := incident.penalty;
+
+                        // Determine incident type for event
+                        let incidentType = if (incident.penalty <= 1.10) {
+                          "Minor";
+                        } else if (incident.penalty <= 1.15) {
+                          "Medium";
+                        } else {
+                          "Severe";
+                        };
+
+                        events := Array.append(
+                          events,
+                          [{
+                            eventType = #BadLuck {
+                              bot = racer.participant.nftId;
+                              incidentType = incidentType;
+                              penalty = incident.penalty;
+                            };
+                            timestamp = racer.cumulativeTime;
+                            segmentIndex = segmentIdx;
+                            description = "💥 Bot " # racer.participant.nftId # ": " # incident.description;
+                          }],
+                        );
+                      };
+                      case (null) {};
+                    };
+                  };
+                  // Underdogs (bottom half) are protected from bad luck
                 };
               };
             };
@@ -2052,22 +2094,24 @@ module {
           };
         };
 
+        // Base parts awarded by race class (flattened curve: Scrap ~70, SilentKlan ~200)
         let baseParts : Nat = switch (race.raceClass) {
-          case (#Scrap) { 2 };
-          case (#Junker) { 5 };
-          case (#Raider) { 12 };
-          case (#Elite) { 25 };
-          case (#SilentKlan) { 50 };
+          case (#Scrap) { 70 };
+          case (#Junker) { 100 };
+          case (#Raider) { 135 };
+          case (#Elite) { 170 };
+          case (#SilentKlan) { 200 };
         };
 
+        // Position multiplier (flattened: winner gets 1.5x, participation gets 1x)
         let positionMultiplier : Float = if (position == 1) {
-          3.0;
+          1.5; // Winner: 1.5x
         } else if (position == 2) {
-          2.0;
+          1.25; // Second: 1.25x
         } else if (position == 3) {
-          1.5;
+          1.1; // Third: 1.1x
         } else {
-          1.0; // Everyone else: 1.0x (participation)
+          1.0; // Everyone else: 1x (participation)
         };
 
         let partsEarned = Int.abs(Float.toInt(Float.fromInt(baseParts) * positionMultiplier));
@@ -2164,7 +2208,14 @@ module {
 
   public class RaceManager(initRaces : Map.Map<Nat, Race>) {
     private let races = initRaces;
-    private var nextRaceId : Nat = Map.size(races);
+    // FIXED: Use max key + 1 instead of size to prevent ID reuse after deletions
+    private var nextRaceId : Nat = do {
+      var maxId : Nat = 0;
+      for (raceId in Map.keys(races)) {
+        if (raceId >= maxId) { maxId := raceId + 1 };
+      };
+      maxId;
+    };
 
     /// Generate race name
     private func generateRaceName(raceId : Nat, terrain : Terrain, raceClass : RaceClass) : Text {
@@ -2264,29 +2315,33 @@ module {
     private func selectTrackForRace(terrain : Terrain, distance : Nat, raceId : Nat) : Nat {
       // Define tracks by terrain and distance ranges
       // Short tracks (< 8km): suitable for Daily Sprints (5-10km)
-      // Medium tracks (8-14km): suitable for Weekly Leagues (15-25km) - will use multiple laps
-      // Long tracks (> 14km): suitable for longer events (20-30km)
+      // Medium tracks (8-20km): suitable for Weekly Leagues (15-25km)
+      // Long tracks (20-35km): suitable for longer events
+      // Ultra tracks (45km+): for ultra marathons
 
-      let (shortTracks, mediumTracks, longTracks) = switch (terrain) {
+      let (shortTracks, mediumTracks, longTracks, ultraTracks) = switch (terrain) {
         case (#ScrapHeaps) {
           (
             [4, 8], // Junkyard Sprint (4.05km), Debris Field Dash (7.1km)
             [1], // Scrap Mountain Circuit (10.1km)
-            [], // No long tracks yet
+            [13], // Iron Crucible (28.8km) - ScrapHeaps/MetalRoads mixed
+            [15], // Survival Gauntlet (59km) - all terrains, ScrapHeaps primary
           );
         };
         case (#MetalRoads) {
           (
             [2, 7, 9], // Highway (6.7km), Rust Belt Rally (9.2km), Velocity Viaduct (4.5km)
             [5], // Metal Mesa Loop (7.4km)
-            [], // No long tracks yet
+            [13], // Iron Crucible (28.8km) - MetalRoads primary
+            [15], // Survival Gauntlet (59km) - mixed
           );
         };
         case (#WastelandSand) {
           (
             [11], // Desert Sprint (6.3km)
-            [10, 3], // Sandstorm Circuit (10.8km), Wasteland Gauntlet (13.3km)
-            [6], // Dune Runner (16.6km)
+            [10, 3, 6], // Sandstorm Circuit (10.8km), Wasteland Gauntlet (13.3km), Dune Runner (16.6km)
+            [12], // Wasteland Odyssey (22.6km)
+            [14], // Endless Expanse (50.5km)
           );
         };
       };
@@ -2302,9 +2357,20 @@ module {
         } else {
           shortTracks;
         };
-      } else {
-        // Long distance races (> 20km) - prefer long, fallback to medium, then short
+      } else if (distance <= 40) {
+        // Long distance races (21-40km) - prefer long, fallback to medium
         if (longTracks.size() > 0) {
+          longTracks;
+        } else if (mediumTracks.size() > 0) {
+          mediumTracks;
+        } else {
+          shortTracks;
+        };
+      } else {
+        // Ultra marathon races (40km+) - use ultra tracks
+        if (ultraTracks.size() > 0) {
+          ultraTracks;
+        } else if (longTracks.size() > 0) {
           longTracks;
         } else if (mediumTracks.size() > 0) {
           mediumTracks;

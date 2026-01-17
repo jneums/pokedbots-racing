@@ -25,6 +25,9 @@ function bracketToRaceClass(bracket: BracketType): RaceClass | undefined {
 function formatICP(amount: bigint): string {
   // ICP has 8 decimals (e8s)
   const icp = Number(amount) / 100_000_000;
+  if (icp >= 1000) {
+    return (icp / 1000).toFixed(1) + 'k ICP';
+  }
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,
@@ -269,7 +272,7 @@ export default function LeaderboardPage() {
                 <CardTitle className="text-3xl font-bold text-primary">
                   {totalRaces}
                 </CardTitle>
-                <CardDescription>Total Races</CardDescription>
+                <CardDescription>Race Entries</CardDescription>
               </CardHeader>
             </Card>
 

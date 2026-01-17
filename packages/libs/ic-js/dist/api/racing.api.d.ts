@@ -66,6 +66,9 @@ export declare const getUpcomingEventsWithRaces: (daysAhead?: number, identity?:
         distances: Array<bigint>;
         totalParticipants: bigint;
         totalPrizePool: bigint;
+        nextRaceStartTime: [] | [bigint];
+        completedRaces: bigint;
+        pendingRaces: bigint;
     };
 }>>;
 /**

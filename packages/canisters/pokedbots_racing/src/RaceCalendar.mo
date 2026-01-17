@@ -228,6 +228,29 @@ module {
     (currentSeconds + secondsUntilNext) * NANOS_PER_SECOND;
   };
 
+  // Calculate next Free Sprint time (03:00, 09:00, 15:00, 21:00 UTC - offset 3h from Daily Sprint)
+  public func getNextFreeSprintTime(fromTime : Int) : Int {
+    let NANOS_PER_SECOND : Int = 1_000_000_000;
+    let SECONDS_PER_HOUR : Int = 3600;
+    let SPRINT_INTERVAL : Int = 6 * SECONDS_PER_HOUR; // 6 hours
+    let FREE_SPRINT_OFFSET : Int = 3 * SECONDS_PER_HOUR; // 3 hours offset from daily sprint
+
+    let currentSeconds = fromTime / NANOS_PER_SECOND;
+
+    // Free sprints happen at: 03:00, 09:00, 15:00, 21:00 UTC (3h after daily sprints)
+    // Adjust by subtracting the offset, find next 6h boundary, then add offset back
+    let adjustedSeconds = currentSeconds - FREE_SPRINT_OFFSET;
+    let secondsIntoInterval = Int.abs(adjustedSeconds % SPRINT_INTERVAL);
+
+    let secondsUntilNext = if (secondsIntoInterval == 0) {
+      SPRINT_INTERVAL;
+    } else {
+      SPRINT_INTERVAL - secondsIntoInterval;
+    };
+
+    (adjustedSeconds + secondsUntilNext + FREE_SPRINT_OFFSET) * NANOS_PER_SECOND;
+  };
+
   // Calculate first Saturday of month
   public func getFirstSaturdayOfMonth(year : Nat, month : Nat, hour : Nat, minute : Nat) : Int {
     // This is simplified - in production, use a proper date library
@@ -316,7 +339,14 @@ module {
     initEvents : Map.Map<Nat, ScheduledEvent>
   ) {
     private let events = initEvents;
-    private var nextEventId : Nat = Map.size(events);
+    // FIXED: Use max key + 1 instead of size to prevent ID reuse after deletions
+    private var nextEventId : Nat = do {
+      var maxId : Nat = 0;
+      for (eventId in Map.keys(events)) {
+        if (eventId >= maxId) { maxId := eventId + 1 };
+      };
+      maxId;
+    };
 
     // Get events map for stable storage
     public func getEventsMap() : Map.Map<Nat, ScheduledEvent> {
@@ -707,8 +737,29 @@ module {
         eventBonusPrize = 0;
       };
 
+      // Calculate terrain pair based on time slot (0-3) and day
+      // This gives variety: each slot is different, and same slot on different days rotates
+      let NANOS_PER_SECOND : Int = 1_000_000_000;
+      let SECONDS_PER_HOUR : Int = 3600;
+      let SECONDS_PER_DAY : Int = 86400;
+
+      let totalSeconds = scheduledTime / NANOS_PER_SECOND;
+      let secondsIntoDay = Int.abs(totalSeconds % SECONDS_PER_DAY);
+      let slotInDay = secondsIntoDay / (6 * SECONDS_PER_HOUR); // 0, 1, 2, or 3
+      let dayNumber = Int.abs(totalSeconds / SECONDS_PER_DAY);
+
+      // Combine slot and day to get variety: (slot + day) mod 3 picks the terrain pair
+      // 3 terrain pairs: [Scrap+Sand, Sand+Metal, Metal+Scrap]
+      let pairIndex = (slotInDay + dayNumber) % 3;
+
+      let terrains : [Terrain] = switch (pairIndex) {
+        case (0) { [#ScrapHeaps, #WastelandSand] };
+        case (1) { [#WastelandSand, #MetalRoads] };
+        case (_) { [#MetalRoads, #ScrapHeaps] };
+      };
+
       let raceMode : RaceCreationMode = #Automatic({
-        terrains = [#ScrapHeaps, #WastelandSand, #MetalRoads];
+        terrains = terrains;
         distanceRange = { min = 5; max = 10 };
         racesPerClass = null;
         heatAllocation = #TopBottom; // Separate high ELO vs low ELO heats
@@ -727,6 +778,65 @@ module {
           fullRefund = scheduledTime - (2 * 3600 * 1_000_000_000); // 2h before
           halfRefund = scheduledTime - (1 * 3600 * 1_000_000_000); // 1h before
           quarterRefund = scheduledTime - (30 * 60 * 1_000_000_000); // 30min before
+        },
+        now,
+      );
+    };
+
+    // Create Free Sprint event (free version of Daily Sprint for casual racing)
+    public func createFreeSprintEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
+      let metadata : EventMetadata = {
+        name = "Free Sprint";
+        description = "Free racing for all! No entry fee, just pure wasteland fun. Perfect for practice, trying new strategies, or casual competition. Reduced prizes but zero risk!";
+        entryFee = 0; // FREE!
+        maxEntries = 100; // No practical cap - heats handle overflow
+        minEntries = 2;
+        prizePoolBonus = 25_000_000; // Platform adds 0.25 ICP (smaller prize pool since free)
+        pointsMultiplier = 0.5; // Half points (encourages paid events for serious competition)
+        divisions = [#Scrap, #Junker, #Raider, #Elite]; // All classes welcome
+        scoringMode = #Individual;
+        eventBonusPrize = 0;
+      };
+
+      // Calculate terrain based on time slot - offset from Daily Sprint terrains for variety
+      let NANOS_PER_SECOND : Int = 1_000_000_000;
+      let SECONDS_PER_HOUR : Int = 3600;
+      let SECONDS_PER_DAY : Int = 86400;
+
+      let totalSeconds = scheduledTime / NANOS_PER_SECOND;
+      let secondsIntoDay = Int.abs(totalSeconds % SECONDS_PER_DAY);
+      let slotInDay = secondsIntoDay / (6 * SECONDS_PER_HOUR); // 0, 1, 2, or 3
+      let dayNumber = Int.abs(totalSeconds / SECONDS_PER_DAY);
+
+      // Use different terrain rotation than Daily Sprint
+      let pairIndex = (slotInDay + dayNumber + 1) % 3; // +1 offset from Daily Sprint
+
+      let terrains : [Terrain] = switch (pairIndex) {
+        case (0) { [#WastelandSand, #MetalRoads] };
+        case (1) { [#MetalRoads, #ScrapHeaps] };
+        case (_) { [#ScrapHeaps, #WastelandSand] };
+      };
+
+      let raceMode : RaceCreationMode = #Automatic({
+        terrains = terrains;
+        distanceRange = { min = 5; max = 8 }; // Slightly shorter races
+        racesPerClass = null;
+        heatAllocation = #TopBottom;
+      });
+
+      let regCloses = scheduledTime - (10 * 60 * 1_000_000_000); // 10min before (shorter since free)
+
+      scheduleEvent(
+        #SpecialEvent("Free Sprint"),
+        scheduledTime,
+        now, // Opens immediately
+        regCloses,
+        metadata,
+        raceMode,
+        {
+          fullRefund = scheduledTime; // No refunds needed - it's free!
+          halfRefund = scheduledTime;
+          quarterRefund = scheduledTime;
         },
         now,
       );
@@ -830,7 +940,7 @@ module {
             stageName = ?"Friday Sprint";
             raceClass = #Scrap;
             terrain = #MetalRoads;
-            distance = 15_000;
+            distance = 15;
             trackId = null;
             startOffset = 0;
           },
@@ -838,7 +948,7 @@ module {
             stageName = ?"Friday Sprint";
             raceClass = #Junker;
             terrain = #MetalRoads;
-            distance = 15_000;
+            distance = 15;
             trackId = null;
             startOffset = 0;
           },
@@ -846,7 +956,7 @@ module {
             stageName = ?"Friday Sprint";
             raceClass = #Raider;
             terrain = #MetalRoads;
-            distance = 15_000;
+            distance = 15;
             trackId = null;
             startOffset = 0;
           },
@@ -854,7 +964,7 @@ module {
             stageName = ?"Friday Sprint";
             raceClass = #Elite;
             terrain = #MetalRoads;
-            distance = 15_000;
+            distance = 15;
             trackId = null;
             startOffset = 0;
           },
@@ -863,7 +973,7 @@ module {
             stageName = ?"Saturday Endurance";
             raceClass = #Scrap;
             terrain = #WastelandSand;
-            distance = 30_000;
+            distance = 30;
             trackId = null;
             startOffset = 86_400_000_000_000;
           },
@@ -871,7 +981,7 @@ module {
             stageName = ?"Saturday Endurance";
             raceClass = #Junker;
             terrain = #WastelandSand;
-            distance = 30_000;
+            distance = 30;
             trackId = null;
             startOffset = 86_400_000_000_000;
           },
@@ -879,7 +989,7 @@ module {
             stageName = ?"Saturday Endurance";
             raceClass = #Raider;
             terrain = #WastelandSand;
-            distance = 30_000;
+            distance = 30;
             trackId = null;
             startOffset = 86_400_000_000_000;
           },
@@ -887,7 +997,7 @@ module {
             stageName = ?"Saturday Endurance";
             raceClass = #Elite;
             terrain = #WastelandSand;
-            distance = 30_000;
+            distance = 30;
             trackId = null;
             startOffset = 86_400_000_000_000;
           },
@@ -896,7 +1006,7 @@ module {
             stageName = ?"Sunday Championship";
             raceClass = #Scrap;
             terrain = #ScrapHeaps;
-            distance = 25_000;
+            distance = 25;
             trackId = null;
             startOffset = 172_800_000_000_000;
           },
@@ -904,7 +1014,7 @@ module {
             stageName = ?"Sunday Championship";
             raceClass = #Junker;
             terrain = #ScrapHeaps;
-            distance = 25_000;
+            distance = 25;
             trackId = null;
             startOffset = 172_800_000_000_000;
           },
@@ -912,7 +1022,7 @@ module {
             stageName = ?"Sunday Championship";
             raceClass = #Raider;
             terrain = #ScrapHeaps;
-            distance = 25_000;
+            distance = 25;
             trackId = null;
             startOffset = 172_800_000_000_000;
           },
@@ -920,7 +1030,7 @@ module {
             stageName = ?"Sunday Championship";
             raceClass = #Elite;
             terrain = #ScrapHeaps;
-            distance = 25_000;
+            distance = 25;
             trackId = null;
             startOffset = 172_800_000_000_000;
           },
@@ -1863,6 +1973,85 @@ module {
           };
         };
       };
+    };
+
+    // Get the scheduled race times for an event (scheduledTime + offsets from race templates)
+    // Returns array of race start times in nanoseconds
+    public func getEventRaceTimes(event : ScheduledEvent) : [Int] {
+      switch (event.raceCreationMode) {
+        case (#Automatic(_)) {
+          // Automatic mode: races start at the event's scheduled time
+          [event.scheduledTime];
+        };
+        case (#Manual({ raceTemplates; heatAllocation = _ })) {
+          // Manual mode: each race template has a startOffset from scheduledTime
+          Array.map<RaceTemplate, Int>(
+            raceTemplates,
+            func(template) { event.scheduledTime + template.startOffset },
+          );
+        };
+      };
+    };
+
+    // Check if a bot has a conflicting event registration based on actual race times
+    // Returns the conflicting event if found, null otherwise
+    public func getConflictingEventForBot(
+      excludeEventId : Nat,
+      tokenIndex : Nat,
+      newEventScheduledTime : Int,
+      newEventRaceMode : RaceCreationMode,
+    ) : ?ScheduledEvent {
+      // Define time window around each race for conflict detection (2 hours buffer)
+      let RACE_CONFLICT_BUFFER : Int = 2 * 60 * 60 * 1_000_000_000; // 2 hours in nanoseconds
+
+      // Get race times for the new event
+      let newEventRaceTimes = switch (newEventRaceMode) {
+        case (#Automatic(_)) {
+          [newEventScheduledTime];
+        };
+        case (#Manual({ raceTemplates; heatAllocation = _ })) {
+          Array.map<RaceTemplate, Int>(
+            raceTemplates,
+            func(template) { newEventScheduledTime + template.startOffset },
+          );
+        };
+      };
+
+      let allEvents = getAllEvents();
+      for (event in allEvents.vals()) {
+        // Skip the event we're trying to register for, completed, or cancelled events
+        if (event.eventId != excludeEventId and event.status != #Completed and event.status != #Cancelled) {
+          // Check if bot is registered for this event
+          let isRegistered = Array.find<EventRegistration>(
+            event.registrations,
+            func(r) { r.tokenIndex == tokenIndex },
+          );
+
+          switch (isRegistered) {
+            case (null) {}; // Not registered, continue
+            case (?_) {
+              // Bot is registered - check if any race times conflict
+              let existingRaceTimes = getEventRaceTimes(event);
+
+              // Check each new race time against each existing race time
+              for (newRaceTime in newEventRaceTimes.vals()) {
+                for (existingRaceTime in existingRaceTimes.vals()) {
+                  let timeDiff = if (newRaceTime > existingRaceTime) {
+                    newRaceTime - existingRaceTime;
+                  } else {
+                    existingRaceTime - newRaceTime;
+                  };
+
+                  if (timeDiff < RACE_CONFLICT_BUFFER) {
+                    return ?event;
+                  };
+                };
+              };
+            };
+          };
+        };
+      };
+      null;
     };
 
     // ===== HEAT ALLOCATION FUNCTIONS =====

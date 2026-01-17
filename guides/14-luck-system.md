@@ -1,6 +1,6 @@
 ---
 title: Luck System Guide
-description: Understanding luck, daily phenomena, and breakthrough moments in races
+description: Understanding luck as a catchup mechanic and daily phenomena in races
 order: 14
 ---
 
@@ -8,75 +8,49 @@ order: 14
 
 ## OVERVIEW
 
-Luck is the 5th stat in PokedBots Racing. It creates exciting breakthrough moments during races without breaking fundamental balance. Think of it like critical hits in an RPG - high luck increases your *ceiling*, not just adds randomness.
+Luck in PokedBots Racing is a **catchup mechanic** that creates exciting breakthrough moments during races. All bots have the same base luck stat of **10**, ensuring fair competition while allowing for dramatic comebacks.
 
 **Core Principles:**
+- All bots have equal luck (10) - no advantages from token index
 - Stats still matter - better bots still win most races
-- Luck enables breakthrough performances, not random swings
 - Underdogs get extra luck chances (comeback mechanic)
-- Daily cosmic events favor different bots each day
+- Daily cosmic events favor different bots each day based on faction, stats, and token patterns
 
-## THE LUCK STAT
+## HOW LUCK WORKS IN RACES
 
-### How Luck is Determined
+Luck creates breakthrough moments during races through two mechanics:
 
-**Base Luck:** Derived from your bot's token index:
-```
-baseLuck = (tokenIndex % 100) / 2 + 10
-Range: 10-60 (before upgrades)
-```
+### 1. Luck Procs (Breakthrough Moments)
 
-**Upgrade Luck:** Like other stats, luck can be upgraded to 100+ using Universal Parts.
+During races, bots trailing behind get bonus chances to trigger luck procs - speed boosts that help them catch up.
 
-### What Luck Does
+**Base Chance:** 10% per segment for all bots
 
-Luck affects racing in three ways:
+**Underdog Bonus:** Bots in lower positions get significantly higher proc chances:
 
-1. **Reduces Segment Variance** - High luck shifts your performance center favorably
-   - 10 luck: Center at 103% time (3% slower average)
-   - 50 luck: Center at 100% time (neutral)
-   - 100 luck: Center at 94% time (6% faster average)
+| Position | Proc Chance |
+|----------|-------------|
+| Leading (top half) | No luck procs |
+| Trailing (bottom half) | 10% + position bonus |
+| Last place | Up to 30% chance |
 
-2. **Triggers Luck Procs** - Breakthrough moments during races
-   - Base chance: luck / 250 (6% at 14 luck, 24% at 60 luck)
-   - No floor - low luck bots rarely proc, high luck bots proc often
-   - Underdog bonus: +50% chance if in bottom half of racers
-   - Daily affinity adds up to +40% more
-   - Capped at 60% per segment
+This ensures luck primarily helps bots that are behind, creating exciting comeback opportunities without randomly deciding races.
 
-3. **Reduces Bad Luck Incidents** - Fewer mishaps with higher luck
-   - Formula: 6% / (1 + (luck - 10) / 30)
-   - 10 luck: 6% incident chance per segment
-   - 40 luck: 3% incident chance
-   - 100 luck: 1.5% incident chance
+### 2. Daily Affinity Bonus
 
-## LUCK PROCS (CRITICAL HITS)
+Your bot's affinity to the current day's phenomenon adds bonus luck chance (up to +16% at cosmic alignment).
 
-During races, each segment has a chance to trigger a luck proc - a breakthrough moment that boosts your speed.
+## LUCK PROCS (BREAKTHROUGH MOMENTS)
+
+When a luck proc triggers, your bot gets a speed boost:
 
 ### Proc Types
 
-| Type | Boost | Duration | Effect |
-|------|-------|----------|--------|
-| **Minor** | +15% speed | 1 segment | Small burst |
-| **Major** | +25% speed | 3 segments | Significant advantage |
-| **Legendary** | +40% speed | 5 segments | Race-changing moment |
-
-### Proc Type Distribution (Spectrum)
-
-Higher luckTier shifts your probability toward better procs - but even low luck bots can occasionally hit a Legendary!
-
-| LuckTier | Legendary | Major | Minor |
-|----------|-----------|-------|-------|
-| 20 | 5% | 16% | 79% |
-| 40 | 9% | 23% | 68% |
-| 60 | 13% | 30% | 57% |
-| 80 | 17% | 36% | 47% |
-
-**Formula:**
-- Legendary: 1% + luckTier/5
-- Major: 10% + luckTier/3
-- Minor: remainder
+| Type | Speed Boost | Duration | Chance |
+|------|-------------|----------|--------|
+| **Minor** | +15% | 1 segment | 70% of procs |
+| **Major** | +25% | 3 segments | 25% of procs |
+| **Legendary** | +40% | 5 segments | 5% of procs |
 
 ### Proc Descriptions
 
@@ -84,72 +58,20 @@ Higher luckTier shifts your probability toward better procs - but even low luck 
 - "Lucky dodge saves time!"
 - "Catches tailwind!"
 - "Smooth patch ahead!"
-- "Debris clears perfectly!"
 
 **Major Procs:**
 - "Discovers hidden shortcut!"
 - "Catches massive tailwind!"
 - "Perfect line through debris!"
-- "Engine surge! Extra power!"
 
 **Legendary Procs:**
 - "FLOW STATE ACTIVATED! Bot transcends physics!"
 - "LEGENDARY SHORTCUT! Bot warps through space!"
 - "COSMIC BLESSING! Bot channels wasteland energy!"
-- "UNSTOPPABLE! Bot enters god mode!"
-
-### Underdog Bonus
-
-Bots in lower positions get bonus luck chances:
-
-| Position | Luck Multiplier |
-|----------|----------------|
-| 1st-3rd | 1.0x (no bonus) |
-| 4th-6th | 1.2x |
-| 7th-9th | 1.4x |
-| 10th-12th | 1.5x |
-
-This gives trailing bots a better chance at comebacks without guaranteeing victory.
-
-### Expected Procs Per Race
-
-How often will your bot proc in a typical 10-segment race?
-
-| Luck | Affinity | Proc Chance | Expected Procs |
-|------|----------|-------------|----------------|
-| 14 | 0 | ~6% | 0-1 procs |
-| 14 | 40 | ~22% | 2 procs |
-| 40 | 0 | ~16% | 1-2 procs |
-| 40 | 40 | ~32% | 3 procs |
-| 60 | 0 | ~24% | 2-3 procs |
-| 60 | 60 | ~48% | 4-5 procs |
-| 80 | 80 | ~60% (cap) | 6 procs |
-
-**Key takeaways:**
-- Low luck bots (14) barely proc without affinity - maybe 0-1 per race
-- High luck bots (60+) proc 2-3x more often AND get better proc types
-- Affinity is the great equalizer - a low luck bot on a good day can compete
-
-## BAD LUCK INCIDENTS
-
-Low-luck bots have a higher chance of mishaps:
-
-| Severity | Time Penalty | % of Incidents |
-|----------|-------------|----------------|
-| **Minor** | +20% time | 60% |
-| **Medium** | +35% time | 30% |
-| **Severe** | +50% time | 10% |
-
-**Incident Examples:**
-- "Bot hit debris - loses momentum!"
-- "Engine sputter - needs to recover!"
-- "Navigation error - off the line!"
-
-**Protection:** Higher luck dramatically reduces incident chance. At 100 luck, incidents are rare (1.5%).
 
 ## DAILY PHENOMENA (WASTELAND ASTROLOGY)
 
-Each day features a different cosmic phenomenon that gives bonuses to bots with matching "affinities." The cycle repeats every 13 days.
+Each day features a different cosmic phenomenon that gives affinity bonuses to bots with matching characteristics. Higher affinity = higher luck proc chance. The cycle repeats every 13 days.
 
 ### The 13-Day Cycle
 
@@ -165,30 +87,14 @@ Each day features a different cosmic phenomenon that gives bonuses to bots with 
 | 7 | **Machine Ghost** | 👻 | Master/Ultimate factions, token > 5000 |
 | 8 | **Blood Moon** | 🔴 | Murder faction, token % 9 = 0 |
 | 9 | **Binary Surge** | 💻 | Balanced stats (spread ≤ 10) |
-| 10 | **Chaos Pulse** | ⚡ | Token % 11 = 0, high luck stat |
+| 10 | **Chaos Pulse** | ⚡ | Token % 11 = 0 |
 | 11 | **Momentum Shift** | 🔄 | Bracket underdogs (avg % 10 ≤ 4) |
 | 12 | **Singularity** | 🌌 | Blackhole faction, token % 13 = 0 |
 
-### Understanding Affinity
-
-Each bot gets an affinity score (0-100) for the current day based on:
-
-**Stat Patterns (modulo):**
-- The last digit of your stat matters, not the magnitude
-- A Scrap bot with Power 17 and an Elite bot with Power 47 BOTH get +60 on Solar Flare (digit = 7)
-
-**Token Patterns:**
-- Your token index (e.g., #4829) is checked against various patterns
-- Prime numbers, divisibility, digit patterns
-
-**Faction Bonuses:**
-- Your faction gets a big bonus on their special day
-- Rare factions get bigger bonuses (Wild +70, Golden +65, Dead +60)
-
 ### Affinity Tiers
 
-| Affinity | Stars | Bonus |
-|----------|-------|-------|
+| Affinity | Stars | Luck Bonus |
+|----------|-------|------------|
 | 0-39 | - | No bonus |
 | 40-59 | ⭐ | +8% luck proc chance |
 | 60-79 | ⭐⭐ | +12% luck proc chance |
@@ -241,7 +147,7 @@ Each bot gets an affinity score (0-100) for the current day based on:
 - Token % 4 = 0 → +35 (25% of bots)
 
 #### Day 4: Scrap Tornado 🌀
-*"Chaos favors the lucky and wild"*
+*"Chaos favors the wild"*
 
 **Faction Bonus:**
 - Wild faction → +70 (only 5 bots!)
@@ -296,13 +202,10 @@ Each bot gets an affinity score (0-100) for the current day based on:
 *No token or faction bonus - pure stat balance day*
 
 #### Day 10: Chaos Pulse ⚡
-*"Pure randomness, pure luck"*
+*"Pure randomness rules"*
 
 **Token Bonus:**
 - Token % 11 = 0 → +70 (9.1% of bots)
-
-**Luck Stat Bonus:**
-- Additional affinity from luck: (luck - 10) × 2 (up to +30)
 
 #### Day 11: Momentum Shift 🔄
 *"Underdogs rise today"*
@@ -354,53 +257,22 @@ Each bot gets an affinity score (0-100) for the current day based on:
 
 **Cosmic days: 2, Strong days: 2** - Rare faction provides extra opportunities!
 
-### Underdog (#6666, Game)
-**Stats:** Speed 12, Power 11, Accel 14, Stability 13
-
-| Day | Phenomenon | Affinity | Why |
-|-----|-----------|----------|-----|
-| 5 | Dead Zone | **90** ⭐⭐⭐ | Token contains "666"! |
-| 7 | Machine Ghost | **40** ⭐ | Token > 5000! |
-| 9 | Binary Surge | **70** ⭐⭐ | Stats spread only 3 |
-| 11 | Momentum Shift | **60** ⭐⭐ | Avg 12, digit = 2 (bottom!) |
-
-**Even weak bots get lucky days!** The system ensures everyone has a chance.
-
-## UPGRADING LUCK
-
-Luck can be upgraded just like other stats:
-
-**Cost:** Uses **Universal Parts** only (luck isn't tied to a specific part type)
-
-**Duration:** 12 hours (same as other stats)
-
-**Success Rate:** Same curve as other stats:
-- First upgrades: 85% success
-- 10th upgrade: ~29% success
-- 15+ upgrades: 1% success (soft cap)
-
-**Why Upgrade Luck?**
-- Shift your performance center from 103% to 94% (9% improvement!)
-- Increase proc chance from 2% to 20% per segment
-- Reduce bad incident chance from 6% to 1.5%
-- Extra affinity bonus on Chaos Pulse day
-
 ## BALANCE & WIN RATES
 
-The luck system is designed to add excitement without breaking competitive balance:
+The luck system adds excitement without breaking competitive balance:
 
 | Matchup | Expected Win Rate |
 |---------|------------------|
 | Top tier vs Low tier | **85-90%** (top still dominates) |
-| Equal tier bots | Luck decides **25-30%** |
-| Underdog victories | ~5-10% more often with luck |
+| Equal tier bots | Luck can influence **25-30%** |
+| Underdog comebacks | ~5-10% more likely with luck |
 | Daily affinity impact | ~5% win rate difference |
 
 **Key Balance Points:**
-- Average bot: 10-15% luck proc rate per segment
-- High luck bot: 15-20% proc rate per segment
-- Cosmic alignment: +16% bonus on top
-- Legendary procs: <1% of all segments
+- Luck only helps bots that are trailing
+- Leading bots don't get luck procs
+- All bots have equal base luck (10)
+- Daily affinity provides variety, not permanent advantage
 
 ## STRATEGY TIPS
 
@@ -409,12 +281,6 @@ The luck system is designed to add excitement without breaking competitive balan
 1. **Check Today's Phenomenon** - Your bot may have high affinity!
 2. **Multiple Strong Days** - Race more aggressively when aligned
 3. **Underdog Days** - Day 11 (Momentum Shift) benefits bracket underdogs
-
-### Building Your Bot
-
-1. **Balanced Stats** - Binary Surge day rewards balanced builds
-2. **Luck Upgrades** - Consider investing in luck for consistent benefits
-3. **Know Your Token** - Check which days favor your token index
 
 ### Understanding Your Affinity
 
@@ -427,15 +293,15 @@ To find your bot's affinities:
 
 Look for luck events in race commentary:
 - 🍀 indicates a luck proc (Minor/Major/Legendary)
-- 💥 indicates a bad luck incident
-- Track which bots are getting hot hands!
+- Track which trailing bots are making comebacks!
 
 ## SUMMARY
 
-The luck system creates memorable moments:
-- **Your underdog's day is coming** - Daily phenomena cycle through, blessing different bots
+The luck system creates memorable comeback moments:
+- **Equal for all** - Every bot has the same base luck (10)
+- **Catchup mechanic** - Only helps bots that are trailing
+- **Daily variety** - Different bots shine on different days through affinity
 - **Stats still matter** - Better bots still win most of the time
-- **Exciting comebacks** - Trailing bots get extra luck chances
-- **Upgradeable advantage** - Invest in luck for consistent benefits
+- **Exciting races** - Trailing bots always have a chance at a comeback
 
-*"Bot #4829's moment is coming. Will yours be next?"* 🍀
+*"Every bot's moment is coming. Will today be yours?"* 🍀

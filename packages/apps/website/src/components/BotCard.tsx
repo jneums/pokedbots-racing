@@ -3,14 +3,13 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { BotListItem, generatetokenIdentifier } from '@pokedbots-racing/ic-js';
 import { useAuth } from '../hooks/useAuth';
-import { calculateDailyAffinity, getAffinityColor, getDailyPhenomenon } from './DailyPhenomenonBanner';
+import { calculateDailyAffinity } from './DailyPhenomenonBanner';
 import { 
   useInitializeBot,
   useRechargeBot,
   useRepairBot,
   useFullMaintenanceBot,
-  useUpgradeBot, 
-  useCancelUpgrade,
+  useUpgradeBot,
   useListBotForSale,
   useUnlistBot,
   useTransferBot,
@@ -24,7 +23,7 @@ import { useGetUpcomingEventsWithRaces, useRegisterForEvent, useUnregisterFromEv
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 import { Battery, Wrench } from 'lucide-react';
 import { Input } from './ui/input';
@@ -63,8 +62,6 @@ function getUpgradeDisplayName(upgradeType: string): string {
     'thruster': 'Acceleration',
     'Gyro': 'Stability',
     'gyro': 'Stability',
-    'Luck': 'Luck',
-    'luck': 'Luck',
   };
   return nameMap[upgradeType] || upgradeType;
 }
@@ -98,7 +95,6 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   const repairMutation = useRepairBot();
   const fullMaintenanceMutation = useFullMaintenanceBot();
   const upgradeMutation = useUpgradeBot();
-  const cancelUpgradeMutation = useCancelUpgrade();
   const listForSaleMutation = useListBotForSale();
   const unlistMutation = useUnlistBot();
   const transferMutation = useTransferBot();
@@ -117,9 +113,24 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showScavenging, setShowScavenging] = useState(false);
   const [showRespec, setShowRespec] = useState(false);
-  const [showCancelUpgradeConfirm, setShowCancelUpgradeConfirm] = useState(false);
-  const [upgradeType, setUpgradeType] = useState<'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro' | 'Luck'>('Velocity');
+  const [upgradeType, setUpgradeType] = useState<'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro'>('Velocity');
   const [paymentMethod, setPaymentMethod] = useState<'icp' | 'parts'>('parts');
+  
+  // Upgrade result state for dramatic reveal
+  const [upgradeResult, setUpgradeResult] = useState<{
+    success: boolean;
+    isDouble: boolean;
+    message: string;
+    statName: string;
+    pointsAwarded: number;
+    roll: number;
+    successRate: string;
+    pityBonus: string;
+    refund?: string;
+  } | null>(null);
+  const [showUpgradeResult, setShowUpgradeResult] = useState(false);
+  const [isRolling, setIsRolling] = useState(false);
+  
   const [scavengingZone, setScavengingZone] = useState<'ScrapHeaps' | 'AbandonedSettlements' | 'DeadMachineFields' | 'RepairBay' | 'ChargingStation'>('ScrapHeaps');
   const [scavengingDuration, setScavengingDuration] = useState<number | undefined>(15);
   const [botName, setBotName] = useState('');
@@ -130,6 +141,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   // Event registration state
   const [registeringEventId, setRegisteringEventId] = useState<number | null>(null);
   const [unregisteringEventId, setUnregisteringEventId] = useState<number | null>(null);
+  const [withdrawConfirmEvent, setWithdrawConfirmEvent] = useState<any | null>(null);
 
   const handleInitialize = () => {
     initializeMutation.mutate(
@@ -216,18 +228,6 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
     });
   };
 
-  const handleCancelUpgrade = () => {
-    cancelUpgradeMutation.mutate(Number(bot.tokenIndex), {
-      onSuccess: (result) => {
-        toast.success(result);
-        onUpdate();
-      },
-      onError: (err: Error) => {
-        toast.error(err.message || 'Failed to cancel upgrade');
-      },
-    });
-  };
-
   const handleRespec = () => {
     // Convert Set to array (empty array = strip all stats)
     const statsArray = Array.from(statsToStrip);
@@ -262,14 +262,16 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
 
     const typeKey = upgradeType === 'Velocity' ? 'speed' : 
                     upgradeType === 'PowerCore' ? 'powerCore' : 
-                    upgradeType === 'Thruster' ? 'acceleration' : 
-                    upgradeType === 'Luck' ? 'luck' : 'stability';
+                    upgradeType === 'Thruster' ? 'acceleration' : 'stability';
     
     const costData = bot.upgradeCostsV2[typeKey as keyof typeof bot.upgradeCostsV2];
     const currentCount = getCurrentUpgradeCount(upgradeType);
     const pityCounter = Number(bot.upgradeCostsV2.pityCounter || 0n);
     
     // Handle luck not being in upgradeCostsV2 yet (pre-deploy compatibility)
+    // Pity bonus is capped at 25% (5 fails * 5% = 25%)
+    const cappedPityBonus = Math.min(pityCounter * 5, 25);
+    
     if (!costData || typeof costData === 'bigint') {
       const partsCost = getUpgradeCostInParts(currentCount);
       const icpCost = partsCost / 100;
@@ -278,7 +280,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
         icpCost: icpCost.toFixed(2),
         partsCost,
         successRate: '85%',
-        pityBonus: '+' + (pityCounter * 5) + '%',
+        pityBonus: '+' + cappedPityBonus + '%',
       };
     }
     
@@ -287,11 +289,11 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
       icpCost: (Number(costData.costE8s) / 100_000_000).toFixed(2),
       partsCost: Math.round(Number(costData.costE8s) / 1_000_000), // Convert e8s to parts equivalent
       successRate: costData.successRate.toFixed(1) + '%',
-      pityBonus: '+' + (pityCounter * 5) + '%',
+      pityBonus: '+' + cappedPityBonus + '%',
     };
   };
 
-  const getCurrentUpgradeCount = (type: 'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro' | 'Luck'): number => {
+  const getCurrentUpgradeCount = (type: 'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro'): number => {
     if (!bot.isInitialized || !bot.stats) return 0;
     const stats = bot.stats as any;
     switch (type) {
@@ -299,7 +301,6 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
       case 'PowerCore': return Number(stats.powerCoreUpgrades || stats.power_core_upgrades || 0n);
       case 'Thruster': return Number(stats.accelerationUpgrades || stats.acceleration_upgrades || 0n);
       case 'Gyro': return Number(stats.stabilityUpgrades || stats.stability_upgrades || 0n);
-      case 'Luck': return Number(stats.luckUpgrades || 0n);
       default: return 0;
     }
   };
@@ -312,11 +313,6 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
     if (upgradeCount === 3) return 900;
     if (upgradeCount === 4) return 2700;
     return 8100; // 5+ upgrades
-  };
-
-  const getUpgradeTimeRemaining = () => {
-    if (!bot.activeUpgrade) return null;
-    return formatRelativeTime(bot.activeUpgrade.endsAt);
   };
 
   const formatWorldBuff = () => {
@@ -348,18 +344,66 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
 
   const handleUpgrade = async () => {
     try {
+      setIsRolling(true);
+      setShowUpgrade(false);
+      
       // Convert string type to variant type
       const upgradeTypeVariant = { [upgradeType]: null } as any;
-      await upgradeMutation.mutateAsync({
+      const result = await upgradeMutation.mutateAsync({
         tokenIndex: Number(bot.tokenIndex),
         upgradeType: upgradeTypeVariant,
         paymentMethod,
       });
-      setShowUpgrade(false);
-      toast.success(`Upgrade started! Will complete in 12 hours.`);
+      
+      // Parse the result message to extract details
+      const resultText = result || '';
+      const isSuccess = resultText.includes('SUCCESS') || resultText.includes('✅') || resultText.includes('DOUBLE WIN');
+      // Only check for double if it's a success - avoid matching "+25%" pity bonus as "+2"
+      const isDouble = isSuccess && (resultText.includes('+2 stat') || resultText.includes('DOUBLE WIN'));
+      
+      // Extract stat name from upgrade type
+      const statNames: Record<string, string> = {
+        Velocity: 'Speed',
+        PowerCore: 'Power Core',
+        Thruster: 'Acceleration',
+        Gyro: 'Stability',
+      };
+      const statName = statNames[upgradeType] || upgradeType;
+      
+      // Extract roll info if available (format: "Roll: 45 < 85%")
+      const rollMatch = resultText.match(/Roll:\s*(\d+)\s*[<>]\s*(\d+)%/);
+      const roll = rollMatch ? parseInt(rollMatch[1]) : 0;
+      const successRate = rollMatch ? `${rollMatch[2]}%` : '';
+      
+      // Extract pity bonus if mentioned
+      const pityMatch = resultText.match(/pity\s*(\+\d+%)/i);
+      const pityBonus = pityMatch ? pityMatch[1] : '';
+      
+      // Extract refund info if failed
+      const refundMatch = resultText.match(/(Refunded|refund)[:\s]+([^.]+)/i);
+      const refund = refundMatch ? refundMatch[2].trim() : undefined;
+      
+      setUpgradeResult({
+        success: isSuccess,
+        isDouble,
+        message: resultText,
+        statName,
+        pointsAwarded: isDouble ? 2 : (isSuccess ? 1 : 0),
+        roll,
+        successRate,
+        pityBonus,
+        refund,
+      });
+      
+      // Small delay to build anticipation
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setIsRolling(false);
+      setShowUpgradeResult(true);
+      
       onUpdate();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to start upgrade');
+      setIsRolling(false);
+      toast.error(err instanceof Error ? err.message : 'Failed to upgrade');
     }
   };
 
@@ -370,9 +414,8 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
       return;
     }
     
-    const priceE8s = BigInt(Math.floor(price * 100_000_000));
     listForSaleMutation.mutate(
-      { tokenIndex: Number(bot.tokenIndex), priceE8s },
+      { tokenIndex: Number(bot.tokenIndex), priceICP: price },
       {
         onSuccess: (result) => {
           toast.success(result);
@@ -633,7 +676,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
         </CardTitle>
         <CardDescription className="space-y-1">
           <div>
-            ELO: {formatBigInt(stats.eloRating)} | Rating: {bot.currentStats ? Math.floor((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4) : '?'}/{bot.maxStats ? Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4) : '100'} | Rep: {formatBigInt(stats.factionReputation)}
+            ELO: {formatBigInt(stats.eloRating)} | Rating: {bot.currentStats ? ((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4).toFixed(2) : '?'}/{bot.maxStats ? ((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4).toFixed(2) : '100'} | Rep: {formatBigInt(stats.factionReputation)}
           </div>
           <div className="flex items-center gap-1 text-xs flex-wrap">
             <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400 px-2 py-0">
@@ -712,8 +755,8 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 <div className="text-xs space-y-0.5">
                   <p className="font-semibold text-yellow-700 dark:text-yellow-400">🎯 Jackpot! Next race boost:</p>
                   <div className="flex justify-between">
-                    <span className="text-green-600 font-semibold">+{(overcharge * 0.125).toFixed(1)}% Speed</span>
-                    <span className="text-green-600 font-semibold">+{(overcharge * 0.125).toFixed(1)}% Accel</span>
+                    <span className="text-green-600 font-semibold">+{(overcharge * 0.20).toFixed(1)}% Speed</span>
+                    <span className="text-green-600 font-semibold">+{(overcharge * 0.20).toFixed(1)}% Accel</span>
                   </div>
                   <p className="text-xs text-muted-foreground italic">No penalties! Perfect timing on repair.</p>
                 </div>
@@ -721,8 +764,8 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 <div className="text-xs space-y-0.5">
                   <p className="text-muted-foreground">Next race boost:</p>
                   <div className="flex justify-between">
-                    <span className="text-green-600">+{(overcharge * 0.125).toFixed(1)}% Speed/Accel</span>
-                    <span className="text-red-600">-{(overcharge * 0.083).toFixed(1)}% Power/Stab</span>
+                    <span className="text-green-600">+{(overcharge * 0.20).toFixed(1)}% Speed/Accel</span>
+                    <span className="text-red-600">-{(overcharge * 0.133).toFixed(1)}% Power/Stab</span>
                   </div>
                 </div>
               ) : (
@@ -876,25 +919,6 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 </div>
               </div>
               
-              {/* Daily Affinity Display */}
-              {(() => {
-                const phenomenon = getDailyPhenomenon();
-                return (
-                  <div className={`p-2 rounded-lg border border-primary/20 bg-gradient-to-r ${phenomenon.color}`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span>{phenomenon.emoji}</span>
-                        <span className="text-xs font-medium">{phenomenon.name}</span>
-                      </div>
-                      <span className={`font-bold ${getAffinityColor(affinity)}`}>
-                        {affinity}%
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-1">{phenomenon.description}</p>
-                  </div>
-                );
-              })()}
-              
               {isPenalized && (
                 <p className="text-xs text-yellow-500 text-center">
                   ⚠️ Stats penalized by low {battery < 80 && condition < 90 ? 'battery & condition' : battery < 80 ? 'battery' : 'condition'}
@@ -932,12 +956,6 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 }`}
                 style={{ width: `${Number(stats.battery)}%` }}
               />
-              {/* Optimal recharge marker at 35% */}
-              <div 
-                className="absolute top-0 bottom-0 w-[2px] bg-cyan-400/60"
-                style={{ left: '35%' }}
-                title="Optimal recharge point (35%)"
-              />
             </div>
           </div>
 
@@ -957,12 +975,6 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                   Number(stats.condition) < 30 ? 'bg-destructive' : 'bg-green-500'
                 }`}
                 style={{ width: `${Number(stats.condition)}%` }}
-              />
-              {/* Optimal repair marker at 70% */}
-              <div 
-                className="absolute top-0 bottom-0 w-[2px] bg-yellow-400/60"
-                style={{ left: '70%' }}
-                title="Optimal repair point (70%)"
               />
             </div>
           </div>
@@ -988,12 +1000,16 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
 
             // Check cooldowns
             const now = Date.now();
-            const rechargeCooldownMs = 6 * 60 * 60 * 1000 * rechargeCooldownMultiplier; // 6 hours * multiplier
+            // Apply both garage-wide synergy AND bot's individual dedication bonus
+            const dedicationRechargeMult = dedicationInfo?.benefits.rechargeCooldownMult ?? 1.0;
+            const dedicationRepairMult = dedicationInfo?.benefits.repairCooldownMult ?? 1.0;
+            const rechargeCooldownMs = 6 * 60 * 60 * 1000 * rechargeCooldownMultiplier * dedicationRechargeMult; // 6 hours * garage synergy * dedication bonus
             const rechargeReady = stats.lastRecharged 
               ? Number(stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
               : 0;
+            const repairCooldownMs = 3 * 60 * 60 * 1000 * dedicationRepairMult; // 3 hours * dedication bonus
             const repairReady = stats.lastRepaired
-              ? Number(stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
+              ? Number(stats.lastRepaired) / 1_000_000 + repairCooldownMs
               : 0;
             const rechargeCooldown = rechargeReady > now;
             const repairCooldown = repairReady > now;
@@ -1085,117 +1101,44 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           const upgradeInfo = getUpgradeInfo();
           const pityCounter = Number(bot.upgradeCostsV2?.pityCounter || 0n);
           
-          if (bot.activeUpgrade) {
-            // Active upgrade state - show current upgrade status AND next upgrade info
-            const timeRemaining = getUpgradeTimeRemaining();
-            const isComplete = timeRemaining === 'Ready!';
-            const upgradeTypeName = Object.keys(bot.activeUpgrade.upgradeType)[0];
-            
-            return (
-              <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg space-y-2">
-                <p className="text-sm font-semibold text-primary">⚡ Upgrade in Progress</p>
-                <div className="text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Current:</span>
-                    <span className="font-medium">{getUpgradeDisplayName(upgradeTypeName)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Status:</span>
-                    <span className={`font-medium ${isComplete ? 'text-green-600' : ''}`}>
-                      {isComplete ? 'Ready!' : timeRemaining}
-                    </span>
-                  </div>
-                  <div className="border-t border-primary/20 my-1 pt-1">
-                    <p className="text-muted-foreground mb-1">Next Upgrade:</p>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Cost:</span>
-                      <span className="font-medium text-primary">{upgradeInfo.icpCost} ICP / {upgradeInfo.partsCost} parts</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Success Rate:</span>
-                      <span className="font-medium text-green-600">{upgradeInfo.successRate}</span>
-                    </div>
-                    {pityCounter > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Pity Bonus:</span>
-                        <span className="font-medium text-blue-600">{upgradeInfo.pityBonus}</span>
-                      </div>
-                    )}
-                  </div>
+          // Upgrades are now instant - show upgrade info card
+          return (
+            <div className="p-3 bg-muted/30 border border-muted rounded-lg space-y-2">
+              <p className="text-sm font-semibold text-muted-foreground">⚡ Stat Upgrades</p>
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Next Cost (ICP):</span>
+                  <span className="font-medium text-primary">{upgradeInfo.icpCost} ICP</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {isComplete && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="col-span-2"
-                      onClick={() => setShowUpgrade(true)}
-                      disabled={upgradeMutation.isPending}
-                    >
-                      ⚡ Start Next Upgrade
-                    </Button>
-                  )}
-                  {!isComplete && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="col-span-2"
-                      onClick={() => setShowCancelUpgradeConfirm(true)}
-                      disabled={cancelUpgradeMutation.isPending || upgradeMutation.isPending}
-                    >
-                      {cancelUpgradeMutation.isPending ? (
-                        <>
-                          <span className="animate-spin mr-2">⚙️</span>
-                          Cancelling...
-                        </>
-                      ) : (
-                        '🛑 Cancel Upgrade (Full Refund)'
-                      )}
-                    </Button>
-                  )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Next Cost (Parts):</span>
+                  <span className="font-medium text-primary">{upgradeInfo.partsCost} parts</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Success Rate:</span>
+                  <span className="font-medium text-green-600">{upgradeInfo.successRate}</span>
+                </div>
+                {pityCounter > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Pity Bonus:</span>
+                    <span className="font-medium text-blue-600">{upgradeInfo.pityBonus}</span>
+                  </div>
+                )}
               </div>
-            );
-          } else {
-            // No active upgrade - show upgrade info card
-            return (
-              <div className="p-3 bg-muted/30 border border-muted rounded-lg space-y-2">
-                <p className="text-sm font-semibold text-muted-foreground">⚡ Stat Upgrades</p>
-                <div className="text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Next Cost (ICP):</span>
-                    <span className="font-medium text-primary">{upgradeInfo.icpCost} ICP</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Next Cost (Parts):</span>
-                    <span className="font-medium text-primary">{upgradeInfo.partsCost} parts</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Success Rate:</span>
-                    <span className="font-medium text-green-600">{upgradeInfo.successRate}</span>
-                  </div>
-                  {pityCounter > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Pity Bonus:</span>
-                      <span className="font-medium text-blue-600">{upgradeInfo.pityBonus}</span>
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground pt-1">
-                  💡 Upgrades take 12 hours. Pay with ICP or parts from scavenging!
-                </p>
-                <Button
-                  onClick={() => setShowUpgrade(true)}
-                  disabled={upgradeMutation.isPending}
-                  size="sm"
-                  className="w-full"
-                  variant="default"
-                >
-                  ⚡ Start Upgrade
-                </Button>
-              </div>
-            );
-          }
+              <p className="text-xs text-muted-foreground pt-1">
+                💡 Instant upgrades with RNG. Pay with ICP or parts from scavenging!
+              </p>
+              <Button
+                onClick={() => setShowUpgrade(true)}
+                disabled={upgradeMutation.isPending}
+                size="sm"
+                className="w-full"
+                variant="default"
+              >
+                ⚡ Upgrade Now
+              </Button>
+            </div>
+          );
         })()}
 
         {/* Scavenging Section - V2 Continuous */}
@@ -1417,18 +1360,35 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
             return '';
           };
 
-          // Calculate bracket-scaled entry fee
+          // Calculate bracket-scaled entry fee (shifted up one bracket)
           const calculateBracketEntryFee = (baseEntryFee: bigint, raceClass: any): bigint => {
             const base = Number(baseEntryFee);
             let multiplier = 1.0;
             
-            if ('Scrap' in raceClass) multiplier = 0.5;
-            else if ('Junker' in raceClass) multiplier = 1.0;
-            else if ('Raider' in raceClass) multiplier = 1.5;
-            else if ('Elite' in raceClass) multiplier = 2.0;
-            else if ('SilentKlan' in raceClass) multiplier = 2.5;
+            if ('Scrap' in raceClass) multiplier = 1.0;
+            else if ('Junker' in raceClass) multiplier = 1.5;
+            else if ('Raider' in raceClass) multiplier = 2.0;
+            else if ('Elite' in raceClass) multiplier = 2.5;
+            else if ('SilentKlan' in raceClass) multiplier = 3.0;
             
             return BigInt(Math.floor(base * multiplier));
+          };
+
+          // Calculate refund percentage based on cancellation deadlines
+          const getRefundInfo = (event: any): { percentage: number; refundAmount: bigint; penalty: number } => {
+            const nowNs = BigInt(Date.now() * 1_000_000); // Convert to nanoseconds
+            const registration = event.registrations?.find((r: any) => Number(r.tokenIndex) === Number(bot.tokenIndex));
+            const entryFee = calculateBracketEntryFee(BigInt(event.metadata?.entryFee || 0), registration?.raceClass);
+            
+            if (nowNs <= event.cancellationDeadlines?.fullRefund) {
+              return { percentage: 100, refundAmount: entryFee, penalty: 0 };
+            } else if (nowNs <= event.cancellationDeadlines?.halfRefund) {
+              return { percentage: 50, refundAmount: entryFee / 2n, penalty: 50 };
+            } else if (nowNs <= event.cancellationDeadlines?.quarterRefund) {
+              return { percentage: 25, refundAmount: entryFee / 4n, penalty: 75 };
+            } else {
+              return { percentage: 0, refundAmount: 0n, penalty: 100 };
+            }
           };
 
           const isBotEligibleForClass = (raceClass: any): boolean => {
@@ -1533,6 +1493,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           }
 
           return (
+            <>
             <div className="space-y-2">
               {/* Registered Events */}
               {botRegisteredEvents.length > 0 && (
@@ -1563,11 +1524,14 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                               <span>•</span>
                               <span>{formatICP(calculateBracketEntryFee(BigInt(event.metadata?.entryFee || 0), registration?.raceClass))}</span>
                             </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              🏁 Starts {formatRelativeTime(BigInt(event.scheduledTime))}
+                            </div>
                           </div>
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleUnregisterFromEvent(Number(event.eventId))}
+                            onClick={() => setWithdrawConfirmEvent(event)}
                             disabled={unregisteringEventId === Number(event.eventId)}
                             className="ml-2 text-xs h-7"
                           >
@@ -1698,6 +1662,80 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 </div>
               )}
             </div>
+
+            {/* Withdrawal Confirmation Dialog */}
+            <AlertDialog open={!!withdrawConfirmEvent} onOpenChange={(open) => !open && setWithdrawConfirmEvent(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Withdraw from Event?</AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-3">
+                      <p>
+                        You are about to withdraw from <span className="font-semibold">{withdrawConfirmEvent?.metadata?.name || `Event #${withdrawConfirmEvent?.eventId}`}</span>.
+                      </p>
+                      
+                      {withdrawConfirmEvent && (() => {
+                        const refundInfo = getRefundInfo(withdrawConfirmEvent);
+                        const registration = withdrawConfirmEvent.registrations?.find((r: any) => Number(r.tokenIndex) === Number(bot.tokenIndex));
+                        const entryFee = calculateBracketEntryFee(BigInt(withdrawConfirmEvent.metadata?.entryFee || 0), registration?.raceClass);
+                        
+                        return (
+                          <div className={`p-3 rounded-lg ${
+                            refundInfo.percentage === 100 ? 'bg-green-500/10 border border-green-500/30' :
+                            refundInfo.percentage === 50 ? 'bg-yellow-500/10 border border-yellow-500/30' :
+                            refundInfo.percentage === 25 ? 'bg-orange-500/10 border border-orange-500/30' :
+                            'bg-red-500/10 border border-red-500/30'
+                          }`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium">Refund Rate:</span>
+                              <span className={`font-bold ${
+                                refundInfo.percentage === 100 ? 'text-green-500' :
+                                refundInfo.percentage === 50 ? 'text-yellow-500' :
+                                refundInfo.percentage === 25 ? 'text-orange-500' :
+                                'text-red-500'
+                              }`}>{refundInfo.percentage}%</span>
+                            </div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm text-muted-foreground">Entry Fee Paid:</span>
+                              <span className="text-sm">{formatICP(entryFee)}</span>
+                            </div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm text-muted-foreground">You Will Receive:</span>
+                              <span className="text-sm font-semibold text-green-400">{formatICP(refundInfo.refundAmount)}</span>
+                            </div>
+                            {refundInfo.penalty > 0 && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Penalty ({refundInfo.penalty}%):</span>
+                                <span className="text-sm text-red-400">-{formatICP(entryFee - refundInfo.refundAmount)}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      
+                      <p className="text-xs text-muted-foreground">
+                        💡 Cancellation penalties increase as the event approaches. Early cancellations get full refunds.
+                      </p>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep Registration</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      if (withdrawConfirmEvent) {
+                        handleUnregisterFromEvent(Number(withdrawConfirmEvent.eventId));
+                        setWithdrawConfirmEvent(null);
+                      }
+                    }}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    Withdraw
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            </>
           );
         })()}
 
@@ -1751,7 +1789,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           variant="destructive"
           className="w-full"
         >
-          {respecMutation.isPending ? '🔧 Stripping...' : '🔧 Strip Bot (1 ICP)'}
+          {respecMutation.isPending ? '🔧 Stripping...' : '🔧 Strip Bot (FREE)'}
         </Button>
         
         {bot.isListed && bot.listPrice && (
@@ -2180,7 +2218,6 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                   <SelectItem value="PowerCore">🔋 Power Core ({formatBigInt(stats.powerCoreUpgrades)} upgrades)</SelectItem>
                   <SelectItem value="Thruster">🚀 Acceleration ({formatBigInt(stats.accelerationUpgrades)} upgrades)</SelectItem>
                   <SelectItem value="Gyro">🎯 Stability ({formatBigInt(stats.stabilityUpgrades)} upgrades)</SelectItem>
-                  <SelectItem value="Luck">🍀 Luck ({formatBigInt(stats.luckUpgrades || 0n)} upgrades)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2222,6 +2259,72 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
               </div>
             </div>
 
+            {/* Bracket Bump Warning */}
+            {(() => {
+              if (!bot.maxStats) return null;
+              const currentRating = (Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + 
+                Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4;
+              
+              // Class boundaries: 20 (Scrap→Junker), 30 (Junker→Raider), 40 (Raider→Elite), 50 (Elite→SilentKlan)
+              const boundaries = [
+                { threshold: 20, from: 'Scrap', to: 'Junker' },
+                { threshold: 30, from: 'Junker', to: 'Raider' },
+                { threshold: 40, from: 'Raider', to: 'Elite' },
+                { threshold: 50, from: 'Elite', to: 'Silent Klan' },
+              ];
+              
+              // Find if we're close to any boundary (within 1.0 rating points)
+              // A successful upgrade adds +1 to one stat = +0.25 rating, double upgrade = +0.5 rating
+              const nearBoundary = boundaries.find(b => currentRating < b.threshold && currentRating >= b.threshold - 1.0);
+              
+              if (!nearBoundary) return null;
+              
+              const pointsUntilBump = nearBoundary.threshold - currentRating;
+              const willBumpOnNormal = pointsUntilBump <= 0.25;
+              const willBumpOnDouble = pointsUntilBump <= 0.5;
+              
+              return (
+                <div className={`p-3 rounded-lg border-2 ${
+                  willBumpOnNormal 
+                    ? 'bg-red-500/10 border-red-500/50' 
+                    : 'bg-yellow-500/10 border-yellow-500/50'
+                }`}>
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg">{willBumpOnNormal ? '🚨' : '⚠️'}</span>
+                    <div className="space-y-1">
+                      <p className={`text-sm font-semibold ${
+                        willBumpOnNormal ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'
+                      }`}>
+                        {willBumpOnNormal ? 'BRACKET BUMP IMMINENT!' : 'Near Bracket Boundary'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Current rating: <span className="font-mono font-bold">{currentRating.toFixed(2)}</span> → 
+                        {nearBoundary.from} class
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {willBumpOnNormal ? (
+                          <span className="text-red-600 dark:text-red-400 font-semibold">
+                            A successful upgrade WILL bump you to {nearBoundary.to} class!
+                          </span>
+                        ) : willBumpOnDouble ? (
+                          <span className="text-yellow-600 dark:text-yellow-400">
+                            A double-point upgrade could bump you to {nearBoundary.to} class.
+                          </span>
+                        ) : (
+                          <span>
+                            {pointsUntilBump.toFixed(2)} rating points until {nearBoundary.to} class.
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground italic">
+                        Higher classes have tougher competition and higher entry fees.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="space-y-2">
               <Label htmlFor="payment-method">Payment Method</Label>
               <Select value={paymentMethod} onValueChange={(value: any) => setPaymentMethod(value)}>
@@ -2259,33 +2362,6 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Upgrade Confirmation Dialog */}
-      <AlertDialog open={showCancelUpgradeConfirm} onOpenChange={setShowCancelUpgradeConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Upgrade?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to cancel this upgrade? You will receive a full refund of your payment.
-              {bot.activeUpgrade && (
-                <div className="mt-2 p-2 bg-muted rounded-md text-sm">
-                  <p className="font-medium">Current upgrade:</p>
-                  <p>{getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])}</p>
-                </div>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>No, keep upgrade</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleCancelUpgrade}
-              disabled={cancelUpgradeMutation.isPending}
-            >
-              {cancelUpgradeMutation.isPending ? 'Cancelling...' : 'Yes, cancel upgrade'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Strip Bot Confirmation Dialog */}
       <AlertDialog open={showRespec} onOpenChange={setShowRespec}>
         <AlertDialogContent>
@@ -2300,17 +2376,6 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                       <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                         <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">⚠️ Cannot Strip Bot</p>
                         <p className="text-sm text-muted-foreground mt-2">Your bot is currently on a scavenging mission. Retrieve your bot from its mission first before stripping upgrades.</p>
-                      </div>
-                    </div>
-                  );
-                }
-
-                if (bot.activeUpgrade) {
-                  return (
-                    <div className="space-y-3">
-                      <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                        <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">⚠️ Cannot Strip Bot</p>
-                        <p className="text-sm text-muted-foreground mt-2">Your bot has an upgrade in progress. Cancel the upgrade first before stripping all upgrades.</p>
                       </div>
                     </div>
                   );
@@ -2451,8 +2516,8 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                         </div>
                       </div>
                       
-                      <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg space-y-1 text-sm">
-                        <p className="font-semibold text-destructive">Cost: 1 ICP</p>
+                      <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg space-y-1 text-sm">
+                        <p className="font-semibold text-green-600 dark:text-green-400">Cost: FREE! 🎉</p>
                       </div>
                       
                       <div className="p-3 bg-muted rounded-lg space-y-1 text-xs">
@@ -2482,7 +2547,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 Number(stats.accelerationUpgrades || 0) > 0 ||
                 Number(stats.stabilityUpgrades || 0) > 0
               );
-              const canStrip = hasUpgrades && !bot.activeMission && !bot.activeUpgrade && statsToStrip.size > 0;
+              const canStrip = hasUpgrades && !bot.activeMission && statsToStrip.size > 0;
 
               return (
                 <AlertDialogAction
@@ -2497,6 +2562,134 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Rolling Animation Dialog */}
+      <Dialog open={isRolling} onOpenChange={() => {}}>
+        <DialogContent className="max-w-sm border border-yellow-500/30 bg-background">
+          <div className="flex flex-col items-center gap-4 py-8">
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full border-4 border-yellow-500 border-t-transparent animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-2xl">🎲</span>
+              </div>
+            </div>
+            <p className="text-lg font-bold text-yellow-500">ROLLING...</p>
+            <p className="text-sm text-muted-foreground">Determining upgrade outcome</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upgrade Result Dialog */}
+      <Dialog open={showUpgradeResult} onOpenChange={setShowUpgradeResult}>
+        <DialogContent className={`max-w-md overflow-hidden ${
+          upgradeResult?.success 
+            ? upgradeResult.isDouble 
+              ? 'border-2 border-yellow-500' 
+              : 'border-2 border-green-500'
+            : 'border-2 border-red-500/50'
+        }`}>
+          {/* Animated background for wins */}
+          {upgradeResult?.success && (
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              {upgradeResult.isDouble && (
+                <>
+                  <div className="absolute top-0 left-1/4 text-4xl animate-bounce" style={{animationDelay: '0ms'}}>🎉</div>
+                  <div className="absolute top-0 right-1/4 text-4xl animate-bounce" style={{animationDelay: '200ms'}}>🎊</div>
+                  <div className="absolute bottom-0 left-1/3 text-3xl animate-bounce" style={{animationDelay: '400ms'}}>⭐</div>
+                  <div className="absolute bottom-0 right-1/3 text-3xl animate-bounce" style={{animationDelay: '100ms'}}>✨</div>
+                </>
+              )}
+              <div className={`absolute inset-0 ${
+                upgradeResult.isDouble 
+                  ? 'bg-gradient-to-br from-yellow-500/10 via-transparent to-yellow-500/10' 
+                  : 'bg-gradient-to-br from-green-500/10 via-transparent to-green-500/10'
+              }`} />
+            </div>
+          )}
+          
+          <DialogHeader className="relative">
+            <DialogTitle className="text-center text-2xl">
+              {upgradeResult?.success ? (
+                upgradeResult.isDouble ? (
+                  <span className="text-yellow-400 animate-pulse">🌟 JACKPOT! 🌟</span>
+                ) : (
+                  <span className="text-green-400">✅ SUCCESS!</span>
+                )
+              ) : (
+                <span className="text-red-400">💔 FAILED</span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-6 space-y-4 relative">
+            {/* Main result display */}
+            <div className="text-center">
+              {upgradeResult?.success ? (
+                <div className="space-y-2">
+                  <p className="text-lg">
+                    Your <span className="font-bold text-yellow-500">{upgradeResult.statName}</span> upgrade succeeded!
+                  </p>
+                  <div className={`text-5xl font-black ${
+                    upgradeResult.isDouble ? 'text-yellow-500' : 'text-green-500'
+                  }`}>
+                    +{upgradeResult.pointsAwarded}
+                  </div>
+                  <p className="text-muted-foreground text-sm">
+                    {upgradeResult.isDouble 
+                      ? '🎰 You hit the DOUBLE lottery!' 
+                      : 'Stat point added!'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-lg text-muted-foreground">
+                    The <span className="font-bold text-yellow-500">{upgradeResult?.statName}</span> upgrade didn't take...
+                  </p>
+                  <div className="text-5xl">😢</div>
+                  {upgradeResult?.refund && (
+                    <p className="text-sm text-orange-400">
+                      💰 50% refund: {upgradeResult.refund}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2 bg-muted/50 rounded p-2">
+                    💪 Your pity counter increased! Next attempt has better odds.
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            {/* Roll details */}
+            {upgradeResult && upgradeResult.roll > 0 && (
+              <div className="text-center text-sm text-muted-foreground border-t border-border pt-3 mt-3">
+                <span className="font-mono bg-muted px-2 py-1 rounded">
+                  🎲 Roll: {upgradeResult.roll} {upgradeResult.success ? '<' : '≥'} {upgradeResult.successRate}
+                </span>
+                {upgradeResult.pityBonus && (
+                  <span className="ml-2 text-green-400">(+pity bonus)</span>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              onClick={() => setShowUpgradeResult(false)} 
+              className={`w-full ${
+                upgradeResult?.success 
+                  ? upgradeResult.isDouble 
+                    ? 'bg-yellow-600 hover:bg-yellow-700' 
+                    : 'bg-green-600 hover:bg-green-700'
+                  : ''
+              }`}
+              variant={upgradeResult?.success ? 'default' : 'destructive'}
+            >
+              {upgradeResult?.success 
+                ? (upgradeResult.isDouble ? '🎉 Amazing!' : 'Nice!') 
+                : 'Try Again...'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

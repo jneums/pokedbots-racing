@@ -70,7 +70,7 @@ Send your bots into the wasteland to gather upgrade parts. **No ICP cost** - onl
 - Overcharge formula: (100 - battery) × 0.4 × efficiency (capped at 60%)
 - Lower battery at recharge = bigger overcharge potential (10% battery → ~36% overcharge avg)
 - Efficiency varies by condition + RNG: 100% condition = 0.55-1.35× (highly random!)
-- Overcharge bonus: +0.3% Speed/Accel per 1% overcharge (max +18% at 60%)
+- Overcharge bonus: +0.20% Speed/Accel per 1% overcharge (max +8% at 40%)
 - Strategy: Drop battery low in RepairBay, then recharge for big one-time race boost!
 
 ## Part Types & Distribution

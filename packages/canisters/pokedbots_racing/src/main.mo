@@ -51,7 +51,7 @@ import GarageRechargeRobot "tools/garage_recharge_robot";
 import GarageRepairRobot "tools/garage_repair_robot";
 import GarageUpgradeRobot "tools/garage_upgrade_robot";
 import GarageCancelUpgrade "tools/garage_cancel_upgrade";
-import GarageTransferParts "tools/garage_transfer_parts";
+// SECURITY: GarageTransferParts removed - could be exploited by malicious API key holders to steal parts
 import GarageStartScavenging "tools/garage_start_scavenging";
 import GarageCompleteScavenging "tools/garage_complete_scavenging";
 import GarageConvertParts "tools/garage_convert_parts";
@@ -64,11 +64,13 @@ import RacingGetRaceDetails "tools/racing_get_race_details";
 import RacingGetBotRaces "tools/racing_get_bot_races";
 import RacingRegisterForEvent "tools/racing_register_for_event";
 import RacingUnregisterFromEvent "tools/racing_unregister_from_event";
+import RacingGetEventResults "tools/racing_get_event_results";
 import HelpGetCompendium "tools/help_get_compendium";
 import BettingPlaceBet "tools/betting_place_bet";
 import BettingListPools "tools/betting_list_pools";
 import BettingGetPoolInfo "tools/betting_get_pool_info";
 import BettingGetMyBets "tools/betting_get_my_bets";
+import RacingGetBotNames "tools/racing_get_bot_names";
 
 // Import Stats module for NFT metadata
 import Stats "Stats";
@@ -86,72 +88,14 @@ import BettingManager "BettingManager";
 import BettingTypes "BettingTypes";
 import RaceClassUtils "RaceClassUtils";
 import BotDedication "BotDedication";
+import ResonanceSystem "ResonanceSystem";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
 
-// // Migration function for luck system features
-// // Adds luck tracking fields and BadLuck event type
+// Migration function to add overcharge/perfectTuneUp fields to RacingStats
+// COMPLETED: This migration has been run. Commenting out to prevent re-running.
 // (with migration =
 //   func(old : {
-//     var stable_racing_stats : Map.Map<Nat, {
-//       tokenIndex : Nat;
-//       ownerPrincipal : Principal;
-//       faction : PokedBotsGarage.FactionType;
-//       name : ?Text;
-//       luckBase : Nat;
-//       speedBonus : Nat;
-//       powerCoreBonus : Nat;
-//       accelerationBonus : Nat;
-//       stabilityBonus : Nat;
-//       luckBonus : Nat;
-//       speedUpgrades : Nat;
-//       powerCoreUpgrades : Nat;
-//       accelerationUpgrades : Nat;
-//       stabilityUpgrades : Nat;
-//       luckUpgrades : Nat;
-//       respecCount : Nat;
-//       battery : Nat;
-//       condition : Nat;
-//       experience : Nat;
-//       overcharge : Nat;
-//       perfectTuneUp : Bool;
-//       preferredDistance : PokedBotsGarage.Distance;
-//       preferredTerrain : PokedBotsGarage.Terrain;
-//       racesEntered : Nat;
-//       wins : Nat;
-//       places : Nat;
-//       shows : Nat;
-//       totalScrapEarned : Nat;
-//       factionReputation : Nat;
-//       eloRating : Nat;
-//       activatedAt : Int;
-//       lastDecayed : Int;
-//       lastRecharged : ?Int;
-//       lastRepaired : ?Int;
-//       lastDiagnostics : ?Int;
-//       lastRaced : ?Int;
-//       upgradeEndsAt : ?Int;
-//       listedForSale : Bool;
-//       scavengingMissions : Nat;
-//       totalPartsScavenged : Nat;
-//       scavengingReputation : Nat;
-//       bestHaul : Nat;
-//       activeMission : ?PokedBotsGarage.ScavengingMission;
-//       worldBuff : ?PokedBotsGarage.WorldBuff;
-//       lastMissionRewards : ?{
-//         totalParts : Nat;
-//         speedChips : Nat;
-//         powerCoreFragments : Nat;
-//         thrusterKits : Nat;
-//         gyroModules : Nat;
-//         universalParts : Nat;
-//         conditionRestored : Nat;
-//         batteryRestored : Nat;
-//         hoursOut : Nat;
-//         completedAt : Int;
-//         zone : PokedBotsGarage.ScavengingZone;
-//       };
-//     }>;
 //     var stable_races : Map.Map<Nat, {
 //       raceId : Nat;
 //       name : Text;
@@ -167,86 +111,144 @@ import Star "mo:star/star";
 //       duration : Nat;
 //       entryDeadline : Int;
 //       createdAt : Int;
-//       entries : [RacingSimulator.RaceEntry];
-//       status : RacingSimulator.RaceStatus;
-//       results : ?[RacingSimulator.RaceResult];
-//       events : [{
-//         eventType : {
-//           #Overtake : { overtaker : Text; overtaken : Text };
-//           #LeadChange : { newLeader : Text; previousLeader : Text };
-//           #LargeGap : { leader : Text; gapSeconds : Float };
-//           #CloseRacing : { bots : [Text]; gapSeconds : Float };
-//           #ExceptionalPerformance : { bot : Text; performancePct : Float };
-//           #PoorPerformance : { bot : Text; performancePct : Float };
-//           #SegmentComplete : { segmentIndex : Nat; leader : Text };
-//           #LuckProc : { bot : Text; procType : Text; boost : Float };
+//       entries : [{
+//         nftId : Text;
+//         owner : Principal;
+//         entryFee : Nat;
+//         enteredAt : Int;
+//         stats : ?{
+//           speed : Nat;
+//           powerCore : Nat;
+//           acceleration : Nat;
+//           stability : Nat;
+//           luck : Nat;
 //         };
-//         timestamp : Float;
-//         segmentIndex : Nat;
-//         description : Text;
 //       }];
+//       status : RacingSimulator.RaceStatus;
+//       results : ?[{
+//         nftId : Text;
+//         owner : Principal;
+//         position : Nat;
+//         finalTime : Float;
+//         prizeAmount : Nat;
+//         partsEarned : Nat;
+//         partType : Text;
+//         stats : ?{
+//           speed : Nat;
+//           powerCore : Nat;
+//           acceleration : Nat;
+//           stability : Nat;
+//           luck : Nat;
+//         };
+//       }];
+//       events : [RacingSimulator.RaceEvent];
 //       prizePool : Nat;
 //       platformTax : Nat;
 //       platformBonus : Nat;
 //       sponsors : [RacingSimulator.Sponsor];
 //     }>;
 //   }) : {
-//     var stable_racing_stats : Map.Map<Nat, PokedBotsGarage.PokedBotRacingStats>;
 //     var stable_races : Map.Map<Nat, RacingSimulator.Race>;
 //   } {
-//     Debug.print("Migration: Adding luck tracking fields and BadLuck events");
-
-//     // Migrate racing stats - add luck tracking fields
-//     let migratedStats = Map.new<Nat, PokedBotsGarage.PokedBotRacingStats>();
-//     var count = 0;
-//     for ((tokenIndex, oldStats) in Map.entries(old.stable_racing_stats)) {
-//       let newStats : PokedBotsGarage.PokedBotRacingStats = {
-//         oldStats with
-//         totalLuckProcs = 0;
-//         majorLuckProcs = 0;
-//         legendaryLuckProcs = 0;
-//         totalBadLuckIncidents = 0;
-//         cosmicAlignmentDays = 0;
-//       };
-//       ignore Map.put(migratedStats, Map.nhash, tokenIndex, newStats);
-//       count += 1;
-//     };
-//     Debug.print("Migration complete: " # Nat.toText(count) # " bot stats migrated");
-
-//     // Migrate races - convert old events to new format
+//     Debug.print("Migration: Adding overcharge/perfectTuneUp to RacingStats in stored races");
+//
+//     // Migrate races - add default values for new fields
 //     let migratedRaces = Map.new<Nat, RacingSimulator.Race>();
 //     var raceCount = 0;
 //     for ((raceId, oldRace) in Map.entries(old.stable_races)) {
-//       let newEvents = Array.map(oldRace.events, func(e : { eventType : { #Overtake : { overtaker : Text; overtaken : Text }; #LeadChange : { newLeader : Text; previousLeader : Text }; #LargeGap : { leader : Text; gapSeconds : Float }; #CloseRacing : { bots : [Text]; gapSeconds : Float }; #ExceptionalPerformance : { bot : Text; performancePct : Float }; #PoorPerformance : { bot : Text; performancePct : Float }; #SegmentComplete : { segmentIndex : Nat; leader : Text }; #LuckProc : { bot : Text; procType : Text; boost : Float } }; timestamp : Float; segmentIndex : Nat; description : Text }) : RacingSimulator.RaceEvent {
-//         let newEventType : RacingSimulator.RaceEventType = switch(e.eventType) {
-//           case (#Overtake(data)) { #Overtake(data) };
-//           case (#LeadChange(data)) { #LeadChange(data) };
-//           case (#LargeGap(data)) { #LargeGap(data) };
-//           case (#CloseRacing(data)) { #CloseRacing(data) };
-//           case (#ExceptionalPerformance(data)) { #ExceptionalPerformance(data) };
-//           case (#PoorPerformance(data)) { #PoorPerformance(data) };
-//           case (#SegmentComplete(data)) { #SegmentComplete(data) };
-//           case (#LuckProc(data)) { #LuckProc(data) };
+//       // Migrate entries with new RacingStats fields
+// //       let newEntries = Array.map<{
+//         nftId : Text;
+//         owner : Principal;
+//         entryFee : Nat;
+//         enteredAt : Int;
+//         stats : ?{
+//           speed : Nat;
+//           powerCore : Nat;
+//           acceleration : Nat;
+//           stability : Nat;
+//           luck : Nat;
 //         };
+//       }, RacingSimulator.RaceEntry>(oldRace.entries, func(e) : RacingSimulator.RaceEntry {
 //         {
-//           eventType = newEventType;
-//           timestamp = e.timestamp;
-//           segmentIndex = e.segmentIndex;
-//           description = e.description;
+//           nftId = e.nftId;
+//           owner = e.owner;
+//           entryFee = e.entryFee;
+//           enteredAt = e.enteredAt;
+//           stats = switch (e.stats) {
+//             case (?s) { ?{ s with overcharge = 0; perfectTuneUp = false } };
+//             case (null) { null };
+//           };
 //         }
 //       });
-
+//
+//       // Migrate results with new RacingStats fields
+//       let newResults : ?[RacingSimulator.RaceResult] = switch (oldRace.results) {
+//         case (?results) {
+//           ?Array.map<{
+//             nftId : Text;
+//             owner : Principal;
+//             position : Nat;
+//             finalTime : Float;
+//             prizeAmount : Nat;
+//             partsEarned : Nat;
+//             partType : Text;
+//             stats : ?{
+//               speed : Nat;
+//               powerCore : Nat;
+//               acceleration : Nat;
+//               stability : Nat;
+//               luck : Nat;
+//             };
+//           }, RacingSimulator.RaceResult>(results, func(r) : RacingSimulator.RaceResult {
+//             {
+//               nftId = r.nftId;
+//               owner = r.owner;
+//               position = r.position;
+//               finalTime = r.finalTime;
+//               prizeAmount = r.prizeAmount;
+//               partsEarned = r.partsEarned;
+//               partType = r.partType;
+//               stats = switch (r.stats) {
+//                 case (?s) { ?{ s with overcharge = 0; perfectTuneUp = false } };
+//                 case (null) { null };
+//               };
+//             }
+//           });
+//         };
+//         case (null) { null };
+//       };
+//
 //       let newRace : RacingSimulator.Race = {
-//         oldRace with
-//         events = newEvents;
+//         raceId = oldRace.raceId;
+//         name = oldRace.name;
+//         distance = oldRace.distance;
+//         terrain = oldRace.terrain;
+//         trackId = oldRace.trackId;
+//         trackSeed = oldRace.trackSeed;
+//         raceClass = oldRace.raceClass;
+//         entryFee = oldRace.entryFee;
+//         maxEntries = oldRace.maxEntries;
+//         minEntries = oldRace.minEntries;
+//         startTime = oldRace.startTime;
+//         duration = oldRace.duration;
+//         entryDeadline = oldRace.entryDeadline;
+//         createdAt = oldRace.createdAt;
+//         entries = newEntries;
+//         status = oldRace.status;
+//         results = newResults;
+//         events = oldRace.events;
+//         prizePool = oldRace.prizePool;
+//         platformTax = oldRace.platformTax;
+//         platformBonus = oldRace.platformBonus;
+//         sponsors = oldRace.sponsors;
 //       };
 //       ignore Map.put(migratedRaces, Map.nhash, raceId, newRace);
 //       raceCount += 1;
 //     };
 //     Debug.print("Races migrated: " # Nat.toText(raceCount));
-
+//
 //     {
-//       var stable_racing_stats = migratedStats;
 //       var stable_races = migratedRaces;
 //     };
 //   }
@@ -292,9 +294,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   let stable_alltime_board = Map.new<Nat, Leaderboard.LeaderboardEntry>();
   let stable_faction_boards = Map.new<Text, Map.Map<Nat, Leaderboard.LeaderboardEntry>>();
 
-  // Stable state for battery recharge tracking
-  var stable_last_recharge_time : Int = 0;
-
   // Stable state for prize payment tracking (prevents duplicate payments)
   // Key: "raceId:owner:amount" - ensures each prize is only paid once
   let stable_paid_prizes = Map.new<Text, Int>(); // Maps prize key to timestamp when paid
@@ -317,6 +316,36 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   // Stable state for bot dedication system (per-bot investment and activity tracking)
   let stable_bot_dedication = Map.new<Nat, BotDedication.BotDedicationProfile>(); // tokenIndex -> profile
 
+  // --- DIAGNOSTIC DATA COLLECTION ---
+  // Stable storage for timer diagnostic logs to debug disappearing race_create timers
+  type TimerDiagnosticEntry = {
+    timestamp : Int;
+    handlerType : Text; // "race_create", "race_start", "race_finish", etc.
+    actionId : { id : Nat; time : Nat };
+    message : Text;
+    existingTimerCount : Nat;
+    scheduledNextTimer : Bool;
+    nextTimerTime : ?Nat;
+  };
+  var stable_timer_diagnostics : [TimerDiagnosticEntry] = [];
+  let MAX_DIAGNOSTIC_ENTRIES : Nat = 500; // Keep last 500 entries
+
+  // Helper to add diagnostic entry
+  func addTimerDiagnostic(entry : TimerDiagnosticEntry) {
+    let newEntries = Array.append(stable_timer_diagnostics, [entry]);
+    // Trim to max size, keeping newest entries
+    if (newEntries.size() > MAX_DIAGNOSTIC_ENTRIES) {
+      stable_timer_diagnostics := Array.tabulate<TimerDiagnosticEntry>(
+        MAX_DIAGNOSTIC_ENTRIES,
+        func(i : Nat) : TimerDiagnosticEntry {
+          newEntries[newEntries.size() - MAX_DIAGNOSTIC_ENTRIES + i];
+        },
+      );
+    } else {
+      stable_timer_diagnostics := newEntries;
+    };
+  };
+
   // Constants
   let TRANSFER_FEE : Nat = 10_000; // 0.0001 ICP
   let PRIZE_DISTRIBUTION_TIMEOUT : Nat = 60_000_000_000; // 60 seconds timeout for prize transfers
@@ -330,12 +359,61 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   // --- TT Setup ---
   private func reportTTExecution(execInfo : TT.ExecutionReport) : Bool {
     Debug.print("CANISTER: TimerTool Execution: " # debug_show (execInfo));
+    // Log execution to diagnostics
+    let (actionId, action) = execInfo.action;
+    addTimerDiagnostic({
+      timestamp = Time.now();
+      handlerType = "TT_EXECUTION";
+      actionId = { id = actionId.id; time = actionId.time };
+      message = "Execution report: actionType=" # action.actionType # ", awaited=" # debug_show (execInfo.awaited);
+      existingTimerCount = 0;
+      scheduledNextTimer = false;
+      nextTimerTime = null;
+    });
     false;
   };
 
+  // Maximum retries for different action types
+  let MAX_RETRIES_CRITICAL = 5; // race_create, race_start - critical for system operation
+  let MAX_RETRIES_IMPORTANT = 3; // race_finish, betting_pool_create, prize_distribution, bet_settlement
+  let RETRY_DELAY_NS = 30_000_000_000; // 30 seconds between retries
+
   private func reportTTError(errInfo : TT.ErrorReport) : ?Nat {
     Debug.print("CANISTER: TimerTool Error: " # debug_show (errInfo));
-    null;
+    // Log error to diagnostics
+    let (actionId, action) = errInfo.action;
+
+    // Determine max retries based on action type
+    let maxRetries = switch (action.actionType) {
+      case ("race_create") { MAX_RETRIES_CRITICAL };
+      case ("race_start") { MAX_RETRIES_CRITICAL };
+      case ("race_finish") { MAX_RETRIES_IMPORTANT };
+      case ("betting_pool_create") { MAX_RETRIES_IMPORTANT };
+      case ("prize_distribution") { MAX_RETRIES_IMPORTANT };
+      case ("bet_settlement") { MAX_RETRIES_IMPORTANT };
+      case (_) { 0 }; // Don't retry unknown action types
+    };
+
+    // Check if we should retry
+    let shouldRetry = action.retries < maxRetries;
+    let retryTime = if (shouldRetry) { ?Int.abs(Time.now() + RETRY_DELAY_NS) } else {
+      null;
+    };
+
+    addTimerDiagnostic({
+      timestamp = Time.now();
+      handlerType = "TT_ERROR";
+      actionId = { id = actionId.id; time = actionId.time };
+      message = "Error report: actionType=" # action.actionType #
+      ", retries=" # Nat.toText(action.retries) # "/" # Nat.toText(maxRetries) #
+      ", willRetry=" # debug_show (shouldRetry) #
+      ", error=" # debug_show (errInfo.error);
+      existingTimerCount = 0;
+      scheduledNextTimer = shouldRetry;
+      nextTimerTime = retryTime;
+    });
+
+    retryTime;
   };
 
   var tt_migration_state : TT.State = TT.Migration.migration.initialState;
@@ -804,35 +882,23 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     actionId;
   };
 
-  // Handle hourly battery recharge (self-rescheduling timer)
-  func handleHourlyRecharge<system>(_actionId : TT.ActionId, _action : TT.Action) : TT.ActionId {
-    Debug.print("Hourly battery recharge handler triggered");
-
-    let now = Time.now();
-    let botsRecharged = garageManager.applyRechargeToAll(now);
-    stable_last_recharge_time := now;
-
-    Debug.print("Applied battery recharge to " # debug_show (botsRecharged) # " bots");
-
-    // Schedule next recharge in 1 hour
-    let nextRechargeTime = now + (60 * 60 * 1_000_000_000); // 1 hour in nanoseconds
-    let nextActionId = tt().setActionSync<system>(
-      Int.abs(nextRechargeTime),
-      {
-        actionType = "hourly_recharge";
-        params = to_candid (());
-      },
-    );
-    Debug.print("Scheduled next recharge for " # debug_show (nextRechargeTime));
-
-    nextActionId;
-  };
-
   // Handle automatic race creation (recurring timer)
   func handleRaceCreation<system>(actionId : TT.ActionId, _action : TT.Action) : TT.ActionId {
     Debug.print("Race creation handler triggered");
 
     let now = Time.now();
+
+    // Log diagnostic at entry
+    let existingRaceCreateActionsAtEntry = tt().getActionsByFilter(#ByType("race_create"));
+    addTimerDiagnostic({
+      timestamp = now;
+      handlerType = "race_create_ENTRY";
+      actionId = { id = actionId.id; time = actionId.time };
+      message = "Handler entry. Existing race_create timers: " # Nat.toText(existingRaceCreateActionsAtEntry.size());
+      existingTimerCount = existingRaceCreateActionsAtEntry.size();
+      scheduledNextTimer = false;
+      nextTimerTime = null;
+    });
 
     // First, ensure we have upcoming calendar events scheduled
     ensureCalendarScheduled<system>(now);
@@ -861,11 +927,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           // NEW SYSTEM: Event has registrations - create heats from registered bots
           Debug.print("Creating races from " # Nat.toText(event.registrations.size()) # " registrations for event " # Nat.toText(event.eventId));
 
-          // Helper function to get bot ELO for skill-based allocation
+          // Helper function to get bot rating for skill-based allocation
           let getElo = func(tokenIndex : Nat) : Nat {
             switch (garageManager.getStats(tokenIndex)) {
-              case (?stats) { stats.eloRating };
-              case (null) { 1500 }; // Default ELO for new bots
+              case (?stats) { garageManager.calculateOverallRating(stats) };
+              case (null) { 50 }; // Default rating for unknown bots
             };
           };
 
@@ -887,7 +953,32 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             // ============================================================
             case (#Manual(manualConfig)) {
               var stageNumber = 0;
-              var firstRaceScheduled = false;
+
+              // Pre-calculate how many races (stages) each class will have
+              // This is used to split entry fees proportionally across races
+              func countRacesForClass(raceClass : RacingSimulator.RaceClass) : Nat {
+                var count : Nat = 0;
+                for (t in manualConfig.raceTemplates.vals()) {
+                  if (t.raceClass == raceClass) {
+                    count += 1;
+                  };
+                };
+                count;
+              };
+
+              // Check if this is a multi-stage event with aggregate scoring
+              // Multi-stage events (Cumulative or TeamAggregate) should NOT have per-race prizes
+              // All prizes are distributed at the EVENT level based on cumulative standings
+              let isMultiStagePrizing = switch (event.metadata.scoringMode) {
+                case (#Cumulative) { true };
+                case (#TeamAggregate) { true };
+                case (#Individual) { false };
+                case (#Elimination) { false };
+              };
+
+              if (isMultiStagePrizing) {
+                Debug.print("Multi-stage event with " # debug_show (event.metadata.scoringMode) # " scoring - prizes will be distributed at event level, not per-race");
+              };
 
               for (template in manualConfig.raceTemplates.vals()) {
                 stageNumber += 1;
@@ -921,31 +1012,53 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
                   var heatNumber = 1;
                   for (heat in heats.vals()) {
-                    // Calculate entry fee for this class
-                    let classFeeMultiplier : Float = switch (template.raceClass) {
-                      case (#Scrap) { 0.5 };
-                      case (#Junker) { 1.0 };
-                      case (#Raider) { 1.5 };
-                      case (#Elite) { 2.0 };
-                      case (#SilentKlan) { 2.5 };
-                    };
-                    let adjustedEntryFee = Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
+                    // Calculate entry fee and platform bonus
+                    // For multi-stage events with aggregate scoring, individual races get NO prizes
+                    // All prizes are distributed at event completion based on cumulative standings
+                    let (adjustedEntryFee, platformBonus) = if (isMultiStagePrizing) {
+                      // Multi-stage: No per-race prizes
+                      (0 : Nat, 0 : Nat);
+                    } else {
+                      // Single-stage: Split entry fees and platform bonus across races
+                      let classFeeMultiplier : Float = switch (template.raceClass) {
+                        case (#Scrap) { 1.0 };
+                        case (#Junker) { 1.5 };
+                        case (#Raider) { 2.0 };
+                        case (#Elite) { 2.5 };
+                        case (#SilentKlan) { 3.0 };
+                      };
 
-                    // Platform bonus based on event type and class
-                    let platformBonus : Nat = switch (event.eventType, template.raceClass) {
-                      case (#DailySprint, #Scrap) { 20_000_000 };
-                      case (#DailySprint, #Junker) { 40_000_000 };
-                      case (#DailySprint, #Raider) { 60_000_000 };
-                      case (#DailySprint, #Elite) { 80_000_000 };
-                      case (#DailySprint, #SilentKlan) { 100_000_000 };
-                      case (#WeeklyLeague, #Scrap) { 80_000_000 };
-                      case (#WeeklyLeague, #Junker) { 160_000_000 };
-                      case (#WeeklyLeague, #Raider) { 240_000_000 };
-                      case (#WeeklyLeague, #Elite) { 320_000_000 };
-                      case (#WeeklyLeague, #SilentKlan) { 480_000_000 };
-                      case (#MonthlyCup, #Elite) { 800_000_000 };
-                      case (#MonthlyCup, #SilentKlan) { 1_200_000_000 };
-                      case _ { event.metadata.prizePoolBonus };
+                      let racesForThisClass = countRacesForClass(template.raceClass);
+                      let perRaceFee = if (racesForThisClass > 0) {
+                        Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier)) / racesForThisClass;
+                      } else {
+                        0;
+                      };
+
+                      // Platform bonus based on event type and class (40% contribution)
+                      let basePlatformBonus : Nat = switch (event.eventType, template.raceClass) {
+                        case (#DailySprint, #Scrap) { 110_000_000 };
+                        case (#DailySprint, #Junker) { 160_000_000 };
+                        case (#DailySprint, #Raider) { 210_000_000 };
+                        case (#DailySprint, #Elite) { 270_000_000 };
+                        case (#DailySprint, #SilentKlan) { 320_000_000 };
+                        case (#WeeklyLeague, #Scrap) { 80_000_000 };
+                        case (#WeeklyLeague, #Junker) { 160_000_000 };
+                        case (#WeeklyLeague, #Raider) { 240_000_000 };
+                        case (#WeeklyLeague, #Elite) { 320_000_000 };
+                        case (#WeeklyLeague, #SilentKlan) { 480_000_000 };
+                        case (#MonthlyCup, #Elite) { 800_000_000 };
+                        case (#MonthlyCup, #SilentKlan) { 1_200_000_000 };
+                        case _ { event.metadata.prizePoolBonus };
+                      };
+                      // Split platform bonus across races for this class
+                      let splitBonus = if (racesForThisClass > 0) {
+                        basePlatformBonus / racesForThisClass;
+                      } else {
+                        basePlatformBonus;
+                      };
+
+                      (perRaceFee, splitBonus);
                     };
 
                     // Calculate start time for this stage (base + offset)
@@ -986,8 +1099,13 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                       3_600_000_000_000,
                     );
 
-                    // Schedule race start - but for multi-stage, each stage's first race starts independently
-                    if (not firstRaceScheduled or template.startOffset > 0) {
+                    // Schedule race start:
+                    // - For each stage (unique startOffset), only schedule Heat 1
+                    // - Heat 2+ within the same stage will CHAIN after Heat 1 finishes
+                    //   (handled by handleRaceFinish which triggers next race in event.raceIds)
+                    // - Different stages run independently at their scheduled times
+                    if (heatNumber == 1) {
+                      // First heat of this stage - schedule it at the stage start time
                       ignore tt().setActionASync<system>(
                         Int.abs(stageStartTime),
                         {
@@ -996,10 +1114,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                         },
                         3_600_000_000_000,
                       );
-                      if (template.startOffset == 0) {
-                        firstRaceScheduled := true;
-                      };
-                      Debug.print("Scheduled race start for " # stageName # " at " # Int.toText(stageStartTime));
+                      Debug.print("Scheduled race start for " # stageName # " Heat 1 at " # Int.toText(stageStartTime));
+                    } else {
+                      Debug.print("Heat " # Nat.toText(heatNumber) # " of " # stageName # " will chain after Heat " # Nat.toText(heatNumber - 1) # " finishes");
                     };
 
                     raceIndex += 1;
@@ -1137,23 +1254,23 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                       };
                     };
 
-                    // Calculate entry fee for this class
+                    // Calculate entry fee for this class (shifted up one bracket)
                     let classFeeMultiplier : Float = switch (raceClass) {
-                      case (#Scrap) { 0.5 };
-                      case (#Junker) { 1.0 };
-                      case (#Raider) { 1.5 };
-                      case (#Elite) { 2.0 };
-                      case (#SilentKlan) { 2.5 };
+                      case (#Scrap) { 1.0 };
+                      case (#Junker) { 1.5 };
+                      case (#Raider) { 2.0 };
+                      case (#Elite) { 2.5 };
+                      case (#SilentKlan) { 3.0 };
                     };
                     let adjustedEntryFee = Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
 
-                    // Platform bonus
+                    // Platform bonus (40% contribution)
                     let platformBonus : Nat = switch (event.eventType, raceClass) {
-                      case (#DailySprint, #Scrap) { 20_000_000 };
-                      case (#DailySprint, #Junker) { 40_000_000 };
-                      case (#DailySprint, #Raider) { 60_000_000 };
-                      case (#DailySprint, #Elite) { 80_000_000 };
-                      case (#DailySprint, #SilentKlan) { 100_000_000 };
+                      case (#DailySprint, #Scrap) { 110_000_000 };
+                      case (#DailySprint, #Junker) { 160_000_000 };
+                      case (#DailySprint, #Raider) { 210_000_000 };
+                      case (#DailySprint, #Elite) { 270_000_000 };
+                      case (#DailySprint, #SilentKlan) { 320_000_000 };
                       case (#WeeklyLeague, #Scrap) { 80_000_000 };
                       case (#WeeklyLeague, #Junker) { 160_000_000 };
                       case (#WeeklyLeague, #Raider) { 240_000_000 };
@@ -1290,6 +1407,27 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           params = to_candid (());
         },
       );
+      // Log successful scheduling
+      addTimerDiagnostic({
+        timestamp = Time.now();
+        handlerType = "race_create_EXIT";
+        actionId = { id = nextActionId.id; time = nextActionId.time };
+        message = "Scheduled next race_create timer. Next time: " # Nat.toText(Int.abs(nextCreationTime));
+        existingTimerCount = existingRaceCreateActions.size();
+        scheduledNextTimer = true;
+        nextTimerTime = ?Int.abs(nextCreationTime);
+      });
+    } else {
+      // Log that we skipped scheduling due to existing timer
+      addTimerDiagnostic({
+        timestamp = Time.now();
+        handlerType = "race_create_EXIT";
+        actionId = { id = actionId.id; time = actionId.time };
+        message = "SKIPPED scheduling - already have " # Nat.toText(existingRaceCreateActions.size()) # " race_create timers";
+        existingTimerCount = existingRaceCreateActions.size();
+        scheduledNextTimer = false;
+        nextTimerTime = null;
+      });
     };
 
     nextActionId;
@@ -1369,8 +1507,15 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     if (sprintsIn48h.size() < 8) {
       // Always start from now to fill gaps in the 48-hour window
       var scheduleTime = now;
+      var createdCount : Nat = 0;
+      let targetCount : Nat = 8 - sprintsIn48h.size();
 
-      for (i in Iter.range(0, 7 - sprintsIn48h.size())) {
+      // Limit iterations to prevent infinite loops (48h = 8 slots max)
+      var iterations : Nat = 0;
+      let maxIterations : Nat = 16; // Safety limit: check up to 16 slots
+
+      label scheduling while (createdCount < targetCount and iterations < maxIterations) {
+        iterations += 1;
         let nextSprint = RaceCalendar.getNextDailySprintTime(scheduleTime);
 
         // Check if event already exists at this time (within 5-minute window)
@@ -1390,11 +1535,64 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         if (existingAtTime.size() == 0) {
           ignore eventCalendar.createDailySprintEvent(nextSprint, now);
           Debug.print("Auto-scheduled Daily Sprint for timestamp: " # debug_show (nextSprint));
+          createdCount += 1;
         } else {
           Debug.print("SKIP: Daily Sprint already exists at timestamp: " # debug_show (nextSprint));
         };
 
         scheduleTime := nextSprint + 1_000_000_000;
+      };
+    };
+
+    // Check for Free Sprints in next 48 hours
+    let freeSprintsIn48h = Array.filter<RaceCalendar.ScheduledEvent>(
+      eventCalendar.getUpcomingEvents(now, 2), // Next 2 days
+      func(e) {
+        switch (e.eventType) {
+          case (#SpecialEvent(name)) { name == "Free Sprint" };
+          case (_) { false };
+        };
+      },
+    );
+
+    // Schedule Free Sprints to ensure at least 8 in next 48 hours (one every 6 hours, offset from Daily Sprints)
+    if (freeSprintsIn48h.size() < 8) {
+      var scheduleTime = now;
+      var createdCount : Nat = 0;
+      let targetCount : Nat = 8 - freeSprintsIn48h.size();
+
+      var iterations : Nat = 0;
+      let maxIterations : Nat = 16;
+
+      label freeScheduling while (createdCount < targetCount and iterations < maxIterations) {
+        iterations += 1;
+        let nextFreeSprint = RaceCalendar.getNextFreeSprintTime(scheduleTime);
+
+        // Check if Free Sprint already exists at this time (within 5-minute window)
+        let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
+          upcomingEvents,
+          func(e) {
+            switch (e.eventType) {
+              case (#SpecialEvent(name)) {
+                if (name == "Free Sprint") {
+                  let timeDiff = Int.abs(e.scheduledTime - nextFreeSprint);
+                  timeDiff < (5 * 60 * 1_000_000_000);
+                } else { false };
+              };
+              case (_) { false };
+            };
+          },
+        );
+
+        if (existingAtTime.size() == 0) {
+          ignore eventCalendar.createFreeSprintEvent(nextFreeSprint, now);
+          Debug.print("Auto-scheduled Free Sprint for timestamp: " # debug_show (nextFreeSprint));
+          createdCount += 1;
+        } else {
+          Debug.print("SKIP: Free Sprint already exists at timestamp: " # debug_show (nextFreeSprint));
+        };
+
+        scheduleTime := nextFreeSprint + 1_000_000_000;
       };
     };
 
@@ -2332,47 +2530,65 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   // - ScrapHeaps: PowerCells (power to push through debris)
                   // - WastelandSand: ThrusterKits/GyroModules alternating (accel/stability in sand)
 
-                  let partType : PokedBotsGarage.PartType = switch (race.terrain) {
-                    case (#MetalRoads) { #SpeedChip };
-                    case (#ScrapHeaps) { #PowerCoreFragment };
-                    case (#WastelandSand) {
-                      // Alternate between Thruster and Gyro based on race ID
-                      if (raceId % 2 == 0) { #ThrusterKit } else { #GyroModule };
+                  // Check if this race is part of a multi-stage event (Cumulative or TeamAggregate)
+                  // If so, skip per-race parts - they'll be awarded at event completion
+                  let isMultiStageRace = switch (eventCalendar.getEventByRaceId(raceId)) {
+                    case (?parentEvent) {
+                      switch (parentEvent.metadata.scoringMode) {
+                        case (#Cumulative) { true };
+                        case (#TeamAggregate) { true };
+                        case (_) { false };
+                      };
                     };
+                    case (null) { false };
                   };
 
-                  // Base parts awarded by race class (matches original scrap system: 1 scrap = 1 part)
-                  // First upgrade costs 100 parts, achievable in ~7-15 Junker races
-                  let baseParts : Nat = switch (race.raceClass) {
-                    case (#Scrap) { 2 }; // Rookie: 1-6 parts per race (winner: 6, participation: 1)
-                    case (#Junker) { 5 }; // Entry: 2.5-15 parts per race (winner: 15, participation: 2.5)
-                    case (#Raider) { 12 }; // Mid: 6-36 parts per race (winner: 36)
-                    case (#Elite) { 25 }; // High: 12.5-75 parts per race (winner: 75)
-                    case (#SilentKlan) { 50 }; // Top: 25-150 parts per race (winner: 150)
-                  };
+                  if (not isMultiStageRace) {
+                    let partType : PokedBotsGarage.PartType = switch (race.terrain) {
+                      case (#MetalRoads) { #SpeedChip };
+                      case (#ScrapHeaps) { #PowerCoreFragment };
+                      case (#WastelandSand) {
+                        // Alternate between Thruster and Gyro based on race ID
+                        if (raceId % 2 == 0) { #ThrusterKit } else {
+                          #GyroModule;
+                        };
+                      };
+                    };
 
-                  // Position multiplier (winner gets most, last place gets least)
-                  let positionMultiplier : Float = if (result.position == 1) {
-                    3.0; // Winner: 3x
-                  } else if (result.position == 2) {
-                    2.0; // Second: 2x
-                  } else if (result.position == 3) {
-                    1.5; // Third: 1.5x
+                    // Base parts awarded by race class (flattened curve: Scrap ~70, SilentKlan ~200)
+                    let baseParts : Nat = switch (race.raceClass) {
+                      case (#Scrap) { 70 };
+                      case (#Junker) { 100 };
+                      case (#Raider) { 135 };
+                      case (#Elite) { 170 };
+                      case (#SilentKlan) { 200 };
+                    };
+
+                    // Position multiplier (flattened: winner gets 1.5x, participation gets 1x)
+                    let positionMultiplier : Float = if (result.position == 1) {
+                      1.5; // Winner: 1.5x
+                    } else if (result.position == 2) {
+                      1.25; // Second: 1.25x
+                    } else if (result.position == 3) {
+                      1.1; // Third: 1.1x
+                    } else {
+                      1.0; // Everyone else: 1x (participation)
+                    };
+
+                    let partsEarned = Int.abs(Float.toInt(Float.fromInt(baseParts) * positionMultiplier));
+                    garageManager.addParts(result.owner, partType, partsEarned);
+
+                    let partName = switch (partType) {
+                      case (#SpeedChip) { "SpeedChips" };
+                      case (#PowerCoreFragment) { "PowerCells" };
+                      case (#ThrusterKit) { "ThrusterKits" };
+                      case (#GyroModule) { "GyroModules" };
+                      case (#UniversalPart) { "UniversalParts" };
+                    };
+                    Debug.print("Awarded " # debug_show (partsEarned) # " " # partName # " to " # Principal.toText(result.owner));
                   } else {
-                    1.0; // Everyone else: 1x (participation)
+                    Debug.print("Skipping per-race parts for multi-stage event - will award at event completion");
                   };
-
-                  let partsEarned = Int.abs(Float.toInt(Float.fromInt(baseParts) * positionMultiplier));
-                  garageManager.addParts(result.owner, partType, partsEarned);
-
-                  let partName = switch (partType) {
-                    case (#SpeedChip) { "SpeedChips" };
-                    case (#PowerCoreFragment) { "PowerCells" };
-                    case (#ThrusterKit) { "ThrusterKits" };
-                    case (#GyroModule) { "GyroModules" };
-                    case (#UniversalPart) { "UniversalParts" };
-                  };
-                  Debug.print("Awarded " # debug_show (partsEarned) # " " # partName # " to " # Principal.toText(result.owner));
 
                   // Apply race costs (battery drain and condition wear based on race)
                   garageManager.applyRaceCosts(result.nftId, race.distance, race.trackId, result.position);
@@ -2499,7 +2715,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                           // Check if this event has aggregate scoring to process
                           switch (event.metadata.scoringMode) {
                             case (#TeamAggregate) {
-                              // FACTION WARS: Aggregate points by faction, distribute bonus to winning faction
+                              // FACTION WARS: Aggregate points by faction, distribute FULL prize pool to winning faction
                               Debug.print("Processing TeamAggregate scoring for Faction Wars event " # Nat.toText(event.eventId));
 
                               // Collect all results from all races in the event
@@ -2582,6 +2798,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                               // Find winning faction
                               var winningFaction = "None";
                               var winningPoints : Nat = 0;
+                              Debug.print("=== FACTION WARS STANDINGS ===");
                               for ((faction, points) in Map.entries(factionPoints)) {
                                 Debug.print("Faction " # faction # ": " # Nat.toText(points) # " points");
                                 if (points > winningPoints) {
@@ -2592,42 +2809,81 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
                               Debug.print("Winning faction: " # winningFaction # " with " # Nat.toText(winningPoints) # " points");
 
-                              // Distribute event bonus prize to winning faction members
-                              if (event.metadata.eventBonusPrize > 0 and winningFaction != "None") {
+                              // Calculate total prize pool from entry fees paid by all registrants
+                              var totalPrizePool : Nat = event.metadata.prizePoolBonus; // Start with platform bonus
+                              for (registration in event.registrations.vals()) {
+                                let classFeeMultiplier : Float = switch (registration.raceClass) {
+                                  case (#Scrap) { 1.0 };
+                                  case (#Junker) { 1.5 };
+                                  case (#Raider) { 2.0 };
+                                  case (#Elite) { 2.5 };
+                                  case (#SilentKlan) { 3.0 };
+                                };
+                                totalPrizePool += Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
+                              };
+
+                              // Add event bonus prize
+                              totalPrizePool += event.metadata.eventBonusPrize;
+
+                              // Apply 5% platform tax
+                              let platformTax = (totalPrizePool * 5) / 100;
+                              let netPrizePool = Nat.sub(totalPrizePool, platformTax);
+
+                              Debug.print("TeamAggregate event total prize pool: " # Nat.toText(totalPrizePool) # " (net: " # Nat.toText(netPrizePool) # " after 5% tax)");
+
+                              // Distribute FULL prize pool to winning faction members (split equally)
+                              if (netPrizePool > 0 and winningFaction != "None") {
                                 switch (Map.get(factionMembers, Map.thash, winningFaction)) {
                                   case (?winners) {
                                     if (winners.size() > 0) {
-                                      let prizePerMember = event.metadata.eventBonusPrize / winners.size();
+                                      let prizePerMember = netPrizePool / winners.size();
                                       Debug.print("Distributing " # Nat.toText(prizePerMember) # " ICP e8s to each of " # Nat.toText(winners.size()) # " " # winningFaction # " members");
 
+                                      var memberIndex : Nat = 0;
                                       for (winner in winners.vals()) {
                                         ignore tt().setActionASync<system>(
-                                          Int.abs(Time.now() + 10_000_000_000), // 10 second delay
+                                          Int.abs(Time.now() + (10_000_000_000 * (memberIndex + 1))), // Stagger payouts
                                           {
                                             actionType = "prize_distribution";
                                             params = to_candid ({
-                                              raceId = 0 : Nat; // Event-level bonus
+                                              raceId = 0 : Nat; // Event-level prize
                                               owner = winner;
                                               amount = prizePerMember;
                                             });
                                           },
                                           PRIZE_DISTRIBUTION_TIMEOUT,
                                         );
+                                        memberIndex += 1;
                                       };
                                     };
                                   };
                                   case (null) {};
                                 };
                               };
+
+                              // Award parts to winning faction members (UniversalParts based on average class)
+                              // Base: 150 parts per member (between Raider and Elite)
+                              Debug.print("Awarding parts to winning faction members");
+                              switch (Map.get(factionMembers, Map.thash, winningFaction)) {
+                                case (?winners) {
+                                  let partsPerMember : Nat = 150; // Multi-stage event parts reward
+                                  for (winner in winners.vals()) {
+                                    garageManager.addParts(winner, #UniversalPart, partsPerMember);
+                                    Debug.print("Awarded " # Nat.toText(partsPerMember) # " UniversalParts to " # Principal.toText(winner) # " (TeamAggregate winner)");
+                                  };
+                                };
+                                case (null) {};
+                              };
                             };
 
                             case (#Cumulative) {
-                              // DISTANCE CHALLENGE: Sum points per bot, distribute bonus to top cumulative performer
+                              // MULTI-STAGE EVENT: Sum points per bot, distribute FULL prize pool based on cumulative standings
                               Debug.print("Processing Cumulative scoring for event " # Nat.toText(event.eventId));
 
-                              // Collect cumulative points per bot
+                              // Collect cumulative points per bot AND track by division
                               var botPoints = Map.new<Text, Nat>();
                               var botOwners = Map.new<Text, Principal>();
+                              var botDivisions = Map.new<Text, RacingSimulator.RaceClass>();
 
                               for (eventRaceId in event.raceIds.vals()) {
                                 switch (raceManager.getRace(eventRaceId)) {
@@ -2649,6 +2905,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                                           };
                                           ignore Map.put(botPoints, Map.thash, result.nftId, currentPoints + positionPoints);
                                           ignore Map.put(botOwners, Map.thash, result.nftId, result.owner);
+                                          ignore Map.put(botDivisions, Map.thash, result.nftId, eventRace.raceClass);
                                         };
                                       };
                                       case (null) {};
@@ -2658,37 +2915,114 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                                 };
                               };
 
-                              // Find top cumulative performer
-                              var winningBot = "";
-                              var winningPoints : Nat = 0;
-                              for ((botId, points) in Map.entries(botPoints)) {
-                                Debug.print("Bot " # botId # ": " # Nat.toText(points) # " cumulative points");
-                                if (points > winningPoints) {
-                                  winningBot := botId;
-                                  winningPoints := points;
+                              // Calculate total prize pool from entry fees paid by all registrants
+                              // Entry fee calculation: base fee × class multiplier
+                              var totalPrizePool : Nat = event.metadata.prizePoolBonus; // Start with platform bonus
+                              for (registration in event.registrations.vals()) {
+                                let classFeeMultiplier : Float = switch (registration.raceClass) {
+                                  case (#Scrap) { 1.0 };
+                                  case (#Junker) { 1.5 };
+                                  case (#Raider) { 2.0 };
+                                  case (#Elite) { 2.5 };
+                                  case (#SilentKlan) { 3.0 };
                                 };
+                                totalPrizePool += Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
                               };
 
-                              // Distribute event bonus to cumulative winner
-                              if (event.metadata.eventBonusPrize > 0 and winningBot != "") {
-                                switch (Map.get(botOwners, Map.thash, winningBot)) {
-                                  case (?winner) {
-                                    Debug.print("Cumulative winner: " # winningBot # " (" # Principal.toText(winner) # ") with " # Nat.toText(winningPoints) # " points - awarding " # Nat.toText(event.metadata.eventBonusPrize) # " bonus");
-                                    ignore tt().setActionASync<system>(
-                                      Int.abs(Time.now() + 10_000_000_000), // 10 second delay
-                                      {
-                                        actionType = "prize_distribution";
-                                        params = to_candid ({
-                                          raceId = 0 : Nat; // Event-level bonus
-                                          owner = winner;
-                                          amount = event.metadata.eventBonusPrize;
-                                        });
-                                      },
-                                      PRIZE_DISTRIBUTION_TIMEOUT,
-                                    );
+                              // Add event bonus prize
+                              totalPrizePool += event.metadata.eventBonusPrize;
+
+                              // Apply 5% platform tax
+                              let platformTax = (totalPrizePool * 5) / 100;
+                              let netPrizePool = Nat.sub(totalPrizePool, platformTax);
+
+                              Debug.print("Cumulative event total prize pool: " # Nat.toText(totalPrizePool) # " (net: " # Nat.toText(netPrizePool) # " after 5% tax)");
+
+                              // Sort bots by cumulative points (descending)
+                              let botEntries = Iter.toArray(Map.entries(botPoints));
+                              let sortedBots = Array.sort<(Text, Nat)>(
+                                botEntries,
+                                func(a : (Text, Nat), b : (Text, Nat)) : {
+                                  #less;
+                                  #greater;
+                                  #equal;
+                                } {
+                                  if (a.1 > b.1) { #less } else if (a.1 < b.1) {
+                                    #greater;
+                                  } else { #equal };
+                                },
+                              );
+
+                              // Print final cumulative standings
+                              Debug.print("=== CUMULATIVE EVENT STANDINGS ===");
+                              var position : Nat = 1;
+                              for ((botId, points) in sortedBots.vals()) {
+                                Debug.print("#" # Nat.toText(position) # ": Bot " # botId # " - " # Nat.toText(points) # " points");
+                                position += 1;
+                              };
+
+                              // Distribute prizes based on cumulative standings (same distribution as individual races)
+                              // 1st: 45%, 2nd: 28%, 3rd: 18%, 4th: 9%
+                              var prizePosition : Nat = 1;
+                              for ((botId, points) in sortedBots.vals()) {
+                                let prizeAmount : Nat = if (prizePosition == 1) {
+                                  (netPrizePool * 45) / 100;
+                                } else if (prizePosition == 2) {
+                                  (netPrizePool * 28) / 100;
+                                } else if (prizePosition == 3) {
+                                  (netPrizePool * 18) / 100;
+                                } else if (prizePosition == 4) {
+                                  (netPrizePool * 9) / 100;
+                                } else {
+                                  0;
+                                };
+
+                                if (prizeAmount > 0) {
+                                  switch (Map.get(botOwners, Map.thash, botId)) {
+                                    case (?owner) {
+                                      Debug.print("Awarding " # Nat.toText(prizeAmount) # " ICP e8s to Bot " # botId # " (position " # Nat.toText(prizePosition) # ", " # Nat.toText(points) # " points)");
+                                      ignore tt().setActionASync<system>(
+                                        Int.abs(Time.now() + (10_000_000_000 * prizePosition)), // Stagger by 10s each
+                                        {
+                                          actionType = "prize_distribution";
+                                          params = to_candid ({
+                                            raceId = 0 : Nat; // Event-level prize
+                                            owner = owner;
+                                            amount = prizeAmount;
+                                          });
+                                        },
+                                        PRIZE_DISTRIBUTION_TIMEOUT,
+                                      );
+                                    };
+                                    case (null) {};
+                                  };
+                                };
+                                prizePosition += 1;
+                              };
+
+                              // Award parts based on cumulative standings (UniversalParts)
+                              // Position-based: 1st=225, 2nd=188, 3rd=165, 4th+=150 (roughly matching normal race parts)
+                              Debug.print("Awarding parts based on cumulative standings");
+                              var partsPosition : Nat = 1;
+                              for ((botId, points) in sortedBots.vals()) {
+                                let partsEarned : Nat = if (partsPosition == 1) {
+                                  225; // ~150 base * 1.5x winner
+                                } else if (partsPosition == 2) {
+                                  188; // ~150 base * 1.25x
+                                } else if (partsPosition == 3) {
+                                  165; // ~150 base * 1.1x
+                                } else {
+                                  150; // base participation
+                                };
+
+                                switch (Map.get(botOwners, Map.thash, botId)) {
+                                  case (?owner) {
+                                    garageManager.addParts(owner, #UniversalPart, partsEarned);
+                                    Debug.print("Awarded " # Nat.toText(partsEarned) # " UniversalParts to Bot " # botId # " (position " # Nat.toText(partsPosition) # ")");
                                   };
                                   case (null) {};
                                 };
+                                partsPosition += 1;
                               };
                             };
 
@@ -2733,7 +3067,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     return #awaited(actionId);
   };
   tt().registerExecutionListenerSync(?"upgrade_complete", handleUpgradeCompletion);
-  tt().registerExecutionListenerSync(?"hourly_recharge", handleHourlyRecharge);
   tt().registerExecutionListenerSync(?"race_create", handleRaceCreation);
   tt().registerExecutionListenerSync(?"betting_pool_create", handleBettingPoolCreate);
   tt().registerExecutionListenerSync(?"race_start", handleRaceStart);
@@ -2846,7 +3179,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     GarageRepairRobot.config(),
     GarageUpgradeRobot.config(),
     GarageCancelUpgrade.config(),
-    GarageTransferParts.config(),
+    // SECURITY: GarageTransferParts removed - could be exploited to steal parts
     GarageStartScavenging.config(),
     GarageCompleteScavenging.config(),
     GarageConvertParts.config(),
@@ -2859,10 +3192,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     RacingGetBotRaces.config(),
     RacingRegisterForEvent.config(),
     RacingUnregisterFromEvent.config(),
+    RacingGetEventResults.config(),
     BettingPlaceBet.config(),
     BettingListPools.config(),
     BettingGetPoolInfo.config(),
     BettingGetMyBets.config(),
+    RacingGetBotNames.config(),
   ];
 
   // --- 2. CONFIGURE THE SDK ---
@@ -2891,7 +3226,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       ("garage_repair_robot", GarageRepairRobot.handle(toolContext)),
       ("garage_upgrade_robot", GarageUpgradeRobot.handle(toolContext)),
       ("garage_cancel_upgrade", GarageCancelUpgrade.handle(toolContext)),
-      ("garage_transfer_parts", GarageTransferParts.handle(toolContext)),
+      // SECURITY: garage_transfer_parts removed - could be exploited to steal parts
       ("garage_start_scavenging", GarageStartScavenging.handle(toolContext)),
       ("garage_complete_scavenging", GarageCompleteScavenging.handle(toolContext)),
       ("garage_convert_parts", GarageConvertParts.handle(toolContext)),
@@ -2904,10 +3239,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       ("racing_get_bot_races", RacingGetBotRaces.handle(toolContext)),
       ("racing_register_for_event", RacingRegisterForEvent.handle(toolContext)),
       ("racing_unregister_from_event", RacingUnregisterFromEvent.handle(toolContext)),
+      ("racing_get_event_results", RacingGetEventResults.handle(toolContext)),
       ("betting_place_bet", BettingPlaceBet.handle(toolContext)),
       ("betting_list_pools", BettingListPools.handle(toolContext)),
       ("betting_get_pool_info", BettingGetPoolInfo.handle(toolContext)),
       ("betting_get_my_bets", BettingGetMyBets.handle(toolContext)),
+      ("racing_get_bot_names", RacingGetBotNames.handle(toolContext)),
     ];
     beacon = beaconContext;
   };
@@ -2959,6 +3296,110 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   /// Get the currently configured EXT NFT canister ID.
   public query func get_ext_canister() : async Principal {
     return extCanisterId;
+  };
+
+  // --- RACE CREATE TIMER DIAGNOSTIC ENDPOINTS ---
+
+  /// Get race_create timer handler diagnostic logs
+  public query func get_race_create_diagnostics() : async {
+    entries : [{
+      timestamp : Int;
+      handlerType : Text;
+      actionId : { id : Nat; time : Nat };
+      message : Text;
+      existingTimerCount : Nat;
+      scheduledNextTimer : Bool;
+      nextTimerTime : ?Nat;
+    }];
+    totalCount : Nat;
+    currentRaceCreateTimers : Nat;
+  } {
+    // Get current race_create timers for context
+    let raceCreateTimers = tt().getActionsByFilter(#ByType("race_create"));
+
+    return {
+      entries = stable_timer_diagnostics;
+      totalCount = stable_timer_diagnostics.size();
+      currentRaceCreateTimers = raceCreateTimers.size();
+    };
+  };
+
+  /// Clear race_create timer diagnostic logs (owner only)
+  public shared ({ caller }) func clear_race_create_diagnostics() : async Result.Result<Nat, Text> {
+    if (caller != owner) {
+      return #err("Only the owner can clear timer diagnostics");
+    };
+    let clearedCount = stable_timer_diagnostics.size();
+    stable_timer_diagnostics := [];
+    return #ok(clearedCount);
+  };
+
+  /// Get detailed timer state for race_create debugging
+  public query func get_race_create_timer_state() : async {
+    raceCreateTimers : [{ id : Nat; time : Nat; actionType : Text }];
+    raceStartTimers : [{ id : Nat; time : Nat; actionType : Text }];
+    raceFinishTimers : [{ id : Nat; time : Nat; actionType : Text }];
+    allTimerCount : Nat;
+  } {
+    let raceCreate = tt().getActionsByFilter(#ByType("race_create"));
+    let raceStart = tt().getActionsByFilter(#ByType("race_start"));
+    let raceFinish = tt().getActionsByFilter(#ByType("race_finish"));
+
+    return {
+      raceCreateTimers = Array.map<(TT.ActionId, TT.Action), { id : Nat; time : Nat; actionType : Text }>(
+        raceCreate,
+        func((aid, act)) {
+          { id = aid.id; time = aid.time; actionType = act.actionType };
+        },
+      );
+      raceStartTimers = Array.map<(TT.ActionId, TT.Action), { id : Nat; time : Nat; actionType : Text }>(
+        raceStart,
+        func((aid, act)) {
+          { id = aid.id; time = aid.time; actionType = act.actionType };
+        },
+      );
+      raceFinishTimers = Array.map<(TT.ActionId, TT.Action), { id : Nat; time : Nat; actionType : Text }>(
+        raceFinish,
+        func((aid, act)) {
+          { id = aid.id; time = aid.time; actionType = act.actionType };
+        },
+      );
+      allTimerCount = raceCreate.size() + raceStart.size() + raceFinish.size();
+    };
+  };
+
+  /// Manually trigger a race_create timer if none exist (owner only, emergency recovery)
+  public shared ({ caller }) func force_schedule_race_create() : async Result.Result<{ id : Nat; time : Nat }, Text> {
+    if (caller != owner) {
+      return #err("Only the owner can force schedule timers");
+    };
+
+    let existingTimers = tt().getActionsByFilter(#ByType("race_create"));
+    if (existingTimers.size() > 0) {
+      return #err("Race create timer already exists (" # Nat.toText(existingTimers.size()) # " timers found)");
+    };
+
+    let now = Time.now();
+    let nextTime = now + (60 * 1_000_000_000); // 1 minute from now
+    let newActionId = tt().setActionSync<system>(
+      Int.abs(nextTime),
+      {
+        actionType = "race_create";
+        params = to_candid (());
+      },
+    );
+
+    addTimerDiagnostic({
+      timestamp = now;
+      handlerType = "MANUAL_FORCE_SCHEDULE";
+      actionId = { id = newActionId.id; time = newActionId.time };
+      message = "Manually forced race_create timer creation";
+      existingTimerCount = 0;
+      scheduledNextTimer = true;
+      nextTimerTime = ?Int.abs(nextTime);
+    });
+
+    return #ok({ id = newActionId.id; time = newActionId.time });
   };
 
   /// Get the canister's balance of a specific ICRC-1 token.
@@ -3394,19 +3835,51 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             } else { 1.0 };
             let speedBonus = 1.0 + (Float.fromInt(currentStats.speed) / 100.0 * 0.10);
 
-            let chargingCurve = if (mission.zone == #ChargingStation) {
-              if (stats.battery < 25) { 4.0 } else if (stats.battery < 50) {
-                3.0;
-              } else if (stats.battery < 75) { 2.0 } else { 1.0 };
-            } else { 1.0 };
-
             let durationBonus = garageManager.getDurationBonus(Int.abs(Float.toInt(totalHoursElapsed)));
 
             let synergies = garageManager.calculateFactionSynergies(stats.ownerPrincipal);
 
             let partsThisAccumulation = rates.basePartsPerHour * hoursElapsed * zoneMultipliers.parts * factionBonus.partsMultiplier * speedBonus * durationBonus * synergies.yieldMultipliers.scavengingParts;
-            let batteryDrain = rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus * chargingCurve / durationBonus * synergies.drainMultipliers.scavengingDrain;
-            let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionBonus.conditionMultiplier * stabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
+
+            // Calculate battery drain using proper tiered charging simulation for ChargingStation
+            // NOTE: Don't apply powerCoreBonus or faction batteryMultiplier to restoration!
+            // Those bonuses reduce battery DRAIN, not increase charging speed.
+            // POWER GRID: Apply garage power efficiency to charging rate
+            let batteryDrain = if (mission.zone == #ChargingStation) {
+              let baseRestorationRate = Float.abs(rates.baseBatteryDrain * zoneMultipliers.battery / durationBonus * synergies.drainMultipliers.scavengingDrain);
+              let powerEfficiency = garageManager.getGaragePowerEfficiency(stats.ownerPrincipal);
+              let batteryGained = garageManager.calculateChargingStationBattery(stats.battery, baseRestorationRate, hoursElapsed, powerEfficiency);
+              -batteryGained; // Negative = restoration
+            } else {
+              rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
+            };
+
+            // Calculate effective charging curve for display (actual battery gained / base rate battery)
+            let chargingCurve = if (mission.zone == #ChargingStation and hoursElapsed > 0.0) {
+              let baseRestorationRate = Float.abs(rates.baseBatteryDrain * zoneMultipliers.battery / durationBonus * synergies.drainMultipliers.scavengingDrain);
+              let baseRestoration = baseRestorationRate * hoursElapsed; // What we'd get at 1.0x
+              let actualRestoration = Float.abs(batteryDrain);
+              if (baseRestoration > 0.0) { actualRestoration / baseRestoration } else {
+                1.0;
+              };
+            } else { 1.0 };
+
+            // Faction condition multiplier should only apply to damage, not restoration
+            // In RepairBay, the zone multiplier is negative (restoration), so we don't apply faction penalty
+            // Same for stabilityBonus - it reduces condition DAMAGE, shouldn't slow restoration
+            let isRestorationZone = mission.zone == #RepairBay;
+            let factionConditionMult = if (isRestorationZone) {
+              1.0; // No faction modifier for restoration
+            } else {
+              factionBonus.conditionMultiplier; // Apply faction modifier for damage
+            };
+            let effectiveStabilityBonus = if (isRestorationZone) {
+              1.0; // No stability modifier for restoration
+            } else {
+              stabilityBonus; // Apply stability modifier for damage
+            };
+
+            let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionConditionMult * effectiveStabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
 
             // Apply variance (same as actual function)
             let batteryVariance = Float.fromInt((PokedBotsGarage.hashNat(tokenIndex + Int.abs(now)) % 41) - 20) / 100.0;
@@ -3425,8 +3898,18 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               batteryFloor;
             };
 
+            // Update battery (restoration for ChargingStation, drain for others)
             let newBattery = if (batteryDrainWithVariance < 0.0) {
-              Nat.min(100, stats.battery + batteryDrainRounded);
+              // Restoration: add battery (capped at 100)
+              // FIX: Use float comparison to check if we should reach 100%
+              // This prevents variance and rounding from keeping bots stuck at 99%
+              let preVarianceBatteryFloat = Float.fromInt(stats.battery) + Float.abs(batteryDrain);
+              if (preVarianceBatteryFloat >= 99.5) {
+                // Close enough to 100 - just complete the charge
+                100;
+              } else {
+                Nat.min(100, stats.battery + batteryDrainRounded);
+              };
             } else {
               if (stats.battery > batteryDrainRounded) {
                 stats.battery - batteryDrainRounded;
@@ -3659,6 +4142,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   acceleration = 50;
                   stability = 50;
                   luck = 10;
+                  overcharge = 0;
+                  perfectTuneUp = false;
                 };
               };
             };
@@ -3754,6 +4239,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                     acceleration = 50;
                     stability = 50;
                     luck = 10;
+                    overcharge = 0;
+                    perfectTuneUp = false;
                   };
                 };
               };
@@ -3765,6 +4252,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                 acceleration = 50;
                 stability = 50;
                 luck = 10;
+                overcharge = 0;
+                perfectTuneUp = false;
               };
             };
           };
@@ -4293,7 +4782,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         let baseStats = garageManager.getBaseStats(tokenIndex);
         let totalBaseStats = baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability;
         let baseRating = totalBaseStats / 4;
-        let baseLuck = RacingSimulator.deriveBaseLuck(tokenIndex);
+        let baseLuck = 10; // Fixed luck for all bots
 
         // Get faction from precomputed stats
         let precomputedStats = Map.get(stable_base_stats, Map.nhash, tokenIndex);
@@ -4403,7 +4892,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           let baseStats = garageManager.getBaseStats(tokenIndex);
           let totalBaseStats = baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability;
           let baseRating = totalBaseStats / 4;
-          let baseLuck = RacingSimulator.deriveBaseLuck(tokenIndex);
+          let baseLuck = 10; // Fixed luck for all bots
 
           // Get faction from precomputed stats
           let precomputedStats = Map.get(stable_base_stats, Map.nhash, tokenIndex);
@@ -4473,6 +4962,58 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         });
       };
     };
+  };
+
+  /// Get resonance info for a bot (admin only) - for verifying the resonance system
+  public shared query (msg) func admin_get_resonance(tokenIndex : Nat) : async Result.Result<{ tokenIndex : Nat; currentTime : Int; recharge : { optimalPoint : Nat; inPeakZone : Bool; inGoodZone : Bool; resonanceStatus : Text; hoursUntilDrift : Nat }; repair : { optimalPoint : Nat; inPeakZone : Bool; inGoodZone : Bool; resonanceStatus : Text; hoursUntilDrift : Nat }; currentBattery : ?Nat; currentCondition : ?Nat }, Text> {
+    if (msg.caller != owner) {
+      return #err("Only the owner can access resonance info");
+    };
+
+    let now = Time.now();
+
+    // Get current stats if available
+    let statsOpt = garageManager.getStats(tokenIndex);
+    let (battery, condition) = switch (statsOpt) {
+      case (?stats) { (?stats.battery, ?stats.condition) };
+      case (null) { (null, null) };
+    };
+
+    // Calculate resonance for both recharge and repair
+    let rechargeResonance = ResonanceSystem.calculateResonance(
+      tokenIndex,
+      #Recharge,
+      Option.get(battery, 50), // Default to 50% if no stats
+      now,
+    );
+
+    let repairResonance = ResonanceSystem.calculateResonance(
+      tokenIndex,
+      #Repair,
+      Option.get(condition, 50), // Default to 50% if no stats
+      now,
+    );
+
+    #ok({
+      tokenIndex = tokenIndex;
+      currentTime = now;
+      recharge = {
+        optimalPoint = rechargeResonance.optimalPoint;
+        inPeakZone = rechargeResonance.inPeakZone;
+        inGoodZone = rechargeResonance.inGoodZone;
+        resonanceStatus = rechargeResonance.resonanceStatus;
+        hoursUntilDrift = rechargeResonance.hoursUntilDrift;
+      };
+      repair = {
+        optimalPoint = repairResonance.optimalPoint;
+        inPeakZone = repairResonance.inPeakZone;
+        inGoodZone = repairResonance.inGoodZone;
+        resonanceStatus = repairResonance.resonanceStatus;
+        hoursUntilDrift = repairResonance.hoursUntilDrift;
+      };
+      currentBattery = battery;
+      currentCondition = condition;
+    });
   };
 
   // ===== PRE-COMPUTED BASE STATS UPLOAD =====
@@ -4631,6 +5172,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   };
 
   // Get upcoming events with race summaries
+  // Now includes events that have any pending/upcoming races, even if event start time has passed
   public query func get_upcoming_events_with_races(daysAhead : Nat) : async [{
     event : RaceCalendar.ScheduledEvent;
     raceSummary : {
@@ -4639,18 +5181,68 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       distances : [Nat];
       totalParticipants : Nat;
       totalPrizePool : Nat;
+      nextRaceStartTime : ?Int; // When the next race starts (null if all completed)
+      completedRaces : Nat;
+      pendingRaces : Nat;
     };
   }] {
     let now = Time.now();
-    let events = eventCalendar.getUpcomingEvents(now, daysAhead);
+    let NANOS_PER_DAY : Int = 86400_000_000_000;
+    let endTime = now + (daysAhead * NANOS_PER_DAY);
 
-    Array.map<RaceCalendar.ScheduledEvent, { event : RaceCalendar.ScheduledEvent; raceSummary : { totalRaces : Nat; terrains : [RacingSimulator.Terrain]; distances : [Nat]; totalParticipants : Nat; totalPrizePool : Nat } }>(
-      events,
+    // Get all non-cancelled/non-completed events
+    let allEvents = eventCalendar.getAllEvents();
+
+    // Filter to events that either:
+    // 1. Have scheduledTime within range (traditional upcoming)
+    // 2. Have any races that are still pending/upcoming (multi-stage events)
+    let relevantEvents = Array.filter<RaceCalendar.ScheduledEvent>(
+      allEvents,
+      func(e) {
+        // Skip cancelled/completed events
+        if (e.status == #Completed or e.status == #Cancelled) {
+          return false;
+        };
+
+        // Traditional check: event is upcoming
+        let isTraditionalUpcoming = e.scheduledTime >= now and e.scheduledTime <= endTime;
+
+        // New check: event has any pending/upcoming races (for multi-stage events)
+        var hasUpcomingRaces = false;
+        for (raceId in e.raceIds.vals()) {
+          switch (raceManager.getRace(raceId)) {
+            case (?race) {
+              // Race is upcoming if it's not completed/cancelled
+              switch (race.status) {
+                case (#Upcoming) { hasUpcomingRaces := true };
+                case (#InProgress) { hasUpcomingRaces := true };
+                case _ {};
+              };
+            };
+            case (null) {};
+          };
+        };
+
+        isTraditionalUpcoming or hasUpcomingRaces;
+      },
+    );
+
+    // Sort by next race start time or event scheduled time
+    let sortedEvents = Array.sort<RaceCalendar.ScheduledEvent>(
+      relevantEvents,
+      func(a, b) { Int.compare(a.scheduledTime, b.scheduledTime) },
+    );
+
+    Array.map<RaceCalendar.ScheduledEvent, { event : RaceCalendar.ScheduledEvent; raceSummary : { totalRaces : Nat; terrains : [RacingSimulator.Terrain]; distances : [Nat]; totalParticipants : Nat; totalPrizePool : Nat; nextRaceStartTime : ?Int; completedRaces : Nat; pendingRaces : Nat } }>(
+      sortedEvents,
       func(event) {
         var terrains : [RacingSimulator.Terrain] = [];
         var distances : [Nat] = [];
         var totalParticipants : Nat = 0;
         var totalPrizePool : Nat = 0;
+        var nextRaceStartTime : ?Int = null;
+        var completedRaces : Nat = 0;
+        var pendingRaces : Nat = 0;
 
         for (raceId in event.raceIds.vals()) {
           switch (raceManager.getRace(raceId)) {
@@ -4664,6 +5256,26 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                 sponsorships += sponsor.amount;
               };
               totalPrizePool += race.prizePool + race.platformBonus + sponsorships;
+
+              // Track race status and find next race start time
+              switch (race.status) {
+                case (#Completed) { completedRaces += 1 };
+                case (#Cancelled) { completedRaces += 1 }; // Count as "done"
+                case _ {
+                  pendingRaces += 1;
+                  // Find earliest upcoming race
+                  if (race.startTime > now) {
+                    switch (nextRaceStartTime) {
+                      case (null) { nextRaceStartTime := ?race.startTime };
+                      case (?current) {
+                        if (race.startTime < current) {
+                          nextRaceStartTime := ?race.startTime;
+                        };
+                      };
+                    };
+                  };
+                };
+              };
             };
             case (null) {};
           };
@@ -4677,6 +5289,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             distances = distances;
             totalParticipants = totalParticipants;
             totalPrizePool = totalPrizePool;
+            nextRaceStartTime = nextRaceStartTime;
+            completedRaces = completedRaces;
+            pendingRaces = pendingRaces;
           };
         };
       },
@@ -4776,6 +5391,309 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
   };
 
+  // Event result entry for cumulative standings
+  public type EventStandingEntry = {
+    tokenIndex : Nat;
+    owner : Principal;
+    cumulativePoints : Nat;
+    position : Nat;
+    raceResults : [{
+      raceId : Nat;
+      stageName : Text;
+      position : Nat;
+      points : Nat;
+    }];
+    prizeAmount : Nat;
+  };
+
+  // Faction standing entry for team aggregate scoring
+  public type FactionStandingEntry = {
+    faction : Text;
+    totalPoints : Nat;
+    position : Nat;
+    memberCount : Nat;
+    members : [{ tokenIndex : Nat; owner : Principal; points : Nat }];
+    prizePerMember : Nat;
+  };
+
+  // Get event results with cumulative standings for multi-stage events
+  public query func get_event_results(eventId : Nat) : async ?{
+    event : RaceCalendar.ScheduledEvent;
+    scoringMode : RaceCalendar.ScoringMode;
+    isMultiStage : Bool;
+    totalPrizePool : Nat;
+    cumulativeStandings : ?[EventStandingEntry];
+    factionStandings : ?[FactionStandingEntry];
+    raceResultsSummary : [{
+      raceId : Nat;
+      stageName : Text;
+      raceClass : RaceCalendar.RaceClass;
+      terrain : RacingSimulator.Terrain;
+      distance : Nat;
+      status : RacingSimulator.RaceStatus;
+      results : ?[{
+        position : Nat;
+        tokenIndex : Nat;
+        owner : Principal;
+        finalTime : Float;
+        prizeAmount : Nat;
+      }];
+    }];
+  } {
+    switch (eventCalendar.getEvent(eventId)) {
+      case (null) { null };
+      case (?event) {
+        // Check if this is a multi-stage event
+        let isMultiStage = switch (event.metadata.scoringMode) {
+          case (#Cumulative) { true };
+          case (#TeamAggregate) { true };
+          case (#Individual) { false };
+          case (#Elimination) { false };
+        };
+
+        // Calculate total prize pool
+        var totalPrizePool : Nat = event.metadata.prizePoolBonus + event.metadata.eventBonusPrize;
+        for (registration in event.registrations.vals()) {
+          let classFeeMultiplier : Float = switch (registration.raceClass) {
+            case (#Scrap) { 1.0 };
+            case (#Junker) { 1.5 };
+            case (#Raider) { 2.0 };
+            case (#Elite) { 2.5 };
+            case (#SilentKlan) { 3.0 };
+          };
+          totalPrizePool += Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
+        };
+
+        // Apply 5% platform tax for net prize pool calculation
+        let platformTax = (totalPrizePool * 5) / 100;
+        let netPrizePool = Nat.sub(totalPrizePool, platformTax);
+
+        // Build race results summary
+        var raceResultsSummary : [{
+          raceId : Nat;
+          stageName : Text;
+          raceClass : RaceCalendar.RaceClass;
+          terrain : RacingSimulator.Terrain;
+          distance : Nat;
+          status : RacingSimulator.RaceStatus;
+          results : ?[{
+            position : Nat;
+            tokenIndex : Nat;
+            owner : Principal;
+            finalTime : Float;
+            prizeAmount : Nat;
+          }];
+        }] = [];
+
+        // Maps for cumulative calculations
+        var botPoints = Map.new<Nat, Nat>(); // tokenIndex -> total points
+        var botOwners = Map.new<Nat, Principal>(); // tokenIndex -> owner
+        var botRaceResults = Map.new<Nat, [{ raceId : Nat; stageName : Text; position : Nat; points : Nat }]>(); // tokenIndex -> race results
+        var factionPoints = Map.new<Text, Nat>(); // faction -> total points
+        var factionMembers = Map.new<Text, [{ tokenIndex : Nat; owner : Principal; points : Nat }]>(); // faction -> members
+
+        for (raceId in event.raceIds.vals()) {
+          switch (raceManager.getRace(raceId)) {
+            case (?race) {
+              // Extract stage name from race name (format: "Event Name - Stage Name (Heat N)")
+              let stageName = race.name;
+
+              let raceResultsOpt : ?[{
+                position : Nat;
+                tokenIndex : Nat;
+                owner : Principal;
+                finalTime : Float;
+                prizeAmount : Nat;
+              }] = switch (race.results) {
+                case (?results) {
+                  ?Array.map<RacingSimulator.RaceResult, { position : Nat; tokenIndex : Nat; owner : Principal; finalTime : Float; prizeAmount : Nat }>(
+                    results,
+                    func(r) {
+                      let tokenIdx = switch (Nat.fromText(r.nftId)) {
+                        case (?idx) { idx };
+                        case (null) { 0 };
+                      };
+
+                      // Calculate points for this position
+                      let positionPoints : Nat = if (r.position == 1) {
+                        10;
+                      } else if (r.position == 2) {
+                        6;
+                      } else if (r.position == 3) {
+                        4;
+                      } else if (r.position == 4) {
+                        2;
+                      } else { 1 };
+
+                      // Update cumulative standings
+                      let currentPoints = switch (Map.get(botPoints, Map.nhash, tokenIdx)) {
+                        case (?pts) { pts };
+                        case (null) { 0 };
+                      };
+                      ignore Map.put(botPoints, Map.nhash, tokenIdx, currentPoints + positionPoints);
+                      ignore Map.put(botOwners, Map.nhash, tokenIdx, r.owner);
+
+                      // Track per-race results for this bot
+                      let currentRaceResults = switch (Map.get(botRaceResults, Map.nhash, tokenIdx)) {
+                        case (?rr) { rr };
+                        case (null) { [] };
+                      };
+                      ignore Map.put(botRaceResults, Map.nhash, tokenIdx, Array.append(currentRaceResults, [{ raceId = race.raceId; stageName = stageName; position = r.position; points = positionPoints }]));
+
+                      // Update faction standings (for TeamAggregate)
+                      switch (garageManager.getStats(tokenIdx)) {
+                        case (?botStats) {
+                          let factionKey = switch (botStats.faction) {
+                            case (#Golden) { "Golden" };
+                            case (#Crimson) { "Crimson" };
+                            case (#Azure) { "Azure" };
+                            case (#Shadow) { "Shadow" };
+                            case (#Emerald) { "Emerald" };
+                            case (#None) { "None" };
+                          };
+
+                          // Add to faction total
+                          let currentFactionPoints = switch (Map.get(factionPoints, Map.thash, factionKey)) {
+                            case (?pts) { pts };
+                            case (null) { 0 };
+                          };
+                          ignore Map.put(factionPoints, Map.thash, factionKey, currentFactionPoints + positionPoints);
+
+                          // Track faction members (accumulate points per member)
+                          let currentMembers = switch (Map.get(factionMembers, Map.thash, factionKey)) {
+                            case (?members) { members };
+                            case (null) { [] };
+                          };
+
+                          // Find if member already tracked, update their points
+                          var found = false;
+                          var updatedMembers : [{
+                            tokenIndex : Nat;
+                            owner : Principal;
+                            points : Nat;
+                          }] = [];
+                          for (m in currentMembers.vals()) {
+                            if (m.tokenIndex == tokenIdx) {
+                              updatedMembers := Array.append(updatedMembers, [{ tokenIndex = tokenIdx; owner = r.owner; points = m.points + positionPoints }]);
+                              found := true;
+                            } else {
+                              updatedMembers := Array.append(updatedMembers, [m]);
+                            };
+                          };
+                          if (not found) {
+                            updatedMembers := Array.append(updatedMembers, [{ tokenIndex = tokenIdx; owner = r.owner; points = positionPoints }]);
+                          };
+                          ignore Map.put(factionMembers, Map.thash, factionKey, updatedMembers);
+                        };
+                        case (null) {};
+                      };
+
+                      {
+                        position = r.position;
+                        tokenIndex = tokenIdx;
+                        owner = r.owner;
+                        finalTime = r.finalTime;
+                        prizeAmount = r.prizeAmount;
+                      };
+                    },
+                  );
+                };
+                case (null) { null };
+              };
+
+              raceResultsSummary := Array.append(raceResultsSummary, [{ raceId = race.raceId; stageName = stageName; raceClass = race.raceClass; terrain = race.terrain; distance = race.distance; status = race.status; results = raceResultsOpt }]);
+            };
+            case (null) {};
+          };
+        };
+
+        // Build cumulative standings (sorted by points descending)
+        var cumulativeStandings : ?[EventStandingEntry] = null;
+        if (event.metadata.scoringMode == #Cumulative) {
+          let botEntries = Iter.toArray(Map.entries(botPoints));
+          let sortedBots = Array.sort<(Nat, Nat)>(
+            botEntries,
+            func(a : (Nat, Nat), b : (Nat, Nat)) : { #less; #greater; #equal } {
+              if (a.1 > b.1) { #less } else if (a.1 < b.1) { #greater } else {
+                #equal;
+              };
+            },
+          );
+
+          var standings : [EventStandingEntry] = [];
+          var pos : Nat = 1;
+          for ((tokenIdx, points) in sortedBots.vals()) {
+            let owner = switch (Map.get(botOwners, Map.nhash, tokenIdx)) {
+              case (?o) { o };
+              case (null) { Principal.fromText("aaaaa-aa") };
+            };
+            let raceResults = switch (Map.get(botRaceResults, Map.nhash, tokenIdx)) {
+              case (?rr) { rr };
+              case (null) { [] };
+            };
+
+            // Calculate prize amount based on position (same distribution as race prizes)
+            let prizeAmount : Nat = if (pos == 1) {
+              (netPrizePool * 45) / 100;
+            } else if (pos == 2) {
+              (netPrizePool * 28) / 100;
+            } else if (pos == 3) {
+              (netPrizePool * 18) / 100;
+            } else if (pos == 4) {
+              (netPrizePool * 9) / 100;
+            } else { 0 };
+
+            standings := Array.append(standings, [{ tokenIndex = tokenIdx; owner = owner; cumulativePoints = points; position = pos; raceResults = raceResults; prizeAmount = prizeAmount }]);
+            pos += 1;
+          };
+          cumulativeStandings := ?standings;
+        };
+
+        // Build faction standings (sorted by points descending)
+        var factionStandings : ?[FactionStandingEntry] = null;
+        if (event.metadata.scoringMode == #TeamAggregate) {
+          let factionEntries = Iter.toArray(Map.entries(factionPoints));
+          let sortedFactions = Array.sort<(Text, Nat)>(
+            factionEntries,
+            func(a : (Text, Nat), b : (Text, Nat)) : { #less; #greater; #equal } {
+              if (a.1 > b.1) { #less } else if (a.1 < b.1) { #greater } else {
+                #equal;
+              };
+            },
+          );
+
+          var standings : [FactionStandingEntry] = [];
+          var pos : Nat = 1;
+          for ((faction, points) in sortedFactions.vals()) {
+            let members = switch (Map.get(factionMembers, Map.thash, faction)) {
+              case (?m) { m };
+              case (null) { [] };
+            };
+
+            // Only winning faction gets prize
+            let prizePerMember : Nat = if (pos == 1 and members.size() > 0) {
+              netPrizePool / members.size();
+            } else { 0 };
+
+            standings := Array.append(standings, [{ faction = faction; totalPoints = points; position = pos; memberCount = members.size(); members = members; prizePerMember = prizePerMember }]);
+            pos += 1;
+          };
+          factionStandings := ?standings;
+        };
+
+        ?{
+          event = event;
+          scoringMode = event.metadata.scoringMode;
+          isMultiStage = isMultiStage;
+          totalPrizePool = totalPrizePool;
+          cumulativeStandings = cumulativeStandings;
+          factionStandings = factionStandings;
+          raceResultsSummary = raceResultsSummary;
+        };
+      };
+    };
+  };
+
   // Get race details by race ID
   public query func get_race_by_id(raceId : Nat) : async ?RacingSimulator.Race {
     raceManager.getRace(raceId);
@@ -4826,7 +5744,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         {
           nftId = entry.nftId;
           owner = entry.owner;
-          stats = Option.get(entry.stats, { speed = 100; stability = 100; powerCore = 100; acceleration = 100; luck = 30 });
+          stats = Option.get(entry.stats, { speed = 100; stability = 100; powerCore = 100; acceleration = 100; luck = 30; overcharge = 0; perfectTuneUp = false });
           tokenIndex = tokenIdx;
           faction = faction;
           baseAvgRating = baseAvgRating;
@@ -4916,7 +5834,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         {
           nftId = entry.nftId;
           owner = entry.owner;
-          stats = Option.get(entry.stats, { speed = 100; stability = 100; powerCore = 100; acceleration = 100; luck = 30 });
+          stats = Option.get(entry.stats, { speed = 100; stability = 100; powerCore = 100; acceleration = 100; luck = 30; overcharge = 0; perfectTuneUp = false });
           tokenIndex = tokenIdx;
           faction = faction;
           baseAvgRating = baseAvgRating;
@@ -6389,6 +7307,65 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     "Cleared races from " # Nat.toText(clearedEvents) # " events, deleted " # Nat.toText(deletedRaces) # " races, and cancelled " # Nat.toText(cancelledTimers) # " timers";
   };
 
+  // Admin function to create a completed event and attach existing orphaned races to it
+  // Used to fix race orphaning issues where events were overwritten
+  public shared ({ caller }) func admin_create_event_for_orphaned_races(
+    scheduledTimeNanos : Int,
+    raceIds : [Nat],
+  ) : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can create events";
+    };
+
+    let now = Time.now();
+
+    // Create a completed Daily Sprint event
+    let metadata : RaceCalendar.EventMetadata = {
+      name = "Daily Sprint Challenge (Recovered)";
+      description = "Recovered event for orphaned races.";
+      entryFee = 20_000_000;
+      maxEntries = 100;
+      minEntries = 2;
+      prizePoolBonus = 50_000_000;
+      pointsMultiplier = 1.0;
+      divisions = [#Scrap, #Junker, #Raider, #Elite];
+      scoringMode = #Individual;
+      eventBonusPrize = 0;
+    };
+
+    let raceMode : RaceCalendar.RaceCreationMode = #Automatic({
+      terrains = [#ScrapHeaps, #WastelandSand, #MetalRoads];
+      distanceRange = { min = 5; max = 10 };
+      racesPerClass = null;
+      heatAllocation = #TopBottom;
+    });
+
+    let regCloses = scheduledTimeNanos - (15 * 60 * 1_000_000_000);
+
+    let event = eventCalendar.scheduleEvent(
+      #DailySprint,
+      scheduledTimeNanos,
+      scheduledTimeNanos - (24 * 3600 * 1_000_000_000), // Opens 24h before
+      regCloses,
+      metadata,
+      raceMode,
+      {
+        fullRefund = scheduledTimeNanos - (2 * 3600 * 1_000_000_000);
+        halfRefund = scheduledTimeNanos - (1 * 3600 * 1_000_000_000);
+        quarterRefund = scheduledTimeNanos - (30 * 60 * 1_000_000_000);
+      },
+      now,
+    );
+
+    // Add the races to this event
+    ignore eventCalendar.addRacesToEvent(event.eventId, raceIds);
+
+    // Mark as completed
+    ignore eventCalendar.updateEventStatus(event.eventId, #Completed);
+
+    "Created event " # Nat.toText(event.eventId) # " with " # Nat.toText(raceIds.size()) # " races attached and marked as Completed";
+  };
+
   // Admin function to clear a bot's stuck active mission (useful after upgrades that change ScavengingZone type)
   public shared ({ caller }) func admin_clear_active_mission(tokenIndex : Nat) : async Text {
     if (caller != owner) {
@@ -6471,47 +7448,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         "Race " # Nat.toText(raceId) # " not found";
       };
     };
-  };
-
-  // Admin function to clean up duplicate hourly_recharge timers
-  public shared ({ caller }) func cleanup_duplicate_recharge_timers() : async Text {
-    if (caller != owner) {
-      return "Unauthorized: only owner can cleanup timers";
-    };
-
-    let rechargeActions = tt().getActionsByFilter(#ByType("hourly_recharge"));
-    let count = rechargeActions.size();
-
-    if (count <= 1) {
-      return "No cleanup needed. Found " # Nat.toText(count) # " recharge timer(s).";
-    };
-
-    // Find the earliest scheduled action (the one we want to keep)
-    var earliestActionId : ?TT.ActionId = null;
-    var earliestTime : Nat = 9999999999999999999;
-
-    for ((actionId, _action) in rechargeActions.vals()) {
-      if (actionId.time < earliestTime) {
-        earliestTime := actionId.time;
-        earliestActionId := ?actionId;
-      };
-    };
-
-    // Cancel all actions except the earliest one
-    var cancelledCount : Nat = 0;
-    for ((actionId, _action) in rechargeActions.vals()) {
-      switch (earliestActionId) {
-        case (?earliest) {
-          if (actionId.id != earliest.id) {
-            ignore tt().cancelActionsByIds<system>([actionId.id]);
-            cancelledCount += 1;
-          };
-        };
-        case (null) {};
-      };
-    };
-
-    "Cleaned up " # Nat.toText(cancelledCount) # " duplicate recharge timers. Kept the earliest one scheduled at " # Nat.toText(earliestTime) # ".";
   };
 
   // Admin function to manually trigger race creation (for events where registration has closed)
@@ -6844,43 +7780,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     leaderboardManager.updateCurrentPeriods(now);
   };
 
-  // Initialize the hourly battery recharge timer (called on postupgrade or first install)
-  func initializeRechargeTimer<system>() {
-    // Check if we already have a recharge timer scheduled
-    let existingActions = tt().getActionsByFilter(#ByType("hourly_recharge"));
-    if (existingActions.size() == 0) {
-      // No recharge timer exists, schedule the first one
-      let now = Time.now();
-      let firstRechargeTime = if (stable_last_recharge_time == 0) {
-        // First install, schedule recharge in 1 hour
-        Int.abs(now + (60 * 60 * 1_000_000_000));
-      } else {
-        // After upgrade, schedule based on last recharge
-        let timeSinceLastRecharge = now - stable_last_recharge_time;
-        let hourInNs = 60 * 60 * 1_000_000_000;
-        if (timeSinceLastRecharge >= hourInNs) {
-          // Overdue, schedule immediately
-          Int.abs(now + 60_000_000_000); // 1 minute from now
-        } else {
-          // Schedule at next 1-hour mark
-          Int.abs(stable_last_recharge_time + hourInNs);
-        };
-      };
-
-      ignore tt().setActionSync<system>(
-        firstRechargeTime,
-        {
-          actionType = "hourly_recharge";
-          params = to_candid (());
-        },
-      );
-
-      Debug.print("Created initial recharge timer scheduled for " # Nat.toText(firstRechargeTime));
-    } else {
-      Debug.print("Recharge timer already exists (" # Nat.toText(existingActions.size()) # " found), skipping initialization");
-    };
-  };
-
   // Initialize race creation timer (called on postupgrade or first install)
   func initializeRaceCreationTimer<system>() {
     // Check if race creation timer already exists
@@ -6904,7 +7803,6 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
   };
 
-  initializeRechargeTimer<system>();
   initializeRaceCreationTimer<system>();
 
   /**
@@ -7524,6 +8422,30 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     garageManager.getUserInventory(caller);
   };
 
+  /// Get garage power grid status for the caller
+  /// Shows total capacity, current draw, number of bots charging, and efficiency
+  public shared query ({ caller }) func web_get_garage_power_status() : async {
+    totalCapacityWatts : Nat;
+    currentDrawWatts : Nat;
+    botsCharging : Nat;
+    efficiency : Float;
+    wattsPerBot : Nat;
+    // Constants for UI display
+    basePowerWatts : Nat;
+    wattsPerBotRequired : Nat;
+  } {
+    let status = garageManager.getGaragePowerStatus(caller);
+    {
+      totalCapacityWatts = status.totalCapacityWatts;
+      currentDrawWatts = status.currentDrawWatts;
+      botsCharging = status.botsCharging;
+      efficiency = status.efficiency;
+      wattsPerBot = status.wattsPerBot;
+      basePowerWatts = PokedBotsGarage.BASE_POWER_WATTS;
+      wattsPerBotRequired = PokedBotsGarage.WATTS_PER_BOT;
+    };
+  };
+
   /// Get faction synergy bonuses for the caller's collection
   public shared query ({ caller }) func web_get_collection_bonuses() : async {
     statBonuses : {
@@ -7873,6 +8795,31 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     dedicationManager.getDedicationSummary(tokenIndex);
   };
 
+  /// Get batch dedication info for multiple bots (optimized for garage list)
+  public query func web_get_batch_dedication_info(
+    tokenIndices : [Nat]
+  ) : async [(
+    Nat,
+    {
+      tier : Nat;
+      tierName : Text;
+      totalDP : Nat;
+      benefits : {
+        speedBonus : Nat;
+        accelerationBonus : Nat;
+        powerCoreBonus : Nat;
+        stabilityBonus : Nat;
+        terrainBonusPercent : Nat;
+        scavengingYieldMult : Float;
+        upgradeDiscountMult : Float;
+        rechargeCooldownMult : Float;
+        repairCooldownMult : Float;
+      };
+    },
+  )] {
+    dedicationManager.getBatchDedicationSummaries(tokenIndices);
+  };
+
   /// De-register a bot (removes control, preserves stats)
   public shared ({ caller }) func web_deregister_bot(
     tokenIndex : Nat
@@ -7999,36 +8946,52 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         };
 
         let now = Time.now();
-        let totalRecharge = 75;
         let currentBattery = freshStats.battery;
         let currentCondition = freshStats.condition;
         let maxBattery = 100;
 
-        // Battery increases by 75 (capped at 100)
+        // Generate pseudo-random values based on timestamp, token index, and entropy
+        let entropy = garageManager.getNextEntropy();
+        let seed = Int.abs(now) + tokenIndex + (entropy * 7919);
+        let randomHash1 = seed % 1000; // 0-999
+        let randomHash2 = (seed * 7919) % 1000; // Different seed for battery RNG
+
+        // BATTERY RECHARGE: 50-90 range (base 70 ± 20)
+        let batteryRNG = (Float.fromInt(randomHash2) / 1000.0) * 40.0 - 20.0; // -20 to +20
+        let totalRecharge = Int.abs(Float.toInt(70.0 + batteryRNG)); // 50-90
         let newBattery = Nat.min(maxBattery, currentBattery + totalRecharge);
+
+        // ===== RESONANCE SYSTEM FOR OVERCHARGE =====
+        // Each bot has a unique resonance field that determines optimal recharge points
+        // Recharging near the optimal point gives maximum overcharge bonus
+        let resonance = ResonanceSystem.calculateResonance(tokenIndex, #Recharge, currentBattery, now);
 
         // Overcharge based on how LOW battery was before recharge
         // Lower battery = bigger overcharge potential (risk/reward mechanic)
-        // Base formula: (100 - currentBattery) * 0.4, max 40% (grants +5% max speed/accel at cap)
+        // Base formula: (100 - currentBattery) * 0.4, theoretical max 40%
         let batteryDeficit = if (currentBattery >= 100) { 0 } else {
           100 - currentBattery;
         };
         let baseOvercharge = Float.fromInt(batteryDeficit) * 0.4;
 
-        // Condition affects efficiency with randomness
-        // efficiency = 0.5 + (condition / 200) + random(-0.2, +0.2)
-        // At 100% condition: 0.5 + 0.5 + random = 0.8-1.2 (avg 1.0)
-        // At 50% condition: 0.5 + 0.25 + random = 0.55-0.95 (avg 0.75)
-        // At 0% condition: 0.5 + 0 + random = 0.3-0.7 (avg 0.5)
+        // Condition affects efficiency with some randomness
         let conditionBonus = Float.fromInt(currentCondition) / 200.0;
-
-        // Generate pseudo-random variance based on timestamp and token index
-        let seed = Int.abs(now) + tokenIndex;
-        let randomHash = seed % 1000; // 0-999
-        let randomVariance = (Float.fromInt(randomHash) / 1000.0) * 0.4 - 0.2; // -0.2 to +0.2
-
+        let randomVariance = (Float.fromInt(randomHash1) / 1000.0) * 0.5 - 0.25; // -0.25 to +0.25
         let efficiency = 0.5 + conditionBonus + randomVariance;
-        let finalOvercharge = baseOvercharge * efficiency;
+
+        // Apply resonance modifier to overcharge
+        // Peak resonance: full potential (100%)
+        // Good resonance: 80% of potential
+        // Outside resonance: 60% of potential (baseline)
+        let resonanceModifier = if (resonance.inPeakZone) {
+          1.0;
+        } else if (resonance.inGoodZone) {
+          0.8;
+        } else {
+          0.6;
+        };
+
+        let finalOvercharge = baseOvercharge * efficiency * resonanceModifier;
         let newOvercharge = Nat.min(40, Int.abs(Float.toInt(finalOvercharge)));
 
         let overchargeAdded = if (newOvercharge >= freshStats.overcharge) {
@@ -8049,12 +9012,21 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         dedicationManager.recordRecharge(tokenIndex, RECHARGE_COST, now);
         dedicationManager.recordBatteryRestored(tokenIndex, batteryRestored, now);
 
+        // Build resonance message - don't reveal optimal point
+        let resonanceMsg = if (resonance.inPeakZone) {
+          " 🔮 PEAK RESONANCE! Maximum overcharge achieved!";
+        } else if (resonance.inGoodZone) {
+          " ✨ Good resonance - solid overcharge bonus";
+        } else {
+          ""; // Don't reveal optimal point
+        };
+
         let overchargeMsg = if (overchargeAdded > 0) {
           let speedBoost = Int.abs(Float.toInt(Float.fromInt(overchargeAdded) * 0.125));
           let stabilityPenalty = Int.abs(Float.toInt(Float.fromInt(overchargeAdded) * 0.083));
-          " ⚡ OVERCHARGE: +" # Nat.toText(overchargeAdded) # "% (+" # Nat.toText(speedBoost) # "% Speed/Accel, -" # Nat.toText(stabilityPenalty) # "% Stability/PowerCore for next race)";
+          " ⚡ OVERCHARGE: +" # Nat.toText(overchargeAdded) # "% (+" # Nat.toText(speedBoost) # "% Speed/Accel, -" # Nat.toText(stabilityPenalty) # "% Stability/PowerCore for next race)" # resonanceMsg;
         } else {
-          "";
+          resonanceMsg;
         };
 
         #ok("⚡ Battery recharged to " # Nat.toText(newBattery) # "%!" # overchargeMsg);
@@ -8150,32 +9122,57 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           case (?s) { s };
         };
 
+        let now = Time.now();
         let newCondition = Nat.min(100, freshStats.condition + 30);
 
-        // Check for Perfect Tune-Up! If repair lands on exactly 100% condition with overcharge active,
-        // the bot gets to keep the speed boost without the stability/power penalties for the next race
-        // Only trigger if bot was BELOW 100 before repair (not already at 100)
-        let perfectTuneUp = (freshStats.condition < 100 and newCondition == 100 and freshStats.overcharge > 0);
+        // ===== RESONANCE SYSTEM FOR PERFECT TUNE-UP =====
+        // Each bot has a unique resonance field that determines optimal repair points
+        // Repairing within resonance while having overcharge achieves Perfect Tune-Up
+        let resonance = ResonanceSystem.calculateResonance(tokenIndex, #Repair, freshStats.condition, now);
+
+        // Perfect Tune-Up requires: having overcharge AND being in resonance zone
+        let hasOvercharge = freshStats.overcharge > 0;
+        let perfectTuneUp = hasOvercharge and (resonance.inPeakZone or resonance.inGoodZone);
+
+        // Calculate tune-up quality (affects how much penalty is removed)
+        // Peak: 100% penalty removal, Good: 70% penalty removal
+        let tuneupQuality = ResonanceSystem.getPerfectTuneupQuality(resonance);
+
+        // Determine what happens to overcharge
+        // If Perfect Tune-Up: keep overcharge, remove/reduce penalties
+        // If outside resonance: reset overcharge to prevent exploit loops
+        let finalOvercharge = if (perfectTuneUp) {
+          freshStats.overcharge; // Keep overcharge with reduced penalties
+        } else if (hasOvercharge) {
+          0; // Reset overcharge - no Perfect Tune-Up achieved
+        } else {
+          0; // No overcharge to begin with
+        };
 
         let updatedStats = {
           freshStats with
           condition = newCondition;
           perfectTuneUp = perfectTuneUp;
           lastRepaired = ?Time.now();
+          overcharge = finalOvercharge;
         };
 
         garageManager.updateStats(tokenIndex, updatedStats);
 
         // Record dedication points for ICP investment and condition restoration
         let conditionRestored = newCondition - freshStats.condition;
-        let now = Time.now();
         dedicationManager.recordRepair(tokenIndex, REPAIR_COST, now);
         dedicationManager.recordConditionRestored(tokenIndex, conditionRestored, now);
 
-        if (perfectTuneUp) {
-          #ok("⚡ PERFECT TUNE-UP! ⚡\nBot repaired to 100% condition with " # Nat.toText(freshStats.overcharge) # "% overcharge!\nNext race will get the full speed boost WITHOUT penalties!");
+        // Build message based on resonance outcome
+        if (perfectTuneUp and resonance.inPeakZone) {
+          #ok("🔧✨🔮 PEAK RESONANCE Perfect Tune-Up! Condition at " # Nat.toText(newCondition) # "% - ALL overcharge penalties removed! Your bot keeps the " # Nat.toText(freshStats.overcharge) # "% Speed/Accel boost without any Stability/PowerCore penalties!");
+        } else if (perfectTuneUp) {
+          #ok("🔧✨ Good Resonance Tune-Up! Condition at " # Nat.toText(newCondition) # "% - 70% of overcharge penalties removed! Speed/Accel boost preserved with reduced Stability/PowerCore penalties.");
+        } else if (hasOvercharge) {
+          #ok("🔧 Repairs complete. Condition at " # Nat.toText(newCondition) # "%. ⚠️ Outside resonance window - overcharge reset.");
         } else {
-          #ok("Bot repaired successfully!");
+          #ok("🔧 Repairs complete. Condition at " # Nat.toText(newCondition) # "%");
         };
       };
     };
@@ -8255,11 +9252,13 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       case (null) { /* OK to proceed */ };
     };
 
-    // Check cooldowns
-    let REPAIR_COOLDOWN : Int = 10800000000000; // 3 hours in nanoseconds
+    // Check cooldowns (apply both garage synergy and bot dedication bonuses)
+    let BASE_REPAIR_COOLDOWN : Int = 10800000000000; // 3 hours in nanoseconds
     let BASE_RECHARGE_COOLDOWN : Int = 21600000000000; // 6 hours in nanoseconds
     let synergies = garageManager.calculateFactionSynergies(caller);
-    let RECHARGE_COOLDOWN = Float.toInt(Float.fromInt(BASE_RECHARGE_COOLDOWN) * synergies.costMultipliers.rechargeCooldown);
+    let tierBenefits = dedicationManager.getBenefitsForBot(tokenIndex);
+    let RECHARGE_COOLDOWN = Float.toInt(Float.fromInt(BASE_RECHARGE_COOLDOWN) * synergies.costMultipliers.rechargeCooldown * tierBenefits.rechargeCooldownMult);
+    let REPAIR_COOLDOWN = Float.toInt(Float.fromInt(BASE_REPAIR_COOLDOWN) * tierBenefits.repairCooldownMult);
 
     let now = Time.now();
 
@@ -8364,14 +9363,25 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         // Apply repair
         let newCondition = Nat.min(100, freshStats.condition + 30);
 
-        // Check for Perfect Tune-Up
-        let perfectTuneUp = (freshStats.condition < 100 and newCondition == 100 and newOvercharge > 0);
+        // Check for Perfect Tune-Up using resonance system
+        let hasOvercharge = newOvercharge > 0;
+        let resonance = ResonanceSystem.calculateResonance(tokenIndex, #Repair, freshStats.condition, now);
+        let perfectTuneUp = hasOvercharge and (resonance.inPeakZone or resonance.inGoodZone);
+
+        // If outside resonance and had overcharge, reset it
+        let finalOverchargeValue = if (perfectTuneUp) {
+          newOvercharge;
+        } else if (hasOvercharge) {
+          0; // Reset overcharge - no Perfect Tune-Up achieved
+        } else {
+          newOvercharge;
+        };
 
         let updatedStats = {
           freshStats with
           battery = newBattery;
           condition = newCondition;
-          overcharge = newOvercharge;
+          overcharge = finalOverchargeValue;
           perfectTuneUp = perfectTuneUp;
           lastRecharged = ?now;
           lastRepaired = ?now;
@@ -8451,6 +9461,19 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     let icpCost = garageManager.calculateUpgradeCostV2(baseStat, currentStat, overallRating, finalCostMultiplier);
     let partsCost = icpCost / 1_000_000; // Convert e8s to parts (100 parts = 1 ICP, so 1 part = 0.01 ICP = 1_000_000 e8s)
 
+    // Determine part type for parts payment/refund
+    let partType : PokedBotsGarage.PartType = switch (upgradeType) {
+      case (#Velocity) { #SpeedChip };
+      case (#PowerCore) { #PowerCoreFragment };
+      case (#Thruster) { #ThrusterKit };
+      case (#Gyro) { #GyroModule };
+      case (#Luck) { #UniversalPart };
+    };
+
+    // Process payment first
+    let now = Time.now();
+    var partsUsed : Nat = 0;
+
     switch (paymentMethod) {
       case (#icp) {
         // Process ICP payment via ICRC-2
@@ -8485,174 +9508,356 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               };
               case _ { "Payment failed: " # debug_show (e) };
             };
-            #err(errorMsg);
+            return #err(errorMsg);
           };
           case (#Ok(_blockIndex)) {
             // Record dedication points for ICP investment (only ICP payments, not parts)
-            let now = Time.now();
             dedicationManager.recordUpgrade(tokenIndex, icpCost, now);
-
-            // Start upgrade session with V2 parameters
-            let UPGRADE_DURATION : Int = 12 * 60 * 60 * 1_000_000_000; // 12 hours in nanoseconds
-            let endsAt = now + UPGRADE_DURATION;
-
-            let pityCounter = garageManager.getPityCounter(tokenIndex);
-            garageManager.startUpgrade(tokenIndex, upgradeType, now, endsAt, pityCounter, icpCost, "icp", 0);
-
-            // Schedule timer to complete the upgrade
-            ignore tt().setActionSync<system>(
-              Int.abs(endsAt),
-              {
-                actionType = "upgrade_complete";
-                params = to_candid (tokenIndex);
-              },
-            );
-
-            // Update bot stats with upgradeEndsAt
-            let updatedStats = {
-              stats with
-              upgradeEndsAt = ?endsAt;
-            };
-            garageManager.updateStats(tokenIndex, updatedStats);
-
-            #ok("Upgrade started! Will complete in 12 hours.");
           };
         };
       };
       case (#parts) {
         // Deduct parts from inventory
-        let partType : PokedBotsGarage.PartType = switch (upgradeType) {
-          case (#Velocity) { #SpeedChip };
-          case (#PowerCore) { #PowerCoreFragment };
-          case (#Thruster) { #ThrusterKit };
-          case (#Gyro) { #GyroModule };
-          case (#Luck) { #UniversalPart }; // Luck upgrades would use universal parts
-        };
-
         if (not garageManager.removeParts(caller, partType, partsCost)) {
           return #err("Insufficient parts. Needed: " # Nat.toText(partsCost) # " " # debug_show (partType));
         };
-
-        // Start upgrade with V2 parameters
-        let now = Time.now();
-        let UPGRADE_DURATION : Int = 12 * 60 * 60 * 1_000_000_000;
-        let endsAt = now + UPGRADE_DURATION;
-
-        let pityCounter = garageManager.getPityCounter(tokenIndex);
-        garageManager.startUpgrade(tokenIndex, upgradeType, now, endsAt, pityCounter, icpCost, "parts", partsCost);
-
-        // Schedule timer to complete the upgrade
-        ignore tt().setActionSync<system>(
-          Int.abs(endsAt),
-          {
-            actionType = "upgrade_complete";
-            params = to_candid (tokenIndex);
-          },
-        );
-
-        // Update bot stats with upgradeEndsAt
-        let updatedStats = {
-          stats with
-          upgradeEndsAt = ?endsAt;
-        };
-        garageManager.updateStats(tokenIndex, updatedStats);
-
-        #ok("Upgrade started with parts! Will complete in 12 hours.");
+        partsUsed := partsCost;
       };
     };
-  };
 
-  /// Cancel an in-progress upgrade and receive a full refund
-  public shared ({ caller }) func web_cancel_upgrade(
-    tokenIndex : Nat
-  ) : async Result.Result<Text, Text> {
-    // Get stats and verify registration
-    let stats = switch (garageManager.getStats(tokenIndex)) {
-      case (null) {
-        return #err("Bot not registered. Use web_initialize_bot first.");
-      };
-      case (?s) { s };
-    };
+    // Execute RNG immediately (instant upgrades)
+    let attemptNumber = currentStat - baseStat;
+    let pityCounter = garageManager.getPityCounter(tokenIndex);
+    let successRate = garageManager.calculateSuccessRate(attemptNumber, pityCounter);
 
-    // Verify caller is registered owner
-    if (not Principal.equal(stats.ownerPrincipal, caller)) {
-      return #err("You are not the registered owner. Use web_initialize_bot to register.");
-    };
+    // Generate RNG seed with proper hashing
+    let timeNanos = Int.abs(now);
+    let entropy = garageManager.getNextEntropy();
+    let seedInput = tokenIndex + timeNanos + (entropy * 7919);
+    let hashedSeed = garageManager.hashForRNG(seedInput);
+    let seed = Nat32.fromNat(hashedSeed % 4_294_967_296);
 
-    // Check for active upgrade
-    let upgradeSession = switch (garageManager.getActiveUpgrade(tokenIndex)) {
-      case (null) { return #err("No active upgrade to cancel") };
-      case (?session) { session };
-    };
+    // Roll for success
+    let roll = Nat32.toNat(seed % 100);
+    let success = Float.fromInt(roll) < successRate;
 
-    // Process refund based on payment method
-    if (upgradeSession.paymentMethod == "icp") {
-      // Refund ICP (full amount minus transfer fee)
-      let TRANSFER_FEE = 10000 : Nat;
-      if (upgradeSession.costPaid > TRANSFER_FEE) {
-        // Get ICP Ledger canister
-        let ledgerId = switch (icpLedgerCanisterId) {
-          case (?id) { id };
-          case (null) { return #err("ICP Ledger not configured") };
-        };
-
-        let icpLedger = actor (Principal.toText(ledgerId)) : actor {
-          icrc1_transfer : shared IcpLedger.TransferArg -> async IcpLedger.Result;
-        };
-
-        let refundAmount = upgradeSession.costPaid - TRANSFER_FEE;
-        let transferResult = await icpLedger.icrc1_transfer({
-          from_subaccount = null;
-          to = { owner = caller; subaccount = null };
-          amount = refundAmount;
-          fee = ?TRANSFER_FEE;
-          memo = null;
-          created_at_time = null;
-        });
-
-        switch (transferResult) {
-          case (#Err(e)) {
-            return #err("ICP refund failed: " # debug_show (e));
-          };
-          case (#Ok(_)) { /* Refund successful, continue */ };
-        };
-      };
-    } else {
-      // Refund parts of the correct type
-      let partType : PokedBotsGarage.PartType = switch (upgradeSession.upgradeType) {
-        case (#Velocity) { #SpeedChip };
-        case (#PowerCore) { #PowerCoreFragment };
-        case (#Thruster) { #ThrusterKit };
-        case (#Gyro) { #GyroModule };
-        case (#Luck) { #UniversalPart }; // Luck upgrades would use universal parts
-      };
-      garageManager.addParts(caller, partType, upgradeSession.partsUsed);
-    };
-
-    // Clear the upgrade session and update bot stats
-    garageManager.clearUpgrade(tokenIndex);
-    garageManager.setUpgradeEndsAt(tokenIndex, null);
-
-    let upgradeTypeName = switch (upgradeSession.upgradeType) {
-      case (#Velocity) { "Velocity" };
+    let upgradeTypeName = switch (upgradeType) {
+      case (#Velocity) { "Speed" };
       case (#PowerCore) { "Power Core" };
-      case (#Thruster) { "Thruster" };
-      case (#Gyro) { "Gyro" };
+      case (#Thruster) { "Acceleration" };
+      case (#Gyro) { "Stability" };
       case (#Luck) { "Luck" };
     };
 
-    let refundText = if (upgradeSession.paymentMethod == "icp") {
-      let icpAmount = Float.fromInt(upgradeSession.costPaid - 10000) / 100_000_000.0;
-      "Refunded " # Float.toText(icpAmount) # " ICP";
-    } else {
-      "Refunded " # Nat.toText(upgradeSession.partsUsed) # " parts";
-    };
+    let pityText = if (pityCounter > 0) {
+      " (+" # Nat.toText(pityCounter * 5) # "% pity)";
+    } else { "" };
 
-    #ok("Upgrade cancelled. " # refundText # " returned to your account.");
+    if (success) {
+      // Success! Check for double points
+      let doubleChance = Float.max(2.0, 15.0 - (Float.fromInt(attemptNumber) * 0.87));
+      let doubleRoll = Nat32.toNat((seed / 100) % 100);
+      let isDouble = Float.fromInt(doubleRoll) < doubleChance;
+      let pointsAwarded = if (isDouble) { 2 } else { 1 };
+
+      // Apply the stat boost
+      let updatedStats = switch (upgradeType) {
+        case (#Velocity) {
+          {
+            stats with speedBonus = stats.speedBonus + pointsAwarded;
+            speedUpgrades = stats.speedUpgrades + 1;
+            experience = stats.experience + 5;
+            factionReputation = stats.factionReputation + 2;
+            upgradeEndsAt = null;
+            listedForSale = false;
+          };
+        };
+        case (#PowerCore) {
+          {
+            stats with powerCoreBonus = stats.powerCoreBonus + pointsAwarded;
+            powerCoreUpgrades = stats.powerCoreUpgrades + 1;
+            experience = stats.experience + 5;
+            factionReputation = stats.factionReputation + 2;
+            upgradeEndsAt = null;
+            listedForSale = false;
+          };
+        };
+        case (#Thruster) {
+          {
+            stats with accelerationBonus = stats.accelerationBonus + pointsAwarded;
+            accelerationUpgrades = stats.accelerationUpgrades + 1;
+            experience = stats.experience + 5;
+            factionReputation = stats.factionReputation + 2;
+            upgradeEndsAt = null;
+            listedForSale = false;
+          };
+        };
+        case (#Gyro) {
+          {
+            stats with stabilityBonus = stats.stabilityBonus + pointsAwarded;
+            stabilityUpgrades = stats.stabilityUpgrades + 1;
+            experience = stats.experience + 10;
+            factionReputation = stats.factionReputation + 3;
+            upgradeEndsAt = null;
+            listedForSale = false;
+          };
+        };
+        case (#Luck) {
+          {
+            stats with luckBonus = stats.luckBonus + pointsAwarded;
+            luckUpgrades = stats.luckUpgrades + 1;
+            experience = stats.experience + 5;
+            factionReputation = stats.factionReputation + 2;
+            upgradeEndsAt = null;
+            listedForSale = false;
+          };
+        };
+      };
+
+      garageManager.updateStats(tokenIndex, updatedStats);
+      garageManager.setPityCounter(tokenIndex, 0); // Reset pity on success
+
+      if (isDouble) {
+        #ok("🎰 DOUBLE WIN! " # upgradeTypeName # " upgrade succeeded with +2 stat points! (Roll: " # Nat.toText(roll) # " < " # Float.format(#fix 1, successRate) # "%" # pityText # ")");
+      } else {
+        #ok("✅ SUCCESS! " # upgradeTypeName # " upgrade succeeded with +1 stat point! (Roll: " # Nat.toText(roll) # " < " # Float.format(#fix 1, successRate) # "%" # pityText # ")");
+      };
+    } else {
+      // Failure! Refund 50% and increment pity counter
+      let newPityCounter = Nat.min(pityCounter + 1, 5); // Cap at 5 (25% bonus)
+
+      // Update stats without boost
+      let updatedStats = {
+        stats with upgradeEndsAt = null;
+        listedForSale = false;
+      };
+      garageManager.updateStats(tokenIndex, updatedStats);
+      garageManager.setPityCounter(tokenIndex, newPityCounter);
+
+      // Handle 50% refund
+      var refundMessage = "";
+      switch (paymentMethod) {
+        case (#icp) {
+          let refundAmount = icpCost / 2;
+          if (refundAmount > 0) {
+            // Schedule refund via timer action
+            ignore tt().setActionASync<system>(
+              Int.abs(now + 1_000_000_000), // 1 second delay
+              {
+                actionType = "prize_distribution";
+                params = to_candid ({
+                  raceId = 0;
+                  owner = caller;
+                  amount = refundAmount;
+                });
+              },
+              60_000_000_000,
+            );
+            refundMessage := Float.format(#fix 4, Float.fromInt(refundAmount) / 100_000_000.0) # " ICP";
+          };
+        };
+        case (#parts) {
+          let partsToRefund = partsUsed / 2;
+          if (partsToRefund > 0) {
+            garageManager.refundParts(caller, partType, partsToRefund);
+            refundMessage := Nat.toText(partsToRefund) # " parts";
+          };
+        };
+      };
+
+      let pityBonus = newPityCounter * 5;
+      #ok("❌ FAILED! " # upgradeTypeName # " upgrade failed. (Roll: " # Nat.toText(roll) # " >= " # Float.format(#fix 1, successRate) # "%" # pityText # "). Refunded 50%: " # refundMessage # ". Pity bonus now +" # Nat.toText(pityBonus) # "% for next attempt!");
+    };
+  };
+
+  /// Cancel an in-progress upgrade (DEPRECATED - upgrades are now instant)
+  /// Settle a legacy upgrade that was in progress when we switched to instant upgrades
+  /// This runs the RNG and completes the upgrade for users who were mid-upgrade
+  public shared ({ caller }) func web_cancel_upgrade(
+    tokenIndex : Nat
+  ) : async Result.Result<Text, Text> {
+    // Check if there's an active upgrade to settle
+    switch (garageManager.getActiveUpgrade(tokenIndex)) {
+      case (null) {
+        // No legacy upgrade - return the normal message
+        return #ok("⚡ Upgrades now complete instantly! There is nothing to settle. Use web_upgrade_bot to upgrade your PokedBot and get immediate results.");
+      };
+      case (?session) {
+        // Found a legacy upgrade! Settle it now by running the RNG
+
+        // Verify caller is the owner
+        let stats = switch (garageManager.getStats(tokenIndex)) {
+          case (null) { return #err("Bot not registered") };
+          case (?s) { s };
+        };
+
+        if (not Principal.equal(stats.ownerPrincipal, caller)) {
+          return #err("You are not the registered owner of this bot.");
+        };
+
+        // Get current stats for calculation
+        let currentStats = garageManager.getCurrentStats(stats);
+
+        let (currentStatValue, _upgradeCount) = switch (session.upgradeType) {
+          case (#Velocity) { (currentStats.speed, stats.speedUpgrades) };
+          case (#PowerCore) {
+            (currentStats.powerCore, stats.powerCoreUpgrades);
+          };
+          case (#Thruster) {
+            (currentStats.acceleration, stats.accelerationUpgrades);
+          };
+          case (#Gyro) { (currentStats.stability, stats.stabilityUpgrades) };
+          case (#Luck) {
+            (stats.luckBase + stats.luckBonus, stats.luckUpgrades);
+          };
+        };
+
+        // Get base stat for attempt calculation
+        let baseStat = switch (session.upgradeType) {
+          case (#Velocity) { currentStats.speed - stats.speedBonus };
+          case (#PowerCore) { currentStats.powerCore - stats.powerCoreBonus };
+          case (#Thruster) {
+            currentStats.acceleration - stats.accelerationBonus;
+          };
+          case (#Gyro) { currentStats.stability - stats.stabilityBonus };
+          case (#Luck) { stats.luckBase };
+        };
+
+        let attemptNumber = currentStatValue - baseStat;
+
+        // Calculate success rate with pity
+        let successRate = garageManager.calculateSuccessRate(attemptNumber, session.consecutiveFails);
+
+        // Generate RNG
+        let timeNanos = Int.abs(Time.now());
+        let entropy = garageManager.getNextEntropy();
+        let seedInput = tokenIndex + timeNanos + (entropy * 7919);
+        let hashedSeed = garageManager.hashForRNG(seedInput);
+        let seed = Nat32.fromNat(hashedSeed % 4_294_967_296);
+
+        let roll = Nat32.toNat(seed % 100);
+        let success = Float.fromInt(roll) < successRate;
+
+        let upgradeTypeName = switch (session.upgradeType) {
+          case (#Velocity) { "Speed" };
+          case (#PowerCore) { "Power Core" };
+          case (#Thruster) { "Acceleration" };
+          case (#Gyro) { "Stability" };
+          case (#Luck) { "Luck" };
+        };
+
+        if (success) {
+          // Success! Check for double points
+          let doubleChance = 15.0 - (Float.fromInt(attemptNumber) * 0.87);
+          let doubleRoll = Nat32.toNat((seed / 100) % 100);
+          let isDouble = Float.fromInt(doubleRoll) < Float.max(2.0, doubleChance);
+          let pointsAwarded = if (isDouble) { 2 } else { 1 };
+
+          // Apply the stat boost
+          let updatedStats = switch (session.upgradeType) {
+            case (#Velocity) {
+              {
+                stats with speedBonus = stats.speedBonus + pointsAwarded;
+                speedUpgrades = stats.speedUpgrades + 1;
+                upgradeEndsAt = null;
+                listedForSale = false;
+              };
+            };
+            case (#PowerCore) {
+              {
+                stats with powerCoreBonus = stats.powerCoreBonus + pointsAwarded;
+                powerCoreUpgrades = stats.powerCoreUpgrades + 1;
+                upgradeEndsAt = null;
+                listedForSale = false;
+              };
+            };
+            case (#Thruster) {
+              {
+                stats with accelerationBonus = stats.accelerationBonus + pointsAwarded;
+                accelerationUpgrades = stats.accelerationUpgrades + 1;
+                upgradeEndsAt = null;
+                listedForSale = false;
+              };
+            };
+            case (#Gyro) {
+              {
+                stats with stabilityBonus = stats.stabilityBonus + pointsAwarded;
+                stabilityUpgrades = stats.stabilityUpgrades + 1;
+                upgradeEndsAt = null;
+                listedForSale = false;
+              };
+            };
+            case (#Luck) {
+              {
+                stats with luckBonus = stats.luckBonus + pointsAwarded;
+                luckUpgrades = stats.luckUpgrades + 1;
+                upgradeEndsAt = null;
+                listedForSale = false;
+              };
+            };
+          };
+
+          garageManager.updateStats(tokenIndex, updatedStats);
+          garageManager.clearUpgrade(tokenIndex);
+          garageManager.setPityCounter(tokenIndex, 0);
+
+          let doubleText = if (isDouble) { " 🎰 DOUBLE LOTTERY!" } else { "" };
+          return #ok("✅ LEGACY UPGRADE SETTLED - SUCCESS! Your " # upgradeTypeName # " upgrade succeeded with +" # Nat.toText(pointsAwarded) # " stat point!" # doubleText # " (Roll: " # Nat.toText(roll) # " < " # Float.format(#fix 1, successRate) # "%)");
+        } else {
+          // Failure - refund 50%
+          let newPityCounter = session.consecutiveFails + 1;
+
+          let updatedStats = {
+            stats with upgradeEndsAt = null;
+            listedForSale = false;
+          };
+          garageManager.updateStats(tokenIndex, updatedStats);
+          garageManager.setPityCounter(tokenIndex, newPityCounter);
+          garageManager.clearUpgrade(tokenIndex);
+
+          // Refund based on payment method
+          let refundMessage = if (session.paymentMethod == "icp") {
+            let refundAmount = session.costPaid / 2;
+            if (refundAmount > 0) {
+              // Schedule ICP refund via timer
+              ignore tt().setActionASync<system>(
+                Int.abs(Time.now() + 1_000_000_000),
+                {
+                  actionType = "prize_distribution";
+                  params = to_candid ({
+                    raceId = 0;
+                    owner = stats.ownerPrincipal;
+                    amount = refundAmount;
+                  });
+                },
+                PRIZE_DISTRIBUTION_TIMEOUT,
+              );
+            };
+            Nat.toText(refundAmount / 100_000_000) # "." # Nat.toText((refundAmount % 100_000_000) / 10_000_000) # " ICP";
+          } else {
+            let partsToRefund = session.partsUsed / 2;
+            if (partsToRefund > 0) {
+              let partType : PokedBotsGarage.PartType = switch (session.upgradeType) {
+                case (#Velocity) { #SpeedChip };
+                case (#PowerCore) { #PowerCoreFragment };
+                case (#Thruster) { #ThrusterKit };
+                case (#Gyro) { #GyroModule };
+                case (#Luck) { #UniversalPart };
+              };
+              garageManager.refundParts(stats.ownerPrincipal, partType, partsToRefund);
+            };
+            Nat.toText(partsToRefund) # " parts";
+          };
+
+          let pityBonus = newPityCounter * 5;
+          return #ok("❌ LEGACY UPGRADE SETTLED - FAILED. Your " # upgradeTypeName # " upgrade failed. (Roll: " # Nat.toText(roll) # " >= " # Float.format(#fix 1, successRate) # "%). Refunded 50%: " # refundMessage # ". Pity bonus now +" # Nat.toText(pityBonus) # "% for next attempt!");
+        };
+      };
+    };
   };
 
   /// Respec a bot - reset selected stat upgrades and refund parts (with penalty)
-  /// Cost: 1 ICP (flat rate)
+  /// Cost: FREE
   /// statsToStrip: Array of stat names to reset (["speed", "powerCore", "acceleration", "stability"])
   /// Empty array strips all stats (backward compatible)
   public shared ({ caller }) func web_respec_bot(
@@ -8672,61 +9877,24 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       return #err("You are not the registered owner. Use web_initialize_bot to register.");
     };
 
-    // Calculate respec cost
-    let respecCost = garageManager.calculateRespecCost(stats.respecCount);
-
-    // Process ICRC-2 payment
-    let ledgerId = switch (icpLedgerCanisterId) {
-      case (?id) { id };
-      case (null) { return #err("ICP Ledger not configured") };
+    // Calculate total stat points being stripped
+    let totalStatPoints = garageManager.calculateStatsToStrip(tokenIndex, statsToStrip);
+    if (totalStatPoints == 0) {
+      return #err("No stat points to strip in selected stats");
     };
 
-    let icpLedger = actor (Principal.toText(ledgerId)) : actor {
-      icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
-    };
-
-    let transferResult = try {
-      await icpLedger.icrc2_transfer_from({
-        from = { owner = caller; subaccount = null };
-        to = { owner = thisPrincipal; subaccount = null };
-        amount = respecCost + TRANSFER_FEE;
-        fee = ?TRANSFER_FEE;
-        memo = null;
-        created_at_time = null;
-        spender_subaccount = null;
-      });
-    } catch (e) {
-      return #err("Payment transfer failed: " # Error.message(e));
-    };
-
-    switch (transferResult) {
-      case (#Err(e)) {
-        let errorMsg = switch (e) {
-          case (#InsufficientAllowance({ allowance })) {
-            let requiredICP = (respecCost + TRANSFER_FEE) / 100_000_000;
-            "Insufficient spending allowance. Required: " # Nat.toText(requiredICP) # " ICP. Current: " # Nat.toText(allowance / 100_000_000) # " ICP. Please set a higher allowance first.";
-          };
-          case _ { "Payment failed: " # debug_show (e) };
-        };
-        #err(errorMsg);
-      };
-      case (#Ok(_blockIndex)) {
-        // Record dedication points for respec (counts as upgrade investment)
-        dedicationManager.recordUpgrade(tokenIndex, respecCost, Time.now());
-        // Process respec
-        switch (garageManager.respecBot(tokenIndex, caller, statsToStrip)) {
-          case (#err(msg)) { #err(msg) };
-          case (#ok(result)) {
-            #ok({
-              speedPartsRefunded = result.speedPartsRefunded;
-              powerCorePartsRefunded = result.powerCorePartsRefunded;
-              accelerationPartsRefunded = result.accelerationPartsRefunded;
-              stabilityPartsRefunded = result.stabilityPartsRefunded;
-              totalRefunded = result.totalRefunded;
-              respecCost = respecCost;
-            });
-          };
-        };
+    // Process respec (FREE - no payment required)
+    switch (garageManager.respecBot(tokenIndex, caller, statsToStrip)) {
+      case (#err(msg)) { #err(msg) };
+      case (#ok(result)) {
+        #ok({
+          speedPartsRefunded = result.speedPartsRefunded;
+          powerCorePartsRefunded = result.powerCorePartsRefunded;
+          accelerationPartsRefunded = result.accelerationPartsRefunded;
+          stabilityPartsRefunded = result.stabilityPartsRefunded;
+          totalRefunded = result.totalRefunded;
+          respecCost = 0;
+        });
       };
     };
   };
@@ -9025,13 +10193,22 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       };
     };
 
-    // Calculate class-based entry fee
+    // Check if bot is registered for another event with conflicting race times
+    switch (eventCalendar.getConflictingEventForBot(eventId, tokenIndex, event.scheduledTime, event.raceCreationMode)) {
+      case (?conflictingEvent) {
+        let conflictName = conflictingEvent.metadata.name;
+        return #err("This bot is already registered for \"" # conflictName # "\" which has a race at a conflicting time");
+      };
+      case (null) {}; // No conflict
+    };
+
+    // Calculate class-based entry fee (shifted up one bracket)
     let classFeeMultiplier : Float = switch (raceClass) {
-      case (#Scrap) { 0.5 };
-      case (#Junker) { 1.0 };
-      case (#Raider) { 1.5 };
-      case (#Elite) { 2.0 };
-      case (#SilentKlan) { 2.5 };
+      case (#Scrap) { 1.0 };
+      case (#Junker) { 1.5 };
+      case (#Raider) { 2.0 };
+      case (#Elite) { 2.5 };
+      case (#SilentKlan) { 3.0 };
     };
     let adjustedEntryFee = Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
 
@@ -9118,8 +10295,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               };
             };
             case (#ok(_registration)) {
-              // Record dedication points for event registration fee (ICP investment)
-              dedicationManager.recordEventRegistration(tokenIndex, adjustedEntryFee, now);
+              // Event entry fees do NOT count towards dedication points
+              // (only direct investment in upgrades/initialization counts)
 
               return #ok("Successfully registered for event!");
             };
@@ -9480,27 +10657,55 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               } else if (Option.isSome(stats.activeMission)) {
                 #err("On mission");
               } else {
-                // Check cooldown
+                // Check cooldown - apply bot-specific dedication bonus
+                let tierBenefits = dedicationManager.getBenefitsForBot(tokenIndex);
+                let botRechargeCooldown = Float.toInt(Float.fromInt(RECHARGE_COOLDOWN) * tierBenefits.rechargeCooldownMult);
                 let onCooldown = switch (stats.lastRecharged) {
-                  case (?lastTime) { (now - lastTime) < RECHARGE_COOLDOWN };
+                  case (?lastTime) { (now - lastTime) < botRechargeCooldown };
                   case (null) { false };
                 };
                 if (onCooldown) {
                   #err("On cooldown");
                 } else {
-                  // Recharge - manually update stats
-                  let totalRecharge = 75;
-                  let newBattery = Nat.min(100, stats.battery + totalRecharge);
-                  let batteryDeficit = if (stats.battery >= 100) { 0 } else {
-                    100 - stats.battery;
+                  // Recharge - manually update stats (matches web_recharge_bot logic)
+                  let currentBattery = stats.battery;
+                  let currentCondition = stats.condition;
+
+                  // Generate pseudo-random values
+                  let entropy = garageManager.getNextEntropy();
+                  let seed = Int.abs(now) + tokenIndex + (entropy * 7919);
+                  let randomHash1 = seed % 1000;
+                  let randomHash2 = (seed * 7919) % 1000;
+
+                  // BATTERY RECHARGE: 50-90 range (base 70 ± 20)
+                  let batteryRNG = (Float.fromInt(randomHash2) / 1000.0) * 40.0 - 20.0;
+                  let totalRecharge = Int.abs(Float.toInt(70.0 + batteryRNG));
+                  let newBattery = Nat.min(100, currentBattery + totalRecharge);
+
+                  // ===== RESONANCE SYSTEM FOR OVERCHARGE =====
+                  let resonance = ResonanceSystem.calculateResonance(tokenIndex, #Recharge, currentBattery, now);
+
+                  let batteryDeficit = if (currentBattery >= 100) { 0 } else {
+                    100 - currentBattery;
                   };
                   let baseOvercharge = Float.fromInt(batteryDeficit) * 0.4;
-                  let conditionBonus = Float.fromInt(stats.condition) / 200.0;
-                  let seed = Int.abs(now) + tokenIndex;
-                  let randomHash = seed % 1000;
-                  let randomVariance = (Float.fromInt(randomHash) / 1000.0) * 0.4 - 0.2;
+
+                  // Condition affects efficiency with some randomness
+                  let conditionBonus = Float.fromInt(currentCondition) / 200.0;
+                  let randomVariance = (Float.fromInt(randomHash1) / 1000.0) * 0.5 - 0.25;
                   let efficiency = 0.5 + conditionBonus + randomVariance;
-                  let finalOvercharge = baseOvercharge * efficiency;
+
+                  // Apply resonance modifier to overcharge
+                  // Peak: 100%, Good: 80%, Outside: 60%
+                  let resonanceModifier = if (resonance.inPeakZone) {
+                    1.0;
+                  } else if (resonance.inGoodZone) {
+                    0.8;
+                  } else {
+                    0.6;
+                  };
+
+                  let finalOvercharge = baseOvercharge * efficiency * resonanceModifier;
                   let newOvercharge = Nat.min(40, Int.abs(Float.toInt(finalOvercharge)));
 
                   let updatedStats = {
@@ -9512,7 +10717,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   garageManager.updateStats(tokenIndex, updatedStats);
                   // Record dedication points for recharge
                   dedicationManager.recordRecharge(tokenIndex, RECHARGE_COST, now);
-                  dedicationManager.recordBatteryRestored(tokenIndex, newBattery - stats.battery, now);
+                  dedicationManager.recordBatteryRestored(tokenIndex, newBattery - currentBattery, now);
                   #ok("Recharged");
                 };
               };
@@ -9613,11 +10818,20 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                 } else {
                   // Repair - manually update stats
                   let newCondition = Nat.min(100, stats.condition + 30);
-                  let perfectTuneUp = (stats.condition < 100 and newCondition == 100 and stats.overcharge > 0);
+
+                  // Check for Perfect Tune-Up using resonance system
+                  let hasOvercharge = stats.overcharge > 0;
+                  let resonance = ResonanceSystem.calculateResonance(tokenIndex, #Repair, stats.condition, now);
+                  let perfectTuneUp = hasOvercharge and (resonance.inPeakZone or resonance.inGoodZone);
+
+                  // Keep overcharge regardless of Perfect Tune-Up
+                  // If Perfect Tune-Up: penalties removed, if not: penalties remain
+                  let finalOvercharge = stats.overcharge;
 
                   let updatedStats = {
                     stats with
                     condition = newCondition;
+                    overcharge = finalOvercharge;
                     perfectTuneUp = perfectTuneUp;
                     lastRepaired = ?now;
                   };

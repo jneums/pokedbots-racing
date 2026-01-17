@@ -236,40 +236,58 @@ function checkLuckProc(
   totalRacers: number,
   segmentSeed: number
 ): LuckProcType | null {
-  // QUADRATIC scaling: (luck/100)^2 * 30% max
-  // This rewards high luck exponentially:
-  //   20 luck = 1.2%, 40 luck = 4.8%, 60 luck = 10.8%, 80 luck = 19.2%
-  const luckNorm = luck / 100.0;
-  const baseLuckChance = luckNorm * luckNorm * 0.30;
+  // POSITION-GATED: Only underdogs can proc luck
+  // Leaders don't need luck - they're already winning
+  // This creates comeback potential without rewarding the already-ahead
   
-  // Underdog bonus: lower positions get more luck chance (up to +50%)
-  const underdogMultiplier = totalRacers > 1 && position > Math.floor(totalRacers / 2)
-    ? 1.0 + ((position - Math.floor(totalRacers / 2)) / totalRacers) * 0.5
-    : 1.0;
+  // Calculate position threshold: bottom half of field can proc
+  const halfField = totalRacers <= 2 ? 1 : Math.floor(totalRacers / 2);
   
-  // Daily affinity bonus (also quadratic)
+  // If in top half (leading), no luck procs
+  if (position <= halfField) {
+    return null;
+  }
+  
+  // UNDERDOG SCALING: How far back determines proc chance
+  // Position 4/6 (barely behind): low chance
+  // Position 6/6 (dead last): highest chance
+  const positionsBehind = position - halfField; // 1 to halfField
+  const underdogFactor = positionsBehind / halfField;
+  
+  // FLAT BASELINE: Everyone gets the same base chance (10%)
+  // Position is the ONLY multiplier - luck stat is ignored
+  // This creates pure Mario Kart style rubber banding
+  const baseLuckChance = 0.10; // 10% flat for everyone
+  
+  // Underdog multiplier: 1x at barely behind, up to 2.5x at dead last
+  const underdogMultiplier = 1.0 + (underdogFactor * 1.5);
+  
+  // Daily affinity bonus (up to +5%) - small flavor bonus
   const affNorm = dailyAffinity / 100.0;
-  const affinityBonus = affNorm * affNorm * 0.30;
+  const affinityBonus = affNorm * 0.05;
   
-  // Total luck chance (capped at 35%)
-  const totalLuckChance = Math.min(0.35, (baseLuckChance * underdogMultiplier) + affinityBonus);
+  // Total luck chance (capped at 30%)
+  const totalLuckChance = Math.min(0.30, (baseLuckChance * underdogMultiplier) + affinityBonus);
   
   // Roll using segment seed
   const roll = (segmentSeed % 1000) / 1000.0;
   
   if (roll >= totalLuckChance) return null;
   
-  // Determine proc type using spectrum approach
-  // Higher luckTier shifts probability toward better procs
-  const luckTier = Math.floor((luck + dailyAffinity) / 2);
+  // POSITION-BASED PROC TYPE: Worse position = better tier chance
+  // Dead last gets best odds, barely-behind gets worst
+  const underdogRatio = positionsBehind / halfField; // 0.0 to 1.0
   const tierRoll = segmentSeed % 100;
   
-  // Spectrum-based probability:
-  // Legendary chance: 1% base + luckTier/5 (1-21% range)
-  // Major chance: 10% base + luckTier/3 (10-43% range)
-  // Minor: remainder
-  const legendaryChance = 1 + Math.floor(luckTier / 5); // 1-21%
-  const majorChance = 10 + Math.floor(luckTier / 3); // 10-43%
+  // Position-based probability:
+  // Dead last (ratio=1.0): 15% Legendary, 40% Major, 45% Minor
+  // Barely behind (ratio~0.2): 3% Legendary, 20% Major, 77% Minor
+  // 
+  // Luck stat gives small bonus to tier (up to +5% Legendary, +10% Major)
+  const luckBonus = luck / 100.0;
+  
+  const legendaryChance = Math.floor(3.0 + underdogRatio * 12.0 + luckBonus * 5.0); // 3-20%
+  const majorChance = Math.floor(20.0 + underdogRatio * 20.0 + luckBonus * 10.0); // 20-50%
   
   if (tierRoll < legendaryChance) {
     const descriptions = [
@@ -278,7 +296,7 @@ function checkLuckProc(
       "COSMIC BLESSING! Bot channels wasteland energy!",
       "UNSTOPPABLE! Bot enters god mode!"
     ];
-    return { type: 'Legendary', boost: 1.40, description: descriptions[segmentSeed % 4] };
+    return { type: 'Legendary', boost: 1.20, description: descriptions[segmentSeed % 4] };
   }
   else if (tierRoll < legendaryChance + majorChance) {
     const descriptions = [
@@ -287,7 +305,7 @@ function checkLuckProc(
       "Perfect line through debris!",
       "Engine surge! Extra power!"
     ];
-    return { type: 'Major', boost: 1.25, description: descriptions[segmentSeed % 4] };
+    return { type: 'Major', boost: 1.12, description: descriptions[segmentSeed % 4] };
   }
   else {
     const descriptions = [
@@ -296,7 +314,7 @@ function checkLuckProc(
       "Smooth patch ahead!",
       "Debris clears perfectly!"
     ];
-    return { type: 'Minor', boost: 1.15, description: descriptions[segmentSeed % 4] };
+    return { type: 'Minor', boost: 1.06, description: descriptions[segmentSeed % 4] };
   }
 }
 
@@ -400,6 +418,8 @@ interface RaceResult {
     powerCore: number;
     acceleration: number;
     luck?: number; // Luck stat for luck system
+    overcharge?: number; // Overcharge level (0-40) snapshotted at race entry
+    perfectTuneUp?: boolean; // Whether bot had perfect tune-up at race entry
   };
 }
 
@@ -955,23 +975,21 @@ function calculateSegmentTimeEstimate(
   
   // Speed + Acceleration synergy (high speed needs good accel to maintain)
   const speedAccelRatio = (speed + acceleration) / 200.0; // 0.30 to 1.0
-  const speedSynergyMod = 0.80 + (speedAccelRatio * 0.20); // 0.80x to 1.0x
+  const speedSynergyMod = 0.85 + (speedAccelRatio * 0.15); // 0.85x to 1.0x
   const synergisticSpeed = (speedUniversal + speedBonus) * speedSynergyMod;
   
   // Power + Stability synergy (endurance needs stability)
   const powerStabilityRatio = (powerCore + stability) / 200.0; // 0.30 to 1.0
-  const powerSynergyMod = 0.85 + (powerStabilityRatio * 0.15); // 0.85x to 1.0x
+  const powerSynergyMod = 0.82 + (powerStabilityRatio * 0.18); // 0.82x to 1.0x
   
   // === PART 3: UNIVERSAL PENALTIES (all stats matter everywhere) ===
   
-  // Power Core: Universal endurance (25% penalty range)
-  const powerUniversal = 1.0 + ((100.0 - powerCore) / 400.0);
-  
-  // Acceleration: Universal responsiveness (20% penalty range)
+  // Power Core: Universal endurance (28% penalty range)
+  const powerUniversal = 1.0 + ((100.0 - powerCore) / 350.0);
   const accelUniversal = 1.0 + ((100.0 - acceleration) / 350.0);
   
-  // Stability: Universal consistency (17% penalty range)
-  const stabilityUniversal = 1.0 + ((100.0 - stability) / 400.0);
+  // Stability: Universal consistency (28% penalty range)
+  const stabilityUniversal = 1.0 + ((100.0 - stability) / 350.0);
   
   // === PART 4: SITUATIONAL MODIFIERS ===
   
@@ -989,7 +1007,7 @@ function calculateSegmentTimeEstimate(
   // Acceleration: Bonus on roads, momentum recovery
   let accelSituational = 1.0;
   if (segment.terrain === 'MetalRoads') {
-    accelSituational = 1.0 + ((100.0 - acceleration) / 160.0); // +44% penalty on roads
+    accelSituational = 1.0 + ((100.0 - acceleration) / 200.0); // +50% penalty on roads
   }
   
   const momentumLoss = previousDifficulty > 1.0 
@@ -1138,7 +1156,14 @@ function calculateBotSegmentTimes(
       
       // Calculate segment performance: centerPoint ± varianceRange
       const rawRoll = segmentConditionSeed / 500.0 - 1.0; // -1.0 to +1.0
-      const segmentPerformance = centerPoint + (rawRoll * varianceRange);
+      let segmentPerformance = centerPoint + (rawRoll * varianceRange);
+      
+      // RUBBER BAND: Leaders can't get exceptional performance
+      // If in 1st place and rolled better than 0.95 (fast), cap at 0.98 (slightly fast)
+      // This prevents runaway leaders while still allowing decent performance
+      if (currentPosition === 1 && segmentPerformance < 0.95) {
+        segmentPerformance = 0.98;
+      }
       
       // === LUCK SYSTEM ===
       let luckBoost = 1.0;
@@ -1482,13 +1507,18 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
         // Luck system
         activeLuckBuff: null,
         dailyAffinity: calculateDailyAffinity(tokenIndex, result.stats || { speed: 10, powerCore: 10, acceleration: 10, stability: 10 }, result.faction || '', timestamp, overridePhenomenon),
-        currentPosition: idx + 1, // Initial position
+        currentPosition: 0, // Will be set after sorting
       };
     }).sort((a, b) => a.participantIndex - b.participantIndex); // CRITICAL: Sort by participantIndex to match backend order
     
-    // DEBUG: Log all bots' affinities for race 712
-    if (raceId === 712) {
-      console.log('=== RACE 712 BOT AFFINITIES ===');
+    // Set initial positions AFTER sorting (all start equal, so position = participantIndex + 1)
+    racerProgress.forEach((r, idx) => {
+      r.currentPosition = idx + 1;
+    });
+    
+    // DEBUG: Log all bots' affinities for race 724
+    if (raceId === 724) {
+      console.log('=== RACE 724 BOT AFFINITIES ===');
       racerProgress.forEach((r, idx) => {
         console.log(`Bot ${r.nftId} (idx ${idx}, partIdx ${r.participantIndex}): luck=${r.stats?.luck ?? 10}, dailyAffinity=${r.dailyAffinity}`);
       });
@@ -1560,11 +1590,17 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
           
           // Calculate segment performance: centerPoint ± varianceRange
           const rawRoll = segmentConditionSeed / 500.0 - 1.0; // -1.0 to +1.0
-          const segmentPerformance = centerPoint + (rawRoll * varianceRange);
+          let segmentPerformance = centerPoint + (rawRoll * varianceRange);
           
-          // DEBUG: Log seed calculation for first segment (only for race 712)
-          if (raceId === 712 && globalSegmentIdx === 0 && i === 0) {
-            console.log('=== FRONTEND SEED DEBUG (Race 712, Bot 0, Seg 0) ===');
+          // RUBBER BAND: Leaders can't get exceptional performance
+          // If in 1st place and rolled better than 0.95 (fast), cap at 0.98 (slightly fast)
+          if (racer.currentPosition === 1 && segmentPerformance < 0.95) {
+            segmentPerformance = 0.98;
+          }
+          
+          // DEBUG: Log seed calculation for first segment (only for race 724)
+          if (raceId === 724 && globalSegmentIdx === 0 && i === 0) {
+            console.log('=== FRONTEND SEED DEBUG (Race 724, Bot 0, Seg 0) ===');
             console.log('trackSeed:', trackSeed.toString());
             console.log('participantIndex:', racer.participantIndex);
             console.log('i (loop index):', i);
@@ -1608,13 +1644,8 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
             const luckSeed = Number((segmentSeed * 7331n + BigInt(racer.participantIndex * 9973) + BigInt(lap * 54321)) % 10000n);
             const luckCheck = checkLuckProc(luck, racer.dailyAffinity, racer.currentPosition, racerProgress.length, luckSeed);
             
-            // DEBUG: Log luck check for bot 4247 (participantIndex=2) in race 712
-            if (raceId === 712 && racer.nftId === '4247') {
-              console.log(`=== BOT 4247 LUCK CHECK SEG ${globalSegmentIdx} ===`);
-              console.log(`  luckSeed: ${luckSeed}, luck: ${luck}, dailyAffinity: ${racer.dailyAffinity}`);
-              console.log(`  position: ${racer.currentPosition}, totalRacers: ${racerProgress.length}`);
-              console.log(`  luckCheck result:`, luckCheck);
-            }
+            // DEBUG: Log luck check for ALL bots in ALL races
+            console.log(`LUCK CHECK: Bot ${racer.nftId} seg ${globalSegmentIdx} | pos ${racer.currentPosition}/${racerProgress.length} | aff ${racer.dailyAffinity} | seed ${luckSeed} | result: ${luckCheck ? luckCheck.type : 'none'}`);
             
             if (luckCheck) {
               // New luck proc!
@@ -1630,20 +1661,27 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
               }
             } else {
               // No luck proc - check for bad luck incident
-              const badLuckSeed = Number((segmentSeed * 8887n + BigInt(racer.participantIndex * 3331) + BigInt(lap * 77777)) % 10000n);
-              const badLuckCheck = checkBadLuckIncident(luck, badLuckSeed);
+              // RUBBER BAND: Bad luck ONLY affects leaders (top half of field)
+              const halfField = racerProgress.length <= 2 ? 1 : Math.floor(racerProgress.length / 2);
               
-              if (badLuckCheck) {
-                // Bad luck incident! Apply penalty
-                luckBoost = badLuckCheck.penalty;
+              if (racer.currentPosition <= halfField) {
+                // Leader is vulnerable to bad luck
+                const badLuckSeed = Number((segmentSeed * 8887n + BigInt(racer.participantIndex * 3331) + BigInt(lap * 77777)) % 10000n);
+                const badLuckCheck = checkBadLuckIncident(luck, badLuckSeed);
+                
+                if (badLuckCheck) {
+                  // Bad luck incident! Apply penalty
+                  luckBoost = badLuckCheck.penalty;
+                }
               }
+              // Underdogs (bottom half) are protected from bad luck
             }
           }
           
           segmentTime = segmentTime * segmentPerformance * slipstreamBonus * luckBoost;
           
-          // Debug logging for first 3 segments (only for race 712)
-          if (raceId === 712 && globalSegmentIdx < 3) {
+          // Debug logging for first 3 segments (only for race 724)
+          if (raceId === 724 && globalSegmentIdx < 3) {
             console.log(`=== FRONTEND SEGMENT ${globalSegmentIdx} BOT ${i} (${racer.nftId}) ===`);
             console.log(`participantIndex: ${racer.participantIndex}`);
             console.log(`Stats:`, botStats);
@@ -2212,6 +2250,14 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                 const isDNF = bot.finalTime > 100000;
                 const livePosition = bot.position;
                 
+                // Get bot's stats for overcharge/perfectTuneUp indicator
+                const result = results.find(r => r.nftId === bot.nftId);
+                const overcharge = result?.stats?.overcharge ?? 0;
+                const isPerfectTuneUp = result?.stats?.perfectTuneUp === true;
+                const hasOvercharge = overcharge > 0 || isPerfectTuneUp;
+                const maxOvercharge = 40;
+                const overchargePercent = Math.round((overcharge / maxOvercharge) * 100);
+                
                 if (isDNF) return null;
                 
                 // Calculate position on track - cap at 100% so bots stop at finish line
@@ -2248,7 +2294,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                   >
                     <div className="relative">
                       {/* Position badge */}
-                      <div className={`absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border-2 z-10 ${
+                      <div className={`absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border-2 z-20 ${
                         livePosition === 1 ? 'bg-yellow-500 border-yellow-400 text-black' :
                         livePosition === 2 ? 'bg-gray-300 border-gray-400 text-black' :
                         livePosition === 3 ? 'bg-orange-600 border-orange-500 text-white' :
@@ -2257,8 +2303,43 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                         {livePosition}
                       </div>
                       
-                      {/* Bot avatar */}
+                      {/* Bot avatar with overcharge/perfect tune-up indicator */}
                       <div className={`relative ${isFinished ? 'animate-pulse' : ''}`}>
+                        {/* Overcharge/Perfect Tune-Up radial progress ring */}
+                        {hasOvercharge && (
+                          <svg 
+                            className="absolute w-[36px] h-[36px] -rotate-90 z-10 pointer-events-none" 
+                            style={{ left: '-2px', top: '-2px' }}
+                          >
+                            {/* Background ring */}
+                            <circle
+                              cx="18"
+                              cy="18"
+                              r="17"
+                              fill="none"
+                              stroke={isPerfectTuneUp ? "rgba(249, 115, 22, 0.3)" : "rgba(6, 182, 212, 0.3)"}
+                              strokeWidth="2"
+                            />
+                            {/* Progress ring */}
+                            <circle
+                              cx="18"
+                              cy="18"
+                              r="17"
+                              fill="none"
+                              stroke={isPerfectTuneUp ? "rgb(249, 115, 22)" : "rgb(6, 182, 212)"}
+                              strokeWidth="2"
+                              strokeDasharray={`${(overchargePercent / 100) * 106.8} 106.8`}
+                              strokeLinecap="round"
+                              className={isPerfectTuneUp ? "animate-pulse" : ""}
+                              style={{ 
+                                filter: isPerfectTuneUp 
+                                  ? 'drop-shadow(0 0 4px rgba(249, 115, 22, 0.8))' 
+                                  : 'drop-shadow(0 0 3px rgba(6, 182, 212, 0.6))',
+                                ...(isPerfectTuneUp ? { animationDuration: '1.5s' } : {})
+                              }}
+                            />
+                          </svg>
+                        )}
                         <img
                           src={imageUrl}
                           alt={`Bot #${bot.nftId}`}
@@ -2321,6 +2402,13 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                   Math.round((result.stats.speed + result.stats.stability + result.stats.powerCore + result.stats.acceleration) / 4) : null);
                 const botName = botNames.get(bot.nftId) || `Bot #${bot.nftId}`;
                 
+                // Get overcharge/perfectTuneUp for indicator
+                const overcharge = result?.stats?.overcharge ?? 0;
+                const isPerfectTuneUp = result?.stats?.perfectTuneUp === true;
+                const hasOvercharge = overcharge > 0 || isPerfectTuneUp;
+                const maxOvercharge = 40;
+                const overchargePercent = Math.round((overcharge / maxOvercharge) * 100);
+                
                 // Calculate effective luck (base luck + daily affinity) / 2
                 const tokenIndex = parseInt(bot.nftId) || 0;
                 const baseLuck = result?.stats?.luck ?? 10;
@@ -2355,16 +2443,64 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                       {livePosition === 3 && '🥉'}
                       {livePosition > 3 && `#${livePosition}`}
                     </span>
-                    <img
-                      src={imageUrl}
-                      alt={botName}
-                      className="w-8 h-8 rounded border border-primary/40 shadow-sm"
-                    />
+                    <div className="relative w-8 h-8 flex-shrink-0">
+                      {/* Overcharge/Perfect Tune-Up square ring indicator */}
+                      {hasOvercharge && (
+                        <svg 
+                          className="absolute w-[36px] h-[36px] z-10 pointer-events-none" 
+                          style={{ left: '-2px', top: '-2px' }}
+                        >
+                          {/* Background ring - rounded rectangle */}
+                          <rect
+                            x="1"
+                            y="1"
+                            width="34"
+                            height="34"
+                            rx="4"
+                            ry="4"
+                            fill="none"
+                            stroke={isPerfectTuneUp ? "rgba(249, 115, 22, 0.3)" : "rgba(6, 182, 212, 0.3)"}
+                            strokeWidth="2"
+                          />
+                          {/* Progress ring - animated border */}
+                          <rect
+                            x="1"
+                            y="1"
+                            width="34"
+                            height="34"
+                            rx="4"
+                            ry="4"
+                            fill="none"
+                            stroke={isPerfectTuneUp ? "rgb(249, 115, 22)" : "rgb(6, 182, 212)"}
+                            strokeWidth="2"
+                            strokeDasharray={`${(overchargePercent / 100) * 136} 136`}
+                            strokeLinecap="round"
+                            className={isPerfectTuneUp ? "animate-pulse" : ""}
+                            style={{ 
+                              filter: isPerfectTuneUp 
+                                ? 'drop-shadow(0 0 3px rgba(249, 115, 22, 0.8))' 
+                                : 'drop-shadow(0 0 2px rgba(6, 182, 212, 0.6))',
+                              ...(isPerfectTuneUp ? { animationDuration: '1.5s' } : {})
+                            }}
+                          />
+                        </svg>
+                      )}
+                      <img
+                        src={imageUrl}
+                        alt={botName}
+                        className={`w-8 h-8 rounded border shadow-sm ${
+                          hasOvercharge
+                            ? isPerfectTuneUp 
+                              ? 'border-orange-500/50'
+                              : 'border-cyan-400/50'
+                            : 'border-primary/40'
+                        }`}
+                      />
+                    </div>
                     <div className="flex flex-col flex-1 min-w-0">
                       <span className="font-mono text-xs font-semibold">{botName}</span>
                       <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                         {rating && <span>⭐ {rating}</span>}
-                        {result?.stats?.luck !== undefined && <span>🍀 {effectiveLuck}</span>}
                       </div>
                     </div>
                     {!isDNF && !isFinished && (

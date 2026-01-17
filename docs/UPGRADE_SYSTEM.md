@@ -21,10 +21,10 @@ order: 4
 Upgrading improves robot stats over time through a **progressive cost system** where each successive upgrade to the same stat becomes more expensive.
 
 **Current System:**
-- Pay ICP directly when initiating an upgrade
-- Costs scale: 10 ICP → 17 ICP → 27 ICP → 40 ICP → 60 ICP per upgrade
-- Parts purchased automatically (3.33 ICP per part)
-- 12-hour installation time
+- Pay ICP directly or use parts from scavenging/racing
+- V2 RNG-based system with success rates and pity mechanic
+- Costs scale based on current stat value and bot rating
+- **Instant upgrades** - immediate RNG roll and result
 
 **Future Enhancement (Planned):**
 - Scrapyard system to reduce costs by scrapping NFTs for parts

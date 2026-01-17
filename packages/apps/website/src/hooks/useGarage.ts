@@ -17,6 +17,7 @@ import {
   enterRace,
   getUserInventory,
   getCollectionBonuses,
+  getGaragePowerStatus,
   listMyApiKeys,
   createApiKey,
   revokeApiKey,
@@ -32,11 +33,14 @@ import {
   batchStartScavenging,
   batchCompleteScavenging,
   getDedicationInfo,
+  getBatchDedicationInfo,
   type UpgradeType,
   type PaymentMethod,
   type ApiKeyMetadata,
   type UnregisteredNFT,
   type DedicationInfo,
+  type BatchDedicationInfo,
+  type GaragePowerStatus,
 } from '@pokedbots-racing/ic-js';
 import { useAuth } from './useAuth';
 
@@ -101,6 +105,23 @@ export function useDedicationInfo(tokenIndex: number | null) {
 }
 
 /**
+ * Hook to fetch batch dedication info for multiple bots (optimized for garage list)
+ */
+export function useBatchDedicationInfo(tokenIndices: number[]) {
+  return useQuery({
+    queryKey: ['batch-dedication-info', tokenIndices.sort((a,b) => a-b).join(',')],
+    queryFn: async () => {
+      if (tokenIndices.length === 0) {
+        return new Map<number, BatchDedicationInfo>();
+      }
+      return getBatchDedicationInfo(tokenIndices);
+    },
+    enabled: tokenIndices.length > 0,
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
  * Hook to initialize a bot
  */
 export function useInitializeBot() {
@@ -116,7 +137,7 @@ export function useInitializeBot() {
     },
     onSuccess: () => {
       // Invalidate bot lists to refetch
-      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
     },
   });
 }
@@ -136,9 +157,9 @@ export function useRechargeBot() {
       return rechargeBot(tokenIndex, user.agent);
     },
     onSuccess: (_, tokenIndex) => {
-      // Invalidate specific bot details
-      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
-      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      // Invalidate specific bot details and force refetch
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
     },
   });
 }
@@ -158,8 +179,8 @@ export function useRepairBot() {
       return repairBot(tokenIndex, user.agent);
     },
     onSuccess: (_, tokenIndex) => {
-      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
-      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
     },
   });
 }
@@ -180,9 +201,8 @@ export function useFullMaintenanceBot() {
     },
     onSuccess: (_, tokenIndex) => {
       // Force refetch of bot data
-      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
-      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
-      queryClient.refetchQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
     },
   });
 }
@@ -360,7 +380,7 @@ export function useBatchRechargeBots() {
       return batchRechargeBots(tokenIndices, user.agent);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
     },
   });
 }
@@ -380,7 +400,7 @@ export function useBatchRepairBots() {
       return batchRepairBots(tokenIndices, user.agent);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
     },
   });
 }
@@ -408,7 +428,7 @@ export function useBatchStartScavenging() {
       return batchStartScavenging(tokenIndices, zone, durationMinutes, user.agent);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
     },
   });
 }
@@ -428,8 +448,8 @@ export function useBatchCompleteScavenging() {
       return batchCompleteScavenging(tokenIndices, user.agent);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
-      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'], refetchType: 'all' });
     },
   });
 }
@@ -449,9 +469,9 @@ export function useCancelUpgrade() {
       return cancelUpgrade(tokenIndex, user.agent as any);
     },
     onSuccess: (_, tokenIndex) => {
-      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
-      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
-      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'], refetchType: 'all' });
     },
   });
 }
@@ -472,9 +492,9 @@ export function useEnterRace() {
     },
     onSuccess: (_, { tokenIndex, raceId }) => {
       // Invalidate bot details and race details
-      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
-      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
-      queryClient.invalidateQueries({ queryKey: ['race', raceId] });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['race', raceId], refetchType: 'all' });
     },
   });
 }
@@ -547,6 +567,28 @@ export function useCollectionBonuses() {
     enabled: !!user?.agent,
     staleTime: 30 * 1000, // 30 seconds - sync with bot list
     gcTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
+ * Hook to fetch garage power grid status
+ * Shows efficiency when multiple bots are in ChargingStation
+ */
+export function useGaragePowerStatus() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['garage-power-status', user?.principal],
+    queryFn: async () => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return getGaragePowerStatus(user.agent);
+    },
+    enabled: !!user?.agent,
+    staleTime: 10 * 1000, // 10 seconds - refresh often when managing charging bots
+    gcTime: 60 * 1000, // 1 minute
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
   });
 }
 
@@ -640,11 +682,11 @@ export function useListBotForSale() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ tokenIndex, priceE8s }: { tokenIndex: number; priceE8s: bigint }) => {
+    mutationFn: async ({ tokenIndex, priceICP }: { tokenIndex: number; priceICP: number }) => {
       if (!user?.agent) {
         throw new Error('Not authenticated');
       }
-      return listBotForSale(tokenIndex, Number(priceE8s), user.agent as any);
+      return listBotForSale(tokenIndex, priceICP, user.agent as any);
     },
     onSuccess: (_, { tokenIndex }) => {
       queryClient.invalidateQueries({ queryKey: ['my-bots'] });
@@ -718,8 +760,8 @@ export function useStartScavenging() {
       return startScavenging(tokenIndex, zone, user.agent as any, duration);
     },
     onSuccess: (_, { tokenIndex }) => {
-      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
-      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex], refetchType: 'all' });
     },
   });
 }
@@ -739,9 +781,9 @@ export function useCompleteScavenging() {
       return completeScavenging(tokenIndex, user.agent as any);
     },
     onSuccess: (_, tokenIndex) => {
-      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
-      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
-      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'], refetchType: 'all' });
     },
   });
 }
@@ -761,9 +803,9 @@ export function useRespecBot() {
       return respecBot(tokenIndex, statsToStrip, user.agent as any);
     },
     onSuccess: (_, { tokenIndex }) => {
-      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
-      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex] });
-      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'], refetchType: 'all' });
     },
   });
 }

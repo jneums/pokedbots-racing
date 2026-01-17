@@ -15,6 +15,7 @@ import ToolContext "ToolContext";
 import PokedBotsGarage "../PokedBotsGarage";
 import IcpLedger "../IcpLedger";
 import ExtIntegration "../ExtIntegration";
+import ResonanceSystem "../ResonanceSystem";
 
 module {
   // Recharge cost: 0.1 ICP + 0.0001 ICP fee (reduced for testing)
@@ -25,7 +26,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_recharge_robot";
     title = ?"Recharge Robot Battery";
-    description = ?"Recharge robot battery. Costs 0.1 ICP + 0.0001 fee. Restores 50-90 battery (RNG-based). Does NOT restore condition (use garage_repair_robot). 6hr cooldown. Requires ICRC-2 approval.\n\n**BATTERY RECHARGE:**\n• Base recharge: 70 battery\n• RNG variance: ±20 battery (50-90 range)\n• Cannot predict exact amount - waiting for 0% is risky!\n\n**OVERCHARGE MECHANIC:**\n• Base overcharge: (100 - battery) × 0.4, max 40%\n• Efficiency affected by CONDITION + HIGH RNG: 0.4 + (condition/200) + random(-0.35, +0.35)\n  - 100% condition: 55-135% efficiency (volatile!)\n  - 50% condition: 30-110% efficiency (very risky)\n  - 0% condition: 5-75% efficiency (wildcard)\n• Examples at 100% condition:\n  - 10% battery → 22-54% overcharge (highly variable, capped at 40%)\n  - 50% battery → 11-27% overcharge (unpredictable)\n• Overcharge consumed in next race for one-time stat boost:\n  - Speed: +0.125% per 1% overcharge (max +5% at 40%)\n  - Acceleration: +0.125% per 1% overcharge (max +5% at 40%)\n  - Stability: -0.083% per 1% overcharge (max -3.3% at 40%)\n  - Power Core: -0.083% per 1% overcharge (max -3.3% at 40%)\n• ⚠️ REPAIR RESETS OVERCHARGE: Repairing clears overcharge to prevent exploit cycles\n• Strategic: High variance makes optimization unpredictable";
+    description = ?"Recharge robot battery. Costs 0.1 ICP + 0.0001 fee. Restores 50-90 battery (RNG-based). Does NOT restore condition (use garage_repair_robot). 6hr cooldown. Requires ICRC-2 approval.\n\n**BATTERY RECHARGE:**\n• Base recharge: 70 battery\n• RNG variance: ±20 battery (50-90 range)\n• Cannot predict exact amount - waiting for 0% is risky!\n\n**RESONANCE SYSTEM:**\n• Each bot has a hidden 'resonance field' that determines optimal recharge points\n• Resonance drifts slowly over time (~weekly cycle)\n• Peak Zone: Maximum overcharge bonus!\n• Good Zone: 80% of max overcharge\n• Outside Resonance: 60% of max overcharge (baseline)\n• Optimal points are unique per bot and hidden - experiment to discover patterns!\n\n**OVERCHARGE MECHANIC:**\n• Base overcharge: (100 - battery) × 0.4, modified by resonance\n• MCP cap: 25% max (UI gets up to 40%)\n• Condition + RNG affect efficiency\n• Overcharge consumed in next race for stat boost:\n  - Speed: +0.20% per 1% overcharge\n  - Acceleration: +0.20% per 1% overcharge\n  - Stability: -0.133% per 1% overcharge (negated by Perfect Tune-Up)\n  - Power Core: -0.133% per 1% overcharge (negated by Perfect Tune-Up)\n• ⚠️ REPAIR RESETS OVERCHARGE unless you achieve Perfect Tune-Up";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -156,28 +157,39 @@ module {
             let totalRecharge = Int.abs(Float.toInt(70.0 + batteryRNG)); // 50-90
             let newBattery = Nat.min(maxBattery, currentBattery + totalRecharge);
 
+            // ===== RESONANCE SYSTEM FOR OVERCHARGE =====
+            // Each bot has a unique resonance field that determines optimal recharge points
+            // Recharging near the optimal point gives maximum overcharge bonus
+            let resonance = ResonanceSystem.calculateResonance(tokenIndex, #Recharge, currentBattery, now);
+
             // Overcharge based on how LOW battery was before recharge
             // Lower battery = bigger overcharge potential (risk/reward mechanic)
             // Base formula: (100 - currentBattery) * 0.4, theoretical max 40%
-            // With efficiency variance (0.55-1.35), actual max is ~54%
             let batteryDeficit = if (currentBattery >= 100) { 0 } else {
               100 - currentBattery;
             };
             let baseOvercharge = Float.fromInt(batteryDeficit) * 0.4;
 
-            // Condition affects efficiency with HIGH randomness
-            // efficiency = 0.4 + (condition / 200) + random(-0.35, +0.35)
-            // At 100% condition: 0.4 + 0.5 + random = 0.55-1.35 (avg 0.9, highly variable)
-            // At 50% condition: 0.4 + 0.25 + random = 0.30-1.10 (avg 0.65, very risky)
-            // At 0% condition: 0.4 + 0 + random = 0.05-0.75 (avg 0.4, wildcard)
+            // Condition affects efficiency with some randomness
             let conditionBonus = Float.fromInt(currentCondition) / 200.0;
+            let randomVariance = (Float.fromInt(randomHash1) / 1000.0) * 0.5 - 0.25; // -0.25 to +0.25 (reduced from ±0.35)
+            let efficiency = 0.5 + conditionBonus + randomVariance; // Base 0.5 (up from 0.4)
 
-            // INCREASED RNG variance: -0.35 to +0.35 (was -0.2 to +0.2)
-            let randomVariance = (Float.fromInt(randomHash1) / 1000.0) * 0.7 - 0.35; // -0.35 to +0.35
+            // Apply resonance modifier to overcharge
+            // Peak resonance: full potential (100%)
+            // Good resonance: 80% of potential
+            // Outside resonance: 60% of potential (baseline)
+            let resonanceModifier = if (resonance.inPeakZone) {
+              1.0;
+            } else if (resonance.inGoodZone) {
+              0.8;
+            } else {
+              0.6;
+            };
 
-            let efficiency = 0.4 + conditionBonus + randomVariance;
-            let finalOvercharge = baseOvercharge * efficiency;
-            let newOvercharge = Nat.min(60, Int.abs(Float.toInt(finalOvercharge))); // Cap at 60 for safety
+            let finalOvercharge = baseOvercharge * efficiency * resonanceModifier;
+            // MCP cap at 25% overcharge (max +5% stat boost) - UI gets 40% cap (max +8%)
+            let newOvercharge = Nat.min(25, Int.abs(Float.toInt(finalOvercharge)));
 
             let batteryRestored = if (newBattery >= currentBattery) {
               newBattery - currentBattery;
@@ -202,12 +214,21 @@ module {
             // Record activity DP for battery restoration (1 DP per 25 battery)
             ctx.dedicationManager.recordBatteryRestored(tokenIndex, batteryRestored, now);
 
+            // Build resonance message - don't reveal optimal point
+            let resonanceMsg = if (resonance.inPeakZone) {
+              " 🔮 PEAK RESONANCE! Maximum overcharge achieved!";
+            } else if (resonance.inGoodZone) {
+              " ✨ Good resonance - solid overcharge bonus";
+            } else {
+              "";
+            };
+
             let overchargeMsg = if (overchargeAdded > 0) {
               let speedBoost = Int.abs(Float.toInt(Float.fromInt(overchargeAdded) * 0.125));
               let stabilityPenalty = Int.abs(Float.toInt(Float.fromInt(overchargeAdded) * 0.083));
-              " ⚡ OVERCHARGE: +" # Nat.toText(overchargeAdded) # "% (+" # Nat.toText(speedBoost) # "% Speed/Accel, -" # Nat.toText(stabilityPenalty) # "% Stability/PowerCore for next race)";
+              " ⚡ OVERCHARGE: +" # Nat.toText(overchargeAdded) # "% (+" # Nat.toText(speedBoost) # "% Speed/Accel, -" # Nat.toText(stabilityPenalty) # "% Stability/PowerCore for next race)" # resonanceMsg;
             } else {
-              "";
+              resonanceMsg;
             };
 
             let response = Json.obj([
@@ -218,6 +239,7 @@ module {
               ("new_battery", Json.int(updatedStats.battery)),
               ("overcharge_added", Json.int(overchargeAdded)),
               ("new_overcharge", Json.int(updatedStats.overcharge)),
+              ("resonance_status", Json.str(resonance.resonanceStatus)),
               ("cost_icp", Json.str("0.1")),
               ("next_available_hours", Json.int(6)),
               ("message", Json.str("⚡ Power cells recharged. Battery at " # Nat.toText(updatedStats.battery) # "%" # overchargeMsg)),

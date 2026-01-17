@@ -1,12 +1,27 @@
 'use client';
 
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetUpcomingEventsWithRaces, useGetPastEvents, type ScheduledEvent } from "@/hooks/useRacing";
+
+// Type for event with race summary from the backend
+type EventWithRaceSummary = {
+  event: ScheduledEvent;
+  raceSummary: {
+    totalRaces: bigint;
+    terrains: Array<any>;
+    distances: Array<bigint>;
+    totalParticipants: bigint;
+    totalPrizePool?: bigint;
+    nextRaceStartTime?: [] | [bigint];
+    completedRaces?: bigint;
+    pendingRaces?: bigint;
+  };
+};
 
 function formatICP(amount: bigint): string {
   const icp = Number(amount) / 100_000_000;
@@ -26,6 +41,65 @@ function formatDate(timestamp: bigint): string {
     minute: '2-digit',
     timeZoneName: 'short',
   });
+}
+
+// Format date for day headers (no time)
+function formatDayHeader(date: Date): string {
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const isToday = date.toDateString() === today.toDateString();
+  const isTomorrow = date.toDateString() === tomorrow.toDateString();
+  
+  if (isToday) {
+    return '📅 Today';
+  }
+  if (isTomorrow) {
+    return '📅 Tomorrow';
+  }
+  
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+// Get the relevant date for an event (next race time for multi-stage, or scheduled time)
+function getEventSortDate(item: EventWithRaceSummary): Date {
+  // If there's a next race start time, use that for multi-stage events
+  if (item.raceSummary.nextRaceStartTime && item.raceSummary.nextRaceStartTime.length > 0) {
+    return new Date(Number(item.raceSummary.nextRaceStartTime[0]) / 1_000_000);
+  }
+  // Fall back to event scheduled time
+  return new Date(Number(item.event.scheduledTime) / 1_000_000);
+}
+
+// Get the day key for grouping (YYYY-MM-DD in local time)
+function getDayKey(date: Date): string {
+  // Use local date components to avoid UTC timezone issues
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Group events by day
+function groupEventsByDay(events: EventWithRaceSummary[]): Map<string, EventWithRaceSummary[]> {
+  const grouped = new Map<string, EventWithRaceSummary[]>();
+  
+  for (const item of events) {
+    const date = getEventSortDate(item);
+    const dayKey = getDayKey(date);
+    
+    if (!grouped.has(dayKey)) {
+      grouped.set(dayKey, []);
+    }
+    grouped.get(dayKey)!.push(item);
+  }
+  
+  return grouped;
 }
 
 function formatRelativeTime(timestamp: bigint): string {
@@ -117,6 +191,9 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
     distances: Array<bigint>;
     totalParticipants: bigint;
     totalPrizePool?: bigint;
+    nextRaceStartTime?: [] | [bigint];
+    completedRaces?: bigint;
+    pendingRaces?: bigint;
   };
   isPastEvent?: boolean;
 }) {
@@ -130,6 +207,18 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
   
   // Registration hasn't opened yet (based on actual timestamp)
   const isUpcoming = now < registrationOpensDate;
+  
+  // Multi-stage event info
+  const totalRaces = raceSummary ? Number(raceSummary.totalRaces) : 0;
+  const completedRaces = raceSummary?.completedRaces ? Number(raceSummary.completedRaces) : 0;
+  const pendingRaces = raceSummary?.pendingRaces ? Number(raceSummary.pendingRaces) : 0;
+  const isMultiStage = totalRaces > 1;
+  const hasUpcomingRaces = pendingRaces > 0;
+  
+  // Get next race time for multi-stage events
+  const nextRaceTime = raceSummary?.nextRaceStartTime && raceSummary.nextRaceStartTime.length > 0
+    ? new Date(Number(raceSummary.nextRaceStartTime[0]) / 1_000_000)
+    : null;
 
   // Calculate total prize pool from event data
   const calculateEventPrizePool = (): bigint => {
@@ -190,9 +279,15 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
                   <Badge variant="outline" className="bg-primary/20 text-primary font-mono text-sm">
                     {formatDate(event.scheduledTime)}
                   </Badge>
-                  {hasStarted && !isPastEvent && (
+                  {/* Multi-stage progress badge */}
+                  {isMultiStage && hasUpcomingRaces && !isPastEvent && completedRaces > 0 && (
+                    <Badge className="bg-purple-500/90 hover:bg-purple-500 border-purple-400/50">
+                      🏁 {completedRaces}/{totalRaces} Races Complete
+                    </Badge>
+                  )}
+                  {hasStarted && !isPastEvent && !isMultiStage && (
                     <Badge className="bg-orange-500/90 hover:bg-orange-500 border-orange-400/50 animate-pulse">
-                      🏁 Last Event
+                      🏁 Racing
                     </Badge>
                   )}
                   {!hasStarted && getStatusBadge(event.status, event.registrationCloses, isPastEvent)}
@@ -226,7 +321,7 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
             <CardDescription className="text-base">
               {event.metadata.description}
             </CardDescription>
-            <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-4 text-sm flex-wrap">
               {isRegistrationOpen && !isPastEvent && (
                 <span className="text-green-500 font-semibold">
                   ⏰ Closes {formatRelativeTime(event.registrationCloses)}
@@ -240,6 +335,12 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
               {isUpcoming && !isPastEvent && (
                 <span className="text-blue-500 font-semibold">
                   Opens {formatRelativeTime(event.registrationOpens)}
+                </span>
+              )}
+              {/* Show next race time for multi-stage events */}
+              {isMultiStage && hasUpcomingRaces && nextRaceTime && !isPastEvent && (
+                <span className="text-orange-500 font-semibold">
+                  🏎️ Next race {formatRelativeTime(BigInt(nextRaceTime.getTime() * 1_000_000))}
                 </span>
               )}
             </div>
@@ -341,17 +442,39 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
 }
 
 export default function SchedulePage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: upcomingEventsData, isLoading: upcomingLoading } = useGetUpcomingEventsWithRaces(14); // Next 2 weeks
   
   const [pastPage, setPastPage] = useState(0);
-  const [activeTab, setActiveTab] = useState('upcoming');
+  
+  // Get active tab from URL query param, default to 'upcoming'
+  const activeTab = searchParams.get('tab') || 'upcoming';
   const PAST_EVENTS_PER_PAGE = 10;
+  
+  // Update URL query param when tab changes
+  const handleTabChange = (value: string) => {
+    setSearchParams(value === 'upcoming' ? {} : { tab: value });
+  };
   
   const { data: pastEvents, isLoading: pastLoading } = useGetPastEvents(
     pastPage * PAST_EVENTS_PER_PAGE,
     PAST_EVENTS_PER_PAGE,
     activeTab === 'past' // Only fetch when Past Events tab is active
   );
+  
+  // Group upcoming events by day
+  const groupedEvents = useMemo((): Map<string, EventWithRaceSummary[]> => {
+    if (!upcomingEventsData) return new Map();
+    
+    // Sort events by their relevant date (next race time for multi-stage, or scheduled time)
+    const sorted = [...upcomingEventsData].sort((a, b) => {
+      const dateA = getEventSortDate(a as EventWithRaceSummary);
+      const dateB = getEventSortDate(b as EventWithRaceSummary);
+      return dateA.getTime() - dateB.getTime();
+    });
+    
+    return groupEventsByDay(sorted as EventWithRaceSummary[]);
+  }, [upcomingEventsData]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -366,7 +489,7 @@ export default function SchedulePage() {
           </div>
 
           {/* Tabs for Upcoming vs Past */}
-          <Tabs defaultValue="upcoming" className="w-full" onValueChange={setActiveTab}>
+          <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-2 mb-8 h-14 bg-muted p-1.5 rounded-xl">
               <TabsTrigger 
                 value="upcoming" 
@@ -393,14 +516,35 @@ export default function SchedulePage() {
                   <p className="text-sm text-muted-foreground mt-2">Check back later for new races!</p>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {upcomingEventsData.map((item) => (
-                    <EventCard 
-                      key={item.event.eventId.toString()} 
-                      event={item.event} 
-                      raceSummary={item.raceSummary}
-                    />
-                  ))}
+                <div className="space-y-8">
+                  {Array.from(groupedEvents.entries()).map(([dayKey, dayEvents]) => {
+                    const dayDate = new Date(dayKey + 'T00:00:00');
+                    return (
+                      <div key={dayKey} className="space-y-4">
+                        {/* Day Header */}
+                        <div className="flex items-center gap-4">
+                          <h2 className="text-xl font-bold text-primary whitespace-nowrap">
+                            {formatDayHeader(dayDate)}
+                          </h2>
+                          <div className="h-px bg-border flex-1" />
+                          <span className="text-sm text-muted-foreground">
+                            {dayEvents.length} event{dayEvents.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        
+                        {/* Events for this day */}
+                        <div className="space-y-6">
+                          {dayEvents.map((item) => (
+                            <EventCard 
+                              key={item.event.eventId.toString()} 
+                              event={item.event} 
+                              raceSummary={item.raceSummary}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </TabsContent>

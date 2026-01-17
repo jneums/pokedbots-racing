@@ -1,6 +1,54 @@
 import PokedBotsGarage "../PokedBotsGarage";
 
 module {
+  // Get faction emoji for display
+  public func factionEmoji(faction : PokedBotsGarage.FactionType) : Text {
+    switch (faction) {
+      // Ultra-Rare
+      case (#UltimateMaster) { "👑" };
+      case (#Wild) { "🦾" };
+      case (#Golden) { "✨" };
+      case (#Ultimate) { "⚡" };
+      // Super-Rare
+      case (#Blackhole) { "🌌" };
+      case (#Dead) { "💀" };
+      case (#Master) { "🎯" };
+      // Rare
+      case (#Bee) { "🐝" };
+      case (#Food) { "🍔" };
+      case (#Box) { "📦" };
+      case (#Murder) { "🔪" };
+      // Common
+      case (#Game) { "🎮" };
+      case (#Animal) { "🦎" };
+      case (#Industrial) { "⚙️" };
+    };
+  };
+
+  // Get faction name as plain text
+  public func factionName(faction : PokedBotsGarage.FactionType) : Text {
+    switch (faction) {
+      // Ultra-Rare
+      case (#UltimateMaster) { "Ultimate-Master" };
+      case (#Wild) { "Wild" };
+      case (#Golden) { "Golden" };
+      case (#Ultimate) { "Ultimate" };
+      // Super-Rare
+      case (#Blackhole) { "Blackhole" };
+      case (#Dead) { "Dead" };
+      case (#Master) { "Master" };
+      // Rare
+      case (#Bee) { "Bee" };
+      case (#Food) { "Food" };
+      case (#Box) { "Box" };
+      case (#Murder) { "Murder" };
+      // Common
+      case (#Game) { "Game" };
+      case (#Animal) { "Animal" };
+      case (#Industrial) { "Industrial" };
+    };
+  };
+
   // Get faction-specific flavor text for various events
   public func getFactionGreeting(faction : PokedBotsGarage.FactionType) : Text {
     switch (faction) {

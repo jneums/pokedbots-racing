@@ -293,28 +293,6 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
                 </div>
               </div>
 
-              {/* Luck Section (separate - not part of rating) */}
-              <div className="mt-4 p-4 rounded-lg border border-green-500/30 bg-gradient-to-r from-green-500/5 to-emerald-500/10">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">🍀</span>
-                    <div>
-                      <p className="text-sm font-medium text-green-400">Luck</p>
-                      <p className="text-xs text-muted-foreground">Not included in rating</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-3xl font-bold text-primary">
-                      {profile.stats.luck !== undefined ? Number(profile.stats.luck) : Math.floor((Number(tokenIndex) % 100) / 2) + 10}
-                    </p>
-                    {isInitialized && (
-                      <p className="text-xs text-muted-foreground">
-                        Base: {Math.floor((Number(tokenIndex) % 100) / 2) + 10}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
               {!isInitialized && (
                 <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                   <p className="text-sm text-yellow-600 dark:text-yellow-400">

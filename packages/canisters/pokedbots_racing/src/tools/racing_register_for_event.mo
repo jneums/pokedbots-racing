@@ -103,13 +103,13 @@ module {
         #SilentKlan;
       };
 
-      // Calculate class-based entry fee
+      // Calculate class-based entry fee (shifted up one bracket)
       let classFeeMultiplier : Float = switch (raceClass) {
-        case (#Scrap) { 0.5 };
-        case (#Junker) { 1.0 };
-        case (#Raider) { 1.5 };
-        case (#Elite) { 2.0 };
-        case (#SilentKlan) { 2.5 };
+        case (#Scrap) { 1.0 };
+        case (#Junker) { 1.5 };
+        case (#Raider) { 2.0 };
+        case (#Elite) { 2.5 };
+        case (#SilentKlan) { 3.0 };
       };
       let adjustedEntryFee = Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
 
@@ -135,6 +135,15 @@ module {
           };
           case (null) {};
         };
+      };
+
+      // Check if bot is registered for another event with conflicting race times
+      switch (ctx.eventCalendar.getConflictingEventForBot(eventId, tokenIndex, event.scheduledTime, event.raceCreationMode)) {
+        case (?conflictingEvent) {
+          let conflictName = conflictingEvent.metadata.name;
+          return ToolContext.makeError("This bot is already registered for \"" # conflictName # "\" which has a race at a conflicting time", cb);
+        };
+        case (null) {}; // No conflict
       };
 
       // Process ICRC-2 payment

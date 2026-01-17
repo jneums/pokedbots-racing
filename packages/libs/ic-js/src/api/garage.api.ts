@@ -169,6 +169,24 @@ export interface DedicationInfo {
   };
 }
 
+// Lighter weight version for batch queries
+export interface BatchDedicationInfo {
+  tier: number;
+  tierName: string;
+  totalDP: number;
+  benefits: {
+    speedBonus: number;
+    accelerationBonus: number;
+    powerCoreBonus: number;
+    stabilityBonus: number;
+    terrainBonusPercent: number;
+    scavengingYieldMult: number;
+    upgradeDiscountMult: number;
+    rechargeCooldownMult: number;
+    repairCooldownMult: number;
+  };
+}
+
 /**
  * List all PokedBots registered in the garage (QUERY - fast, no inter-canister calls).
  * Returns only bots that have been initialized for racing.
@@ -428,6 +446,42 @@ export const getDedicationInfo = async (
       repairCooldownMult: result.benefits.repairCooldownMult,
     },
   };
+};
+
+/**
+ * Get batch dedication info for multiple bots (optimized for garage list).
+ * Returns a map of tokenIndex to dedication info.
+ * @param tokenIndices Array of token indices
+ * @returns Map of tokenIndex to BatchDedicationInfo
+ */
+export const getBatchDedicationInfo = async (
+  tokenIndices: number[]
+): Promise<Map<number, BatchDedicationInfo>> => {
+  const racingActor = await getRacingActor();
+  const result = await racingActor.web_get_batch_dedication_info(
+    tokenIndices.map(i => BigInt(i))
+  );
+  
+  const map = new Map<number, BatchDedicationInfo>();
+  for (const [tokenIndex, info] of result) {
+    map.set(Number(tokenIndex), {
+      tier: Number(info.tier),
+      tierName: info.tierName,
+      totalDP: Number(info.totalDP),
+      benefits: {
+        speedBonus: Number(info.benefits.speedBonus),
+        accelerationBonus: Number(info.benefits.accelerationBonus),
+        powerCoreBonus: Number(info.benefits.powerCoreBonus),
+        stabilityBonus: Number(info.benefits.stabilityBonus),
+        terrainBonusPercent: Number(info.benefits.terrainBonusPercent),
+        scavengingYieldMult: info.benefits.scavengingYieldMult,
+        upgradeDiscountMult: info.benefits.upgradeDiscountMult,
+        rechargeCooldownMult: info.benefits.rechargeCooldownMult,
+        repairCooldownMult: info.benefits.repairCooldownMult,
+      },
+    });
+  }
+  return map;
 };
 
 /**
@@ -887,6 +941,43 @@ export const getCollectionBonuses = async (
     drainMultipliers: {
       scavenging: Number(result.drainMultipliers.scavenging)
     }
+  };
+};
+
+/**
+ * Power grid status response
+ */
+export interface GaragePowerStatus {
+  basePowerWatts: number;
+  wattsPerBot: number;
+  wattsPerBotRequired: number;
+  totalCapacityWatts: number;
+  currentDrawWatts: number;
+  botsCharging: number;
+  efficiency: number;
+}
+
+/**
+ * Get garage power grid status for the authenticated user.
+ * Shows capacity, current draw, efficiency, and number of bots charging.
+ * When many bots are in ChargingStation, efficiency drops (power is shared).
+ * @param identityOrAgent Required identity for authentication
+ * @returns Power grid status including efficiency
+ */
+export const getGaragePowerStatus = async (
+  identityOrAgent: IdentityOrAgent
+): Promise<GaragePowerStatus> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_get_garage_power_status();
+  
+  return {
+    basePowerWatts: Number(result.basePowerWatts),
+    wattsPerBot: Number(result.wattsPerBot),
+    wattsPerBotRequired: Number(result.wattsPerBotRequired),
+    totalCapacityWatts: Number(result.totalCapacityWatts),
+    currentDrawWatts: Number(result.currentDrawWatts),
+    botsCharging: Number(result.botsCharging),
+    efficiency: result.efficiency
   };
 };
 

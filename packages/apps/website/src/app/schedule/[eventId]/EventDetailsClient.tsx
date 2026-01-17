@@ -10,7 +10,6 @@ import { useMyBots, useEnterRace } from "@/hooks/useGarage";
 import { useAuth } from "@/hooks/useAuth";
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
 import { RaceVisualizer } from '@/components/RaceVisualizer';
-import { BettingInterface } from '@/components/BettingInterface';
 import { toast } from 'sonner';
 
 function formatICP(amount: bigint): string {
@@ -31,6 +30,29 @@ function formatDate(timestamp: bigint): string {
     minute: '2-digit',
     timeZoneName: 'short',
   });
+}
+
+function formatTimeUntil(timestampNs: number): string {
+  const now = Date.now() * 1_000_000;
+  const diffMs = (timestampNs - now) / 1_000_000;
+  
+  if (diffMs <= 0) {
+    return 'Starting soon...';
+  }
+  
+  const minutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 0) {
+    return `in ${days}d ${hours % 24}h`;
+  } else if (hours > 0) {
+    return `in ${hours}h ${minutes % 60}m`;
+  } else if (minutes > 0) {
+    return `in ${minutes}m`;
+  } else {
+    return 'Starting soon...';
+  }
 }
 
 function getTerrainName(terrain: any): string {
@@ -97,16 +119,16 @@ function getClassRatingRange(raceClass: any): string {
   return '';
 }
 
-// Helper to calculate bracket-scaled entry fee
+// Helper to calculate bracket-scaled entry fee (shifted up one bracket)
 function calculateBracketEntryFee(baseEntryFee: bigint, raceClass: any): bigint {
   const base = Number(baseEntryFee);
   let multiplier = 1.0;
   
-  if ('Scrap' in raceClass) multiplier = 0.5;
-  else if ('Junker' in raceClass) multiplier = 1.0;
-  else if ('Raider' in raceClass) multiplier = 1.5;
-  else if ('Elite' in raceClass) multiplier = 2.0;
-  else if ('SilentKlan' in raceClass) multiplier = 2.5;
+  if ('Scrap' in raceClass) multiplier = 1.0;
+  else if ('Junker' in raceClass) multiplier = 1.5;
+  else if ('Raider' in raceClass) multiplier = 2.0;
+  else if ('Elite' in raceClass) multiplier = 2.5;
+  else if ('SilentKlan' in raceClass) multiplier = 3.0;
   
   return BigInt(Math.floor(base * multiplier));
 }
@@ -715,6 +737,8 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
       powerCore: Number(statsData.powerCore),
       acceleration: Number(statsData.acceleration),
       luck: Number(statsData.luck ?? 10), // Default luck of 10 if not present
+      overcharge: Number(statsData.overcharge ?? 0),
+      perfectTuneUp: statsData.perfectTuneUp === true,
     } : undefined;
     
     return {
@@ -884,7 +908,14 @@ function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolea
           <div className="text-right">
             <p className="text-sm text-muted-foreground">Status</p>
             <p className="font-semibold text-primary">
-              {'Upcoming' in race.status && '⏳ Upcoming'}
+              {'Upcoming' in race.status && (
+                <>
+                  ⏳ Upcoming
+                  <span className="block text-xs text-muted-foreground font-normal">
+                    {formatTimeUntil(Number(race.startTime))}
+                  </span>
+                </>
+              )}
               {'InProgress' in race.status && '🏁 Racing'}
               {'Completed' in race.status && '✅ Done'}
               {'Cancelled' in race.status && '❌ Cancelled'}
@@ -1154,15 +1185,6 @@ function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolea
             </>
           );
         })()}
-
-        {/* Betting Interface */}
-        <div className="mt-4">
-          <BettingInterface 
-            raceId={Number(raceId)} 
-            entryDeadline={race?.entryDeadline}
-            raceStatus={race?.status}
-          />
-        </div>
       </CardContent>
 
       {/* Enter Race Dialog */}

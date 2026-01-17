@@ -61,23 +61,21 @@ function calculateSegmentTime(
   
   // Speed + Acceleration synergy (high speed needs good accel to maintain)
   const speedAccelRatio = (speed + acceleration) / 200.0; // 0.30 to 1.0
-  const speedSynergyMod = 0.80 + (speedAccelRatio * 0.20); // 0.80x to 1.0x
+  const speedSynergyMod = 0.85 + (speedAccelRatio * 0.15); // 0.85x to 1.0x
   const synergisticSpeed = (speedUniversal + speedBonus) * speedSynergyMod;
   
   // Power + Stability synergy (endurance needs stability)
   const powerStabilityRatio = (powerCore + stability) / 200.0; // 0.30 to 1.0
-  const powerSynergyMod = 0.85 + (powerStabilityRatio * 0.15); // 0.85x to 1.0x
+  const powerSynergyMod = 0.82 + (powerStabilityRatio * 0.18); // 0.82x to 1.0x
   
   // === PART 3: UNIVERSAL PENALTIES (all stats matter everywhere) ===
   
-  // Power Core: Universal endurance (25% penalty range)
-  const powerUniversal = 1.0 + ((100.0 - powerCore) / 400.0);
-  
-  // Acceleration: Universal responsiveness (20% penalty range)
+  // Power Core: Universal endurance (28% penalty range)
+  const powerUniversal = 1.0 + ((100.0 - powerCore) / 350.0);
   const accelUniversal = 1.0 + ((100.0 - acceleration) / 350.0);
   
-  // Stability: Universal consistency (17% penalty range)
-  const stabilityUniversal = 1.0 + ((100.0 - stability) / 400.0);
+  // Stability: Universal consistency (28% penalty range)
+  const stabilityUniversal = 1.0 + ((100.0 - stability) / 350.0);
   
   // === PART 4: SITUATIONAL MODIFIERS ===
   
@@ -95,7 +93,7 @@ function calculateSegmentTime(
   // Acceleration: Bonus on roads, momentum recovery
   let accelSituational = 1.0;
   if (segment.terrain === 'MetalRoads') {
-    accelSituational = 1.0 + ((100.0 - acceleration) / 160.0); // +44% penalty on roads
+    accelSituational = 1.0 + ((100.0 - acceleration) / 200.0); // +50% penalty on roads
   }
   
   const momentumLoss = previousDifficulty > 1.0 

@@ -158,6 +158,9 @@ export const getUpcomingEventsWithRaces = async (
     distances: Array<bigint>;
     totalParticipants: bigint;
     totalPrizePool: bigint;
+    nextRaceStartTime: [] | [bigint]; // When the next race starts (empty if all completed)
+    completedRaces: bigint;
+    pendingRaces: bigint;
   };
 }>> => {
   const racingActor = await getActor(identity);

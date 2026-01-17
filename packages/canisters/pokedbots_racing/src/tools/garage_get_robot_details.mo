@@ -280,6 +280,7 @@ module {
                   ("battery", Json.int(racingStats.battery)),
                   ("overcharge", Json.int(racingStats.overcharge)),
                   ("condition", Json.int(racingStats.condition)),
+                  ("perfect_tuneup_active", Json.bool(racingStats.perfectTuneUp)),
                   ("status", Json.str(status)),
                   ("status_message", Json.str(statusFlavor)),
                   ("last_recharged_utc", switch (racingStats.lastRecharged) { case (?t) { Json.str(TimeUtils.nanosToUtcString(t)) }; case (null) { Json.nullable() } }),

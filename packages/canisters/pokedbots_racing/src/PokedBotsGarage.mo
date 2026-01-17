@@ -226,6 +226,27 @@ module {
     universalParts : Nat;
   };
 
+  // ===== POWER GRID SYSTEM =====
+  // Garages have limited power capacity from the wasteland grid.
+  // Only bots actively in ChargingStation draw power.
+  // More bots = slower charging for each bot.
+
+  public let BASE_POWER_WATTS : Nat = 500; // Default garage power capacity
+  public let WATTS_PER_BOT : Nat = 100; // Power each bot needs for full-speed charging
+
+  public type GaragePowerSettings = {
+    basePowerWatts : Nat; // Base power capacity (can be upgraded later)
+    // Future: generatorLevel, batteryStorage, solarPanels, etc.
+  };
+
+  public type GaragePowerStatus = {
+    totalCapacityWatts : Nat; // Total power available
+    currentDrawWatts : Nat; // Power being consumed by bots in ChargingStation
+    botsCharging : Nat; // Number of bots drawing power
+    efficiency : Float; // Effective charging rate (1.0 = full speed, 0.5 = half speed)
+    wattsPerBot : Nat; // Current watts allocated per charging bot
+  };
+
   // Import stat derivation functions from Racing module (we'll keep these here)
   // These will be extracted and cleaned up
 
@@ -271,6 +292,10 @@ module {
     private let activeUpgrades = initActiveUpgrades;
     private let userInventories = initUserInventories;
     private let pityCounters = initPityCounters;
+
+    // Garage power settings per owner (for future upgrades)
+    // Note: We don't persist this yet - all garages use BASE_POWER_WATTS
+    // When we add generators/batteries, we'll need to add this to stable storage
 
     // Mission ID counter for scavenging
     private var nextMissionId : Nat = 0;
@@ -423,6 +448,8 @@ module {
                 acceleration = current.acceleration;
                 stability = current.stability;
                 luck = botStats.luckBase + botStats.luckBonus;
+                overcharge = botStats.overcharge;
+                perfectTuneUp = botStats.perfectTuneUp;
               };
             };
             case (null) { null };
@@ -463,6 +490,8 @@ module {
                 acceleration = finalStats.acceleration;
                 stability = finalStats.stability;
                 luck = botStats.luckBase + botStats.luckBonus;
+                overcharge = botStats.overcharge;
+                perfectTuneUp = botStats.perfectTuneUp;
               };
             };
             case (null) { null };
@@ -510,6 +539,8 @@ module {
                 acceleration = finalStats.acceleration;
                 stability = finalStats.stability;
                 luck = botStats.luckBase + botStats.luckBonus;
+                overcharge = 0; // At 100% stats, no overcharge active
+                perfectTuneUp = false;
               };
             };
             case (null) {
@@ -579,7 +610,9 @@ module {
                 powerCore = finalStats.powerCore;
                 acceleration = finalStats.acceleration;
                 stability = finalStats.stability;
-                luck = RacingSimulator.deriveBaseLuck(idx); // Base luck from tokenIndex
+                luck = 10; // Fixed luck for all bots
+                overcharge = 0; // Uninitialized bots have no overcharge
+                perfectTuneUp = false;
               };
             };
           };
@@ -938,7 +971,7 @@ module {
         ownerPrincipal = owner;
         faction = faction;
         name = customName;
-        luckBase = RacingSimulator.deriveBaseLuck(tokenIndex); // Set once at init
+        luckBase = 10; // Fixed luck for all bots
         speedBonus = 0;
         powerCoreBonus = 0;
         accelerationBonus = 0;
@@ -1089,6 +1122,103 @@ module {
       );
     };
 
+    // ===== POWER GRID FUNCTIONS =====
+
+    /// Count how many of an owner's bots are currently in ChargingStation zone
+    public func countBotsInChargingStation(owner : Principal) : Nat {
+      let ownerBots = getBotsForOwner(owner);
+      var count : Nat = 0;
+      for (bot in ownerBots.vals()) {
+        switch (bot.activeMission) {
+          case (?mission) {
+            if (mission.zone == #ChargingStation) {
+              count += 1;
+            };
+          };
+          case (null) {};
+        };
+      };
+      count;
+    };
+
+    /// Get the power efficiency for an owner's garage
+    /// Returns a value between 0 and 1 (1.0 = full speed, 0.5 = half speed)
+    /// No floor - if you have 100 bots charging, efficiency is 5%
+    public func getGaragePowerEfficiency(owner : Principal) : Float {
+      let botsCharging = countBotsInChargingStation(owner);
+      if (botsCharging == 0) {
+        return 1.0; // No bots charging = full efficiency (not used)
+      };
+
+      let totalCapacity = Float.fromInt(BASE_POWER_WATTS);
+      let totalDraw = Float.fromInt(botsCharging * WATTS_PER_BOT);
+
+      // efficiency = capacity / draw (capped at 1.0)
+      Float.min(1.0, totalCapacity / totalDraw);
+    };
+
+    /// Get full power status for an owner's garage (for UI display)
+    public func getGaragePowerStatus(owner : Principal) : GaragePowerStatus {
+      let botsCharging = countBotsInChargingStation(owner);
+      let totalCapacity = BASE_POWER_WATTS;
+      let currentDraw = botsCharging * WATTS_PER_BOT;
+      let efficiency = if (botsCharging == 0) {
+        1.0;
+      } else {
+        Float.min(1.0, Float.fromInt(totalCapacity) / Float.fromInt(currentDraw));
+      };
+      let wattsPerBot = if (botsCharging == 0) {
+        WATTS_PER_BOT; // Theoretical full allocation
+      } else if (currentDraw <= totalCapacity) {
+        WATTS_PER_BOT; // Full power to each bot
+      } else {
+        totalCapacity / botsCharging; // Divided power
+      };
+
+      {
+        totalCapacityWatts = totalCapacity;
+        currentDrawWatts = currentDraw;
+        botsCharging = botsCharging;
+        efficiency = efficiency;
+        wattsPerBot = wattsPerBot;
+      };
+    };
+
+    /// Snapshot (force accumulate) all ChargingStation bots for an owner
+    /// This should be called BEFORE a bot joins or leaves ChargingStation
+    /// to lock in their gains at the current efficiency before the power balance changes.
+    /// Returns the number of bots that were snapshotted.
+    public func snapshotChargingStationBots(owner : Principal, now : Int, excludeTokenIndex : ?Nat) : Nat {
+      let ownerBots = getBotsForOwner(owner);
+      var snapshotCount : Nat = 0;
+
+      for (bot in ownerBots.vals()) {
+        // Check if this bot should be skipped (the one joining/leaving)
+        let shouldSkip = switch (excludeTokenIndex) {
+          case (?exclude) { bot.tokenIndex == exclude };
+          case (null) { false };
+        };
+
+        if (not shouldSkip) {
+          // Check if bot is in ChargingStation
+          switch (bot.activeMission) {
+            case (?mission) {
+              if (mission.zone == #ChargingStation) {
+                // Force accumulate to lock in gains at current efficiency
+                switch (accumulateScavengingRewards(bot.tokenIndex, now)) {
+                  case (#ok(_)) { snapshotCount += 1 };
+                  case (#err(_)) {}; // Ignore errors (bot might have died, etc.)
+                };
+              };
+            };
+            case (null) {};
+          };
+        };
+      };
+
+      snapshotCount;
+    };
+
     /// Get base stats from precomputed or metadata
     public func getBaseStats(tokenIndex : Nat) : {
       speed : Nat;
@@ -1193,24 +1323,31 @@ module {
       };
 
       // OVERCHARGE BONUSES (consumed in next race)
-      // Speed: +0.125% per 1% overcharge (max +5% at 40% overcharge)
-      // Acceleration: +0.125% per 1% overcharge (max +5% at 40% overcharge)
-      // Stability: -0.083% per 1% overcharge (max -3.3% at 40% overcharge) - UNLESS Perfect Tune-Up
-      // PowerCore: -0.083% per 1% overcharge (max -3.3% at 40% overcharge) - UNLESS Perfect Tune-Up
+      // Speed: +0.20% per 1% overcharge (max +8% at 40% overcharge)
+      // Acceleration: +0.20% per 1% overcharge (max +8% at 40% overcharge)
+      // Stability: -0.133% per 1% overcharge (max -5.3% at 40% overcharge) - UNLESS Perfect Tune-Up
+      // PowerCore: -0.133% per 1% overcharge (max -5.3% at 40% overcharge) - UNLESS Perfect Tune-Up
       let overchargeBonus = Float.fromInt(botStats.overcharge) / 100.0; // 0.0 to 0.40
-      let speedOvercharge = 1.0 + (overchargeBonus * 0.125); // 1.0 to 1.05
-      let accelOvercharge = 1.0 + (overchargeBonus * 0.125); // 1.0 to 1.05
+      let speedOvercharge = 1.0 + (overchargeBonus * 0.20); // 1.0 to 1.08
+      let accelOvercharge = 1.0 + (overchargeBonus * 0.20); // 1.0 to 1.08
 
-      // Perfect Tune-Up: If repaired to exactly 100% with overcharge, penalties are removed!
+      // Perfect Tune-Up: Penalty removal based on tune-up quality
+      // perfectTuneUp = true means resonance was achieved, but quality varies:
+      // - Peak resonance: 100% penalty removal (tuneupQuality = 1.0)
+      // - Good resonance: 70% penalty removal (tuneupQuality = 0.7)
+      // For backward compatibility, we use the bool flag and default to full removal
+      let penaltyRemoval = if (botStats.perfectTuneUp) { 1.0 } else { 0.0 };
+      let remainingPenalty = 1.0 - penaltyRemoval;
+
       let stabilityOvercharge = if (botStats.perfectTuneUp) {
         1.0; // No penalty with perfect tune-up!
       } else {
-        1.0 - (overchargeBonus * 0.083); // 1.0 to 0.967
+        1.0 - (overchargeBonus * 0.133); // 1.0 to 0.947
       };
       let powerCoreOvercharge = if (botStats.perfectTuneUp) {
         1.0; // No penalty with perfect tune-up!
       } else {
-        1.0 - (overchargeBonus * 0.083); // 1.0 to 0.967
+        1.0 - (overchargeBonus * 0.133); // 1.0 to 0.947
       };
 
       // WORLD BUFF BONUSES (from scavenging missions, expires in 48h)
@@ -1356,13 +1493,13 @@ module {
 
       // Overcharge calculations
       let overchargeBonus = Float.fromInt(botStats.overcharge) / 100.0;
-      let speedOvercharge = 1.0 + (overchargeBonus * 0.125);
-      let accelOvercharge = 1.0 + (overchargeBonus * 0.125);
+      let speedOvercharge = 1.0 + (overchargeBonus * 0.20);
+      let accelOvercharge = 1.0 + (overchargeBonus * 0.20);
       let stabilityOvercharge = if (botStats.perfectTuneUp) { 1.0 } else {
-        1.0 - (overchargeBonus * 0.083);
+        1.0 - (overchargeBonus * 0.133);
       };
       let powerCoreOvercharge = if (botStats.perfectTuneUp) { 1.0 } else {
-        1.0 - (overchargeBonus * 0.083);
+        1.0 - (overchargeBonus * 0.133);
       };
 
       // World buff bonuses
@@ -2040,9 +2177,34 @@ module {
     // ===== RESPEC SYSTEM =====
 
     /// Calculate respec cost in e8s
-    /// Cost = 1 ICP (flat rate)
-    public func calculateRespecCost(respecCount : Nat) : Nat {
-      100_000_000; // 1 ICP flat rate
+    /// Cost = 0.25 ICP per stat type being stripped
+    public func calculateRespecCost(numStatTypes : Nat) : Nat {
+      // 0.25 ICP = 25_000_000 e8s per stat type
+      numStatTypes * 25_000_000;
+    };
+
+    /// Calculate number of stat types that would be stripped
+    public func calculateStatsToStrip(tokenIndex : Nat, statsToStrip : [Text]) : Nat {
+      switch (Map.get(stats, nhash, tokenIndex)) {
+        case (null) { 0 };
+        case (?botStats) {
+          let stripAll = statsToStrip.size() == 0;
+          let stripSpeed = stripAll or Array.find(statsToStrip, func(s : Text) : Bool { s == "speed" }) != null;
+          let stripPowerCore = stripAll or Array.find(statsToStrip, func(s : Text) : Bool { s == "powerCore" }) != null;
+          let stripAcceleration = stripAll or Array.find(statsToStrip, func(s : Text) : Bool { s == "acceleration" }) != null;
+          let stripStability = stripAll or Array.find(statsToStrip, func(s : Text) : Bool { s == "stability" }) != null;
+
+          // Count stat types with upgrades that are selected for stripping
+          var count : Nat = 0;
+          if (stripSpeed and botStats.speedBonus > 0) { count += 1 };
+          if (stripPowerCore and botStats.powerCoreBonus > 0) { count += 1 };
+          if (stripAcceleration and botStats.accelerationBonus > 0) {
+            count += 1;
+          };
+          if (stripStability and botStats.stabilityBonus > 0) { count += 1 };
+          count;
+        };
+      };
     };
 
     /// Calculate parts refund for a single stat with 40% penalty (60% returned)
@@ -2894,6 +3056,63 @@ module {
       pending.speedChips + pending.powerCoreFragments + pending.thrusterKits + pending.gyroModules + pending.universalParts;
     };
 
+    /// Calculate total battery restored in ChargingStation using the tiered charging curve
+    /// The curve is: 1x at <25%, 2x at 25-50%, 3x at 50-75%, 4x at 75-100%
+    /// This properly simulates tier-by-tier charging where faster tiers take less time
+    ///
+    /// POWER GRID SYSTEM: powerEfficiency reduces charging speed based on garage power capacity
+    /// - 1.0 = full speed (garage has enough power for all charging bots)
+    /// - 0.5 = half speed (garage has 50% of required power)
+    /// - 0.1 = 10% speed (10 bots sharing 500W when they need 1000W)
+    ///
+    /// Returns total battery gained (not capped at 100 - caller should cap)
+    public func calculateChargingStationBattery(startBattery : Nat, baseRatePerHour : Float, hoursElapsed : Float, powerEfficiency : Float) : Float {
+      // Apply power efficiency to the base rate
+      let effectiveRate = baseRatePerHour * powerEfficiency;
+
+      var currentBattery = Float.fromInt(startBattery);
+      var timeRemaining = hoursElapsed;
+      var batteryGained : Float = 0.0;
+
+      // Process each tier until we run out of time or hit 100%
+      while (timeRemaining > 0.0 and currentBattery < 100.0) {
+        // Determine current tier and its properties
+        let (tierMultiplier, tierCeiling) : (Float, Float) = if (currentBattery < 25.0) {
+          (1.0, 25.0);
+        } else if (currentBattery < 50.0) {
+          (2.0, 50.0);
+        } else if (currentBattery < 75.0) {
+          (3.0, 75.0);
+        } else {
+          (4.0, 100.0);
+        };
+
+        // How much battery to reach the next tier?
+        let batteryToNextTier = tierCeiling - currentBattery;
+
+        // Rate in this tier (effectiveRate * tierMultiplier)
+        let rateInThisTier = effectiveRate * tierMultiplier;
+
+        // Time needed to reach next tier at current rate
+        let timeToReachNextTier = batteryToNextTier / rateInThisTier;
+
+        if (timeToReachNextTier <= timeRemaining) {
+          // We have enough time to reach the next tier
+          batteryGained += batteryToNextTier;
+          currentBattery := tierCeiling;
+          timeRemaining -= timeToReachNextTier;
+        } else {
+          // Use remaining time in current tier
+          let batteryThisPeriod = timeRemaining * rateInThisTier;
+          batteryGained += batteryThisPeriod;
+          currentBattery += batteryThisPeriod;
+          timeRemaining := 0.0;
+        };
+      };
+
+      batteryGained;
+    };
+
     /// Get zone multipliers
     public func getZoneMultipliers(zone : ScavengingZone) : {
       battery : Float;
@@ -3147,49 +3366,39 @@ module {
               // Charging curve: INVERTED - slower at low, faster at high
               // Rewards keeping battery topped up, punishes letting it drain
               // 1x at <25% (slowest) → 2x at <50% → 3x at <75% → 4x at 75-100% (fastest)
-              // FIXED: Calculate weighted average across tiers to properly accelerate as battery increases
-              let chargingCurve = if (mission.zone == #ChargingStation) {
-                // Calculate base restoration rate (without curve)
-                let baseRestoration = Float.abs(rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus / durationBonus * synergies.drainMultipliers.scavengingDrain);
-
-                // Calculate how much battery would be restored in each tier
-                let startBattery = Float.fromInt(botStats.battery);
-                let tier1End = Float.min(25.0, startBattery + baseRestoration); // 0-25%: 1.0x
-                let tier2End = Float.min(50.0, Float.max(25.0, startBattery + baseRestoration)); // 25-50%: 2.0x
-                let tier3End = Float.min(75.0, Float.max(50.0, startBattery + baseRestoration)); // 50-75%: 3.0x
-                let tier4End = Float.min(100.0, Float.max(75.0, startBattery + baseRestoration)); // 75-100%: 4.0x
-
-                // Calculate battery restored in each tier (accounting for starting position)
-                let inTier1 = Float.max(0.0, tier1End - startBattery);
-                let inTier2 = Float.max(0.0, tier2End - Float.max(25.0, startBattery));
-                let inTier3 = Float.max(0.0, tier3End - Float.max(50.0, startBattery));
-                let inTier4 = Float.max(0.0, tier4End - Float.max(75.0, startBattery));
-
-                // Weighted average multiplier based on time spent in each tier
-                let totalRestoration = inTier1 + inTier2 + inTier3 + inTier4;
-                if (totalRestoration > 0.0) {
-                  (inTier1 * 1.0 + inTier2 * 2.0 + inTier3 * 3.0 + inTier4 * 4.0) / totalRestoration;
-                } else {
-                  // Default to current tier if no restoration
-                  if (botStats.battery < 25) { 1.0 } else if (botStats.battery < 50) {
-                    2.0;
-                  } else if (botStats.battery < 75) { 3.0 } else { 4.0 };
-                };
+              // FIXED: Properly simulate tier-by-tier charging instead of weighted average
+              let batteryDrain = if (mission.zone == #ChargingStation) {
+                // For ChargingStation, calculate actual battery gained using tiered simulation
+                // Base rate: baseBatteryDrain * zoneMultipliers.battery = 20 * -0.25 = -5 per hour
+                // NOTE: Don't apply powerCoreBonus or faction batteryMultiplier to restoration!
+                // Those bonuses reduce battery DRAIN, not increase charging speed.
+                // POWER GRID: Apply garage power efficiency to charging rate
+                let baseRestorationRate = Float.abs(rates.baseBatteryDrain * zoneMultipliers.battery / durationBonus * synergies.drainMultipliers.scavengingDrain);
+                let powerEfficiency = getGaragePowerEfficiency(botStats.ownerPrincipal);
+                let batteryGained = calculateChargingStationBattery(botStats.battery, baseRestorationRate, hoursElapsed, powerEfficiency);
+                // Return as negative to indicate restoration (matches rest of the codebase)
+                -batteryGained;
               } else {
-                1.0; // No curve for non-charging zones
+                // Normal zones: no charging curve
+                rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
               };
 
-              let batteryDrain = rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus * chargingCurve / durationBonus * synergies.drainMultipliers.scavengingDrain;
-
               // Faction condition multiplier should only apply to damage, not restoration
-              // In RepairBay, baseConditionLoss is negative (restoration), so we don't apply faction penalty
-              let factionConditionMult = if (rates.baseConditionLoss < 0.0) {
+              // In RepairBay, the zone multiplier is negative (restoration), so we don't apply faction penalty
+              // Same for stabilityBonus - it reduces condition DAMAGE, shouldn't slow restoration
+              let isRestorationZone = mission.zone == #RepairBay;
+              let factionConditionMult = if (isRestorationZone) {
                 1.0; // No faction modifier for restoration
               } else {
                 factionBonus.conditionMultiplier; // Apply faction modifier for damage
               };
+              let effectiveStabilityBonus = if (isRestorationZone) {
+                1.0; // No stability modifier for restoration
+              } else {
+                stabilityBonus; // Apply stability modifier for damage
+              };
 
-              let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionConditionMult * stabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
+              let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionConditionMult * effectiveStabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
 
               // Add variance to battery and condition costs (±20% random variation)
               // This creates more unpredictable resource management - sometimes lucky, sometimes not
@@ -3221,7 +3430,17 @@ module {
               // Negative batteryDrain means restoration (Charging Station)
               let newBattery = if (batteryDrainWithVariance < 0.0) {
                 // Restoration: add battery (capped at 100)
-                Nat.min(100, botStats.battery + batteryDrainRounded);
+                // FIX: Use float comparison to check if we should reach 100%
+                // This prevents variance and rounding from keeping bots stuck at 99%
+                // If current battery + pre-variance gain >= 100, guarantee we hit 100
+                let preVarianceBatteryFloat = Float.fromInt(botStats.battery) + Float.abs(batteryDrain);
+                if (preVarianceBatteryFloat >= 99.5) {
+                  // Close enough to 100 - just complete the charge
+                  // Using 99.5 threshold catches any floating point edge cases
+                  100;
+                } else {
+                  Nat.min(100, botStats.battery + batteryDrainRounded);
+                };
               } else {
                 // Drain: subtract battery (floored at 0)
                 if (botStats.battery > batteryDrainRounded) {
@@ -3475,49 +3694,39 @@ module {
           // Charging curve: INVERTED - slower at low, faster at high
           // Rewards keeping battery topped up, punishes letting it drain
           // 1x at <25% (slowest) → 2x at <50% → 3x at <75% → 4x at 75-100% (fastest)
-          // FIXED: Calculate weighted average across tiers to properly accelerate as battery increases
-          let chargingCurve = if (mission.zone == #ChargingStation) {
-            // Calculate base restoration rate (without curve)
-            let baseRestoration = Float.abs(rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus / durationBonus * synergies.drainMultipliers.scavengingDrain);
-
-            // Calculate how much battery would be restored in each tier
-            let startBattery = Float.fromInt(botStats.battery);
-            let tier1End = Float.min(25.0, startBattery + baseRestoration); // 0-25%: 1.0x
-            let tier2End = Float.min(50.0, Float.max(25.0, startBattery + baseRestoration)); // 25-50%: 2.0x
-            let tier3End = Float.min(75.0, Float.max(50.0, startBattery + baseRestoration)); // 50-75%: 3.0x
-            let tier4End = Float.min(100.0, Float.max(75.0, startBattery + baseRestoration)); // 75-100%: 4.0x
-
-            // Calculate battery restored in each tier (accounting for starting position)
-            let inTier1 = Float.max(0.0, tier1End - startBattery);
-            let inTier2 = Float.max(0.0, tier2End - Float.max(25.0, startBattery));
-            let inTier3 = Float.max(0.0, tier3End - Float.max(50.0, startBattery));
-            let inTier4 = Float.max(0.0, tier4End - Float.max(75.0, startBattery));
-
-            // Weighted average multiplier based on time spent in each tier
-            let totalRestoration = inTier1 + inTier2 + inTier3 + inTier4;
-            if (totalRestoration > 0.0) {
-              (inTier1 * 1.0 + inTier2 * 2.0 + inTier3 * 3.0 + inTier4 * 4.0) / totalRestoration;
-            } else {
-              // Default to current tier if no restoration
-              if (botStats.battery < 25) { 1.0 } else if (botStats.battery < 50) {
-                2.0;
-              } else if (botStats.battery < 75) { 3.0 } else { 4.0 };
-            };
+          // FIXED: Properly simulate tier-by-tier charging instead of weighted average
+          let batteryDrain = if (mission.zone == #ChargingStation) {
+            // For ChargingStation, calculate actual battery gained using tiered simulation
+            // Base rate: baseBatteryDrain * zoneMultipliers.battery = 20 * -0.25 = -5 per hour
+            // NOTE: Don't apply powerCoreBonus or faction batteryMultiplier to restoration!
+            // Those bonuses reduce battery DRAIN, not increase charging speed.
+            // POWER GRID: Apply garage power efficiency to charging rate
+            let baseRestorationRate = Float.abs(rates.baseBatteryDrain * zoneMultipliers.battery / durationBonus * synergies.drainMultipliers.scavengingDrain);
+            let powerEfficiency = getGaragePowerEfficiency(botStats.ownerPrincipal);
+            let batteryGained = calculateChargingStationBattery(botStats.battery, baseRestorationRate, hoursElapsed, powerEfficiency);
+            // Return as negative to indicate restoration (matches rest of the codebase)
+            -batteryGained;
           } else {
-            1.0; // No curve for non-charging zones
+            // Normal zones: no charging curve
+            rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
           };
 
-          let batteryDrain = rates.baseBatteryDrain * hoursElapsed * zoneMultipliers.battery * factionBonus.batteryMultiplier * powerCoreBonus * chargingCurve / durationBonus * synergies.drainMultipliers.scavengingDrain;
-
           // Faction condition multiplier should only apply to damage, not restoration
-          // In RepairBay, baseConditionLoss is negative (restoration), so we don't apply faction penalty
-          let factionConditionMult = if (rates.baseConditionLoss < 0.0) {
+          // In RepairBay, the zone multiplier is negative (restoration), so we don't apply faction penalty
+          // Same for stabilityBonus - it reduces condition DAMAGE, shouldn't slow restoration
+          let isRestorationZone = mission.zone == #RepairBay;
+          let factionConditionMult = if (isRestorationZone) {
             1.0; // No faction modifier for restoration
           } else {
             factionBonus.conditionMultiplier; // Apply faction modifier for damage
           };
+          let effectiveStabilityBonus = if (isRestorationZone) {
+            1.0; // No stability modifier for restoration
+          } else {
+            stabilityBonus; // Apply stability modifier for damage
+          };
 
-          let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionConditionMult * stabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
+          let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionConditionMult * effectiveStabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
 
           // Add variance to battery and condition costs (±20% random variation) - MATCH UPDATE FUNCTION
           // Use lastAccumulation in seed for deterministic results (must match actual accumulate)
@@ -3539,9 +3748,18 @@ module {
             batteryFloor;
           };
 
-          // Update battery (restoration for ChargingStation, drain for others)
+          // Update battery (restoration for ChargingStation, drain for others) - MATCH UPDATE FUNCTION
           let newBattery = if (batteryDrainWithVariance < 0.0) {
-            Nat.min(100, botStats.battery + batteryDrainRounded);
+            // Restoration: add battery (capped at 100)
+            // FIX: Use float comparison to check if we should reach 100%
+            // This prevents variance and rounding from keeping bots stuck at 99%
+            let preVarianceBatteryFloat = Float.fromInt(botStats.battery) + Float.abs(batteryDrain);
+            if (preVarianceBatteryFloat >= 99.5) {
+              // Close enough to 100 - just complete the charge
+              100;
+            } else {
+              Nat.min(100, botStats.battery + batteryDrainRounded);
+            };
           } else {
             if (botStats.battery > batteryDrainRounded) {
               botStats.battery - batteryDrainRounded;
@@ -3634,6 +3852,12 @@ module {
             case (null) {};
           };
 
+          // POWER GRID: If joining ChargingStation, snapshot all other ChargingStation bots first
+          // This locks in their gains at the CURRENT efficiency before this bot changes the power balance
+          if (zone == #ChargingStation) {
+            ignore snapshotChargingStationBots(botStats.ownerPrincipal, now, ?tokenIndex);
+          };
+
           // Create continuous or timed mission
           let missionId = getNextMissionId();
           let mission : ScavengingMission = {
@@ -3679,6 +3903,12 @@ module {
           switch (botStats.activeMission) {
             case (null) { #err("Bot is not on a scavenging mission") };
             case (?mission) {
+              // If leaving ChargingStation, snapshot other bots FIRST to lock in their gains
+              // at the current efficiency before power grid changes
+              if (mission.zone == #ChargingStation) {
+                ignore snapshotChargingStationBots(botStats.ownerPrincipal, now, ?tokenIndex);
+              };
+
               // Force final accumulation before pulling
               ignore accumulateScavengingRewards(tokenIndex, now);
 
@@ -3747,6 +3977,12 @@ module {
           switch (botStats.activeMission) {
             case (null) { #err("No active mission") };
             case (?mission) {
+              // If leaving ChargingStation, snapshot other bots FIRST to lock in their gains
+              // at the current efficiency before power grid changes
+              if (mission.zone == #ChargingStation) {
+                ignore snapshotChargingStationBots(botStats.ownerPrincipal, now, ?tokenIndex);
+              };
+
               // Force final accumulation for any partial interval
               ignore accumulateScavengingRewards(tokenIndex, now);
 

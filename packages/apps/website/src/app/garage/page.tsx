@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useMyBots, useUserInventory, useCollectionBonuses, useUserWalletNFTs, useRechargeBot, useRepairBot, useBatchRechargeBots, useBatchRepairBots, useBatchCompleteScavenging, useBatchStartScavenging, useStarredBots, useSetStarredBots, useRacerBots, useSetRacerBots, useScavengerBots, useSetScavengerBots } from '../../hooks/useGarage';
+import { useMyBots, useUserInventory, useCollectionBonuses, useGaragePowerStatus, useUserWalletNFTs, useRechargeBot, useRepairBot, useBatchRechargeBots, useBatchRepairBots, useBatchCompleteScavenging, useBatchStartScavenging, useStarredBots, useSetStarredBots, useRacerBots, useSetRacerBots, useScavengerBots, useSetScavengerBots, useBatchDedicationInfo } from '../../hooks/useGarage';
 import { useGetUpcomingEventsWithRaces } from '../../hooks/useRacing';
 import { useBackgrounds } from '../../hooks/useBackgrounds';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
@@ -15,7 +15,7 @@ import { BotCard } from '../../components/BotCard';
 import { PartsConverter } from '../../components/PartsConverter';
 import { Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical, Plus, ChevronDown, ChevronRight, Search, CheckSquare, Square, Filter, X, MapPin } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { BotListItem } from '@pokedbots-racing/ic-js';
+import type { BotListItem, BatchDedicationInfo } from '@pokedbots-racing/ic-js';
 import { Progress } from '../../components/ui/progress';
 import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
 import { generatetokenIdentifier, completeScavenging } from '@pokedbots-racing/ic-js';
@@ -90,6 +90,85 @@ function getScavengingTimeRemaining(bot: BotListItem): string | null {
   return `${remainingMins}m`;
 }
 
+// Component for cooldown badges that includes dedication bonuses
+function BotCooldownBadges({ 
+  bot, 
+  garageCooldownMult, 
+  powerStatus,
+  dedicationInfo,
+  showLabel = true 
+}: { 
+  bot: BotListItem; 
+  garageCooldownMult: number;
+  powerStatus: { efficiency: number } | null | undefined;
+  dedicationInfo: BatchDedicationInfo | undefined;
+  showLabel?: boolean;
+}) {
+  if (!bot.isInitialized || !bot.stats) return null;
+  
+  const now = Date.now();
+  const dedicationRechargeMult = dedicationInfo?.benefits.rechargeCooldownMult ?? 1.0;
+  const dedicationRepairMult = dedicationInfo?.benefits.repairCooldownMult ?? 1.0;
+  
+  const rechargeCooldownMs = 6 * 60 * 60 * 1000 * garageCooldownMult * dedicationRechargeMult;
+  const repairCooldownMs = 3 * 60 * 60 * 1000 * dedicationRepairMult; // Repair base is 3 hours
+  
+  const rechargeReady = bot.stats.lastRecharged 
+    ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
+    : 0;
+  const repairReady = bot.stats.lastRepaired
+    ? Number(bot.stats.lastRepaired) / 1_000_000 + repairCooldownMs
+    : 0;
+  
+  const rechargeTime = bot.stats.lastRecharged 
+    ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + BigInt(Math.round(rechargeCooldownMs * 1_000_000)))
+    : null;
+  const repairTime = bot.stats.lastRepaired
+    ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + BigInt(Math.round(repairCooldownMs * 1_000_000)))
+    : null;
+  
+  return (
+    <>
+      {rechargeReady > now && rechargeTime && (
+        <Badge variant="outline" className="text-xs flex items-center gap-1 w-fit">
+          <Zap className="h-3 w-3" />
+          {showLabel && 'Recharge: '}{rechargeTime}
+        </Badge>
+      )}
+      {repairReady > now && repairTime && (
+        <Badge variant="outline" className="text-xs flex items-center gap-1 w-fit">
+          <Hammer className="h-3 w-3" />
+          {showLabel && 'Repair: '}{repairTime}
+        </Badge>
+      )}
+      {bot.activeUpgrade && (
+        <Badge variant="secondary" className={`text-xs flex items-center gap-1 ${showLabel ? '' : 'w-fit'}`}>
+          <Clock className="h-3 w-3" />
+          {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])}{showLabel ? ' Upgrade: ' : ': '}{formatTimeRemaining(bot.activeUpgrade.endsAt)}
+        </Badge>
+      )}
+      {bot.activeMission && (() => {
+        const zone = Object.keys(bot.activeMission.zone)[0];
+        const timeRemaining = getScavengingTimeRemaining(bot);
+        const isCharging = zone === 'ChargingStation';
+        const isThrottled = isCharging && powerStatus && powerStatus.efficiency < 1;
+        const isLowStats = Number(bot.stats!.battery) < 30 || Number(bot.stats!.condition) < 30;
+        return (
+          <Badge 
+            variant={isLowStats ? "destructive" : isThrottled ? "outline" : "secondary"} 
+            className={`text-xs ${isThrottled ? 'border-yellow-500 text-yellow-500 bg-yellow-500/10' : ''} ${showLabel ? '' : 'w-fit'}`}
+          >
+            {isLowStats ? '⚠️ ' : isThrottled ? '⚡ ' : ''}
+            {isCharging ? '🔋' : '🔍'} {formatScavengingZone(zone)}
+            {isThrottled && ` ${Math.round(powerStatus!.efficiency * 100)}%`}
+            {timeRemaining ? ` • ${timeRemaining}` : ''}
+          </Badge>
+        );
+      })()}
+    </>
+  );
+}
+
 export default function GaragePage() {
   const { isAuthenticated, user } = useAuth();
   const queryClient = useQueryClient();
@@ -155,9 +234,14 @@ export default function GaragePage() {
   const { data: bots = [], isLoading, isFetching, error: botsError } = useMyBots();
   const { data: inventory, isLoading: inventoryLoading, refetch: refetchInventory } = useUserInventory();
   const { data: bonuses, isLoading: bonusesLoading } = useCollectionBonuses();
+  const { data: powerStatus, isLoading: powerStatusLoading } = useGaragePowerStatus();
   const { data: walletNFTs = [], isLoading: walletNFTsLoading, error: walletNFTsError } = useUserWalletNFTs();
   const { data: backgroundData } = useBackgrounds();
   const { data: upcomingEvents = [] } = useGetUpcomingEventsWithRaces(7); // Next 7 days
+  
+  // Batch fetch dedication info for all bots
+  const botTokenIndices = useMemo(() => bots.map(b => Number(b.tokenIndex)), [bots]);
+  const { data: dedicationInfoMap } = useBatchDedicationInfo(botTokenIndices);
   
   // Starred bots from backend
   const { data: starredBotsArray = [], isLoading: starredBotsLoading } = useStarredBots();
@@ -743,9 +827,9 @@ export default function GaragePage() {
 
   // Force immediate refetch of bots by invalidating cache
   const refetchBots = () => {
-    queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+    queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
     // Also refetch inventory since maintenance affects parts
-    queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+    queryClient.invalidateQueries({ queryKey: ['user-inventory'], refetchType: 'all' });
   };
 
   // Recall selected scavengers
@@ -852,80 +936,108 @@ export default function GaragePage() {
 
   const error = botsError ? (botsError instanceof Error ? botsError.message : 'Failed to load bots') : null;
 
-  // Helper: Get next event info for a bot - prioritizes upcoming races, falls back to event registrations
+  // Helper: Get next event info for a bot - considers BOTH upcoming races AND event registrations, returns earliest
   const getNextEventInfo = (bot: BotListItem): { time: string; terrain: any; eventName: string } | null => {
-    // First priority: Check if bot has any upcoming races
+    const now = Date.now();
+    
+    // Helper to format time until
+    const formatTimeUntil = (timeUntilMs: number): string => {
+      if (timeUntilMs < 0) return 'Now';
+      const hours = Math.floor(timeUntilMs / (1000 * 60 * 60));
+      const minutes = Math.floor((timeUntilMs % (1000 * 60 * 60)) / (1000 * 60));
+      if (hours > 24) return `${Math.floor(hours / 24)}d`;
+      else if (hours > 0) return `${hours}h ${minutes}m`;
+      else return `${minutes}m`;
+    };
+    
+    // Candidate from upcoming races (already created)
+    let raceCandidate: { timeMs: number; terrain: any; eventName: string } | null = null;
     if (bot.upcomingRaces && bot.upcomingRaces.length > 0) {
-      // Get the next race (earliest start time)
-      const nextRace = bot.upcomingRaces.reduce((closest, race) => {
-        return Number(race.startTime) < Number(closest.startTime) ? race : closest;
+      // Filter to races that are in the future OR started within the last 5 minutes (currently racing)
+      const fiveMinutesAgo = now - (5 * 60 * 1000);
+      const relevantRaces = bot.upcomingRaces.filter(race => {
+        const raceTimeMs = Number(race.startTime) / 1_000_000;
+        return raceTimeMs > fiveMinutesAgo; // Include races that started up to 5 min ago
       });
+      if (relevantRaces.length > 0) {
+        const nextRace = relevantRaces.reduce((closest, race) => {
+          return Number(race.startTime) < Number(closest.startTime) ? race : closest;
+        });
+        const raceTimeMs = Number(nextRace.startTime) / 1_000_000;
+        raceCandidate = { timeMs: raceTimeMs, terrain: nextRace.terrain, eventName: nextRace.name };
+      }
+    }
+    
+    // Candidate from event registrations (races not yet created)
+    let eventCandidate: { timeMs: number; terrain: any; eventName: string } | null = null;
+    if (user?.principal && upcomingEvents && upcomingEvents.length > 0) {
+      const registeredEvents = upcomingEvents.filter(eventData => 
+        eventData.event.registrations?.some((reg: any) => 
+          reg.tokenIndex === bot.tokenIndex && 
+          reg.owner.toString() === user.principal
+        )
+      );
       
-      const timeUntil = (Number(nextRace.startTime) / 1_000_000) - Date.now();
-      let timeStr: string;
-      if (timeUntil < 0) {
-        timeStr = 'Now';
-      } else {
-        const hours = Math.floor(timeUntil / (1000 * 60 * 60));
-        const minutes = Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60));
+      if (registeredEvents.length > 0) {
+        // Find the event with the earliest FUTURE time
+        // Use nextRaceStartTime if available (for multi-stage events), otherwise scheduledTime
+        let bestEvent: { eventData: typeof registeredEvents[0]; timeMs: number } | null = null;
         
-        if (hours > 24) timeStr = `${Math.floor(hours / 24)}d`;
-        else if (hours > 0) timeStr = `${hours}h ${minutes}m`;
-        else timeStr = `${minutes}m`;
+        for (const eventData of registeredEvents) {
+          let eventTimeMs: number;
+          
+          // Check if there's a nextRaceStartTime from race summary (for multi-stage events)
+          const nextRaceStartTime = eventData.raceSummary?.nextRaceStartTime;
+          if (nextRaceStartTime && nextRaceStartTime.length > 0) {
+            eventTimeMs = Number(nextRaceStartTime[0]) / 1_000_000;
+          } else {
+            eventTimeMs = Number(eventData.event.scheduledTime) / 1_000_000;
+          }
+          
+          // Include if in the future OR started within the last 5 minutes (currently racing)
+          const fiveMinutesAgoForEvents = now - (5 * 60 * 1000);
+          if (eventTimeMs > fiveMinutesAgoForEvents) {
+            if (!bestEvent || eventTimeMs < bestEvent.timeMs) {
+              bestEvent = { eventData, timeMs: eventTimeMs };
+            }
+          }
+        }
+        
+        if (bestEvent) {
+          // Get terrain from race creation mode
+          let terrain: any = { ScrapHeaps: null };
+          if ('Automatic' in bestEvent.eventData.event.raceCreationMode) {
+            const terrains = bestEvent.eventData.event.raceCreationMode.Automatic.terrains;
+            if (terrains && terrains.length > 0) terrain = terrains[0];
+          } else if ('Manual' in bestEvent.eventData.event.raceCreationMode) {
+            const templates = bestEvent.eventData.event.raceCreationMode.Manual.raceTemplates;
+            if (templates && templates.length > 0 && templates[0].terrain) terrain = templates[0].terrain;
+          }
+          
+          eventCandidate = { 
+            timeMs: bestEvent.timeMs, 
+            terrain, 
+            eventName: bestEvent.eventData.event.metadata?.name || 'Event' 
+          };
+        }
       }
-      
-      return { time: timeStr, terrain: nextRace.terrain, eventName: nextRace.name };
     }
     
-    // Second priority: Fall back to event registrations if no upcoming races
-    if (!user?.principal || !upcomingEvents || upcomingEvents.length === 0) return null;
-    
-    // Find events where this bot is registered
-    const registeredEvents = upcomingEvents.filter(eventData => 
-      eventData.event.registrations?.some((reg: any) => 
-        reg.tokenIndex === bot.tokenIndex && 
-        reg.owner.toString() === user.principal
-      )
-    );
-    
-    if (registeredEvents.length === 0) return null;
-    
-    // Get the next event (earliest scheduled time)
-    const nextEventData = registeredEvents.reduce((closest, eventData) => {
-      const eventTime = Number(eventData.event.scheduledTime) / 1_000_000;
-      const closestTime = Number(closest.event.scheduledTime) / 1_000_000;
-      return eventTime < closestTime ? eventData : closest;
-    });
-    
-    const timeUntil = (Number(nextEventData.event.scheduledTime) / 1_000_000) - Date.now();
-    let timeStr: string;
-    if (timeUntil < 0) {
-      timeStr = 'Now';
+    // Pick the earliest of the two candidates
+    let winner: { timeMs: number; terrain: any; eventName: string } | null = null;
+    if (raceCandidate && eventCandidate) {
+      winner = raceCandidate.timeMs <= eventCandidate.timeMs ? raceCandidate : eventCandidate;
     } else {
-      const hours = Math.floor(timeUntil / (1000 * 60 * 60));
-      const minutes = Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60));
-      
-      if (hours > 24) timeStr = `${Math.floor(hours / 24)}d`;
-      else if (hours > 0) timeStr = `${hours}h ${minutes}m`;
-      else timeStr = `${minutes}m`;
+      winner = raceCandidate || eventCandidate;
     }
     
-    // Get terrain from race creation mode (use first terrain if available, otherwise default to ScrapHeaps)
-    let terrain: any = { ScrapHeaps: null };
-    if ('Automatic' in nextEventData.event.raceCreationMode) {
-      const terrains = nextEventData.event.raceCreationMode.Automatic.terrains;
-      if (terrains && terrains.length > 0) {
-        terrain = terrains[0];
-      }
-    } else if ('Manual' in nextEventData.event.raceCreationMode) {
-      const templates = nextEventData.event.raceCreationMode.Manual.raceTemplates;
-      if (templates && templates.length > 0 && templates[0].terrain) {
-        terrain = templates[0].terrain;
-      }
-    }
-    const eventName = nextEventData.event.metadata?.name || 'Event';
+    if (!winner) return null;
     
-    return { time: timeStr, terrain, eventName };
+    return { 
+      time: formatTimeUntil(winner.timeMs - now), 
+      terrain: winner.terrain, 
+      eventName: winner.eventName 
+    };
   };
 
   // Helper: Get next event start time as relative string (for backwards compatibility)
@@ -1193,6 +1305,66 @@ export default function GaragePage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Power Grid Status - Always visible on mobile */}
+      {powerStatus && (
+        <Card className={`xl:hidden border-2 mb-6 ${
+          powerStatus.botsCharging > 0 && powerStatus.efficiency < 0.5 
+            ? 'border-red-500/40 bg-red-950/20' 
+            : powerStatus.botsCharging > 0 && powerStatus.efficiency < 0.8 
+              ? 'border-yellow-500/30 bg-yellow-950/10' 
+              : powerStatus.botsCharging > 0
+                ? 'border-green-500/30 bg-green-950/10'
+                : 'border-primary/20 bg-card/80'
+        } backdrop-blur`}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Zap className={`h-4 w-4 ${
+                powerStatus.botsCharging === 0 ? 'text-muted-foreground'
+                : powerStatus.efficiency < 0.5 ? 'text-red-500' 
+                : powerStatus.efficiency < 0.8 ? 'text-yellow-500' 
+                : 'text-green-500'
+              }`} />
+              Garage Power Grid
+            </CardTitle>
+            <CardDescription className="text-xs">
+              {powerStatus.botsCharging === 0 
+                ? 'Send bots to Charging Station for free battery'
+                : `${powerStatus.botsCharging} bot${powerStatus.botsCharging !== 1 ? 's' : ''} × ${powerStatus.wattsPerBotRequired}W each`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* Power usage display */}
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground font-medium">
+                {powerStatus.currentDrawWatts}W / {powerStatus.totalCapacityWatts}W
+              </span>
+              <span className={`font-bold ${
+                powerStatus.botsCharging === 0 ? 'text-muted-foreground'
+                : powerStatus.efficiency < 0.5 ? 'text-red-500' 
+                : powerStatus.efficiency < 0.8 ? 'text-yellow-500' 
+                : 'text-green-500'
+              }`}>
+                {Math.round(powerStatus.efficiency * 100)}% efficiency
+              </span>
+            </div>
+            <Progress 
+              value={powerStatus.totalCapacityWatts > 0 ? (powerStatus.currentDrawWatts / powerStatus.totalCapacityWatts) * 100 : 0} 
+              className={`h-2 ${
+                powerStatus.botsCharging === 0 ? '[&>div]:bg-muted-foreground'
+                : powerStatus.efficiency < 0.5 ? '[&>div]:bg-red-500' 
+                : powerStatus.efficiency < 0.8 ? '[&>div]:bg-yellow-500' 
+                : '[&>div]:bg-green-500'
+              }`}
+            />
+            {powerStatus.botsCharging > 0 && powerStatus.efficiency < 1 && (
+              <p className="text-xs text-muted-foreground/80">
+                ⚠️ Over capacity! Charging speed reduced. Recall some bots to charge faster.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Two-column layout: Main content + Sticky sidebar */}
       <div className="flex gap-6">
@@ -2011,58 +2183,13 @@ export default function GaragePage() {
                                       <>      
                                         {/* Cooldowns and Status */}
                                         <div className="flex flex-wrap gap-1.5">
-                                            {(() => {
-                                              const now = Date.now();
-                                              const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
-                                              const rechargeReady = bot.stats.lastRecharged 
-                                                ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
-                                                : 0;
-                                              const repairReady = bot.stats.lastRepaired
-                                                ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
-                                                : 0;
-                                              
-                                              const rechargeTime = bot.stats.lastRecharged 
-                                                ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + BigInt(Math.round(rechargeCooldownMs * 1_000_000)))
-                                                : null;
-                                              const repairTime = bot.stats.lastRepaired
-                                                ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)
-                                                : null;
-                                              
-                                              return (
-                                                <>
-                                                  {rechargeReady > now && rechargeTime && (
-                                                    <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                                      <Zap className="h-3 w-3" />
-                                                      Recharge: {rechargeTime}
-                                                    </Badge>
-                                                  )}
-                                                  {repairReady > now && repairTime && (
-                                                    <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                                      <Hammer className="h-3 w-3" />
-                                                      Repair: {repairTime}
-                                                    </Badge>
-                                                  )}
-                                                  {bot.activeUpgrade && (
-                                                    <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                                                      <Clock className="h-3 w-3" />
-                                                      {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])} Upgrade: {formatTimeRemaining(bot.activeUpgrade.endsAt)}
-                                                    </Badge>
-                                                  )}
-                                                  {bot.activeMission && (() => {
-                                                    const zone = Object.keys(bot.activeMission.zone)[0];
-                                                    const timeRemaining = getScavengingTimeRemaining(bot);
-                                                    return (
-                                                      <Badge 
-                                                        variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
-                                                        className="text-xs"
-                                                      >
-                                                        {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}🔍 {formatScavengingZone(zone)}{timeRemaining ? ` • ${timeRemaining}` : ''}
-                                                      </Badge>
-                                                    );
-                                                  })()}
-                                                </>
-                                              );
-                                            })()}
+                                          <BotCooldownBadges 
+                                            bot={bot} 
+                                            garageCooldownMult={bonuses?.costMultipliers.rechargeCooldown ?? 1} 
+                                            powerStatus={powerStatus}
+                                            dedicationInfo={dedicationInfoMap?.get(Number(bot.tokenIndex))}
+                                            showLabel={true}
+                                          />
                                         </div>
                                       </>
                                     )}
@@ -2223,58 +2350,13 @@ export default function GaragePage() {
                                       {/* Cooldown Chips - Stacked Vertically */}
                                       {bot.isInitialized && bot.stats && (
                                         <div className="flex flex-col gap-1">
-                                          {(() => {
-                                            const now = Date.now();
-                                            const rechargeCooldownMs = 6 * 60 * 60 * 1000 * (bonuses?.costMultipliers.rechargeCooldown ?? 1);
-                                            const rechargeReady = bot.stats.lastRecharged 
-                                              ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
-                                              : 0;
-                                            const repairReady = bot.stats.lastRepaired
-                                              ? Number(bot.stats.lastRepaired) / 1_000_000 + (3 * 60 * 60 * 1000)
-                                              : 0;
-                                            
-                                            const rechargeTime = bot.stats.lastRecharged 
-                                              ? formatTimeRemaining(BigInt(bot.stats.lastRecharged) + BigInt(Math.round(rechargeCooldownMs * 1_000_000)))
-                                              : null;
-                                            const repairTime = bot.stats.lastRepaired
-                                              ? formatTimeRemaining(BigInt(bot.stats.lastRepaired) + 10_800_000_000_000n)
-                                              : null;
-                                            
-                                            return (
-                                              <>
-                                                {rechargeReady > now && rechargeTime && (
-                                                  <Badge variant="outline" className="text-xs flex items-center gap-1 w-fit">
-                                                    <Zap className="h-3 w-3" />
-                                                    {rechargeTime}
-                                                  </Badge>
-                                                )}
-                                                {repairReady > now && repairTime && (
-                                                  <Badge variant="outline" className="text-xs flex items-center gap-1 w-fit">
-                                                    <Hammer className="h-3 w-3" />
-                                                    {repairTime}
-                                                  </Badge>
-                                                )}
-                                                {bot.activeUpgrade && (
-                                                  <Badge variant="secondary" className="text-xs flex items-center gap-1 w-fit">
-                                                    <Clock className="h-3 w-3" />
-                                                    {getUpgradeDisplayName(Object.keys(bot.activeUpgrade.upgradeType)[0])}: {formatTimeRemaining(bot.activeUpgrade.endsAt)}
-                                                  </Badge>
-                                                )}
-                                                {bot.activeMission && (() => {
-                                                  const zone = Object.keys(bot.activeMission.zone)[0];
-                                                  const timeRemaining = getScavengingTimeRemaining(bot);
-                                                  return (
-                                                    <Badge 
-                                                      variant={Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? "destructive" : "secondary"} 
-                                                      className="text-xs w-fit"
-                                                    >
-                                                      {Number(bot.stats.battery) < 30 || Number(bot.stats.condition) < 30 ? '⚠️ ' : ''}🔍 {formatScavengingZone(zone)}{timeRemaining ? ` • ${timeRemaining}` : ''}
-                                                    </Badge>
-                                                  );
-                                                })()}
-                                              </>
-                                            );
-                                          })()}
+                                          <BotCooldownBadges 
+                                            bot={bot} 
+                                            garageCooldownMult={bonuses?.costMultipliers.rechargeCooldown ?? 1} 
+                                            powerStatus={powerStatus}
+                                            dedicationInfo={dedicationInfoMap?.get(Number(bot.tokenIndex))}
+                                            showLabel={false}
+                                          />
                                         </div>
                                       )}
 
@@ -2406,6 +2488,60 @@ export default function GaragePage() {
                 <CardDescription className="text-xs">Your inventory and collection bonuses</CardDescription>
               </CardHeader>
               <CardContent className="text-sm space-y-3">
+                {/* Power Grid Status - Always visible */}
+                {powerStatus && (
+                  <div className={`pb-3 border-b space-y-2 ${
+                    powerStatus.botsCharging > 0 && powerStatus.efficiency < 0.5 
+                      ? 'border-red-500/40' 
+                      : powerStatus.botsCharging > 0 && powerStatus.efficiency < 0.8 
+                        ? 'border-yellow-500/30' 
+                        : 'border-border'
+                  }`}>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1">
+                      <Zap className={`h-3 w-3 ${
+                        powerStatus.botsCharging === 0 ? 'text-muted-foreground'
+                        : powerStatus.efficiency < 0.5 ? 'text-red-500' 
+                        : powerStatus.efficiency < 0.8 ? 'text-yellow-500' 
+                        : 'text-green-500'
+                      }`} />
+                      Power Grid
+                    </h4>
+                    <div className="space-y-2">
+                      {/* Watts usage bar */}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          {powerStatus.currentDrawWatts}W / {powerStatus.totalCapacityWatts}W
+                        </span>
+                        <span className={`font-bold ${
+                          powerStatus.botsCharging === 0 ? 'text-muted-foreground'
+                          : powerStatus.efficiency < 0.5 ? 'text-red-500' 
+                          : powerStatus.efficiency < 0.8 ? 'text-yellow-500' 
+                          : 'text-green-500'
+                        }`}>
+                          {Math.round(powerStatus.efficiency * 100)}% eff
+                        </span>
+                      </div>
+                      <Progress 
+                        value={powerStatus.totalCapacityWatts > 0 ? (powerStatus.currentDrawWatts / powerStatus.totalCapacityWatts) * 100 : 0} 
+                        className={`h-1.5 ${
+                          powerStatus.botsCharging === 0 ? '[&>div]:bg-muted-foreground'
+                          : powerStatus.efficiency < 0.5 ? '[&>div]:bg-red-500' 
+                          : powerStatus.efficiency < 0.8 ? '[&>div]:bg-yellow-500' 
+                          : '[&>div]:bg-green-500'
+                        }`}
+                      />
+                      <div className="text-[10px] text-muted-foreground/70">
+                        {powerStatus.botsCharging === 0 
+                          ? 'Send bots to Charging Station for free battery'
+                          : `${powerStatus.botsCharging} bot${powerStatus.botsCharging !== 1 ? 's' : ''} × ${powerStatus.wattsPerBotRequired}W each`}
+                        {powerStatus.botsCharging > 0 && powerStatus.efficiency < 1 && (
+                          <span className="block">⚠️ Over capacity! Charging slowed.</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {bonusesLoading ? (
                   <p className="text-muted-foreground">Loading...</p>
                 ) : !bonuses || bots.length === 0 ? (

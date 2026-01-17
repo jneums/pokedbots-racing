@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useGetUpcomingEventsWithRaces } from '@/hooks/useRacing';
-import { Clock, Calendar, Trophy, TrendingUp, ChevronDown } from 'lucide-react';
+import { Clock, Calendar, Trophy, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/popover';
 
 interface EventDeadline {
-  type: 'race_start' | 'betting_open' | 'betting_close' | 'registration_close';
+  type: 'race_start' | 'registration_close';
   time: number;
   label: string;
   link: string;
@@ -88,29 +88,8 @@ export default function EventsHub() {
         });
       }
 
-      // Betting opens (at registration close)
-      if (regCloseTime > currentTime) {
-        newDeadlines.push({
-          type: 'betting_open',
-          time: regCloseTime,
-          label: 'Betting Opens',
-          link: `/schedule/${eventId}`,
-          icon: <TrendingUp className="h-4 w-4" />,
-          eventId,
-        });
-      }
-
-      // Betting closes (at race start)
-      if (raceStartTime > currentTime && regCloseTime < currentTime) {
-        newDeadlines.push({
-          type: 'betting_close',
-          time: raceStartTime,
-          label: 'Betting Closes',
-          link: `/schedule/${eventId}`,
-          icon: <TrendingUp className="h-4 w-4" />,
-          eventId,
-        });
-      }
+      // Betting disabled for now - remove betting_open and betting_close events
+      // TODO: Re-enable when betting is restored
     });
 
     // Sort by time (soonest first)

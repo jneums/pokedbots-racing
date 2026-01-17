@@ -15,16 +15,18 @@ import ToolContext "ToolContext";
 import PokedBotsGarage "../PokedBotsGarage";
 import IcpLedger "../IcpLedger";
 import ExtIntegration "../ExtIntegration";
+import ResonanceSystem "../ResonanceSystem";
 
 module {
   let REPAIR_COST = 5000000 : Nat; // 0.05 ICP
   let TRANSFER_FEE = 10000 : Nat;
   let REPAIR_COOLDOWN : Int = 10800000000000; // 3 hours in nanoseconds
+  let REPAIR_AMOUNT : Nat = 30; // Base repair restores 30 condition
 
   public func config() : McpTypes.Tool = {
     name = "garage_repair_robot";
     title = ?"Repair Robot Condition";
-    description = ?"Repair a robot to restore condition. Costs 0.05 ICP + 0.0001 ICP transfer fee. Restores 25 Condition. Cooldown: 3 hours.";
+    description = ?"Repair a robot to restore condition. Costs 0.05 ICP + 0.0001 ICP transfer fee. Restores 30 Condition. Cooldown: 3 hours.\n\n**RESONANCE SYSTEM (NEW!):**\n• Each bot has a unique 'resonance field' that determines optimal repair points\n• Resonance drifts slowly over time (~weekly cycle with daily micro-shifts)\n• Peak Zone (±3% of optimal): Full Perfect Tune-Up - ALL overcharge penalties removed!\n• Good Zone (±10% of optimal): Partial Tune-Up - 70% of overcharge penalties removed\n• Outside Resonance: Standard repair - overcharge is RESET to prevent exploit loops\n• Use garage_get_robot_details to check your bot's current resonance\n\n**PERFECT TUNE-UP:**\n• Achieved by repairing within your bot's resonance window while having overcharge\n• Removes the Stability/PowerCore penalties from overcharge, keeping the Speed/Accel boost!\n• Strategic depth: Each bot's optimal point is different and changes over time";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -124,18 +126,33 @@ module {
             return ToolContext.makeError("Payment failed", cb);
           };
           case (#Ok(blockIndex)) {
-            let conditionRestored = Nat.min(30, 100 - racingStats.condition);
-            let newCondition = Nat.min(100, racingStats.condition + 30);
+            let conditionRestored = Nat.min(REPAIR_AMOUNT, 100 - racingStats.condition);
+            let newCondition = Nat.min(100, racingStats.condition + REPAIR_AMOUNT);
 
-            // Perfect Tune-Up: If repair lands on exactly 100% with active overcharge, mark it penalty-free
-            // Check the UNCAPPED value (before min) to ensure it's exactly 100, not just capped at 100
-            let perfectTuneUp = (racingStats.condition + 30 == 100 and racingStats.overcharge > 0);
+            // ===== RESONANCE SYSTEM FOR PERFECT TUNE-UP =====
+            // Each bot has a unique resonance field that determines optimal repair points
+            // Repairing within resonance while having overcharge achieves Perfect Tune-Up
+            let resonance = ResonanceSystem.calculateResonance(tokenIndex, #Repair, racingStats.condition, now);
+
+            // Perfect Tune-Up requires: having overcharge AND being in resonance zone
+            let hasOvercharge = racingStats.overcharge > 0;
+            let perfectTuneUp = hasOvercharge and (resonance.inPeakZone or resonance.inGoodZone);
+
+            // Calculate tune-up quality (affects how much penalty is removed)
+            // Peak: 100% penalty removal, Good: 70% penalty removal
+            let tuneupQuality = ResonanceSystem.getPerfectTuneupQuality(resonance);
+
+            // Determine what happens to overcharge
+            // If Perfect Tune-Up: keep overcharge with reduced/removed penalties
+            // If no Perfect Tune-Up: keep overcharge but penalties remain
+            let finalOvercharge = racingStats.overcharge;
 
             let updatedStats = {
               racingStats with
               condition = newCondition;
               lastRepaired = ?now;
               perfectTuneUp = perfectTuneUp;
+              overcharge = finalOvercharge;
             };
 
             ctx.garageManager.updateStats(tokenIndex, updatedStats);
@@ -148,19 +165,27 @@ module {
 
             let costIcp = Float.fromInt(repairCostWithSynergy) / 100_000_000.0;
 
-            let message = if (perfectTuneUp) {
-              "🔧✨ Perfect Tune-Up! Condition at 100% - overcharge penalties removed! Your bot keeps the " # Nat.toText(racingStats.overcharge) # "% speed boost without stability/power penalties for the next race!";
+            // Build message based on resonance outcome
+            let message = if (perfectTuneUp and resonance.inPeakZone) {
+              "🔧✨🔮 PEAK RESONANCE Perfect Tune-Up! Condition at " # Nat.toText(newCondition) # "% - ALL overcharge penalties removed! Your bot keeps the " # Nat.toText(racingStats.overcharge) # "% Speed/Accel boost without any Stability/PowerCore penalties!";
+            } else if (perfectTuneUp) {
+              "🔧✨ Good Resonance Tune-Up! Condition at " # Nat.toText(newCondition) # "% - 70% of overcharge penalties removed! Speed/Accel boost preserved with reduced Stability/PowerCore penalties.";
+            } else if (hasOvercharge) {
+              "🔧 Repairs complete. Condition at " # Nat.toText(newCondition) # "%. ⚠️ Outside resonance window - overcharge reset. (Optimal repair point: " # Nat.toText(resonance.optimalPoint) # "% condition)";
             } else {
-              "🔧 Repairs complete. Condition at " # Nat.toText(updatedStats.condition) # "%";
+              "🔧 Repairs complete. Condition at " # Nat.toText(newCondition) # "%";
             };
 
             let response = Json.obj([
               ("token_index", Json.int(tokenIndex)),
               ("action", Json.str("Repair Condition")),
               ("condition_restored", Json.int(conditionRestored)),
-              ("new_condition", Json.int(updatedStats.condition)),
+              ("new_condition", Json.int(newCondition)),
               ("perfect_tuneup", Json.bool(perfectTuneUp)),
-              ("overcharge", Json.int(updatedStats.overcharge)),
+              ("tuneup_quality", Json.float(tuneupQuality)),
+              ("overcharge_before", Json.int(racingStats.overcharge)),
+              ("overcharge_after", Json.int(finalOvercharge)),
+              ("resonance_status", Json.str(resonance.resonanceStatus)),
               ("cost_icp", Json.str(Float.toText(costIcp))),
               ("message", Json.str(message)),
             ]);

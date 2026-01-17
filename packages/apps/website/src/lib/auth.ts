@@ -84,7 +84,11 @@ export class AuthService {
   }
 
   private async initAuthClient() {
-    this.authClient = await AuthClient.create();
+    this.authClient = await AuthClient.create({
+      idleOptions: {
+        disableIdle: true,
+      },
+    });
     
     // Only load from storage once during initialization
     if (!this.hasInitialized) {
@@ -252,9 +256,14 @@ export class AuthService {
       ? 'https://nfid.one/authenticate'
       : 'https://id.ai';
 
+    // Session TTL: 7 days in nanoseconds
+    const maxTimeToLive = BigInt(7 * 24 * 60 * 60 * 1_000_000_000);
+      
+
     return new Promise((resolve, reject) => {
       this.authClient!.login({
         identityProvider,
+        maxTimeToLive,
         onSuccess: () => {
           const identity = this.authClient!.getIdentity();
           const principal = identity.getPrincipal().toString();
