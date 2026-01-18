@@ -171,6 +171,7 @@ module {
     partsEarned : Nat; // Parts awarded based on position
     partType : Text; // Type of part ("SpeedChip", "PowerCoreFragment", etc.)
     stats : ?RacingStats; // Stats used in the race (for accurate replay)
+    dnf : Bool; // Did Not Finish - bot was too slow (exceeded 3x median time cap)
   };
 
   /// Race event types for announcer commentary and recaps
@@ -2127,6 +2128,7 @@ module {
             partsEarned = partsEarned;
             partType = partType;
             stats = ?racer.participant.stats;
+            dnf = false; // Will be updated by time cap logic in main.mo if needed
           }],
         );
       };

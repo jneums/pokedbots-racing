@@ -412,6 +412,7 @@ interface RaceResult {
   rating?: number;
   faction?: string;
   preferredTerrain?: string;
+  dnf?: boolean; // Did Not Finish - bot was too slow (exceeded 3x median time cap)
   stats?: {
     speed: number;
     stability: number;
@@ -1245,7 +1246,7 @@ function simulateRaceProgression(
   segmentTimesMap: Map<string, SegmentTime[]>
 ): BotPosition[] {
   const positions = results.map((result, idx) => {
-    const isDNF = result.finalTime !== null && result.finalTime > 100000;
+    const isDNF = result?.dnf === true || (result.finalTime !== null && result.finalTime > 100000);
     const isInProgress = result.finalTime === null; // Race not finished yet
     
     if (isDNF) {
@@ -2247,11 +2248,11 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                 const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.nftId));
                 const imageUrl = generateExtThumbnailLink(tokenId);
                 const isFinished = bot.progress >= 99.9 || currentTime >= bot.finalTime;
-                const isDNF = bot.finalTime > 100000;
+                const result = results.find(r => r.nftId === bot.nftId);
+                const isDNF = result?.dnf === true || bot.finalTime > 100000;
                 const livePosition = bot.position;
                 
                 // Get bot's stats for overcharge/perfectTuneUp indicator
-                const result = results.find(r => r.nftId === bot.nftId);
                 const overcharge = result?.stats?.overcharge ?? 0;
                 const isPerfectTuneUp = result?.stats?.perfectTuneUp === true;
                 const hasOvercharge = overcharge > 0 || isPerfectTuneUp;
@@ -2394,10 +2395,10 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                 const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.nftId));
                 const imageUrl = generateExtThumbnailLink(tokenId);
                 const isFinished = bot.progress >= 99.9 || currentTime >= bot.finalTime;
-                const isDNF = bot.finalTime > 100000;
+                const result = results.find(r => r.nftId === bot.nftId);
+                const isDNF = result?.dnf === true || bot.finalTime > 100000;
                 const livePosition = bot.position;
                 const timeBehind = bot.finalTime - leaderTime;
-                const result = results.find(r => r.nftId === bot.nftId);
                 const rating = result?.rating || (result?.stats ? 
                   Math.round((result.stats.speed + result.stats.stability + result.stats.powerCore + result.stats.acceleration) / 4) : null);
                 const botName = botNames.get(bot.nftId) || `Bot #${bot.nftId}`;
@@ -2526,6 +2527,19 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                             +{timeBehind.toFixed(2)}s
                           </span>
                         )}
+                      </div>
+                    )}
+                    {isDNF && (
+                      <div className="flex flex-col items-end gap-0.5">
+                        <div className="flex items-center gap-1">
+                          <span className="text-red-500 font-mono text-xs font-bold">
+                            DNF
+                          </span>
+                          <span className="text-red-500">⚠️</span>
+                        </div>
+                        <span className="text-red-500/70 text-[10px] font-mono">
+                          Too slow
+                        </span>
                       </div>
                     )}
                   </div>

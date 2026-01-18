@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 
 // 13-day phenomenon cycle
 const PHENOMENA = [
@@ -161,14 +162,17 @@ export function DailyPhenomenonBanner() {
   const phenomenon = PHENOMENA[phenomenonIndex];
   
   return (
-    <div className={`w-full bg-gradient-to-r ${phenomenon.color} border-b border-primary/20 py-2 px-4`}>
+    <Link 
+      to="/guides/14-luck-system" 
+      className={`block w-full bg-gradient-to-r ${phenomenon.color} border-b border-primary/20 py-2 px-4 hover:brightness-110 transition-all`}
+    >
       <div className="container mx-auto flex items-center justify-center gap-2 text-sm">
         <span className="text-lg">{phenomenon.emoji}</span>
         <span className={`font-semibold ${phenomenon.textColor}`}>
           Today&apos;s Phenomenon: {phenomenon.name}
         </span>
       </div>
-    </div>
+    </Link>
   );
 }
 

@@ -92,8 +92,8 @@ import ResonanceSystem "ResonanceSystem";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
 
-// Migration function to add overcharge/perfectTuneUp fields to RacingStats
-// COMPLETED: This migration has been run. Commenting out to prevent re-running.
+// // Migration function to add dnf field to RaceResult
+// // This runs on upgrade to add the new DNF (Did Not Finish) tracking field
 // (with migration =
 //   func(old : {
 //     var stable_races : Map.Map<Nat, {
@@ -111,19 +111,7 @@ import Star "mo:star/star";
 //       duration : Nat;
 //       entryDeadline : Int;
 //       createdAt : Int;
-//       entries : [{
-//         nftId : Text;
-//         owner : Principal;
-//         entryFee : Nat;
-//         enteredAt : Int;
-//         stats : ?{
-//           speed : Nat;
-//           powerCore : Nat;
-//           acceleration : Nat;
-//           stability : Nat;
-//           luck : Nat;
-//         };
-//       }];
+//       entries : [RacingSimulator.RaceEntry];
 //       status : RacingSimulator.RaceStatus;
 //       results : ?[{
 //         nftId : Text;
@@ -133,13 +121,8 @@ import Star "mo:star/star";
 //         prizeAmount : Nat;
 //         partsEarned : Nat;
 //         partType : Text;
-//         stats : ?{
-//           speed : Nat;
-//           powerCore : Nat;
-//           acceleration : Nat;
-//           stability : Nat;
-//           luck : Nat;
-//         };
+//         stats : ?RacingSimulator.RacingStats;
+//         // NOTE: dnf field is missing in old data
 //       }];
 //       events : [RacingSimulator.RaceEvent];
 //       prizePool : Nat;
@@ -150,39 +133,13 @@ import Star "mo:star/star";
 //   }) : {
 //     var stable_races : Map.Map<Nat, RacingSimulator.Race>;
 //   } {
-//     Debug.print("Migration: Adding overcharge/perfectTuneUp to RacingStats in stored races");
-//
-//     // Migrate races - add default values for new fields
+//     Debug.print("Migration: Adding dnf field to RaceResult in stored races");
+
+//     // Migrate races - add dnf = false for all existing results
 //     let migratedRaces = Map.new<Nat, RacingSimulator.Race>();
 //     var raceCount = 0;
 //     for ((raceId, oldRace) in Map.entries(old.stable_races)) {
-//       // Migrate entries with new RacingStats fields
-// //       let newEntries = Array.map<{
-//         nftId : Text;
-//         owner : Principal;
-//         entryFee : Nat;
-//         enteredAt : Int;
-//         stats : ?{
-//           speed : Nat;
-//           powerCore : Nat;
-//           acceleration : Nat;
-//           stability : Nat;
-//           luck : Nat;
-//         };
-//       }, RacingSimulator.RaceEntry>(oldRace.entries, func(e) : RacingSimulator.RaceEntry {
-//         {
-//           nftId = e.nftId;
-//           owner = e.owner;
-//           entryFee = e.entryFee;
-//           enteredAt = e.enteredAt;
-//           stats = switch (e.stats) {
-//             case (?s) { ?{ s with overcharge = 0; perfectTuneUp = false } };
-//             case (null) { null };
-//           };
-//         }
-//       });
-//
-//       // Migrate results with new RacingStats fields
+//       // Migrate results to add dnf field
 //       let newResults : ?[RacingSimulator.RaceResult] = switch (oldRace.results) {
 //         case (?results) {
 //           ?Array.map<{
@@ -193,13 +150,7 @@ import Star "mo:star/star";
 //             prizeAmount : Nat;
 //             partsEarned : Nat;
 //             partType : Text;
-//             stats : ?{
-//               speed : Nat;
-//               powerCore : Nat;
-//               acceleration : Nat;
-//               stability : Nat;
-//               luck : Nat;
-//             };
+//             stats : ?RacingSimulator.RacingStats;
 //           }, RacingSimulator.RaceResult>(results, func(r) : RacingSimulator.RaceResult {
 //             {
 //               nftId = r.nftId;
@@ -209,16 +160,14 @@ import Star "mo:star/star";
 //               prizeAmount = r.prizeAmount;
 //               partsEarned = r.partsEarned;
 //               partType = r.partType;
-//               stats = switch (r.stats) {
-//                 case (?s) { ?{ s with overcharge = 0; perfectTuneUp = false } };
-//                 case (null) { null };
-//               };
+//               stats = r.stats;
+//               dnf = false; // Existing races - all bots finished
 //             }
 //           });
 //         };
 //         case (null) { null };
 //       };
-//
+
 //       let newRace : RacingSimulator.Race = {
 //         raceId = oldRace.raceId;
 //         name = oldRace.name;
@@ -234,7 +183,7 @@ import Star "mo:star/star";
 //         duration = oldRace.duration;
 //         entryDeadline = oldRace.entryDeadline;
 //         createdAt = oldRace.createdAt;
-//         entries = newEntries;
+//         entries = oldRace.entries;
 //         status = oldRace.status;
 //         results = newResults;
 //         events = oldRace.events;
@@ -246,8 +195,8 @@ import Star "mo:star/star";
 //       ignore Map.put(migratedRaces, Map.nhash, raceId, newRace);
 //       raceCount += 1;
 //     };
-//     Debug.print("Races migrated: " # Nat.toText(raceCount));
-//
+//     Debug.print("Races migrated with dnf field: " # Nat.toText(raceCount));
+
 //     {
 //       var stable_races = migratedRaces;
 //     };
@@ -720,11 +669,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                 let successRate = garageManager.calculateSuccessRate(attemptNumber, session.consecutiveFails);
 
                 // Generate RNG seed with proper hashing to avoid modulo bias
-                // CRITICAL FIX: Use entropy counter to ensure unique seeds even when Time.now() is identical
+                // Use XOR-based combination for better distribution
                 let timeNanos = Int.abs(Time.now());
                 let entropy = garageManager.getNextEntropy();
-                let seedInput = tokenIndex + timeNanos + (entropy * 7919); // Mix entropy strongly
-                let hashedSeed = garageManager.hashForRNG(seedInput);
+                let combined = garageManager.combineRNG(tokenIndex, timeNanos, entropy);
+                let hashedSeed = garageManager.hashForRNG(combined);
                 let seed = Nat32.fromNat(hashedSeed % 4_294_967_296);
 
                 // Roll for success
@@ -1532,10 +1481,34 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           },
         );
 
-        if (existingAtTime.size() == 0) {
+        // Check if a special event is scheduled within 2 hours (skip sprint to avoid conflict)
+        let specialEventNearby = Array.filter<RaceCalendar.ScheduledEvent>(
+          allUpcomingEvents,
+          func(e) {
+            switch (e.eventType) {
+              case (#DailySprint) { false }; // Ignore other sprints
+              case (#SpecialEvent(name)) {
+                if (name == "Free Sprint") { false } // Ignore free sprints
+                else {
+                  let timeDiff = Int.abs(e.scheduledTime - nextSprint);
+                  timeDiff < (2 * 60 * 60 * 1_000_000_000); // Within 2 hours
+                };
+              };
+              case (_) {
+                // Weekly League, Monthly Cup, etc.
+                let timeDiff = Int.abs(e.scheduledTime - nextSprint);
+                timeDiff < (2 * 60 * 60 * 1_000_000_000); // Within 2 hours
+              };
+            };
+          },
+        );
+
+        if (existingAtTime.size() == 0 and specialEventNearby.size() == 0) {
           ignore eventCalendar.createDailySprintEvent(nextSprint, now);
           Debug.print("Auto-scheduled Daily Sprint for timestamp: " # debug_show (nextSprint));
           createdCount += 1;
+        } else if (specialEventNearby.size() > 0) {
+          Debug.print("SKIP: Daily Sprint skipped due to nearby special event at timestamp: " # debug_show (nextSprint));
         } else {
           Debug.print("SKIP: Daily Sprint already exists at timestamp: " # debug_show (nextSprint));
         };
@@ -1584,10 +1557,34 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           },
         );
 
-        if (existingAtTime.size() == 0) {
+        // Check if a special event is scheduled within 2 hours (skip free sprint to avoid conflict)
+        let specialEventNearby = Array.filter<RaceCalendar.ScheduledEvent>(
+          allUpcomingEvents,
+          func(e) {
+            switch (e.eventType) {
+              case (#DailySprint) { false }; // Ignore daily sprints
+              case (#SpecialEvent(name)) {
+                if (name == "Free Sprint") { false } // Ignore other free sprints
+                else {
+                  let timeDiff = Int.abs(e.scheduledTime - nextFreeSprint);
+                  timeDiff < (2 * 60 * 60 * 1_000_000_000); // Within 2 hours
+                };
+              };
+              case (_) {
+                // Weekly League, Monthly Cup, etc.
+                let timeDiff = Int.abs(e.scheduledTime - nextFreeSprint);
+                timeDiff < (2 * 60 * 60 * 1_000_000_000); // Within 2 hours
+              };
+            };
+          },
+        );
+
+        if (existingAtTime.size() == 0 and specialEventNearby.size() == 0) {
           ignore eventCalendar.createFreeSprintEvent(nextFreeSprint, now);
           Debug.print("Auto-scheduled Free Sprint for timestamp: " # debug_show (nextFreeSprint));
           createdCount += 1;
+        } else if (specialEventNearby.size() > 0) {
+          Debug.print("SKIP: Free Sprint skipped due to nearby special event at timestamp: " # debug_show (nextFreeSprint));
         } else {
           Debug.print("SKIP: Free Sprint already exists at timestamp: " # debug_show (nextFreeSprint));
         };
@@ -1703,7 +1700,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     if (eliteShowcases.size() < 2) {
       var scheduleTime = now;
       for (i in Iter.range(0, 1 - eliteShowcases.size())) {
-        let nextSunday = RaceCalendar.getNextWeeklyOccurrence(0, 18, 0, scheduleTime); // Sunday=0, 6pm
+        let nextSunday = RaceCalendar.getNextWeeklyOccurrence(0, 17, 0, scheduleTime); // Sunday=0, 5pm (moved from 6pm to give gap before Weekly League)
         // Check if event already exists at this time
         let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
           allUpcomingEvents,
@@ -1790,7 +1787,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     );
 
     if (distanceChallenges.size() == 0) {
-      let nextThirdSaturday = RaceCalendar.getNextMonthlyOccurrence(6, 3, 12, 0, now); // Saturday=6, third=3, noon
+      let nextThirdSaturday = RaceCalendar.getNextMonthlyOccurrence(6, 3, 11, 0, now); // Saturday=6, third=3, 11am (moved from noon to avoid Daily Sprint conflict)
       // Check if event already exists at this time
       let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
         allUpcomingEvents,
@@ -1819,7 +1816,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     if (rushHours.size() < 2) {
       var scheduleTime = now;
       for (i in Iter.range(0, 1 - rushHours.size())) {
-        let nextFriday = RaceCalendar.getNextWeeklyOccurrence(5, 19, 0, scheduleTime); // Friday=5, 7pm
+        let nextFriday = RaceCalendar.getNextWeeklyOccurrence(5, 17, 0, scheduleTime); // Friday=5, 5pm (moved from 7pm to avoid Weekend Warrior conflict)
         // Check if event already exists at this time
         let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
           allUpcomingEvents,
@@ -1848,7 +1845,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     );
 
     if (ultraMarathons.size() == 0) {
-      let nextSecondSaturday = RaceCalendar.getNextMonthlyOccurrence(6, 2, 12, 0, now); // Saturday=6, second=2, noon
+      let nextSecondSaturday = RaceCalendar.getNextMonthlyOccurrence(6, 2, 11, 0, now); // Saturday=6, second=2, 11am (moved from noon to avoid Daily Sprint conflict)
       // Check if event already exists at this time
       let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
         allUpcomingEvents,
@@ -1906,7 +1903,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     );
 
     if (championsCups.size() == 0) {
-      let nextLastSunday = RaceCalendar.getNextMonthlyOccurrence(0, -1, 20, 0, now); // Sunday=0, last=-1, 8pm
+      let nextLastSunday = RaceCalendar.getNextMonthlyOccurrence(0, -1, 22, 0, now); // Sunday=0, last=-1, 10pm (moved from 8pm to avoid Weekly League conflict)
       // Check if event already exists at this time
       let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
         allUpcomingEvents,
@@ -2359,13 +2356,58 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               case (?(results, events)) {
                 Debug.print("Race simulated at start, " # debug_show (results.size()) # " racers, " # debug_show (events.size()) # " events");
 
-                // Store results and events immediately
-                let updatedWithResults = raceManager.setRaceResults(raceId, results, events);
+                // === TIME CAP SYSTEM ===
+                // Cap race duration at 3x median time to prevent one slow bot from holding up the race
+                // Bots exceeding the cap are marked as DNF (Did Not Finish)
+
+                // Sort times to find median
+                let times = Array.map<RacingSimulator.RaceResult, Float>(results, func(r) { r.finalTime });
+                let sortedTimes = Array.sort<Float>(times, Float.compare);
+
+                // Calculate median time
+                let medianTime : Float = if (sortedTimes.size() == 0) {
+                  60.0; // Fallback: 60 seconds
+                } else if (sortedTimes.size() % 2 == 0) {
+                  // Even number: average of two middle values
+                  let mid = sortedTimes.size() / 2;
+                  (sortedTimes[mid - 1] + sortedTimes[mid]) / 2.0;
+                } else {
+                  // Odd number: middle value
+                  sortedTimes[sortedTimes.size() / 2];
+                };
+
+                // Time cap at 3x median (e.g., if median is 20s, cap is 60s)
+                let timeCap = medianTime * 3.0;
+                Debug.print("Time cap system: median=" # Float.toText(medianTime) # "s, cap=" # Float.toText(timeCap) # "s");
+
+                // Apply time cap and mark DNF for stragglers
+                var cappedResults : [RacingSimulator.RaceResult] = [];
+                var dnfCount : Nat = 0;
+                for (result in results.vals()) {
+                  if (result.finalTime > timeCap) {
+                    // Bot exceeded time cap - mark as DNF
+                    dnfCount += 1;
+                    cappedResults := Array.append(cappedResults, [{ result with
+                    finalTime = timeCap; /* Cap the time */
+                    dnf = true; prizeAmount = 0; /* DNF bots don't get prizes */
+                    partsEarned = result.partsEarned / 2; /* Half parts for DNF (participation) */ }]);
+                    Debug.print("DNF: Bot " # result.nftId # " exceeded time cap (original: " # Float.toText(result.finalTime) # "s)");
+                  } else {
+                    cappedResults := Array.append(cappedResults, [result]);
+                  };
+                };
+
+                if (dnfCount > 0) {
+                  Debug.print("Time cap applied: " # Nat.toText(dnfCount) # " bot(s) marked as DNF");
+                };
+
+                // Store results and events (with DNF markers)
+                let updatedWithResults = raceManager.setRaceResults(raceId, cappedResults, events);
                 Debug.print("Stored results and events in race, updated race: " # debug_show (updatedWithResults));
 
-                // Find slowest finisher to determine actual race duration
+                // Find slowest finisher (capped) to determine actual race duration
                 var slowestTime : Float = 0.0;
-                for (result in results.vals()) {
+                for (result in cappedResults.vals()) {
                   if (result.finalTime > slowestTime) {
                     slowestTime := result.finalTime;
                   };
@@ -5866,6 +5908,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           stats = newResult.stats;
           partsEarned = newResult.partsEarned;
           partType = newResult.partType;
+          dnf = newResult.dnf;
         };
       },
     );
@@ -6095,6 +6138,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                     stats = result.stats;
                     partsEarned = result.partsEarned;
                     partType = result.partType;
+                    dnf = result.dnf;
                   };
                 },
               );
@@ -8951,10 +8995,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         let maxBattery = 100;
 
         // Generate pseudo-random values based on timestamp, token index, and entropy
+        // Use XOR-based combination for better distribution
         let entropy = garageManager.getNextEntropy();
-        let seed = Int.abs(now) + tokenIndex + (entropy * 7919);
+        let combined = garageManager.combineRNG(tokenIndex, Int.abs(now), entropy);
+        let seed = garageManager.hashForRNG(combined);
         let randomHash1 = seed % 1000; // 0-999
-        let randomHash2 = (seed * 7919) % 1000; // Different seed for battery RNG
+        let randomHash2 = garageManager.hashForRNG(seed * 7919) % 1000; // Different seed for battery RNG
 
         // BATTERY RECHARGE: 50-90 range (base 70 ± 20)
         let batteryRNG = (Float.fromInt(randomHash2) / 1000.0) * 40.0 - 20.0; // -20 to +20
@@ -9138,16 +9184,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         // Peak: 100% penalty removal, Good: 70% penalty removal
         let tuneupQuality = ResonanceSystem.getPerfectTuneupQuality(resonance);
 
-        // Determine what happens to overcharge
-        // If Perfect Tune-Up: keep overcharge, remove/reduce penalties
-        // If outside resonance: reset overcharge to prevent exploit loops
-        let finalOvercharge = if (perfectTuneUp) {
-          freshStats.overcharge; // Keep overcharge with reduced penalties
-        } else if (hasOvercharge) {
-          0; // Reset overcharge - no Perfect Tune-Up achieved
-        } else {
-          0; // No overcharge to begin with
-        };
+        // Keep overcharge regardless of Perfect Tune-Up
+        // If Perfect Tune-Up: penalties removed, if not: penalties remain
+        let finalOvercharge = freshStats.overcharge;
 
         let updatedStats = {
           freshStats with
@@ -9170,7 +9209,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         } else if (perfectTuneUp) {
           #ok("🔧✨ Good Resonance Tune-Up! Condition at " # Nat.toText(newCondition) # "% - 70% of overcharge penalties removed! Speed/Accel boost preserved with reduced Stability/PowerCore penalties.");
         } else if (hasOvercharge) {
-          #ok("🔧 Repairs complete. Condition at " # Nat.toText(newCondition) # "%. ⚠️ Outside resonance window - overcharge reset.");
+          #ok("🔧 Repairs complete. Condition at " # Nat.toText(newCondition) # "%. Overcharge (" # Nat.toText(freshStats.overcharge) # "%) preserved with penalties.");
         } else {
           #ok("🔧 Repairs complete. Condition at " # Nat.toText(newCondition) # "%");
         };
@@ -9368,14 +9407,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         let resonance = ResonanceSystem.calculateResonance(tokenIndex, #Repair, freshStats.condition, now);
         let perfectTuneUp = hasOvercharge and (resonance.inPeakZone or resonance.inGoodZone);
 
-        // If outside resonance and had overcharge, reset it
-        let finalOverchargeValue = if (perfectTuneUp) {
-          newOvercharge;
-        } else if (hasOvercharge) {
-          0; // Reset overcharge - no Perfect Tune-Up achieved
-        } else {
-          newOvercharge;
-        };
+        // Keep overcharge regardless of Perfect Tune-Up
+        // If Perfect Tune-Up: penalties removed, if not: penalties remain
+        let finalOverchargeValue = newOvercharge;
 
         let updatedStats = {
           freshStats with
@@ -9531,10 +9565,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     let successRate = garageManager.calculateSuccessRate(attemptNumber, pityCounter);
 
     // Generate RNG seed with proper hashing
+    // Use multiple entropy sources combined with XOR for better mixing
     let timeNanos = Int.abs(now);
     let entropy = garageManager.getNextEntropy();
-    let seedInput = tokenIndex + timeNanos + (entropy * 7919);
-    let hashedSeed = garageManager.hashForRNG(seedInput);
+    // Combine sources with XOR and prime multipliers for better distribution
+    let combined = garageManager.combineRNG(tokenIndex, timeNanos, entropy);
+    let hashedSeed = garageManager.hashForRNG(combined);
     let seed = Nat32.fromNat(hashedSeed % 4_294_967_296);
 
     // Roll for success
@@ -9728,11 +9764,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         // Calculate success rate with pity
         let successRate = garageManager.calculateSuccessRate(attemptNumber, session.consecutiveFails);
 
-        // Generate RNG
+        // Generate RNG with XOR-based combination
         let timeNanos = Int.abs(Time.now());
         let entropy = garageManager.getNextEntropy();
-        let seedInput = tokenIndex + timeNanos + (entropy * 7919);
-        let hashedSeed = garageManager.hashForRNG(seedInput);
+        let combined = garageManager.combineRNG(tokenIndex, timeNanos, entropy);
+        let hashedSeed = garageManager.hashForRNG(combined);
         let seed = Nat32.fromNat(hashedSeed % 4_294_967_296);
 
         let roll = Nat32.toNat(seed % 100);
@@ -10671,11 +10707,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   let currentBattery = stats.battery;
                   let currentCondition = stats.condition;
 
-                  // Generate pseudo-random values
+                  // Generate pseudo-random values with XOR-based combination
                   let entropy = garageManager.getNextEntropy();
-                  let seed = Int.abs(now) + tokenIndex + (entropy * 7919);
+                  let combined = garageManager.combineRNG(tokenIndex, Int.abs(now), entropy);
+                  let seed = garageManager.hashForRNG(combined);
                   let randomHash1 = seed % 1000;
-                  let randomHash2 = (seed * 7919) % 1000;
+                  let randomHash2 = garageManager.hashForRNG(seed * 7919) % 1000;
 
                   // BATTERY RECHARGE: 50-90 range (base 70 ± 20)
                   let batteryRNG = (Float.fromInt(randomHash2) / 1000.0) * 40.0 - 20.0;

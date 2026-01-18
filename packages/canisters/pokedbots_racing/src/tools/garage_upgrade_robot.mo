@@ -195,10 +195,11 @@ module {
       let successRate = ctx.garageManager.calculateSuccessRate(attemptNumber, pityCounter);
 
       // Generate RNG seed with proper hashing to avoid modulo bias
+      // Use XOR-based combination for better distribution
       let timeNanos = Int.abs(now);
       let entropy = ctx.garageManager.getNextEntropy();
-      let seedInput = tokenIndex + timeNanos + (entropy * 7919); // Mix entropy strongly
-      let hashedSeed = ctx.garageManager.hashForRNG(seedInput);
+      let combined = ctx.garageManager.combineRNG(tokenIndex, timeNanos, entropy);
+      let hashedSeed = ctx.garageManager.hashForRNG(combined);
       let seed = Nat32.fromNat(hashedSeed % 4_294_967_296);
 
       // Roll for success

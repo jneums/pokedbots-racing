@@ -442,6 +442,7 @@ type RaceResults =
  };
 type RaceResult = 
  record {
+   dnf: bool;
    finalTime: float64;
    nftId: text;
    owner: principal;

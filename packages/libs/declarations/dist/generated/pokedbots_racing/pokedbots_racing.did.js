@@ -375,6 +375,7 @@ export const idlFactory = ({ IDL }) => {
   const NFTMetadata = IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text));
   const NFTStats = IDL.Vec(IDL.Nat);
   const RaceResult = IDL.Record({
+    'dnf' : IDL.Bool,
     'owner' : IDL.Principal,
     'prizeAmount' : IDL.Nat,
     'partType' : IDL.Text,

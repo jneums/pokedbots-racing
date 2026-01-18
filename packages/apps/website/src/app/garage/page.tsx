@@ -24,6 +24,8 @@ import { getTerrainIcon, getTerrainPreference, getFactionSpecialTerrain } from '
 import { Input } from '../../components/ui/input';
 import { Checkbox } from '../../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { SMRPurchaseDialog, SMR_TIERS, type SMRTier } from '../../components/SMRPurchaseDialog';
+import { Radiation } from 'lucide-react';
 
 // Helper to format time remaining
 function formatTimeRemaining(timestampNanos: bigint): string {
@@ -180,6 +182,7 @@ export default function GaragePage() {
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(null);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [smrDialogOpen, setSmrDialogOpen] = useState(false);
   
   // Filter and selection state
   const [selectionMode, setSelectionMode] = useState(false);
@@ -1362,9 +1365,31 @@ export default function GaragePage() {
                 ⚠️ Over capacity! Charging speed reduced. Recall some bots to charge faster.
               </p>
             )}
+            {/* SMR Upgrade Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mt-2 border-amber-500/30 text-amber-500 hover:bg-amber-500/10 hover:text-amber-400"
+              onClick={() => setSmrDialogOpen(true)}
+            >
+              <Radiation className="h-4 w-4 mr-2" />
+              Upgrade Power Grid
+            </Button>
           </CardContent>
         </Card>
       )}
+
+      {/* SMR Purchase Dialog */}
+      <SMRPurchaseDialog
+        isOpen={smrDialogOpen}
+        onClose={() => setSmrDialogOpen(false)}
+        onPurchase={async (tier: SMRTier) => {
+          // TODO: Implement actual SMR purchase logic
+          toast.info(`SMR purchase coming soon! Selected: ${tier.name}`);
+          throw new Error('SMR purchases are not yet available');
+        }}
+        currentCapacity={powerStatus?.totalCapacityWatts || 500}
+      />
 
       {/* Two-column layout: Main content + Sticky sidebar */}
       <div className="flex gap-6">
@@ -2518,7 +2543,7 @@ export default function GaragePage() {
                           : powerStatus.efficiency < 0.8 ? 'text-yellow-500' 
                           : 'text-green-500'
                         }`}>
-                          {Math.round(powerStatus.efficiency * 100)}% eff
+                          {Math.round(powerStatus.efficiency * 100)}% efficiency
                         </span>
                       </div>
                       <Progress 
@@ -2538,6 +2563,16 @@ export default function GaragePage() {
                           <span className="block">⚠️ Over capacity! Charging slowed.</span>
                         )}
                       </div>
+                      {/* SMR Upgrade Button - Desktop sidebar */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-2 h-7 text-xs border-amber-500/30 text-amber-500 hover:bg-amber-500/10 hover:text-amber-400"
+                        onClick={() => setSmrDialogOpen(true)}
+                      >
+                        <Radiation className="h-3 w-3 mr-1" />
+                        Upgrade Grid
+                      </Button>
                     </div>
                   </div>
                 )}

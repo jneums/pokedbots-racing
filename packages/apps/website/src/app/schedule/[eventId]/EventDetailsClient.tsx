@@ -748,6 +748,7 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
       faction: getFactionString(profile?.faction),
       preferredTerrain: getTerrainString(profile?.preferredTerrain),
       stats: finalStats,
+      dnf: r.dnf === true, // Did Not Finish flag from backend
     };
   });
 

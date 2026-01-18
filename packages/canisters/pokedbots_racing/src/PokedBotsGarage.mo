@@ -1,5 +1,6 @@
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
+import Nat64 "mo:base/Nat64";
 import Text "mo:base/Text";
 import Char "mo:base/Char";
 import Float "mo:base/Float";
@@ -260,11 +261,31 @@ module {
   };
 
   /// Hash nat for deterministic randomness
+  /// Uses MurmurHash3-style bit mixing for better distribution
   public func hashNat(n : Nat) : Nat {
-    let a = n * 2654435761;
-    let b = a % 4294967296;
-    let c = (b * 1103515245 + 12345) % 2147483648;
-    c;
+    // Convert to Nat64 for bit operations
+    var h : Nat64 = Nat64.fromNat(n % 0x10000000000000000);
+
+    // MurmurHash3 finalizer (64-bit version)
+    h := Nat64.bitxor(h, h >> 33);
+    h := h *% 0xff51afd7ed558ccd;
+    h := Nat64.bitxor(h, h >> 33);
+    h := h *% 0xc4ceb9fe1a85ec53;
+    h := Nat64.bitxor(h, h >> 33);
+
+    Nat64.toNat(h);
+  };
+
+  /// Combine multiple values for RNG seeding using XOR and prime multipliers
+  /// This provides better entropy mixing than simple addition
+  public func combineForRNG(a : Nat, b : Nat, c : Nat) : Nat {
+    let a64 = Nat64.fromNat(a % 0x10000000000000000);
+    let b64 = Nat64.fromNat(b % 0x10000000000000000);
+    let c64 = Nat64.fromNat(c % 0x10000000000000000);
+    let mixed1 = a64 *% 31;
+    let mixed2 = b64 *% 7919;
+    let mixed3 = c64 *% 127773;
+    Nat64.toNat(Nat64.bitxor(Nat64.bitxor(mixed1, mixed2), mixed3));
   };
 
   // ===== POKEDBOTS GARAGE MANAGER =====
@@ -1690,6 +1711,11 @@ module {
     /// Expose hash function for RNG in main.mo
     public func hashForRNG(n : Nat) : Nat {
       hashNat(n);
+    };
+
+    /// Expose combineForRNG for better entropy mixing
+    public func combineRNG(a : Nat, b : Nat, c : Nat) : Nat {
+      combineForRNG(a, b, c);
     };
 
     // ===== BATTERY RECHARGE SYSTEM =====

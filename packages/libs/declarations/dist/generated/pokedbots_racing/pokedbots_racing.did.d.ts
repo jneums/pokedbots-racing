@@ -1281,6 +1281,7 @@ export type RaceEventType = {
   { 'LargeGap' : { 'gapSeconds' : number, 'leader' : string } } |
   { 'PoorPerformance' : { 'bot' : string, 'performancePct' : number } };
 export interface RaceResult {
+  'dnf' : boolean,
   'owner' : Principal,
   'prizeAmount' : bigint,
   'partType' : string,
