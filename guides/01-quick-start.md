@@ -41,7 +41,7 @@ At the start of every race, the system simulates the race based on all bots' sta
 ### Battery (Energy)
 Drains each race. Low battery = HUGE speed/accel penalties. At 50% battery you lose ~25% performance.
 - **Recharge:** 0.1 ICP, restores 50-90 battery (RNG-based), 6hr cooldown
-- **Overcharge bonus:** Recharging at low battery gives temporary boost for next race: +0.20% Speed/Accel per 1% overcharge (max +8% at 40% overcharge), but -0.133% Power Core/Stability per 1% overcharge (max -5.3%)
+- **Overcharge bonus:** Recharging at low battery gives temporary boost for next race: +0.25% Speed/Accel per 1% overcharge (max +10% at 40% overcharge), but -0.133% Power Core/Stability per 1% overcharge (max -5.3%)
 
 ### Condition (Health)
 Wears down each race. Low condition = reduced power core & stability stats (at 50% condition = -40% to those stats, at 0% condition = -90%).

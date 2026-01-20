@@ -34,13 +34,49 @@ import {
   batchCompleteScavenging,
   getDedicationInfo,
   getBatchDedicationInfo,
+  getBatteries,
+  getBotHeat,
+  joltBot,
+  repairBattery,
+  rebuildBattery,
+  salvageBattery,
+  toggleBattery,
+  getBatteryInfo,
+  purchaseSMR,
+  getUserSMRs,
+  // Repair Bay APIs
+  getUserRepairBays,
+  getRepairBayUpgradeCost,
+  purchaseRepairBaySlot,
+  upgradeRepairBay,
+  completeRepairBayUpgrade,
+  getRepairBayTiers,
   type UpgradeType,
   type PaymentMethod,
+  type SMRModelId,
+  type SMRPurchaseResult,
+  type InstalledSMR,
+  type UserSMRStorage,
   type ApiKeyMetadata,
   type UnregisteredNFT,
   type DedicationInfo,
   type BatchDedicationInfo,
   type GaragePowerStatus,
+  type BatteryInfo,
+  type BatteryStorageSummary,
+  type BotHeatStatus,
+  type BatteryTypeInfo,
+  type RepairBatteryResult,
+  type RebuildBatteryResult,
+  type ToggleBatteryResult,
+  // Repair Bay types
+  type UserRepairBayStorage,
+  type RepairBayInfo,
+  type RepairBayTierConfig,
+  type RepairBayUpgradeCost,
+  type PurchaseRepairBaySlotResult,
+  type UpgradeRepairBayResult,
+  type CompleteRepairBayUpgradeResult,
 } from '@pokedbots-racing/ic-js';
 import { useAuth } from './useAuth';
 
@@ -593,6 +629,50 @@ export function useGaragePowerStatus() {
 }
 
 /**
+ * Hook to purchase and install an SMR (Small Modular Reactor)
+ * Increases garage power capacity
+ */
+export function usePurchaseSMR() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (modelId: SMRModelId): Promise<SMRPurchaseResult> => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return purchaseSMR(modelId, user.agent);
+    },
+    onSuccess: () => {
+      // Invalidate power status and SMR list to reflect new capacity
+      queryClient.invalidateQueries({ queryKey: ['garage-power-status'] });
+      queryClient.invalidateQueries({ queryKey: ['user-smrs'] });
+    },
+  });
+}
+
+/**
+ * Hook to fetch user's installed SMRs with lifetime tracking
+ */
+export function useUserSMRs() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['user-smrs', user?.principal],
+    queryFn: async () => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return getUserSMRs(user.agent);
+    },
+    enabled: !!user?.agent,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 60 * 1000, // 1 minute
+    refetchInterval: 60 * 1000, // Auto-refetch every minute for lifetime updates
+  });
+}
+
+/**
  * Hook to fetch user's API keys
  */
 export function useMyApiKeys() {
@@ -809,3 +889,300 @@ export function useRespecBot() {
     },
   });
 }
+
+// ===== Battery Storage System Hooks =====
+
+/**
+ * Hook to fetch user's batteries and summary
+ */
+export function useBatteries() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['batteries', user?.principal],
+    queryFn: async () => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return getBatteries(user.agent as any);
+    },
+    enabled: !!user?.agent,
+    staleTime: 10000, // Consider data fresh for 10 seconds
+    refetchInterval: 15000, // Auto-refresh every 15 seconds to show charging progress
+  });
+}
+
+/**
+ * Hook to fetch heat status for a specific bot
+ */
+export function useBotHeat(tokenIndex: number | undefined) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['bot-heat', tokenIndex, user?.principal],
+    queryFn: async () => {
+      if (!user?.agent || tokenIndex === undefined) {
+        throw new Error('Not authenticated or no token index');
+      }
+      return getBotHeat(BigInt(tokenIndex), user.agent as any);
+    },
+    enabled: !!user?.agent && tokenIndex !== undefined,
+    staleTime: 10000, // Heat data can change frequently
+    refetchInterval: 60000, // Refetch every minute for cooldown timers
+  });
+}
+
+/**
+ * Hook to jolt a bot using a battery
+ */
+export function useJoltBot() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ batteryId, tokenIndex }: { batteryId: bigint; tokenIndex: number }) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return joltBot(batteryId, BigInt(tokenIndex), user.agent as any);
+    },
+    onSuccess: (_, { tokenIndex }) => {
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['batteries'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['bot-heat', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex], refetchType: 'all' });
+    },
+  });
+}
+
+/**
+ * Hook to repair a battery's health
+ */
+export function useRepairBattery() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (batteryId: bigint) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return repairBattery(batteryId, user.agent as any);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batteries'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'], refetchType: 'all' });
+    },
+  });
+}
+
+/**
+ * Hook to rebuild a battery's core
+ */
+export function useRebuildBattery() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ batteryId, useIcp }: { batteryId: bigint; useIcp: boolean }) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return rebuildBattery(batteryId, useIcp, user.agent as any);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batteries'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'], refetchType: 'all' });
+    },
+  });
+}
+
+/**
+ * Hook to salvage a battery for parts
+ */
+export function useSalvageBattery() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (batteryId: bigint) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return salvageBattery(batteryId, user.agent as any);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batteries'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'], refetchType: 'all' });
+    },
+  });
+}
+
+/**
+ * Hook to toggle battery charging on/off
+ */
+export function useToggleBattery() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (batteryId: bigint) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return toggleBattery(batteryId, user.agent as any);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batteries'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['garage-power-status'], refetchType: 'all' });
+    },
+  });
+}
+
+/**
+ * Hook to fetch static battery type info (costs, capacities)
+ */
+export function useBatteryInfo() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['battery-info'],
+    queryFn: async () => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return getBatteryInfo(user.agent as any);
+    },
+    enabled: !!user?.agent,
+    staleTime: Infinity, // Static data, never goes stale
+  });
+}
+
+// ===============================
+// REPAIR BAY HOOKS
+// ===============================
+
+/**
+ * Hook to fetch user's repair bays with current status
+ */
+export function useUserRepairBays() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['user-repair-bays', user?.principal],
+    queryFn: async () => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return getUserRepairBays(user.agent);
+    },
+    enabled: !!user?.agent,
+    staleTime: 10 * 1000, // 10 seconds - refresh often when managing bays
+    gcTime: 60 * 1000, // 1 minute
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+  });
+}
+
+/**
+ * Hook to fetch repair bay tier configurations
+ */
+export function useRepairBayTiers() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['repair-bay-tiers'],
+    queryFn: async () => {
+      return getRepairBayTiers(user?.agent);
+    },
+    enabled: !!user?.agent,
+    staleTime: Infinity, // Static data, never changes
+  });
+}
+
+/**
+ * Hook to fetch upgrade cost for a specific bay
+ */
+export function useRepairBayUpgradeCost(bayId: number | null) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['repair-bay-upgrade-cost', bayId, user?.principal],
+    queryFn: async () => {
+      if (!user?.agent || bayId === null) {
+        throw new Error('Not authenticated or no bay selected');
+      }
+      return getRepairBayUpgradeCost(bayId, user.agent);
+    },
+    enabled: !!user?.agent && bayId !== null,
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+/**
+ * Hook to purchase a new repair bay slot
+ */
+export function usePurchaseRepairBaySlot() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (): Promise<PurchaseRepairBaySlotResult> => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return purchaseRepairBaySlot(user.agent);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-repair-bays'] });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-power-status'] });
+    },
+  });
+}
+
+/**
+ * Hook to start upgrading a repair bay
+ */
+export function useUpgradeRepairBay() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (bayId: number): Promise<UpgradeRepairBayResult> => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return upgradeRepairBay(bayId, user.agent);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-repair-bays'] });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-power-status'] });
+    },
+  });
+}
+
+/**
+ * Hook to complete a repair bay upgrade
+ */
+export function useCompleteRepairBayUpgrade() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (bayId: number): Promise<CompleteRepairBayUpgradeResult> => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return completeRepairBayUpgrade(bayId, user.agent);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-repair-bays'] });
+      queryClient.invalidateQueries({ queryKey: ['garage-power-status'] });
+    },
+  });
+}
+
+// Re-export types for convenience
+export type { BatteryInfo, BatteryStorageSummary, BotHeatStatus, BatteryTypeInfo, RepairBatteryResult, RebuildBatteryResult, ToggleBatteryResult };

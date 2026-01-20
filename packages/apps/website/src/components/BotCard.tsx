@@ -755,8 +755,8 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 <div className="text-xs space-y-0.5">
                   <p className="font-semibold text-yellow-700 dark:text-yellow-400">🎯 Jackpot! Next race boost:</p>
                   <div className="flex justify-between">
-                    <span className="text-green-600 font-semibold">+{(overcharge * 0.20).toFixed(1)}% Speed</span>
-                    <span className="text-green-600 font-semibold">+{(overcharge * 0.20).toFixed(1)}% Accel</span>
+                    <span className="text-green-600 font-semibold">+{(overcharge * 0.30).toFixed(1)}% Speed</span>
+                    <span className="text-green-600 font-semibold">+{(overcharge * 0.30).toFixed(1)}% Accel</span>
                   </div>
                   <p className="text-xs text-muted-foreground italic">No penalties! Perfect timing on repair.</p>
                 </div>
@@ -764,7 +764,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 <div className="text-xs space-y-0.5">
                   <p className="text-muted-foreground">Next race boost:</p>
                   <div className="flex justify-between">
-                    <span className="text-green-600">+{(overcharge * 0.20).toFixed(1)}% Speed/Accel</span>
+                    <span className="text-green-600">+{(overcharge * 0.30).toFixed(1)}% Speed/Accel</span>
                     <span className="text-red-600">-{(overcharge * 0.133).toFixed(1)}% Power/Stab</span>
                   </div>
                 </div>
@@ -2046,13 +2046,13 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Battery per Hour:</span>
                       <span className={scavengingZone === 'DeadMachineFields' ? 'text-red-600 font-semibold' : ''}>
-                        ~{scavengingZone === 'ScrapHeaps' ? '20' : scavengingZone === 'AbandonedSettlements' ? '40' : '70'}
+                        ~{scavengingZone === 'ScrapHeaps' ? '30' : scavengingZone === 'AbandonedSettlements' ? '60' : '105'}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Condition per Hour:</span>
                       <span className={scavengingZone === 'DeadMachineFields' ? 'text-red-600 font-semibold' : ''}>
-                        ~{scavengingZone === 'ScrapHeaps' ? '22' : scavengingZone === 'AbandonedSettlements' ? '44' : '77'}
+                        ~{scavengingZone === 'ScrapHeaps' ? '12' : scavengingZone === 'AbandonedSettlements' ? '24' : '42'}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -2070,15 +2070,38 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Battery per Hour:</span>
-                      <span>~40</span>
+                      <span className="font-semibold text-cyan-600">0 (No drain!)</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Condition per Hour:</span>
-                      <span className="font-semibold text-green-600">+12-18 (Restored!)</span>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Condition per Hour:</span>
+                        <span className="font-semibold text-green-600">Based on Bay Tier</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground pl-4 space-y-0.5">
+                        <div className="flex justify-between">
+                          <span>T1 Salvage Arm:</span>
+                          <span className="text-green-500 font-medium">+6/hr</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>T4 Parts Handler:</span>
+                          <span className="text-green-500 font-medium">+12/hr</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>T8 Plasma Cutter:</span>
+                          <span className="text-green-500 font-medium">+26/hr</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>T16 Foundry Core:</span>
+                          <span className="text-green-500 font-medium">+120/hr</span>
+                        </div>
+                      </div>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Cooldown:</span>
                       <span className="font-medium text-primary">Bypasses repair cooldown</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                      🔧 <strong>Repair Bay Required:</strong> Bot will be assigned to your next available bay. Manage bays in the sidebar to upgrade repair rates!
                     </div>
                   </>
                 ) : (
@@ -2095,19 +2118,19 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                       <div className="text-xs text-muted-foreground pl-4 space-y-0.5">
                         <div className="flex justify-between">
                           <span>0-24% battery:</span>
-                          <span className="text-red-500 font-medium">~0.25/hr (1x - SLOW!)</span>
+                          <span className="text-red-500 font-medium">~3/hr (1x - SLOW!)</span>
                         </div>
                         <div className="flex justify-between">
                           <span>25-49% battery:</span>
-                          <span className="text-orange-500 font-medium">~0.5/hr (2x)</span>
+                          <span className="text-orange-500 font-medium">~6/hr (2x)</span>
                         </div>
                         <div className="flex justify-between">
                           <span>50-74% battery:</span>
-                          <span className="text-yellow-500 font-medium">~0.75/hr (3x)</span>
+                          <span className="text-yellow-500 font-medium">~9/hr (3x)</span>
                         </div>
                         <div className="flex justify-between">
                           <span>75-100% battery:</span>
-                          <span className="text-green-500 font-medium">~1/hr (4x - FAST!)</span>
+                          <span className="text-green-500 font-medium">~12/hr (4x - FAST!)</span>
                         </div>
                       </div>
                     </div>
@@ -2155,7 +2178,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           <DialogHeader>
             <DialogTitle>Upgrade {bot.name || `Bot #${bot.tokenIndex}`}</DialogTitle>
             <DialogDescription>
-              Upgrade a stat to improve racing performance. Upgrades take 12 hours to complete.
+              Upgrade a stat to improve racing performance. Upgrades complete instantly with RNG-based success.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">

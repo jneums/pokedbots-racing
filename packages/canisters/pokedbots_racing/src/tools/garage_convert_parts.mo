@@ -13,11 +13,11 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_convert_parts";
     title = ?"Convert Parts";
-    description = ?"Convert parts from one type to another with a 25% conversion cost (you receive 75% of input amount).\n\n**Conversion Rules:**\n• Cannot convert Universal Parts (they already work for any upgrade)\n• Cannot convert to the same type\n• 25% conversion cost: converting 100 parts yields 75 parts of the target type\n• Minimum conversion: 2 parts input → 1 part output\n\n**Part Types:**\n• SpeedChip → For Speed upgrades\n• PowerCoreFragment → For Power Core upgrades\n• ThrusterKit → For Acceleration upgrades\n• GyroModule → For Stability upgrades\n• UniversalPart → Works for any upgrade (cannot convert from this)\n\n**Strategy:**\n• Use conversion when you have excess parts of one type and need another\n• Universal Parts are more valuable - save them rather than converting to them\n• Consider scavenging in zone-specific areas if you need lots of one part type";
+    description = ?"Convert parts from one specialized type to another.\n\n**Conversion Rules:**\n• Cannot convert FROM Universal Parts (they already work for any upgrade)\n• Cannot convert TO Universal Parts (use garage_combine_parts instead)\n• Cannot convert to the same type\n• Converting between specialized types: 25% cost (receive 75% of input)\n\n**Part Types:**\n• SpeedChip → For Speed upgrades\n• PowerCoreFragment → For Power Core upgrades\n• ThrusterKit → For Acceleration upgrades\n• GyroModule → For Stability upgrades\n\n**To create Universal Parts:**\nUse the garage_combine_parts tool instead. It takes 1 of each part type (SPD + PWR + ACC + STB) to create 1 Universal Part.\n\n**Strategy:**\n• Use conversion when you have excess parts of one type and need another\n• Use combine to create Universal parts when you have balanced part inventory";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("from_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("SpeedChip"), Json.str("PowerCoreFragment"), Json.str("ThrusterKit"), Json.str("GyroModule")])), ("description", Json.str("Part type to convert FROM (cannot be UniversalPart)"))])), ("to_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("SpeedChip"), Json.str("PowerCoreFragment"), Json.str("ThrusterKit"), Json.str("GyroModule"), Json.str("UniversalPart")])), ("description", Json.str("Part type to convert TO"))])), ("amount", Json.obj([("type", Json.str("number")), ("description", Json.str("Amount of parts to convert (you will receive 75% of this amount in the target type)"))]))])),
+      ("properties", Json.obj([("from_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("SpeedChip"), Json.str("PowerCoreFragment"), Json.str("ThrusterKit"), Json.str("GyroModule")])), ("description", Json.str("Part type to convert FROM (cannot be UniversalPart)"))])), ("to_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("SpeedChip"), Json.str("PowerCoreFragment"), Json.str("ThrusterKit"), Json.str("GyroModule")])), ("description", Json.str("Part type to convert TO (75% efficiency)"))])), ("amount", Json.obj([("type", Json.str("number")), ("description", Json.str("Amount of parts to convert"))]))])),
       ("required", Json.arr([Json.str("from_type"), Json.str("to_type"), Json.str("amount")])),
     ]);
     outputSchema = null;
@@ -75,9 +75,8 @@ module {
         case ("PowerCoreFragment") { #PowerCoreFragment };
         case ("ThrusterKit") { #ThrusterKit };
         case ("GyroModule") { #GyroModule };
-        case ("UniversalPart") { #UniversalPart };
         case (_) {
-          return ToolContext.makeError("Invalid to_type. Must be SpeedChip, PowerCoreFragment, ThrusterKit, GyroModule, or UniversalPart", cb);
+          return ToolContext.makeError("Invalid to_type. Must be SpeedChip, PowerCoreFragment, ThrusterKit, or GyroModule. To create Universal Parts, use garage_combine_parts instead.", cb);
         };
       };
 

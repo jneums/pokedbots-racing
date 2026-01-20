@@ -135,8 +135,9 @@ module {
             let resonance = ResonanceSystem.calculateResonance(tokenIndex, #Repair, racingStats.condition, now);
 
             // Perfect Tune-Up requires: having overcharge AND being in resonance zone
+            // Weak zone (70% ±2%) is a fallback for players who miss their optimal window
             let hasOvercharge = racingStats.overcharge > 0;
-            let perfectTuneUp = hasOvercharge and (resonance.inPeakZone or resonance.inGoodZone);
+            let perfectTuneUp = hasOvercharge and (resonance.inPeakZone or resonance.inGoodZone or resonance.inWeakZone);
 
             // Calculate tune-up quality (affects how much penalty is removed)
             // Peak: 100% penalty removal, Good: 70% penalty removal
@@ -168,10 +169,12 @@ module {
             // Build message based on resonance outcome
             let message = if (perfectTuneUp and resonance.inPeakZone) {
               "🔧✨🔮 PEAK RESONANCE Perfect Tune-Up! Condition at " # Nat.toText(newCondition) # "% - ALL overcharge penalties removed! Your bot keeps the " # Nat.toText(racingStats.overcharge) # "% Speed/Accel boost without any Stability/PowerCore penalties!";
-            } else if (perfectTuneUp) {
+            } else if (perfectTuneUp and resonance.inGoodZone) {
               "🔧✨ Good Resonance Tune-Up! Condition at " # Nat.toText(newCondition) # "% - 70% of overcharge penalties removed! Speed/Accel boost preserved with reduced Stability/PowerCore penalties.";
+            } else if (perfectTuneUp and resonance.inWeakZone) {
+              "🔧🔧 Weak Resonance Tune-Up! Condition at " # Nat.toText(newCondition) # "% - 30% of overcharge penalties removed via 70% fallback zone. Speed/Accel boost preserved with most penalties remaining.";
             } else if (hasOvercharge) {
-              "🔧 Repairs complete. Condition at " # Nat.toText(newCondition) # "%. ⚠️ Outside resonance window - overcharge reset. (Optimal repair point: " # Nat.toText(resonance.optimalPoint) # "% condition)";
+              "🔧 Repairs complete. Condition at " # Nat.toText(newCondition) # "%. ⚠️ Outside resonance window - overcharge penalties remain active. (Optimal repair point: " # Nat.toText(resonance.optimalPoint) # "% condition, or 70% for weak zone fallback)";
             } else {
               "🔧 Repairs complete. Condition at " # Nat.toText(newCondition) # "%";
             };

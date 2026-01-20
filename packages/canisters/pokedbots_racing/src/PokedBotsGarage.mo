@@ -237,15 +237,408 @@ module {
 
   public type GaragePowerSettings = {
     basePowerWatts : Nat; // Base power capacity (can be upgraded later)
-    // Future: generatorLevel, batteryStorage, solarPanels, etc.
+    smrCapacityWatts : Nat; // Additional capacity from installed SMRs
   };
 
   public type GaragePowerStatus = {
-    totalCapacityWatts : Nat; // Total power available
+    totalCapacityWatts : Nat; // Total power available (base + SMR)
     currentDrawWatts : Nat; // Power being consumed by bots in ChargingStation
     botsCharging : Nat; // Number of bots drawing power
     efficiency : Float; // Effective charging rate (1.0 = full speed, 0.5 = half speed)
     wattsPerBot : Nat; // Current watts allocated per charging bot
+    // Battery charging info
+    surplusWatts : Nat; // Power available for batteries (capacity - bot draw)
+    batteriesCharging : Nat; // Number of operational batteries
+    batteryDrawWatts : Nat; // Total battery draw rate (may exceed surplus)
+    effectiveBatteryDrawWatts : Nat; // Actual draw (min of surplus and battery draw)
+    // Repair bay info
+    repairBayDrawWatts : Nat; // Power draw from active repair bays
+    activeRepairBays : Nat; // Number of bays with bots being repaired
+  };
+
+  // ===== SMR (Small Modular Reactor) SYSTEM =====
+  // Garages can purchase SMRs to permanently increase power capacity.
+  // SMRs are purchased with ICP and add watts to the garage's power grid.
+
+  /// SMR model types - purchased with ICP, adds permanent power capacity
+  public type SMRModel = {
+    #WR250; // +250 MW, 5 ICP - Scrapyard Special
+    #WR500; // +500 MW, 8 ICP - Rust Belt Reactor
+    #WR880; // +880 MW, 12 ICP - Deadzone Dynamo
+    #WR1210; // +1210 MW, 15 ICP - Flux Capacitor Elite (1.21 GW!)
+  };
+
+  /// Get power output for an SMR model (in watts)
+  public func getSMRPowerOutput(model : SMRModel) : Nat {
+    switch (model) {
+      case (#WR250) { 250 };
+      case (#WR500) { 500 };
+      case (#WR880) { 880 };
+      case (#WR1210) { 1210 };
+    };
+  };
+
+  /// Get ICP cost for an SMR model (in e8s)
+  public func getSMRIcpCost(model : SMRModel) : Nat {
+    switch (model) {
+      case (#WR250) { 500_000_000 }; // 5 ICP
+      case (#WR500) { 800_000_000 }; // 8 ICP
+      case (#WR880) { 1_200_000_000 }; // 12 ICP
+      case (#WR1210) { 1_500_000_000 }; // 15 ICP
+    };
+  };
+
+  /// Get SMR model name for display
+  public func getSMRModelName(model : SMRModel) : Text {
+    switch (model) {
+      case (#WR250) { "WR-250 Scrapyard Special" };
+      case (#WR500) { "WR-500 Rust Belt Reactor" };
+      case (#WR880) { "WR-880 Deadzone Dynamo" };
+      case (#WR1210) { "WR-1210 Flux Capacitor Elite" };
+    };
+  };
+
+  /// Get SMR lifetime capacity in MWh (megawatt-hours)
+  /// Based on ~1 month of continuous operation at full capacity
+  /// Lifetime = powerOutput * 720 hours / 1000 (convert W to MW, hours to MWh)
+  public func getSMRLifetimeMwh(model : SMRModel) : Nat {
+    switch (model) {
+      case (#WR250) { 20 }; // 20 MWh
+      case (#WR500) { 80 }; // 80 MWh
+      case (#WR880) { 160 }; // 160 MWh
+      case (#WR1210) { 300 }; // 300 MWh
+    };
+  };
+
+  /// An installed SMR reactor with lifetime tracking
+  public type InstalledSMR = {
+    model : SMRModel;
+    installedAt : Int; // Time.now() when installed
+    powerOutput : Nat; // Power in watts
+    totalMwhGenerated : Float; // Total MWh generated since installation (for lifetime tracking)
+    lastUpdateTime : Int; // Last time usage was accumulated
+  };
+
+  /// Legacy SMR type for migration (without lifetime tracking)
+  public type InstalledSMRLegacy = {
+    model : SMRModel;
+    installedAt : Int;
+    powerOutput : Nat;
+  };
+
+  /// User's SMR storage - tracks all installed reactors
+  public type UserSMRStorage = {
+    owner : Principal;
+    installedSMRs : [InstalledSMR];
+    totalPowerOutput : Nat; // Sum of all installed SMR power outputs
+  };
+
+  // ===== REPAIR BAY INFRASTRUCTURE SYSTEM =====
+  // Garages can own up to 5 repair bays, each progressing through 16 tiers.
+  // Higher tier bays repair bots faster but draw more power from the grid.
+  // Bays are purchased with parts + ICP and upgraded over time.
+
+  /// Repair bay tier (1-16)
+  public type RepairBayTier = Nat;
+
+  /// Repair bay tier configuration
+  public type RepairBayTierConfig = {
+    tier : Nat;
+    name : Text;
+    repairRatePerHour : Nat; // Condition restored per hour
+    powerDrawWatts : Nat; // Power draw when active
+    partsCost : Nat; // Parts to upgrade TO this tier
+    icpCostE8s : Nat; // ICP (in e8s) to upgrade TO this tier
+    buildTimeNanos : Int; // Build time in nanoseconds
+  };
+
+  /// Tier configuration constants
+  /// Power formula: 25W base + 15W × tier
+  public let REPAIR_BAY_TIERS : [RepairBayTierConfig] = [
+    {
+      tier = 1;
+      name = "Salvage Arm";
+      repairRatePerHour = 6;
+      powerDrawWatts = 40;
+      partsCost = 0;
+      icpCostE8s = 0;
+      buildTimeNanos = 0;
+    },
+    {
+      tier = 2;
+      name = "Scrap Crane";
+      repairRatePerHour = 8;
+      powerDrawWatts = 55;
+      partsCost = 500;
+      icpCostE8s = 0;
+      buildTimeNanos = 3_600_000_000_000;
+    },
+    {
+      tier = 3;
+      name = "Junk Lifter";
+      repairRatePerHour = 10;
+      powerDrawWatts = 70;
+      partsCost = 750;
+      icpCostE8s = 0;
+      buildTimeNanos = 3_600_000_000_000;
+    },
+    {
+      tier = 4;
+      name = "Parts Handler";
+      repairRatePerHour = 12;
+      powerDrawWatts = 85;
+      partsCost = 1000;
+      icpCostE8s = 0;
+      buildTimeNanos = 3_600_000_000_000;
+    },
+    {
+      tier = 5;
+      name = "Torch Station";
+      repairRatePerHour = 15;
+      powerDrawWatts = 100;
+      partsCost = 1250;
+      icpCostE8s = 50_000_000;
+      buildTimeNanos = 7_200_000_000_000;
+    },
+    {
+      tier = 6;
+      name = "Welding Bench";
+      repairRatePerHour = 18;
+      powerDrawWatts = 115;
+      partsCost = 1500;
+      icpCostE8s = 100_000_000;
+      buildTimeNanos = 7_200_000_000_000;
+    },
+    {
+      tier = 7;
+      name = "Fusion Welder";
+      repairRatePerHour = 22;
+      powerDrawWatts = 130;
+      partsCost = 2000;
+      icpCostE8s = 200_000_000;
+      buildTimeNanos = 7_200_000_000_000;
+    },
+    {
+      tier = 8;
+      name = "Plasma Cutter";
+      repairRatePerHour = 26;
+      powerDrawWatts = 145;
+      partsCost = 2500;
+      icpCostE8s = 300_000_000;
+      buildTimeNanos = 14_400_000_000_000;
+    },
+    {
+      tier = 9;
+      name = "Gantry Rig";
+      repairRatePerHour = 32;
+      powerDrawWatts = 160;
+      partsCost = 3500;
+      icpCostE8s = 500_000_000;
+      buildTimeNanos = 14_400_000_000_000;
+    },
+    {
+      tier = 10;
+      name = "Tech Station";
+      repairRatePerHour = 38;
+      powerDrawWatts = 175;
+      partsCost = 5000;
+      icpCostE8s = 800_000_000;
+      buildTimeNanos = 14_400_000_000_000;
+    },
+    {
+      tier = 11;
+      name = "Diagnostic Bay";
+      repairRatePerHour = 45;
+      powerDrawWatts = 190;
+      partsCost = 7000;
+      icpCostE8s = 1_200_000_000;
+      buildTimeNanos = 28_800_000_000_000;
+    },
+    {
+      tier = 12;
+      name = "Cyber Workshop";
+      repairRatePerHour = 54;
+      powerDrawWatts = 205;
+      partsCost = 9000;
+      icpCostE8s = 1_800_000_000;
+      buildTimeNanos = 28_800_000_000_000;
+    },
+    {
+      tier = 13;
+      name = "Factory Arm";
+      repairRatePerHour = 65;
+      powerDrawWatts = 220;
+      partsCost = 12000;
+      icpCostE8s = 2_500_000_000;
+      buildTimeNanos = 43_200_000_000_000;
+    },
+    {
+      tier = 14;
+      name = "Assembly Line";
+      repairRatePerHour = 78;
+      powerDrawWatts = 235;
+      partsCost = 16000;
+      icpCostE8s = 3_500_000_000;
+      buildTimeNanos = 43_200_000_000_000;
+    },
+    {
+      tier = 15;
+      name = "Forge Station";
+      repairRatePerHour = 95;
+      powerDrawWatts = 250;
+      partsCost = 22000;
+      icpCostE8s = 5_000_000_000;
+      buildTimeNanos = 86_400_000_000_000;
+    },
+    {
+      tier = 16;
+      name = "Foundry Core";
+      repairRatePerHour = 120;
+      powerDrawWatts = 265;
+      partsCost = 30000;
+      icpCostE8s = 6_500_000_000;
+      buildTimeNanos = 86_400_000_000_000;
+    },
+  ];
+
+  /// Cost to purchase additional bay slots (slot number, parts, ICP e8s)
+  /// Curve: ~2.5x multiplier per slot (1k → 2.5k → 6k → 15k)
+  public let REPAIR_BAY_SLOT_COSTS : [(Nat, Nat, Nat)] = [
+    (1, 0, 0), // Free (default bay)
+    (2, 1000, 100_000_000), // 1 ICP (~3 days at 300 parts/day)
+    (3, 2500, 300_000_000), // 3 ICP (~8 days)
+    (4, 6000, 800_000_000), // 8 ICP (~20 days)
+    (5, 15000, 2_000_000_000), // 20 ICP (~50 days)
+  ];
+
+  /// Maximum number of repair bays per garage
+  public let MAX_REPAIR_BAYS : Nat = 5;
+
+  /// Fallback repair rate when no bay available (cond/hr)
+  public let FALLBACK_REPAIR_RATE : Nat = 6;
+
+  /// Get tier config by tier number (1-indexed)
+  public func getRepairBayTierConfig(tier : Nat) : ?RepairBayTierConfig {
+    if (tier < 1 or tier > 16) { return null };
+    ?REPAIR_BAY_TIERS[tier - 1];
+  };
+
+  /// Get power draw for a repair bay tier (watts)
+  /// Formula: 25W base + 15W × tier
+  public func getRepairBayPowerDraw(tier : Nat) : Nat {
+    25 + (15 * tier);
+  };
+
+  /// Get slot cost by slot number (1-5)
+  public func getRepairBaySlotCost(slot : Nat) : ?(Nat, Nat) {
+    for ((s, parts, icp) in REPAIR_BAY_SLOT_COSTS.vals()) {
+      if (s == slot) { return ?(parts, icp) };
+    };
+    null;
+  };
+
+  /// A single repair bay in the garage
+  public type RepairBay = {
+    bayId : Nat; // 1-5 (bay slot number)
+    tier : RepairBayTier; // 1-16
+    currentBotToken : ?Nat; // Bot being repaired (null = empty)
+    repairStartTime : ?Int; // When current repair started
+    repairStartCondition : ?Nat; // Bot's condition when repair started
+    upgradeInProgress : ?{
+      targetTier : RepairBayTier;
+      startTime : Int;
+      completionTime : Int;
+    };
+  };
+
+  /// User's repair bay infrastructure
+  public type UserRepairBayStorage = {
+    owner : Principal;
+    bays : [RepairBay]; // 1-5 bays owned
+    totalPartsInvested : Nat; // For stats/tracking
+    totalIcpInvested : Nat; // In e8s
+  };
+
+  /// Create default repair bay storage for a new user (1 free Tier 1 bay)
+  public func defaultRepairBayStorage(owner : Principal) : UserRepairBayStorage {
+    {
+      owner = owner;
+      bays = [{
+        bayId = 1;
+        tier = 1;
+        currentBotToken = null;
+        repairStartTime = null;
+        repairStartCondition = null;
+        upgradeInProgress = null;
+      }];
+      totalPartsInvested = 0;
+      totalIcpInvested = 0;
+    };
+  };
+
+  // ===== BATTERY STORAGE SYSTEM =====
+  // Garages can store salvaged batteries found while scavenging.
+  // Batteries accumulate charge from surplus grid power and deliver "jolts" to bots.
+  // Batteries have health (degrades from jolts) and cycles (affects repair efficiency & max capacity).
+
+  /// Battery types - found while scavenging, never purchased directly
+  public type BatteryType = {
+    #ScrapCell; // 50 kWh capacity, 25W draw
+    #SalvagePack; // 150 kWh capacity, 50W draw
+    #IndustrialBank; // 400 kWh capacity, 100W draw
+    #PlasmaVault; // 1000 kWh capacity, 200W draw
+  };
+
+  /// Battery health tier (derived from healthPercent, for display)
+  public type BatteryHealthTier = {
+    #Fresh; // 100% - fully operational
+    #Worn; // 99-66% - reduced efficiency
+    #Depleted; // 65-33% - poor efficiency, failure chance
+    #Critical; // 32-1% - barely functional
+    #Dead; // 0% - non-functional, must repair to 100%
+  };
+
+  /// A salvaged battery stored in the garage
+  public type Battery = {
+    id : Nat; // Unique battery ID
+    batteryType : BatteryType; // Determines capacity and draw rate
+    healthPercent : Nat; // 0-100 (must be 100 to operate, then degrades with use)
+    storedKwh : Float; // Current charge (capped by getCurrentMaxCapacity)
+    kwhThroughput : Float; // Total kWh jolted since last rebuild (for core wear/cycles)
+    lastChargeUpdate : Int; // Timestamp for passive accumulation + self-discharge
+    discoveredAt : Int; // When the battery was found
+    totalJoltsDelivered : Nat; // Lifetime jolt count (for stats)
+    isEnabled : Bool; // Whether the battery is enabled for charging (can be toggled by user)
+  };
+
+  /// Heat status for a bot - tracks jolt cooldown
+  /// NOTE: Heat is tracked on BOTS, not batteries. A bot can only receive so many jolts.
+  public type BotHeatStatus = {
+    heatStacks : Nat; // 0-4 (at 4 = overheated)
+    lastJoltTime : Int; // When last jolted (for decay calculation)
+    overheatUntil : ?Int; // If overheated, when can jolt again (null = not overheated)
+  };
+
+  /// User's battery storage in their garage
+  public type GarageBatteryStorage = {
+    owner : Principal;
+    batteries : [Battery];
+    firstBatteryDiscovered : Bool; // Has found their first battery (for guaranteed drop)
+    totalBatteriesFound : Nat; // Lifetime discovery count
+    cumulativeScavengingHours : Float; // For guaranteed first battery after 20 hours
+  };
+
+  /// Result of a jolt operation
+  public type JoltResult = {
+    success : Bool;
+    energyDelivered : Float; // Percentage of bot battery restored
+    energyConsumed : Float; // kWh used from battery (always 20.0)
+    newBotBattery : Nat; // Bot's new battery level (0-100)
+    newBatteryCharge : Float; // Battery's remaining stored kWh
+    newBatteryHealth : Nat; // Battery's new health % (decreases from jolt damage)
+    newHeatStacks : Nat; // Bot's new heat stack count (0-4)
+    overheated : Bool; // True if bot is now in overheat lockout
+    message : Text;
   };
 
   // Import stat derivation functions from Racing module (we'll keep these here)
@@ -288,6 +681,279 @@ module {
     Nat64.toNat(Nat64.bitxor(Nat64.bitxor(mixed1, mixed2), mixed3));
   };
 
+  // ===== BATTERY SYSTEM HELPER FUNCTIONS =====
+
+  /// Get BASE battery capacity in kWh (before cycle degradation)
+  /// This is the actual storage capacity for charging/jolting
+  public func getBaseBatteryCapacity(batteryType : BatteryType) : Float {
+    switch (batteryType) {
+      case (#ScrapCell) { 15.0 }; // ~6 days at 100W
+      case (#SalvagePack) { 45.0 }; // ~9 days at 200W
+      case (#IndustrialBank) { 120.0 }; // ~12 days at 400W
+      case (#PlasmaVault) { 300.0 }; // ~16 days at 800W
+    };
+  };
+
+  /// Get battery passive draw rate in watts
+  /// These rates determine how fast batteries charge from surplus grid power
+  /// Battery draw rates in watts - batteries passively charge from grid surplus
+  public func getBatteryDrawRate(batteryType : BatteryType) : Nat {
+    switch (batteryType) {
+      case (#ScrapCell) { 250 }; // 250W draw (~2.5 days to full)
+      case (#SalvagePack) { 500 }; // 500W draw (~3.75 days to full)
+      case (#IndustrialBank) { 1000 }; // 1000W draw (~5 days to full)
+      case (#PlasmaVault) { 2000 }; // 2000W draw (~6.25 days to full)
+    };
+  };
+
+  /// Get human-readable battery type name
+  public func batteryTypeName(batteryType : BatteryType) : Text {
+    switch (batteryType) {
+      case (#ScrapCell) { "Scrap Cell" };
+      case (#SalvagePack) { "Salvage Pack" };
+      case (#IndustrialBank) { "Industrial Bank" };
+      case (#PlasmaVault) { "Plasma Vault" };
+    };
+  };
+
+  /// Get jolt cost in kWh (fixed cost regardless of battery tier)
+  /// All batteries use the same energy per jolt, bigger batteries just hold more jolts
+  public func getJoltCost(batteryType : BatteryType) : Float {
+    // Fixed 1.5 kWh per jolt for all battery types
+    ignore batteryType;
+    1.5;
+  };
+
+  /// Calculate jolt effectiveness (% battery boost)
+  /// Fixed range: 20-30% per jolt regardless of battery tier
+  public func getJoltEffectivenessRange(kwhConsumed : Float) : (Float, Float) {
+    // Fixed 20-30% boost per jolt (kwhConsumed is ignored for now)
+    ignore kwhConsumed;
+    (20.0, 30.0);
+  };
+
+  /// Calculate cycles from throughput and battery type
+  /// Cycles = kWh discharged / base capacity
+  public func calculateBatteryCycles(kwhThroughput : Float, batteryType : BatteryType) : Float {
+    let capacity = getBaseBatteryCapacity(batteryType);
+    kwhThroughput / capacity;
+  };
+
+  /// Get max capacity multiplier based on cycles (cycle degradation)
+  /// Higher cycles = lower max capacity
+  public func getBatteryCapacityMultiplier(kwhThroughput : Float, batteryType : BatteryType) : Float {
+    let cycles = calculateBatteryCycles(kwhThroughput, batteryType);
+
+    if (cycles < 10.0) { return 1.0 }; // 100% capacity
+    if (cycles < 30.0) { return 0.9 }; // 90% capacity
+    if (cycles < 60.0) { return 0.75 }; // 75% capacity
+    if (cycles < 120.0) { return 0.5 }; // 50% capacity
+    return 0.25; // 120+ cycles - 25% capacity
+  };
+
+  /// Get CURRENT max capacity (affected by cycles)
+  public func getCurrentBatteryMaxCapacity(battery : Battery) : Float {
+    let baseCapacity = getBaseBatteryCapacity(battery.batteryType);
+    let multiplier = getBatteryCapacityMultiplier(battery.kwhThroughput, battery.batteryType);
+    baseCapacity * multiplier;
+  };
+
+  /// Get repair efficiency based on cycles
+  /// Higher cycles = less effective repairs
+  public func getBatteryRepairEfficiency(kwhThroughput : Float, batteryType : BatteryType) : Float {
+    let cycles = calculateBatteryCycles(kwhThroughput, batteryType);
+
+    if (cycles < 10.0) { return 1.0 }; // 100% - full +25% per repair
+    if (cycles < 30.0) { return 0.8 }; // 80% - +20% per repair
+    if (cycles < 60.0) { return 0.6 }; // 60% - +15% per repair
+    if (cycles < 120.0) { return 0.4 }; // 40% - +10% per repair
+    return 0.2; // 120+ cycles - +5% per repair
+  };
+
+  /// Calculate effective repair amount based on core wear
+  public func getEffectiveBatteryRepair(baseRepair : Nat, kwhThroughput : Float, batteryType : BatteryType) : Nat {
+    let efficiency = getBatteryRepairEfficiency(kwhThroughput, batteryType);
+    Int.abs(Float.toInt(Float.fromInt(baseRepair) * efficiency));
+  };
+
+  /// Get health damage per jolt (larger batteries are more durable)
+  public func getBatteryHealthLossPerJolt(batteryType : BatteryType) : Float {
+    switch (batteryType) {
+      case (#ScrapCell) { 2.0 }; // ~50 jolts to dead
+      case (#SalvagePack) { 1.0 }; // ~100 jolts to dead
+      case (#IndustrialBank) { 0.5 }; // ~200 jolts to dead
+      case (#PlasmaVault) { 0.25 }; // ~400 jolts to dead
+    };
+  };
+
+  /// Apply health damage after a jolt
+  public func applyBatteryJoltDamage(battery : Battery) : Battery {
+    let damage = getBatteryHealthLossPerJolt(battery.batteryType);
+    let newHealth = if (Float.fromInt(battery.healthPercent) > damage) {
+      Int.abs(Float.toInt(Float.fromInt(battery.healthPercent) - damage));
+    } else { 0 };
+
+    { battery with healthPercent = newHealth };
+  };
+
+  /// Track throughput when jolting (discharge wears the core)
+  public func addBatteryJoltThroughput(battery : Battery, kwhJolted : Float) : Battery {
+    {
+      battery with kwhThroughput = battery.kwhThroughput + Float.abs(kwhJolted)
+    };
+  };
+
+  /// Check if battery is operational (can charge and jolt)
+  /// Battery is operational as long as it has health > 0
+  /// Lower health reduces jolt efficiency but doesn't prevent usage
+  public func isBatteryOperational(battery : Battery) : Bool {
+    battery.healthPercent > 0;
+  };
+
+  /// Check if battery is actively charging (enabled AND operational)
+  /// Used to determine power draw and charging behavior
+  public func isBatteryCharging(battery : Battery) : Bool {
+    battery.isEnabled and isBatteryOperational(battery);
+  };
+
+  /// Check if battery can deliver a jolt (operational + has enough charge)
+  public func canBatteryJolt(battery : Battery) : Bool {
+    let joltCost = getJoltCost(battery.batteryType);
+    isBatteryOperational(battery) and battery.storedKwh >= joltCost;
+  };
+
+  /// Get battery health tier for display
+  public func getBatteryHealthTier(healthPercent : Nat) : BatteryHealthTier {
+    if (healthPercent == 100) { #Fresh } else if (healthPercent >= 66) { #Worn } else if (healthPercent >= 33) {
+      #Depleted;
+    } else if (healthPercent >= 1) { #Critical } else { #Dead };
+  };
+
+  /// Get repair cost in parts
+  public func getBatteryRepairCost(batteryType : BatteryType) : Nat {
+    switch (batteryType) {
+      case (#ScrapCell) { 50 };
+      case (#SalvagePack) { 150 };
+      case (#IndustrialBank) { 400 };
+      case (#PlasmaVault) { 1000 };
+    };
+  };
+
+  /// Get full restore ICP cost (in e8s) - restores to 100% but doesn't reset cycles
+  public func getBatteryFullRestoreIcpCost(batteryType : BatteryType) : Nat {
+    switch (batteryType) {
+      case (#ScrapCell) { 100_000_000 }; // 1 ICP
+      case (#SalvagePack) { 200_000_000 }; // 2 ICP
+      case (#IndustrialBank) { 500_000_000 }; // 5 ICP
+      case (#PlasmaVault) { 1_000_000_000 }; // 10 ICP
+    };
+  };
+
+  /// Get core rebuild cost in parts (resets cycles AND restores health)
+  public func getBatteryRebuildCost(batteryType : BatteryType) : Nat {
+    switch (batteryType) {
+      case (#ScrapCell) { 300 };
+      case (#SalvagePack) { 900 };
+      case (#IndustrialBank) { 2400 };
+      case (#PlasmaVault) { 6000 };
+    };
+  };
+
+  /// Get core rebuild ICP cost (in e8s)
+  public func getBatteryRebuildIcpCost(batteryType : BatteryType) : Nat {
+    switch (batteryType) {
+      case (#ScrapCell) { 200_000_000 }; // 2 ICP
+      case (#SalvagePack) { 500_000_000 }; // 5 ICP
+      case (#IndustrialBank) { 1_200_000_000 }; // 12 ICP
+      case (#PlasmaVault) { 2_500_000_000 }; // 25 ICP
+    };
+  };
+
+  /// Get salvage return in parts (when destroying a battery)
+  public func getBatterySalvageReturn(batteryType : BatteryType) : Nat {
+    switch (batteryType) {
+      case (#ScrapCell) { 50 };
+      case (#SalvagePack) { 150 };
+      case (#IndustrialBank) { 400 };
+      case (#PlasmaVault) { 1000 };
+    };
+  };
+
+  /// Get discovery cycle range by zone (wasteland batteries have existing wear!)
+  public func getBatteryDiscoveryCycleRange(zone : ScavengingZone) : (Float, Float) {
+    switch (zone) {
+      case (#ScrapHeaps) { (60.0, 120.0) }; // Heavily used junk
+      case (#AbandonedSettlements) { (30.0, 80.0) }; // Left behind, moderate wear
+      case (#DeadMachineFields) { (10.0, 50.0) }; // Preserved in machines
+      case (_) { (60.0, 100.0) }; // Default fallback (maintenance zones)
+    };
+  };
+
+  /// Generate random cycles for discovered battery based on zone
+  public func rollBatteryDiscoveryCycles(zone : ScavengingZone, seed : Nat) : Float {
+    let (minCycles, maxCycles) = getBatteryDiscoveryCycleRange(zone);
+    let range = maxCycles - minCycles;
+    let roll = Float.fromInt(seed % 1000) / 1000.0; // 0.0 - 0.999
+    minCycles + (roll * range);
+  };
+
+  /// Convert cycles to kWh throughput for storage
+  public func batteryCyclesToKwh(cycles : Float, batteryType : BatteryType) : Float {
+    cycles * getBaseBatteryCapacity(batteryType);
+  };
+
+  /// Get battery drop rates by zone (% chance per hour)
+  /// Target expected discovery times (10 hrs/day in best zone):
+  /// - Scrap Cell: ~1 week (70 hrs) in ScrapHeaps
+  /// - Salvage Pack: ~1 month (300 hrs) in AbandonedSettlements
+  /// - Industrial Bank: ~3 months (900 hrs) in DeadMachineFields
+  /// - Plasma Vault: ~6 months (1800 hrs) in DeadMachineFields
+  public func getBatteryDropRates(zone : ScavengingZone) : {
+    scrapCell : Float;
+    salvagePack : Float;
+    industrialBank : Float;
+    plasmaVault : Float;
+  } {
+    switch (zone) {
+      case (#ScrapHeaps) {
+        // Safe zone - Best for Scrap Cells, very slim chance at bigger batteries
+        {
+          scrapCell = 1.4; // ~70 hrs expected
+          salvagePack = 0.1; // ~1000 hrs (rare here)
+          industrialBank = 0.02; // ~5000 hrs (very rare)
+          plasmaVault = 0.005; // ~20000 hrs (legendary luck)
+        };
+      };
+      case (#AbandonedSettlements) {
+        // Moderate zone - Best for Salvage Packs, balanced otherwise
+        {
+          scrapCell = 0.7; // ~143 hrs
+          salvagePack = 0.33; // ~300 hrs expected
+          industrialBank = 0.05; // ~2000 hrs
+          plasmaVault = 0.02; // ~5000 hrs
+        };
+      };
+      case (#DeadMachineFields) {
+        // Dangerous zone - Best for Industrial Banks & Plasma Vaults
+        {
+          scrapCell = 0.35; // ~286 hrs (not the place for these)
+          salvagePack = 0.2; // ~500 hrs
+          industrialBank = 0.11; // ~900 hrs expected
+          plasmaVault = 0.055; // ~1800 hrs expected
+        };
+      };
+      case (_) {
+        // Maintenance zones - no battery drops
+        {
+          scrapCell = 0.0;
+          salvagePack = 0.0;
+          industrialBank = 0.0;
+          plasmaVault = 0.0;
+        };
+      };
+    };
+  };
+
   // ===== POKEDBOTS GARAGE MANAGER =====
 
   public class PokedBotsGarageManager(
@@ -295,6 +961,11 @@ module {
     initActiveUpgrades : Map.Map<Nat, UpgradeSession>,
     initUserInventories : Map.Map<Principal, UserInventory>,
     initPityCounters : Map.Map<Nat, Nat>,
+    initGarageBatteries : Map.Map<Principal, GarageBatteryStorage>,
+    initBotHeat : Map.Map<Nat, BotHeatStatus>,
+    initUserSMRs : Map.Map<Principal, UserSMRStorage>,
+    initUserRepairBays : Map.Map<Principal, UserRepairBayStorage>,
+    initNextBatteryId : { get : () -> Nat; set : (Nat) -> () },
     statsProvider : {
       getNFTMetadata : (Nat) -> ?[(Text, Text)];
       getPrecomputedStats : (Nat) -> ?{
@@ -313,6 +984,11 @@ module {
     private let activeUpgrades = initActiveUpgrades;
     private let userInventories = initUserInventories;
     private let pityCounters = initPityCounters;
+    private let garageBatteries = initGarageBatteries;
+    private let botHeat = initBotHeat;
+    private let userSMRs = initUserSMRs;
+    private let userRepairBays = initUserRepairBays;
+    private let nextBatteryIdRef = initNextBatteryId;
 
     // Garage power settings per owner (for future upgrades)
     // Note: We don't persist this yet - all garages use BASE_POWER_WATTS
@@ -463,6 +1139,9 @@ module {
           switch (Map.get(stats, nhash, idx)) {
             case (?botStats) {
               let current = getCurrentStats(botStats);
+              // Calculate base average rating for MomentumShift
+              let baseStats = getBaseStats(idx);
+              let baseAvg = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
               ?{
                 speed = current.speed;
                 powerCore = current.powerCore;
@@ -471,6 +1150,7 @@ module {
                 luck = botStats.luckBase + botStats.luckBonus;
                 overcharge = botStats.overcharge;
                 perfectTuneUp = botStats.perfectTuneUp;
+                baseAvgRating = ?baseAvg;
               };
             };
             case (null) { null };
@@ -505,6 +1185,10 @@ module {
                 boosted;
               };
 
+              // Calculate base average rating (unbuffed) for MomentumShift phenomenon
+              let baseStats = getBaseStats(idx);
+              let baseAvg = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
+
               ?{
                 speed = finalStats.speed;
                 powerCore = finalStats.powerCore;
@@ -513,6 +1197,7 @@ module {
                 luck = botStats.luckBase + botStats.luckBonus;
                 overcharge = botStats.overcharge;
                 perfectTuneUp = botStats.perfectTuneUp;
+                baseAvgRating = ?baseAvg;
               };
             };
             case (null) { null };
@@ -554,6 +1239,9 @@ module {
                 boosted;
               };
 
+              // Calculate base average rating for MomentumShift
+              let baseAvg = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
+
               ?{
                 speed = finalStats.speed;
                 powerCore = finalStats.powerCore;
@@ -562,6 +1250,7 @@ module {
                 luck = botStats.luckBase + botStats.luckBonus;
                 overcharge = 0; // At 100% stats, no overcharge active
                 perfectTuneUp = false;
+                baseAvgRating = ?baseAvg;
               };
             };
             case (null) {
@@ -626,6 +1315,9 @@ module {
                 boosted;
               };
 
+              // Calculate base average rating for MomentumShift
+              let baseAvg = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
+
               ?{
                 speed = finalStats.speed;
                 powerCore = finalStats.powerCore;
@@ -634,6 +1326,7 @@ module {
                 luck = 10; // Fixed luck for all bots
                 overcharge = 0; // Uninitialized bots have no overcharge
                 perfectTuneUp = false;
+                baseAvgRating = ?baseAvg;
               };
             };
           };
@@ -837,9 +1530,9 @@ module {
               let acceleration = currentStats.acceleration;
 
               // Battery drain scales linearly with distance
-              // Formula: 2.5 battery per km (e.g., 4km = 10, 10km = 25, 20km = 50)
-              // This is ~50% higher than before for consistency
-              let baseBatteryDrain = Float.toInt(Float.fromInt(distance) * 2.5);
+              // Formula: 4.0 battery per km (e.g., 4km = 16, 10km = 40, 20km = 80)
+              // Battery drains faster than condition (battery is immediate constraint, condition is long-term durability)
+              let baseBatteryDrain = Float.toInt(Float.fromInt(distance) * 4.0);
 
               // Calculate weighted terrain modifiers from track composition
               let (terrainBatteryMod, terrainConditionMod) = calculateTrackTerrainModifiers(trackId);
@@ -876,9 +1569,10 @@ module {
               let finalBatteryDrain = Nat.min(botStats.battery, Int.abs(totalBatteryDrain));
 
               // Condition wear scales linearly with distance
-              // Formula: 5.0 condition per km (e.g., 4km = 20, 10km = 50, 20km = 100)
+              // Formula: 2.5 condition per km (e.g., 4km = 10, 10km = 25, 20km = 50)
               // All racers pay the same - position doesn't affect wear
-              let baseConditionWear = Float.toInt(Float.fromInt(distance) * 5.0);
+              // Condition drains slower than battery (condition is long-term durability)
+              let baseConditionWear = Float.toInt(Float.fromInt(distance) * 2.5);
 
               // Terrain modifier already calculated from track composition above
 
@@ -959,31 +1653,12 @@ module {
         };
       };
 
-      // Get base stats
+      // Get base stats (needed for preferred distance calculation)
       let baseStats = getBaseStats(tokenIndex);
 
-      // Calculate overall rating from base stats: (speed + powerCore + acceleration + stability) / 4
-      let totalStats = baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability;
-      let averageRating = totalStats / 4;
-
-      // Map rating to starting ELO:
-      // 50+ rating = SilentKlan tier (1900 ELO)
-      // 40-49 rating = Elite tier (1700 ELO)
-      // 40+ rating = Elite tier (1700 ELO)
-      // 30-39 rating = Raider tier (1500 ELO)
-      // 20-29 rating = Junker tier (1300 ELO)
-      // <20 rating = Scrap tier (1100 ELO)
-      let startingElo = if (averageRating >= 50) {
-        1900; // SilentKlan tier
-      } else if (averageRating >= 40) {
-        1700; // Elite tier
-      } else if (averageRating >= 30) {
-        1500; // Raider tier
-      } else if (averageRating >= 20) {
-        1300; // Junker tier
-      } else {
-        1100; // Scrap tier
-      };
+      // All bots start at 1500 ELO (neutral mid-point)
+      // ELO will adjust based on actual race performance
+      let startingElo = 1500;
 
       let now = Time.now();
 
@@ -1134,6 +1809,11 @@ module {
       Option.isSome(Map.get(stats, nhash, tokenIndex));
     };
 
+    /// Get all initialized bot token indices (for admin operations)
+    public func getAllInitializedTokenIndices() : [Nat] {
+      Iter.toArray(Map.keys(stats));
+    };
+
     /// Get all bots for owner
     public func getBotsForOwner(owner : Principal) : [PokedBotRacingStats] {
       let allStats = Map.vals(stats);
@@ -1171,7 +1851,8 @@ module {
         return 1.0; // No bots charging = full efficiency (not used)
       };
 
-      let totalCapacity = Float.fromInt(BASE_POWER_WATTS);
+      let smrPower = getUserSMRPower(owner);
+      let totalCapacity = Float.fromInt(BASE_POWER_WATTS + smrPower);
       let totalDraw = Float.fromInt(botsCharging * WATTS_PER_BOT);
 
       // efficiency = capacity / draw (capped at 1.0)
@@ -1181,8 +1862,21 @@ module {
     /// Get full power status for an owner's garage (for UI display)
     public func getGaragePowerStatus(owner : Principal) : GaragePowerStatus {
       let botsCharging = countBotsInChargingStation(owner);
-      let totalCapacity = BASE_POWER_WATTS;
-      let currentDraw = botsCharging * WATTS_PER_BOT;
+      let smrPower = getUserSMRPower(owner);
+      let totalCapacity = BASE_POWER_WATTS + smrPower;
+
+      // Calculate repair bay power draw
+      let repairBayDraw = getRepairBayTotalPowerDraw(owner);
+      let repairBayStorage = getUserRepairBayStorage(owner);
+      var activeRepairBays : Nat = 0;
+      for (bay in repairBayStorage.bays.vals()) {
+        if (bay.currentBotToken != null) { activeRepairBays += 1 };
+      };
+
+      // Total draw includes both charging bots and repair bays
+      let chargingDraw = botsCharging * WATTS_PER_BOT;
+      let currentDraw = chargingDraw + repairBayDraw;
+
       let efficiency = if (botsCharging == 0) {
         1.0;
       } else {
@@ -1193,8 +1887,27 @@ module {
       } else if (currentDraw <= totalCapacity) {
         WATTS_PER_BOT; // Full power to each bot
       } else {
-        totalCapacity / botsCharging; // Divided power
+        // When overloaded, reduce power per bot proportionally
+        let availableForCharging = if (repairBayDraw >= totalCapacity) { 0 } else {
+          totalCapacity - repairBayDraw;
+        };
+        availableForCharging / botsCharging;
       };
+
+      // Calculate battery charging info (uses power after bots and repair bays)
+      let surplusWatts = if (currentDraw >= totalCapacity) { 0 } else {
+        totalCapacity - currentDraw;
+      };
+      let batteryStorage = getBatteryStorage(owner);
+      var chargingBatteries : Nat = 0;
+      var totalBatteryDraw : Nat = 0;
+      for (battery in batteryStorage.batteries.vals()) {
+        if (isBatteryCharging(battery)) {
+          chargingBatteries += 1;
+          totalBatteryDraw += getBatteryDrawRate(battery.batteryType);
+        };
+      };
+      let effectiveBatteryDraw = Nat.min(surplusWatts, totalBatteryDraw);
 
       {
         totalCapacityWatts = totalCapacity;
@@ -1202,7 +1915,527 @@ module {
         botsCharging = botsCharging;
         efficiency = efficiency;
         wattsPerBot = wattsPerBot;
+        surplusWatts = surplusWatts;
+        batteriesCharging = chargingBatteries;
+        batteryDrawWatts = totalBatteryDraw;
+        effectiveBatteryDrawWatts = effectiveBatteryDraw;
+        repairBayDrawWatts = repairBayDraw;
+        activeRepairBays = activeRepairBays;
       };
+    };
+
+    // ===== SMR (Small Modular Reactor) FUNCTIONS =====
+
+    /// Get user's total SMR power output (in watts)
+    public func getUserSMRPower(owner : Principal) : Nat {
+      switch (Map.get(userSMRs, phash, owner)) {
+        case (?storage) { storage.totalPowerOutput };
+        case (null) { 0 };
+      };
+    };
+
+    /// Get user's SMR storage (all installed reactors)
+    public func getUserSMRStorage(owner : Principal) : UserSMRStorage {
+      switch (Map.get(userSMRs, phash, owner)) {
+        case (?storage) { storage };
+        case (null) {
+          {
+            owner = owner;
+            installedSMRs = [];
+            totalPowerOutput = 0;
+          };
+        };
+      };
+    };
+
+    /// Install an SMR for a user (after payment)
+    public func installSMR(owner : Principal, model : SMRModel, now : Int) : InstalledSMR {
+      let powerOutput = getSMRPowerOutput(model);
+      let newSMR : InstalledSMR = {
+        model = model;
+        installedAt = now;
+        powerOutput = powerOutput;
+        totalMwhGenerated = 0.0;
+        lastUpdateTime = now;
+      };
+
+      let currentStorage = getUserSMRStorage(owner);
+      let updatedStorage : UserSMRStorage = {
+        owner = owner;
+        installedSMRs = Array.append(currentStorage.installedSMRs, [newSMR]);
+        totalPowerOutput = currentStorage.totalPowerOutput + powerOutput;
+      };
+
+      ignore Map.put(userSMRs, phash, owner, updatedStorage);
+      newSMR;
+    };
+
+    /// Accumulate SMR usage based on power delivered to charging bots
+    /// Called during ChargingStation accumulation to track reactor lifetime
+    /// energyWh: Energy delivered in watt-hours (power × hours)
+    public func accumulateSMRUsage(owner : Principal, energyWh : Float, now : Int) {
+      switch (Map.get(userSMRs, phash, owner)) {
+        case (?storage) {
+          if (storage.installedSMRs.size() == 0) { return };
+
+          // Convert Wh to MWh
+          let energyMwh = energyWh / 1_000_000.0;
+
+          // Distribute energy proportionally across all SMRs based on their power output
+          let totalPower = Float.fromInt(storage.totalPowerOutput);
+          let updatedSMRs = Array.map<InstalledSMR, InstalledSMR>(
+            storage.installedSMRs,
+            func(smr : InstalledSMR) : InstalledSMR {
+              let powerRatio = Float.fromInt(smr.powerOutput) / totalPower;
+              let smrEnergyShare = energyMwh * powerRatio;
+              {
+                model = smr.model;
+                installedAt = smr.installedAt;
+                powerOutput = smr.powerOutput;
+                totalMwhGenerated = smr.totalMwhGenerated + smrEnergyShare;
+                lastUpdateTime = now;
+              };
+            },
+          );
+
+          let updatedStorage : UserSMRStorage = {
+            owner = storage.owner;
+            installedSMRs = updatedSMRs;
+            totalPowerOutput = storage.totalPowerOutput;
+          };
+
+          ignore Map.put(userSMRs, phash, owner, updatedStorage);
+        };
+        case (null) {};
+      };
+    };
+
+    /// Get total SMR lifetime stats for an owner
+    public func getSMRLifetimeStats(owner : Principal) : {
+      totalLifetimeMwh : Nat; // Total lifetime capacity across all SMRs
+      totalUsedMwh : Float; // Total energy generated across all SMRs
+      oldestSMRAge : Int; // Age of oldest SMR in nanoseconds
+    } {
+      switch (Map.get(userSMRs, phash, owner)) {
+        case (?storage) {
+          var totalLifetime : Nat = 0;
+          var totalUsed : Float = 0.0;
+          var oldestAge : Int = 0;
+
+          for (smr in storage.installedSMRs.vals()) {
+            totalLifetime += getSMRLifetimeMwh(smr.model);
+            totalUsed += smr.totalMwhGenerated;
+            let smrAge = Time.now() - smr.installedAt;
+            if (smrAge > oldestAge) { oldestAge := smrAge };
+          };
+
+          {
+            totalLifetimeMwh = totalLifetime;
+            totalUsedMwh = totalUsed;
+            oldestSMRAge = oldestAge;
+          };
+        };
+        case (null) {
+          { totalLifetimeMwh = 0; totalUsedMwh = 0.0; oldestSMRAge = 0 };
+        };
+      };
+    };
+
+    /// Get user's SMR map for stable storage
+    public func getUserSMRsMap() : Map.Map<Principal, UserSMRStorage> {
+      userSMRs;
+    };
+
+    // ===== REPAIR BAY INFRASTRUCTURE FUNCTIONS =====
+
+    /// Get user's repair bay storage (creates default if none exists)
+    public func getUserRepairBayStorage(owner : Principal) : UserRepairBayStorage {
+      switch (Map.get(userRepairBays, phash, owner)) {
+        case (?storage) { storage };
+        case (null) { defaultRepairBayStorage(owner) };
+      };
+    };
+
+    /// Get user's repair bay map for stable storage
+    public func getUserRepairBaysMap() : Map.Map<Principal, UserRepairBayStorage> {
+      userRepairBays;
+    };
+
+    /// Get total power draw from all repair bays for an owner (in watts)
+    /// Only counts active bays (those with bots being repaired)
+    public func getRepairBayTotalPowerDraw(owner : Principal) : Nat {
+      let storage = getUserRepairBayStorage(owner);
+      var totalDraw : Nat = 0;
+
+      for (bay in storage.bays.vals()) {
+        // Only draw power if a bot is actively being repaired
+        switch (bay.currentBotToken) {
+          case (?_) {
+            totalDraw += getRepairBayPowerDraw(bay.tier);
+          };
+          case (null) {};
+        };
+      };
+
+      totalDraw;
+    };
+
+    /// Get user's best available (empty) repair bay
+    private func getBestAvailableBay(owner : Principal) : ?RepairBay {
+      let storage = getUserRepairBayStorage(owner);
+      var bestBay : ?RepairBay = null;
+      var bestTier : Nat = 0;
+
+      for (bay in storage.bays.vals()) {
+        // Bay must be empty and not upgrading
+        if (bay.currentBotToken == null and bay.upgradeInProgress == null) {
+          if (bay.tier > bestTier) {
+            bestTier := bay.tier;
+            bestBay := ?bay;
+          };
+        };
+      };
+
+      bestBay;
+    };
+
+    /// Get the repair rate for a specific bot based on its bay assignment
+    public func getBotRepairRate(owner : Principal, tokenIndex : Nat) : Nat {
+      let storage = getUserRepairBayStorage(owner);
+
+      for (bay in storage.bays.vals()) {
+        switch (bay.currentBotToken) {
+          case (?botToken) {
+            if (botToken == tokenIndex) {
+              switch (getRepairBayTierConfig(bay.tier)) {
+                case (?config) { return config.repairRatePerHour };
+                case (null) { return FALLBACK_REPAIR_RATE };
+              };
+            };
+          };
+          case (null) {};
+        };
+      };
+
+      // Bot not in any bay - use fallback rate
+      FALLBACK_REPAIR_RATE;
+    };
+
+    /// Assign a bot to the best available repair bay
+    /// Returns the bay ID if assigned, null if no bay available
+    public func assignBotToRepairBay(owner : Principal, tokenIndex : Nat, now : Int, currentCondition : Nat) : ?Nat {
+      // First check if bot is already assigned
+      let storage = getUserRepairBayStorage(owner);
+      for (bay in storage.bays.vals()) {
+        switch (bay.currentBotToken) {
+          case (?botToken) {
+            if (botToken == tokenIndex) { return ?bay.bayId }; // Already assigned
+          };
+          case (null) {};
+        };
+      };
+
+      // Find best available bay
+      switch (getBestAvailableBay(owner)) {
+        case (?bay) {
+          // Update the bay with the bot assignment
+          let updatedBays = Array.map<RepairBay, RepairBay>(
+            storage.bays,
+            func(b : RepairBay) : RepairBay {
+              if (b.bayId == bay.bayId) {
+                {
+                  bayId = b.bayId;
+                  tier = b.tier;
+                  currentBotToken = ?tokenIndex;
+                  repairStartTime = ?now;
+                  repairStartCondition = ?currentCondition;
+                  upgradeInProgress = b.upgradeInProgress;
+                };
+              } else { b };
+            },
+          );
+
+          let updatedStorage : UserRepairBayStorage = {
+            owner = storage.owner;
+            bays = updatedBays;
+            totalPartsInvested = storage.totalPartsInvested;
+            totalIcpInvested = storage.totalIcpInvested;
+          };
+
+          ignore Map.put(userRepairBays, phash, owner, updatedStorage);
+          ?bay.bayId;
+        };
+        case (null) { null }; // No available bay
+      };
+    };
+
+    /// Release a bot from its repair bay
+    public func releaseBotFromRepairBay(owner : Principal, tokenIndex : Nat) : Bool {
+      let storage = getUserRepairBayStorage(owner);
+      var found = false;
+
+      let updatedBays = Array.map<RepairBay, RepairBay>(
+        storage.bays,
+        func(bay : RepairBay) : RepairBay {
+          switch (bay.currentBotToken) {
+            case (?botToken) {
+              if (botToken == tokenIndex) {
+                found := true;
+                {
+                  bayId = bay.bayId;
+                  tier = bay.tier;
+                  currentBotToken = null;
+                  repairStartTime = null;
+                  repairStartCondition = null;
+                  upgradeInProgress = bay.upgradeInProgress;
+                };
+              } else { bay };
+            };
+            case (null) { bay };
+          };
+        },
+      );
+
+      if (found) {
+        let updatedStorage : UserRepairBayStorage = {
+          owner = storage.owner;
+          bays = updatedBays;
+          totalPartsInvested = storage.totalPartsInvested;
+          totalIcpInvested = storage.totalIcpInvested;
+        };
+        ignore Map.put(userRepairBays, phash, owner, updatedStorage);
+      };
+
+      found;
+    };
+
+    /// Purchase a new repair bay slot (returns #ok(bayId) or error)
+    public func purchaseRepairBaySlot(owner : Principal, partsPaid : Nat, icpPaidE8s : Nat) : Result.Result<Nat, Text> {
+      let storage = getUserRepairBayStorage(owner);
+      let currentSlots = storage.bays.size();
+
+      if (currentSlots >= MAX_REPAIR_BAYS) {
+        return #err("Already at maximum repair bays (" # Nat.toText(MAX_REPAIR_BAYS) # ")");
+      };
+
+      let nextSlot = currentSlots + 1;
+      switch (getRepairBaySlotCost(nextSlot)) {
+        case (?(requiredParts, requiredIcp)) {
+          if (partsPaid < requiredParts) {
+            return #err("Insufficient parts: need " # Nat.toText(requiredParts) # ", have " # Nat.toText(partsPaid));
+          };
+          if (icpPaidE8s < requiredIcp) {
+            return #err("Insufficient ICP: need " # Nat.toText(requiredIcp / 100_000_000) # " ICP");
+          };
+
+          // Create new bay at Tier 1
+          let newBay : RepairBay = {
+            bayId = nextSlot;
+            tier = 1;
+            currentBotToken = null;
+            repairStartTime = null;
+            repairStartCondition = null;
+            upgradeInProgress = null;
+          };
+
+          let updatedStorage : UserRepairBayStorage = {
+            owner = storage.owner;
+            bays = Array.append(storage.bays, [newBay]);
+            totalPartsInvested = storage.totalPartsInvested + partsPaid;
+            totalIcpInvested = storage.totalIcpInvested + icpPaidE8s;
+          };
+
+          ignore Map.put(userRepairBays, phash, owner, updatedStorage);
+          #ok(nextSlot);
+        };
+        case (null) {
+          #err("Invalid slot number: " # Nat.toText(nextSlot));
+        };
+      };
+    };
+
+    /// Start upgrading a repair bay to the next tier
+    public func startRepairBayUpgrade(owner : Principal, bayId : Nat, partsPaid : Nat, icpPaidE8s : Nat, now : Int) : Result.Result<Int, Text> {
+      let storage = getUserRepairBayStorage(owner);
+
+      // Find the bay
+      var targetBay : ?RepairBay = null;
+      for (bay in storage.bays.vals()) {
+        if (bay.bayId == bayId) { targetBay := ?bay };
+      };
+
+      switch (targetBay) {
+        case (null) { return #err("Bay not found: " # Nat.toText(bayId)) };
+        case (?bay) {
+          // Check if upgrade already in progress
+          switch (bay.upgradeInProgress) {
+            case (?_) { return #err("Upgrade already in progress") };
+            case (null) {};
+          };
+
+          // Check if bot is in the bay
+          switch (bay.currentBotToken) {
+            case (?_) {
+              return #err("Cannot upgrade while a bot is in the bay");
+            };
+            case (null) {};
+          };
+
+          // Check if at max tier
+          if (bay.tier >= 16) {
+            return #err("Bay is already at maximum tier (16)");
+          };
+
+          let nextTier = bay.tier + 1;
+          switch (getRepairBayTierConfig(nextTier)) {
+            case (null) { return #err("Invalid tier configuration") };
+            case (?config) {
+              if (partsPaid < config.partsCost) {
+                return #err("Insufficient parts: need " # Nat.toText(config.partsCost));
+              };
+              if (icpPaidE8s < config.icpCostE8s) {
+                return #err("Insufficient ICP: need " # Nat.toText(config.icpCostE8s / 100_000_000) # " ICP");
+              };
+
+              let completionTime = now + config.buildTimeNanos;
+
+              // Update the bay with upgrade in progress
+              let updatedBays = Array.map<RepairBay, RepairBay>(
+                storage.bays,
+                func(b : RepairBay) : RepairBay {
+                  if (b.bayId == bayId) {
+                    {
+                      bayId = b.bayId;
+                      tier = b.tier;
+                      currentBotToken = b.currentBotToken;
+                      repairStartTime = b.repairStartTime;
+                      repairStartCondition = b.repairStartCondition;
+                      upgradeInProgress = ?{
+                        targetTier = nextTier;
+                        startTime = now;
+                        completionTime = completionTime;
+                      };
+                    };
+                  } else { b };
+                },
+              );
+
+              let updatedStorage : UserRepairBayStorage = {
+                owner = storage.owner;
+                bays = updatedBays;
+                totalPartsInvested = storage.totalPartsInvested + partsPaid;
+                totalIcpInvested = storage.totalIcpInvested + icpPaidE8s;
+              };
+
+              ignore Map.put(userRepairBays, phash, owner, updatedStorage);
+              #ok(completionTime);
+            };
+          };
+        };
+      };
+    };
+
+    /// Complete a repair bay upgrade (call when upgrade time has passed)
+    public func completeRepairBayUpgrade(owner : Principal, bayId : Nat, now : Int) : Result.Result<Nat, Text> {
+      let storage = getUserRepairBayStorage(owner);
+
+      // Find the bay
+      var targetBay : ?RepairBay = null;
+      for (bay in storage.bays.vals()) {
+        if (bay.bayId == bayId) { targetBay := ?bay };
+      };
+
+      switch (targetBay) {
+        case (null) { return #err("Bay not found: " # Nat.toText(bayId)) };
+        case (?bay) {
+          switch (bay.upgradeInProgress) {
+            case (null) { return #err("No upgrade in progress") };
+            case (?upgrade) {
+              if (now < upgrade.completionTime) {
+                let remaining = (upgrade.completionTime - now) / 1_000_000_000;
+                return #err("Upgrade not complete: " # Int.toText(remaining) # " seconds remaining");
+              };
+
+              // Complete the upgrade
+              let updatedBays = Array.map<RepairBay, RepairBay>(
+                storage.bays,
+                func(b : RepairBay) : RepairBay {
+                  if (b.bayId == bayId) {
+                    {
+                      bayId = b.bayId;
+                      tier = upgrade.targetTier;
+                      currentBotToken = b.currentBotToken;
+                      repairStartTime = b.repairStartTime;
+                      repairStartCondition = b.repairStartCondition;
+                      upgradeInProgress = null;
+                    };
+                  } else { b };
+                },
+              );
+
+              let updatedStorage : UserRepairBayStorage = {
+                owner = storage.owner;
+                bays = updatedBays;
+                totalPartsInvested = storage.totalPartsInvested;
+                totalIcpInvested = storage.totalIcpInvested;
+              };
+
+              ignore Map.put(userRepairBays, phash, owner, updatedStorage);
+              #ok(upgrade.targetTier);
+            };
+          };
+        };
+      };
+    };
+
+    /// Calculate accumulated condition restored for a bot in a repair bay
+    public func calculateRepairProgress(owner : Principal, tokenIndex : Nat, now : Int) : ?{
+      bayId : Nat;
+      currentTier : Nat;
+      repairRate : Nat;
+      startCondition : Nat;
+      hoursElapsed : Float;
+      conditionRestored : Nat;
+      currentCondition : Nat;
+    } {
+      let storage = getUserRepairBayStorage(owner);
+
+      for (bay in storage.bays.vals()) {
+        switch (bay.currentBotToken) {
+          case (?botToken) {
+            if (botToken == tokenIndex) {
+              switch (bay.repairStartTime, bay.repairStartCondition) {
+                case (?startTime, ?startCondition) {
+                  let elapsedNanos = now - startTime;
+                  let hoursElapsed = Float.fromInt(elapsedNanos) / 3_600_000_000_000.0;
+
+                  switch (getRepairBayTierConfig(bay.tier)) {
+                    case (?config) {
+                      let conditionRestored = Int.abs(Float.toInt(hoursElapsed * Float.fromInt(config.repairRatePerHour)));
+                      let currentCondition = Nat.min(100, startCondition + conditionRestored);
+
+                      return ?{
+                        bayId = bay.bayId;
+                        currentTier = bay.tier;
+                        repairRate = config.repairRatePerHour;
+                        startCondition = startCondition;
+                        hoursElapsed = hoursElapsed;
+                        conditionRestored = conditionRestored;
+                        currentCondition = currentCondition;
+                      };
+                    };
+                    case (null) {};
+                  };
+                };
+                case _ {};
+              };
+            };
+          };
+          case (null) {};
+        };
+      };
+
+      null;
     };
 
     /// Snapshot (force accumulate) all ChargingStation bots for an owner
@@ -1344,13 +2577,13 @@ module {
       };
 
       // OVERCHARGE BONUSES (consumed in next race)
-      // Speed: +0.20% per 1% overcharge (max +8% at 40% overcharge)
-      // Acceleration: +0.20% per 1% overcharge (max +8% at 40% overcharge)
+      // Speed: +0.25% per 1% overcharge (max +10% at 40% overcharge)
+      // Acceleration: +0.25% per 1% overcharge (max +10% at 40% overcharge)
       // Stability: -0.133% per 1% overcharge (max -5.3% at 40% overcharge) - UNLESS Perfect Tune-Up
       // PowerCore: -0.133% per 1% overcharge (max -5.3% at 40% overcharge) - UNLESS Perfect Tune-Up
       let overchargeBonus = Float.fromInt(botStats.overcharge) / 100.0; // 0.0 to 0.40
-      let speedOvercharge = 1.0 + (overchargeBonus * 0.20); // 1.0 to 1.08
-      let accelOvercharge = 1.0 + (overchargeBonus * 0.20); // 1.0 to 1.08
+      let speedOvercharge = 1.0 + (overchargeBonus * 0.25); // 1.0 to 1.10
+      let accelOvercharge = 1.0 + (overchargeBonus * 0.25); // 1.0 to 1.10
 
       // Perfect Tune-Up: Penalty removal based on tune-up quality
       // perfectTuneUp = true means resonance was achieved, but quality varies:
@@ -1514,8 +2747,8 @@ module {
 
       // Overcharge calculations
       let overchargeBonus = Float.fromInt(botStats.overcharge) / 100.0;
-      let speedOvercharge = 1.0 + (overchargeBonus * 0.20);
-      let accelOvercharge = 1.0 + (overchargeBonus * 0.20);
+      let speedOvercharge = 1.0 + (overchargeBonus * 0.25);
+      let accelOvercharge = 1.0 + (overchargeBonus * 0.25);
       let stabilityOvercharge = if (botStats.perfectTuneUp) { 1.0 } else {
         1.0 - (overchargeBonus * 0.133);
       };
@@ -1800,36 +3033,35 @@ module {
       switch (background) {
         case (?(_, value)) {
           let bg = Text.toLowercase(value);
-
-          // MetalRoads: Purple shades, darker blues, teals (industrial/tech aesthetic)
           if (
             Text.contains(bg, #text "purple") or
             Text.contains(bg, #text "teal") or
             Text.contains(bg, #text "dark blue") or
             Text.contains(bg, #text "grey blue")
           ) {
-            #MetalRoads;
-          }
-          // WastelandSand: Warm colors, light/mid blues, reds (desert/sand aesthetic)
-          else if (
+            return #MetalRoads;
+          } else if (
             Text.contains(bg, #text "red") or
             Text.contains(bg, #text "yellow") or
             Text.contains(bg, #text "bones") or
             Text.contains(bg, #text "light blue") or
             (Text.contains(bg, #text "blue") and not Text.contains(bg, #text "dark") and not Text.contains(bg, #text "grey"))
           ) {
-            #WastelandSand;
-          }
-          // ScrapHeaps: Greys, browns, blacks, darks, greens (junkyard aesthetic)
-          else {
-            #ScrapHeaps;
+            return #WastelandSand;
+          } else {
+            // ScrapHeaps: Greys, browns, blacks, darks, greens (junkyard aesthetic)
+            return #ScrapHeaps;
           };
         };
         case (null) {
           let hash = hashNat(0);
           let choice = hash % 3;
-          if (choice == 0) { #ScrapHeaps } else if (choice == 1) { #MetalRoads } else {
-            #WastelandSand;
+          if (choice == 0) {
+            return #ScrapHeaps;
+          } else if (choice == 1) {
+            return #MetalRoads;
+          } else {
+            return #WastelandSand;
           };
         };
       };
@@ -1971,6 +3203,497 @@ module {
       false; // Insufficient parts even with universal substitution
     };
 
+    // ===== BATTERY STORAGE SYSTEM =====
+
+    /// Get next battery ID (global counter)
+    public func getNextBatteryId() : Nat {
+      let id = nextBatteryIdRef.get();
+      nextBatteryIdRef.set(id + 1);
+      id;
+    };
+
+    /// Get battery storage for a user (or create empty storage)
+    public func getBatteryStorage(owner : Principal) : GarageBatteryStorage {
+      switch (Map.get(garageBatteries, phash, owner)) {
+        case (?storage) { storage };
+        case (null) {
+          let newStorage : GarageBatteryStorage = {
+            owner = owner;
+            batteries = [];
+            firstBatteryDiscovered = false;
+            totalBatteriesFound = 0;
+            cumulativeScavengingHours = 0.0;
+          };
+          ignore Map.put(garageBatteries, phash, owner, newStorage);
+          newStorage;
+        };
+      };
+    };
+
+    /// Set battery storage for a user
+    public func setBatteryStorage(owner : Principal, storage : GarageBatteryStorage) {
+      ignore Map.put(garageBatteries, phash, owner, storage);
+    };
+
+    /// Get a specific battery by ID from a user's storage
+    public func getBattery(owner : Principal, batteryId : Nat) : ?Battery {
+      let storage = getBatteryStorage(owner);
+      Array.find<Battery>(storage.batteries, func(b : Battery) : Bool { b.id == batteryId });
+    };
+
+    /// Update a specific battery in a user's storage
+    public func updateBattery(owner : Principal, batteryId : Nat, updatedBattery : Battery) : Bool {
+      let storage = getBatteryStorage(owner);
+      var found = false;
+      let updatedBatteries = Array.map<Battery, Battery>(
+        storage.batteries,
+        func(b : Battery) : Battery {
+          if (b.id == batteryId) {
+            found := true;
+            updatedBattery;
+          } else { b };
+        },
+      );
+      if (found) {
+        setBatteryStorage(owner, { storage with batteries = updatedBatteries });
+      };
+      found;
+    };
+
+    /// Add a battery to a user's storage
+    public func addBatteryToGarage(owner : Principal, battery : Battery) {
+      let storage = getBatteryStorage(owner);
+      let updatedStorage = {
+        storage with
+        batteries = Array.append(storage.batteries, [battery]);
+        totalBatteriesFound = storage.totalBatteriesFound + 1;
+        firstBatteryDiscovered = true;
+      };
+      setBatteryStorage(owner, updatedStorage);
+    };
+
+    /// Remove a battery from a user's storage (returns the removed battery if found)
+    public func removeBatteryFromGarage(owner : Principal, batteryId : Nat) : ?Battery {
+      let storage = getBatteryStorage(owner);
+      var removedBattery : ?Battery = null;
+      let filteredBatteries = Array.filter<Battery>(
+        storage.batteries,
+        func(b : Battery) : Bool {
+          if (b.id == batteryId) {
+            removedBattery := ?b;
+            false; // Don't include in result
+          } else { true };
+        },
+      );
+      setBatteryStorage(owner, { storage with batteries = filteredBatteries });
+      removedBattery;
+    };
+
+    /// Create a new wasteland battery (found during scavenging - has existing wear)
+    public func createWastelandBattery(batteryType : BatteryType, kwhThroughput : Float, now : Int) : Battery {
+      {
+        id = getNextBatteryId();
+        batteryType = batteryType;
+        healthPercent = 0; // Dead - must repair to 100% to activate
+        storedKwh = 0.0; // Empty
+        kwhThroughput = kwhThroughput; // Existing wear from wasteland!
+        lastChargeUpdate = now;
+        discoveredAt = now;
+        totalJoltsDelivered = 0;
+        isEnabled = true; // Enabled by default
+      };
+    };
+
+    /// Toggle a battery's enabled state (on/off for charging)
+    /// Returns the new enabled state, or null if battery not found
+    public func toggleBatteryEnabled(owner : Principal, batteryId : Nat, now : Int) : Result.Result<Bool, Text> {
+      let storage = getBatteryStorage(owner);
+
+      var found = false;
+      var newEnabledState = false;
+
+      let updatedBatteries = Array.map<Battery, Battery>(
+        storage.batteries,
+        func(battery : Battery) : Battery {
+          if (battery.id == batteryId) {
+            found := true;
+            newEnabledState := not battery.isEnabled;
+            // Also update lastChargeUpdate to prevent charge calculation from stale time
+            { battery with isEnabled = newEnabledState; lastChargeUpdate = now };
+          } else {
+            battery;
+          };
+        },
+      );
+
+      if (not found) {
+        return #err("Battery not found in your garage");
+      };
+
+      setBatteryStorage(owner, { storage with batteries = updatedBatteries });
+      #ok(newEnabledState);
+    };
+
+    /// Update cumulative scavenging hours for guaranteed first battery tracking
+    public func updateScavengingHours(owner : Principal, hoursElapsed : Float) {
+      let storage = getBatteryStorage(owner);
+      setBatteryStorage(owner, { storage with cumulativeScavengingHours = storage.cumulativeScavengingHours + hoursElapsed });
+    };
+
+    /// Get bot heat status (or create default)
+    public func getBotHeatStatus(tokenIndex : Nat) : BotHeatStatus {
+      switch (Map.get(botHeat, nhash, tokenIndex)) {
+        case (?status) { status };
+        case (null) {
+          let newStatus : BotHeatStatus = {
+            heatStacks = 0;
+            lastJoltTime = 0;
+            overheatUntil = null;
+          };
+          ignore Map.put(botHeat, nhash, tokenIndex, newStatus);
+          newStatus;
+        };
+      };
+    };
+
+    /// Set bot heat status
+    public func setBotHeatStatus(tokenIndex : Nat, status : BotHeatStatus) {
+      ignore Map.put(botHeat, nhash, tokenIndex, status);
+    };
+
+    /// Calculate current heat stacks with decay (1 stack per hour)
+    public func getCurrentBotHeat(tokenIndex : Nat, now : Int) : Nat {
+      let status = getBotHeatStatus(tokenIndex);
+      if (status.lastJoltTime == 0) { return 0 };
+
+      let hoursElapsed = Float.fromInt(now - status.lastJoltTime) / 3_600_000_000_000.0;
+      let stacksDecayed = Int.abs(Float.toInt(Float.floor(hoursElapsed)));
+
+      if (stacksDecayed >= status.heatStacks) { 0 } else {
+        status.heatStacks - stacksDecayed;
+      };
+    };
+
+    /// Check if bot is currently overheated
+    public func isBotOverheated(tokenIndex : Nat, now : Int) : Bool {
+      let status = getBotHeatStatus(tokenIndex);
+      switch (status.overheatUntil) {
+        case (?until) { now < until };
+        case (null) { false };
+      };
+    };
+
+    /// Calculate surplus power available for battery charging
+    public func getGridSurplusForBatteries(owner : Principal) : Nat {
+      let status = getGaragePowerStatus(owner);
+      if (status.currentDrawWatts >= status.totalCapacityWatts) {
+        return 0; // No surplus, grid fully loaded or overloaded
+      };
+      status.totalCapacityWatts - status.currentDrawWatts;
+    };
+
+    /// Project what battery charge WOULD be at a given time (pure calculation, no mutation)
+    /// Used by query functions to show current projected charge without persisting state
+    /// NOTE: Uses actual surplus to give accurate projection of what charge will be accumulated.
+    /// This ensures UI display matches what will actually happen when jolt is called.
+    public func projectBatteryCharge(battery : Battery, surplus : Nat, now : Int) : Float {
+      // Only batteries that are actively charging (enabled AND operational) can gain charge
+      if (not isBatteryCharging(battery)) {
+        return battery.storedKwh;
+      };
+
+      // If no surplus, no charging will occur - return current stored value
+      if (surplus == 0) {
+        return battery.storedKwh;
+      };
+
+      // Use actual surplus to calculate effective draw rate
+      let batteryDrawWatts = getBatteryDrawRate(battery.batteryType);
+      let effectiveDrawWatts = Nat.min(surplus, batteryDrawWatts);
+
+      let hoursElapsed = Float.fromInt(now - battery.lastChargeUpdate) / 3_600_000_000_000.0;
+      if (hoursElapsed <= 0.0) { return battery.storedKwh };
+
+      let kwhGained = Float.fromInt(effectiveDrawWatts) * hoursElapsed / 1000.0;
+
+      // Max capacity is affected by cycles!
+      let maxCapacity = getCurrentBatteryMaxCapacity(battery);
+      Float.min(maxCapacity, battery.storedKwh + kwhGained);
+    };
+
+    /// Accumulate passive battery charge from grid surplus (MUTATES STATE)
+    /// Called when jolting, or at other state-change moments to persist accumulated charge
+    public func accumulateBatteryCharge(owner : Principal, now : Int) {
+      let storage = getBatteryStorage(owner);
+      if (storage.batteries.size() == 0) { return };
+
+      let surplus = getGridSurplusForBatteries(owner);
+      // NOTE: Even if surplus == 0, we still need to update lastChargeUpdate
+      // to keep the projection in sync with reality. Otherwise the UI shows
+      // projected charge based on time since lastChargeUpdate, which diverges
+      // from actual stored charge when surplus is 0 for extended periods.
+
+      // Track total energy gained for SMR usage
+      var totalEnergyGainedKwh : Float = 0.0;
+
+      let updatedBatteries = Array.map<Battery, Battery>(
+        storage.batteries,
+        func(battery : Battery) : Battery {
+          // Only batteries that are actively charging (enabled AND operational) can gain charge
+          if (not isBatteryCharging(battery)) {
+            // Still update lastChargeUpdate to keep projection in sync
+            return { battery with lastChargeUpdate = now };
+          };
+
+          let hoursElapsed = Float.fromInt(now - battery.lastChargeUpdate) / 3_600_000_000_000.0;
+          if (hoursElapsed <= 0.0) { return battery };
+
+          // Calculate charge gained (0 if no surplus)
+          let kwhGained = if (surplus == 0) {
+            0.0;
+          } else {
+            let batteryDrawWatts = getBatteryDrawRate(battery.batteryType);
+            let effectiveDrawWatts = Nat.min(surplus, batteryDrawWatts);
+            Float.fromInt(effectiveDrawWatts) * hoursElapsed / 1000.0;
+          };
+
+          // Max capacity is affected by cycles!
+          let maxCapacity = getCurrentBatteryMaxCapacity(battery);
+          let newCharge = Float.min(maxCapacity, battery.storedKwh + kwhGained);
+
+          // Track actual energy gained (may be less than kwhGained if capped)
+          let actualGain = newCharge - battery.storedKwh;
+          if (actualGain > 0.0) {
+            totalEnergyGainedKwh += actualGain;
+          };
+
+          {
+            battery with
+            storedKwh = newCharge;
+            lastChargeUpdate = now;
+          };
+        },
+      );
+
+      setBatteryStorage(owner, { storage with batteries = updatedBatteries });
+
+      // Track SMR usage for battery charging (SMR provides power above base 500W)
+      if (totalEnergyGainedKwh > 0.0) {
+        let smrPower = getUserSMRPower(owner);
+        if (smrPower > 0) {
+          let totalCapacity = BASE_POWER_WATTS + smrPower;
+          let smrPowerRatio = Float.fromInt(smrPower) / Float.fromInt(totalCapacity);
+          let smrEnergyWh = totalEnergyGainedKwh * 1000.0 * smrPowerRatio; // Convert kWh to Wh
+          accumulateSMRUsage(owner, smrEnergyWh, now);
+        };
+      };
+    };
+
+    /// Jolt a bot from a battery - instant charge using stored energy
+    public func joltBot(
+      owner : Principal,
+      batteryId : Nat,
+      tokenIndex : Nat,
+      now : Int,
+    ) : Result.Result<JoltResult, Text> {
+      // First, accumulate any pending charge on all batteries (persist projected values)
+      accumulateBatteryCharge(owner, now);
+
+      // 1. Get battery (now with accumulated charge)
+      let battery = switch (getBattery(owner, batteryId)) {
+        case (?b) { b };
+        case (null) { return #err("Battery not found in your garage") };
+      };
+
+      // 2. Check battery is operational (healthPercent > 0)
+      if (not isBatteryOperational(battery)) {
+        return #err("Battery is dead. Rebuild or salvage it. Current health: " # Nat.toText(battery.healthPercent) # "%");
+      };
+
+      // 3. Check battery has enough charge for a jolt (10% of base capacity)
+      let joltCost = getJoltCost(battery.batteryType);
+      if (battery.storedKwh < joltCost) {
+        return #err("Insufficient battery charge. Need " # Float.toText(joltCost) # " kWh, have " # Float.toText(battery.storedKwh) # " kWh");
+      };
+
+      // 4. Check bot ownership
+      let botStats = switch (getStats(tokenIndex)) {
+        case (?s) { s };
+        case (null) { return #err("Bot not found or not initialized") };
+      };
+      if (botStats.ownerPrincipal != owner) {
+        return #err("You don't own this bot");
+      };
+
+      // 5. Check bot heat
+      if (isBotOverheated(tokenIndex, now)) {
+        let status = getBotHeatStatus(tokenIndex);
+        switch (status.overheatUntil) {
+          case (?until) {
+            let minutesLeft = (until - now) / 60_000_000_000;
+            return #err("Bot is overheated! Cooldown: " # Int.toText(minutesLeft) # " minutes remaining");
+          };
+          case (null) {};
+        };
+      };
+
+      let currentHeat = getCurrentBotHeat(tokenIndex, now);
+      if (currentHeat >= 4) {
+        return #err("Bot has too much heat (4/4 stacks). Wait for heat to decay (1 stack per hour)");
+      };
+
+      // Calculate jolt amount based on kWh consumed (scales with battery tier)
+      // Range: 1.25 to 2.25 per kWh, reduced by heat
+      let (minBoost, maxBoost) = getJoltEffectivenessRange(joltCost);
+      let heatMod = 1.0 - (Float.fromInt(currentHeat) * 0.15);
+      let range = maxBoost - minBoost;
+      let joltRoll = minBoost + (Float.fromInt(hashNat(tokenIndex + Int.abs(now)) % 101) / 100.0 * range);
+      let finalJolt = joltRoll * heatMod;
+
+      // Apply to bot
+      let newBotBattery = Nat.min(100, botStats.battery + Int.abs(Float.toInt(finalJolt)));
+
+      // Deduct from battery AND track throughput (only jolts wear the core!)
+      var updatedBattery = {
+        battery with storedKwh = battery.storedKwh - joltCost
+      };
+      updatedBattery := addBatteryJoltThroughput(updatedBattery, joltCost);
+
+      // Apply health damage from jolt
+      updatedBattery := applyBatteryJoltDamage(updatedBattery);
+      updatedBattery := {
+        updatedBattery with totalJoltsDelivered = updatedBattery.totalJoltsDelivered + 1
+      };
+
+      // Update battery in storage
+      ignore updateBattery(owner, batteryId, updatedBattery);
+
+      // Update bot battery level
+      ignore updateStats(tokenIndex, { botStats with battery = newBotBattery });
+
+      // Update bot heat
+      let newHeatStacks = currentHeat + 1;
+      let overheated = newHeatStacks >= 4;
+      let newOverheatUntil = if (overheated) { ?(now + 3_600_000_000_000) } else {
+        null;
+      };
+
+      setBotHeatStatus(
+        tokenIndex,
+        {
+          heatStacks = newHeatStacks;
+          lastJoltTime = now;
+          overheatUntil = newOverheatUntil;
+        },
+      );
+
+      #ok({
+        success = true;
+        energyDelivered = finalJolt;
+        energyConsumed = 20.0;
+        newBotBattery = newBotBattery;
+        newBatteryCharge = updatedBattery.storedKwh;
+        newBatteryHealth = updatedBattery.healthPercent;
+        newHeatStacks = newHeatStacks;
+        overheated = overheated;
+        message = if (overheated) {
+          "⚡ Jolt delivered! Bot charged to " # Nat.toText(newBotBattery) # "% ⚠️ OVERHEATED - 1hr cooldown!";
+        } else {
+          "⚡ Jolt delivered! Bot charged to " # Nat.toText(newBotBattery) # "% (Heat: " # Nat.toText(newHeatStacks) # "/4)";
+        };
+      });
+    };
+
+    /// Repair a battery with parts
+    public func repairBattery(
+      owner : Principal,
+      batteryId : Nat,
+    ) : Result.Result<{ healthGained : Nat; newHealth : Nat; cycles : Float; partsCost : Nat }, Text> {
+      let battery = switch (getBattery(owner, batteryId)) {
+        case (?b) { b };
+        case (null) { return #err("Battery not found in your garage") };
+      };
+
+      if (battery.healthPercent >= 100) {
+        return #err("Battery is already at 100% health");
+      };
+
+      let repairCost = getBatteryRepairCost(battery.batteryType);
+
+      // Check and remove parts
+      if (not removeParts(owner, #UniversalPart, repairCost)) {
+        return #err("Insufficient Universal Parts. Need " # Nat.toText(repairCost) # " parts.");
+      };
+
+      // Calculate effective repair based on cycles
+      let baseRepair = 25; // Base +25% health
+      let cycles = calculateBatteryCycles(battery.kwhThroughput, battery.batteryType);
+      let effectiveRepair = getEffectiveBatteryRepair(baseRepair, battery.kwhThroughput, battery.batteryType);
+
+      let newHealth = Nat.min(100, battery.healthPercent + effectiveRepair);
+
+      // Update battery
+      ignore updateBattery(owner, batteryId, { battery with healthPercent = newHealth });
+
+      #ok({
+        healthGained = effectiveRepair;
+        newHealth = newHealth;
+        cycles = cycles;
+        partsCost = repairCost;
+      });
+    };
+
+    /// Rebuild battery core (resets cycles AND restores health)
+    public func rebuildBatteryCore(
+      owner : Principal,
+      batteryId : Nat,
+      useIcp : Bool,
+    ) : Result.Result<{ message : Text }, Text> {
+      let battery = switch (getBattery(owner, batteryId)) {
+        case (?b) { b };
+        case (null) { return #err("Battery not found in your garage") };
+      };
+
+      if (not useIcp) {
+        let partsCost = getBatteryRebuildCost(battery.batteryType);
+        if (not removeParts(owner, #UniversalPart, partsCost)) {
+          return #err("Insufficient Universal Parts. Need " # Nat.toText(partsCost) # " parts for rebuild.");
+        };
+      };
+      // Note: ICP payment handled separately via ICRC-2 in main.mo
+
+      // Full rebuild: 100% health + reset wear + reset stored charge
+      let rebuiltBattery = {
+        battery with
+        healthPercent = 100;
+        kwhThroughput = 0.0; // Reset cycles!
+        storedKwh = 0.0; // Empty after rebuild
+      };
+
+      ignore updateBattery(owner, batteryId, rebuiltBattery);
+
+      let cycles = calculateBatteryCycles(battery.kwhThroughput, battery.batteryType);
+      #ok({
+        message = "Core rebuilt! Health: 100%, Cycles reset from " # Float.toText(cycles) # " to 0. Max capacity restored to 100%.";
+      });
+    };
+
+    /// Salvage a battery for parts
+    public func salvageBattery(
+      owner : Principal,
+      batteryId : Nat,
+    ) : Result.Result<{ partsReturned : Nat; batteryType : BatteryType }, Text> {
+      let battery = switch (removeBatteryFromGarage(owner, batteryId)) {
+        case (?b) { b };
+        case (null) { return #err("Battery not found in your garage") };
+      };
+
+      let partsReturn = getBatterySalvageReturn(battery.batteryType);
+      addParts(owner, #UniversalPart, partsReturn);
+
+      #ok({ partsReturned = partsReturn; batteryType = battery.batteryType });
+    };
+
     /// Calculate upgrade cost based on current upgrade count
     /// Original scrap progression: 100 -> 200 -> 300 -> 900 -> 2700 -> 8100 parts (at 100 parts = 1 ICP)
     /// ICP equivalent: 1.0 -> 2.0 -> 3.0 -> 9.0 -> 27.0 -> 81.0 ICP
@@ -2015,6 +3738,47 @@ module {
 
     // ===== PARTS CONVERSION =====
 
+    /// Combine 1 of each specialized part type into Universal parts
+    /// Takes 1 SPD + 1 PWR + 1 ACC + 1 STB = 1 Universal (per amount)
+    /// Returns #ok on success, #err with error message on failure
+    public func combinePartsToUniversal(
+      user : Principal,
+      amount : Nat,
+    ) : Result.Result<(), Text> {
+      if (amount == 0) {
+        return #err("Amount must be greater than 0");
+      };
+
+      let inv = getUserInventory(user);
+
+      // Check if user has enough of EACH part type
+      if (inv.speedChips < amount) {
+        return #err("Insufficient Speed Chips (need " # Nat.toText(amount) # ", have " # Nat.toText(inv.speedChips) # ")");
+      };
+      if (inv.powerCoreFragments < amount) {
+        return #err("Insufficient Power Core Fragments (need " # Nat.toText(amount) # ", have " # Nat.toText(inv.powerCoreFragments) # ")");
+      };
+      if (inv.thrusterKits < amount) {
+        return #err("Insufficient Thruster Kits (need " # Nat.toText(amount) # ", have " # Nat.toText(inv.thrusterKits) # ")");
+      };
+      if (inv.gyroModules < amount) {
+        return #err("Insufficient Gyro Modules (need " # Nat.toText(amount) # ", have " # Nat.toText(inv.gyroModules) # ")");
+      };
+
+      // Remove 1 of each specialized part type per amount
+      let finalInv = {
+        inv with
+        speedChips = inv.speedChips - amount;
+        powerCoreFragments = inv.powerCoreFragments - amount;
+        thrusterKits = inv.thrusterKits - amount;
+        gyroModules = inv.gyroModules - amount;
+        universalParts = inv.universalParts + amount;
+      };
+
+      ignore Map.put(userInventories, phash, user, finalInv);
+      #ok();
+    };
+
     /// Convert parts from one type to another (25% conversion cost)
     /// Returns #ok on success, #err with error message on failure
     public func convertParts(
@@ -2028,14 +3792,14 @@ module {
         return #err("Cannot convert parts to the same type");
       };
 
-      // Can't convert Universal Parts (they already work for anything)
+      // Can't convert FROM Universal Parts (they already work for anything)
       if (fromType == #UniversalPart) {
         return #err("Universal Parts cannot be converted (they work for any upgrade)");
       };
 
-      // Can't convert TO Universal Parts (they are more valuable)
+      // Can't convert TO Universal Parts using this function (use combinePartsToUniversal instead)
       if (toType == #UniversalPart) {
-        return #err("Cannot convert to Universal Parts (they are only obtainable through scavenging)");
+        return #err("To create Universal Parts, use the Combine Parts function (requires 1 of each part type)");
       };
 
       if (amount == 0) {
@@ -2057,7 +3821,7 @@ module {
         return #err("Insufficient parts");
       };
 
-      // Calculate conversion with 25% cost (you get 75% of input)
+      // Calculate conversion amount: 25% cost (75% efficiency) for specialized-to-specialized
       let convertedAmount = (amount * 3) / 4;
       if (convertedAmount == 0) {
         return #err("Amount too small to convert (need at least 2 parts for 1 output)");
@@ -2886,10 +4650,11 @@ module {
       // Base hourly rates for scavenging
       // Probabilistic rounding preserves exact fractional values over time
       // Zone multipliers and faction bonuses are fully preserved
+      // Battery drains faster than condition (battery is immediate constraint, condition is long-term durability)
       {
         basePartsPerHour = 10.0; // 10 parts per hour base
-        baseBatteryDrain = 20.0; // 20 battery drain per hour base
-        baseConditionLoss = 22.0; // 22 condition loss per hour base
+        baseBatteryDrain = 30.0; // 30 battery drain per hour base (faster than condition)
+        baseConditionLoss = 12.0; // 12 condition loss per hour base (slower than battery)
       };
     };
 
@@ -3156,17 +4921,19 @@ module {
         case (#DeadMachineFields) {
           { battery = 3.5; condition = 3.5; parts = 2.5 };
         };
-        // Repair Bay: Double battery drain compared to safe zone, but restores condition instead of gathering parts
+        // Repair Bay: No battery drain (like ChargingStation), restores condition instead of gathering parts
         // Negative condition value = restoration instead of loss
-        // Adjusted multiplier to compensate for increased base rate (22.0 vs old 8.0)
+        // 2x restoration speed (faster than before)
         case (#RepairBay) {
-          { battery = 2.0; condition = -1.1; parts = 0.0 };
+          { battery = 0.0; condition = -2.0; parts = 0.0 };
         };
         // Charging Station: No battery drain, restores battery instead. No condition penalty.
         // Negative battery value = restoration instead of loss
-        // Base rate: -0.25 per hour (25% speed, 4x slower)
+        // Rate calculation: abs(30 * -0.1) = 3.0 battery/hour base
+        // With tier multipliers: 1x (<25%), 2x (25-50%), 3x (50-75%), 4x (75-100%)
+        // At fastest tier: 3.0 * 4 = 12 battery/hour
         case (#ChargingStation) {
-          { battery = -0.25; condition = 0.0; parts = 0.0 };
+          { battery = -0.1; condition = 0.0; parts = 0.0 };
         };
       };
     };
@@ -3395,7 +5162,7 @@ module {
               // FIXED: Properly simulate tier-by-tier charging instead of weighted average
               let batteryDrain = if (mission.zone == #ChargingStation) {
                 // For ChargingStation, calculate actual battery gained using tiered simulation
-                // Base rate: baseBatteryDrain * zoneMultipliers.battery = 20 * -0.25 = -5 per hour
+                // Base rate: baseBatteryDrain * zoneMultipliers.battery = 30 * -0.033 = ~1 per hour
                 // NOTE: Don't apply powerCoreBonus or faction batteryMultiplier to restoration!
                 // Those bonuses reduce battery DRAIN, not increase charging speed.
                 // POWER GRID: Apply garage power efficiency to charging rate
@@ -3479,6 +5246,22 @@ module {
                 newBattery - botStats.battery;
               } else {
                 0;
+              };
+
+              // Track SMR energy usage when charging in ChargingStation
+              // SMR provides power above base 500W, so track proportional energy delivered
+              if (mission.zone == #ChargingStation and batteryRestored > 0) {
+                let smrPower = getUserSMRPower(botStats.ownerPrincipal);
+                if (smrPower > 0) {
+                  // Calculate total energy delivered (batteryRestored% * bot capacity = 100Wh per %)
+                  // Full bot charge (0→100%) = 10 kWh = 10,000 Wh, so 1% = 100 Wh
+                  // Then calculate SMR share based on power contribution
+                  let totalCapacity = BASE_POWER_WATTS + smrPower;
+                  let totalEnergyWh = Float.fromInt(batteryRestored) * 100.0; // 100 Wh per battery %
+                  let smrPowerRatio = Float.fromInt(smrPower) / Float.fromInt(totalCapacity);
+                  let smrEnergyWh = totalEnergyWh * smrPowerRatio;
+                  accumulateSMRUsage(botStats.ownerPrincipal, smrEnergyWh, now);
+                };
               };
 
               // BATTERY DEPLETION DAMAGE: If battery reaches 0 during scavenging, damage condition
@@ -3611,6 +5394,88 @@ module {
                 buffMessage := " 🌟 WORLD BUFF DISCOVERED!";
               };
 
+              // ===== BATTERY DISCOVERY (only in scavenging zones) =====
+              var batteryDiscoveryMessage = "";
+              if (isScavengingZone) {
+                // Track cumulative scavenging hours for guaranteed first battery
+                updateScavengingHours(botStats.ownerPrincipal, hoursElapsed);
+                let storage = getBatteryStorage(botStats.ownerPrincipal);
+
+                // Guaranteed first battery after 20 hours (if not already discovered)
+                let guaranteedDrop = not storage.firstBatteryDiscovered and storage.cumulativeScavengingHours >= 20.0;
+
+                // Battery drop rates by zone (% per hour)
+                let dropRates = getBatteryDropRates(mission.zone);
+
+                // Roll for battery discovery
+                let batteryRollSeed = hashNat(tokenIndex + Int.abs(mission.lastAccumulation) + 42424);
+                let discoveryRoll = Float.fromInt(batteryRollSeed % 10000) / 100.0; // 0-100 with 2 decimal precision
+
+                var discoveredBattery : ?BatteryType = null;
+                var cumulativeChance = 0.0;
+
+                if (guaranteedDrop) {
+                  // Guaranteed Scrap Cell for first battery
+                  discoveredBattery := ?#ScrapCell;
+                } else {
+                  // Roll for each battery type (rarest first)
+                  // Plasma Vault (rarest)
+                  cumulativeChance += dropRates.plasmaVault * hoursElapsed;
+                  if (discoveryRoll < cumulativeChance) {
+                    discoveredBattery := ?#PlasmaVault;
+                  };
+
+                  // Industrial Bank
+                  if (Option.isNull(discoveredBattery)) {
+                    cumulativeChance += dropRates.industrialBank * hoursElapsed;
+                    if (discoveryRoll < cumulativeChance) {
+                      discoveredBattery := ?#IndustrialBank;
+                    };
+                  };
+
+                  // Salvage Pack
+                  if (Option.isNull(discoveredBattery)) {
+                    cumulativeChance += dropRates.salvagePack * hoursElapsed;
+                    if (discoveryRoll < cumulativeChance) {
+                      discoveredBattery := ?#SalvagePack;
+                    };
+                  };
+
+                  // Scrap Cell
+                  if (Option.isNull(discoveredBattery)) {
+                    cumulativeChance += dropRates.scrapCell * hoursElapsed;
+                    if (discoveryRoll < cumulativeChance) {
+                      discoveredBattery := ?#ScrapCell;
+                    };
+                  };
+                };
+
+                // Award discovered battery (as Dead with existing cycles from wasteland)
+                switch (discoveredBattery) {
+                  case (?batteryType) {
+                    // Roll for discovery quality (cycles already on the core)
+                    let cycleSeed = hashNat(tokenIndex + Int.abs(now) + 999);
+                    let discoveryCycles = rollBatteryDiscoveryCycles(mission.zone, cycleSeed);
+                    let discoveryKwh = batteryCyclesToKwh(discoveryCycles, batteryType);
+
+                    let battery = createWastelandBattery(batteryType, discoveryKwh, now);
+                    addBatteryToGarage(botStats.ownerPrincipal, battery);
+
+                    // Quality message based on cycles
+                    let qualityMsg = if (discoveryCycles < 10.0) {
+                      " (Pristine!✨)";
+                    } else if (discoveryCycles < 30.0) { " (Good condition)" } else if (discoveryCycles < 60.0) {
+                      " (Average wear)";
+                    } else if (discoveryCycles < 120.0) { " (Worn)" } else {
+                      " (Toast💀)";
+                    };
+
+                    batteryDiscoveryMessage := " ⚡ BATTERY FOUND: " # batteryTypeName(batteryType) # qualityMsg;
+                  };
+                  case (null) {};
+                };
+              };
+
               // Update mission with new pending parts, condition restored, and battery restored
               let updatedMission = {
                 mission with
@@ -3630,7 +5495,7 @@ module {
               updateStats(tokenIndex, updatedStats);
 
               let totalPending = getTotalPendingParts(newPendingParts);
-              #ok("Accumulated " # Float.format(#fix 2, partsThisAccumulation) # " parts (" # Float.format(#fix 2, hoursElapsed) # "h). Battery: " # Nat.toText(newBattery) # ", Condition: " # Nat.toText(newCondition) # ", Total pending: " # Nat.toText(totalPending) # buffMessage);
+              #ok("Accumulated " # Float.format(#fix 2, partsThisAccumulation) # " parts (" # Float.format(#fix 2, hoursElapsed) # "h). Battery: " # Nat.toText(newBattery) # ", Condition: " # Nat.toText(newCondition) # ", Total pending: " # Nat.toText(totalPending) # buffMessage # batteryDiscoveryMessage);
             };
           };
         };
@@ -3723,7 +5588,7 @@ module {
           // FIXED: Properly simulate tier-by-tier charging instead of weighted average
           let batteryDrain = if (mission.zone == #ChargingStation) {
             // For ChargingStation, calculate actual battery gained using tiered simulation
-            // Base rate: baseBatteryDrain * zoneMultipliers.battery = 20 * -0.25 = -5 per hour
+            // Base rate: baseBatteryDrain * zoneMultipliers.battery = 30 * -0.1 = 3 per hour
             // NOTE: Don't apply powerCoreBonus or faction batteryMultiplier to restoration!
             // Those bonuses reduce battery DRAIN, not increase charging speed.
             // POWER GRID: Apply garage power efficiency to charging rate
@@ -3884,6 +5749,19 @@ module {
             ignore snapshotChargingStationBots(botStats.ownerPrincipal, now, ?tokenIndex);
           };
 
+          // REPAIR BAY: If joining RepairBay zone, assign to a specific bay
+          if (zone == #RepairBay) {
+            let currentCondition = botStats.condition;
+            switch (assignBotToRepairBay(botStats.ownerPrincipal, tokenIndex, now, currentCondition)) {
+              case (null) {
+                return #err("No repair bay available. Purchase or upgrade a bay first.");
+              };
+              case (?_bayId) {
+                // Successfully assigned to a bay
+              };
+            };
+          };
+
           // Create continuous or timed mission
           let missionId = getNextMissionId();
           let mission : ScavengingMission = {
@@ -3933,6 +5811,11 @@ module {
               // at the current efficiency before power grid changes
               if (mission.zone == #ChargingStation) {
                 ignore snapshotChargingStationBots(botStats.ownerPrincipal, now, ?tokenIndex);
+              };
+
+              // If leaving RepairBay, release the bay slot
+              if (mission.zone == #RepairBay) {
+                ignore releaseBotFromRepairBay(botStats.ownerPrincipal, tokenIndex);
               };
 
               // Force final accumulation before pulling
@@ -4007,6 +5890,11 @@ module {
               // at the current efficiency before power grid changes
               if (mission.zone == #ChargingStation) {
                 ignore snapshotChargingStationBots(botStats.ownerPrincipal, now, ?tokenIndex);
+              };
+
+              // If leaving RepairBay, release the bay slot
+              if (mission.zone == #RepairBay) {
+                ignore releaseBotFromRepairBay(botStats.ownerPrincipal, tokenIndex);
               };
 
               // Force final accumulation for any partial interval

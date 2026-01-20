@@ -121,6 +121,31 @@ export const getEventWithRaces = async (eventId, identity) => {
     return result.length > 0 ? (result[0] ?? null) : null;
 };
 /**
+ * Fetches comprehensive results for a multi-stage event including standings.
+ * @param eventId The ID of the event to fetch results for
+ * @param identity Optional identity to use for the actor
+ * @returns Event results with standings, or null if not found
+ */
+export const getEventResults = async (eventId, identity) => {
+    const racingActor = await getActor(identity);
+    const result = await racingActor.get_event_results(BigInt(eventId));
+    if (result.length === 0 || !result[0])
+        return null;
+    const data = result[0];
+    return {
+        event: data.event,
+        isMultiStage: data.isMultiStage,
+        scoringMode: data.scoringMode,
+        totalPrizePool: data.totalPrizePool,
+        cumulativeStandings: data.cumulativeStandings.length > 0 ? data.cumulativeStandings[0] ?? null : null,
+        factionStandings: data.factionStandings.length > 0 ? data.factionStandings[0] ?? null : null,
+        raceResultsSummary: data.raceResultsSummary.map(r => ({
+            ...r,
+            results: r.results.length > 0 ? r.results[0] ?? null : null,
+        })),
+    };
+};
+/**
  * Fetches race history for a specific bot with cursor-based pagination.
  * @param tokenIndex The token index of the bot
  * @param limit Maximum number of races to return

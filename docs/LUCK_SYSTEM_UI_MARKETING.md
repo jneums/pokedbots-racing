@@ -442,7 +442,7 @@
       </div>
       <div>
         <div className="text-sm text-gray-400">Duration</div>
-        <div className="text-xl font-bold">12 hours</div>
+        <div className="text-xl font-bold">Instant</div>
       </div>
     </div>
   </div>
@@ -576,7 +576,7 @@ What's your bot's luck stat? Drop token # below 👇
 🍀 **Luck Stat** - Your bot now has a 5th stat: LUCK (30-100 base, upgradeable to 100+)
 - Derived from token index + traits + faction
 - Increases proc chance for breakthrough moments
-- Upgradeable just like other stats (12hr timer, ICP/parts)
+- Upgradeable just like other stats (instant, ICP/parts)
 
 🌟 **Daily Cosmic Events** - 13 phenomena on a rotating cycle:
 - Solar Flare ☀️ - Favors high power core
@@ -650,7 +650,7 @@ Check your bot's luck. Your day is coming. 🍀
   
   <div className="tooltip-section">
     <strong>Upgrade:</strong>
-    <p>Same cost/duration as other stats (12hr, ICP/parts)</p>
+    <p>Same cost as other stats (instant, ICP/parts)</p>
   </div>
 </Tooltip>
 

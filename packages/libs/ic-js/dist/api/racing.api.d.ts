@@ -92,6 +92,21 @@ export declare const getEventWithRaces: (eventId: number, identity?: Identity) =
     }>;
 } | null>;
 /**
+ * Fetches comprehensive results for a multi-stage event including standings.
+ * @param eventId The ID of the event to fetch results for
+ * @param identity Optional identity to use for the actor
+ * @returns Event results with standings, or null if not found
+ */
+export declare const getEventResults: (eventId: number, identity?: Identity) => Promise<{
+    event: ScheduledEvent;
+    isMultiStage: boolean;
+    scoringMode: any;
+    totalPrizePool: bigint;
+    cumulativeStandings: any[] | null;
+    factionStandings: any[] | null;
+    raceResultsSummary: any[];
+} | null>;
+/**
  * Fetches race history for a specific bot with cursor-based pagination.
  * @param tokenIndex The token index of the bot
  * @param limit Maximum number of races to return

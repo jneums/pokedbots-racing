@@ -144,12 +144,24 @@ module {
                           switch (ctx.getStats(tokenIdx)) {
                             case (?botStats) {
                               let factionKey = switch (botStats.faction) {
+                                // Ultra-Rare
+                                case (#UltimateMaster) { "UltimateMaster" };
+                                case (#Wild) { "Wild" };
                                 case (#Golden) { "Golden" };
-                                case (#Crimson) { "Crimson" };
-                                case (#Azure) { "Azure" };
-                                case (#Shadow) { "Shadow" };
-                                case (#Emerald) { "Emerald" };
-                                case (#None) { "None" };
+                                case (#Ultimate) { "Ultimate" };
+                                // Super-Rare
+                                case (#Blackhole) { "Blackhole" };
+                                case (#Dead) { "Dead" };
+                                case (#Master) { "Master" };
+                                // Rare
+                                case (#Bee) { "Bee" };
+                                case (#Food) { "Food" };
+                                case (#Box) { "Box" };
+                                case (#Murder) { "Murder" };
+                                // Common
+                                case (#Game) { "Game" };
+                                case (#Animal) { "Animal" };
+                                case (#Industrial) { "Industrial" };
                               };
 
                               // Update faction total

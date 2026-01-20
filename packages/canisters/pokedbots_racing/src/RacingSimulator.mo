@@ -50,6 +50,8 @@ module {
     // Maintenance buffs (snapshotted at race start for visualization)
     overcharge : Nat; // 0-40, consumed in race for stat boost
     perfectTuneUp : Bool; // True if repaired at resonance, removes overcharge penalties
+    // Base average rating (unbuffed) for MomentumShift phenomenon calculation
+    baseAvgRating : ?Nat; // Optional for backwards compatibility with existing races
   };
 
   // ===== DAILY PHENOMENA SYSTEM =====
@@ -81,9 +83,9 @@ module {
   // ===== LUCK PROC TYPES =====
 
   public type LuckProcType = {
-    #Minor : { boost : Float; description : Text }; // +15%, 1 segment
-    #Major : { boost : Float; description : Text }; // +25%, 3 segments
-    #Legendary : { boost : Float; description : Text }; // +40%, 5 segments
+    #Minor : { boost : Float; description : Text }; // +3-5% (scales with accel), 1 segment
+    #Major : { boost : Float; description : Text }; // +6-10% (scales with accel), 3 segments
+    #Legendary : { boost : Float; description : Text }; // +10.5-17.5% (scales with accel), 5 segments
   };
 
   public type ActiveLuckBuff = {
@@ -1041,6 +1043,7 @@ module {
   /// Check if luck proc triggers this segment
   public func checkLuckProc(
     luck : Nat,
+    acceleration : Nat,
     dailyAffinity : Nat,
     position : Nat, // Current position (1-indexed)
     totalRacers : Nat,
@@ -1083,20 +1086,35 @@ module {
     let roll = Float.fromInt(segmentSeed % 1000) / 1000.0; // 0.0 to 1.0
 
     if (roll < totalLuckChance) {
-      ?determineLuckProc(luck, dailyAffinity, position, totalRacers, segmentSeed);
+      ?determineLuckProc(luck, acceleration, dailyAffinity, position, totalRacers, segmentSeed);
     } else { null };
   };
 
   /// Determine which type of luck proc occurred
   /// POSITION-BASED: Worse position = better tier chance
-  /// This rewards true underdogs with better procs
+  /// ACCEL-SCALED: Higher acceleration = bigger boost magnitude
+  /// This rewards true underdogs with better procs, and high-accel bots capitalize better
   private func determineLuckProc(
     luck : Nat,
+    acceleration : Nat,
     affinity : Nat,
     position : Nat,
     totalRacers : Nat,
     seed : Nat,
   ) : LuckProcType {
+    // Acceleration scaling with diminishing returns:
+    // - 0 accel: 0.75x (reduced)
+    // - 50 accel: 1.0x (base nerfed values)
+    // - 100 accel: 1.25x (halfway to old values, sqrt curve)
+    let accelCapped = Float.fromInt(Int.min(100, acceleration));
+    let accelScale = if (accelCapped <= 50.0) {
+      // Linear from 0.75 to 1.0
+      0.75 + 0.25 * (accelCapped / 50.0);
+    } else {
+      // Sqrt curve from 1.0 to 1.25 (diminishing returns)
+      let accelAbove50 = (accelCapped - 50.0) / 50.0; // 0 to 1
+      1.0 + 0.25 * Float.sqrt(accelAbove50);
+    };
     // Position-based tier calculation
     // Dead last gets best odds, barely-behind gets worst
     let halfField = if (totalRacers <= 2) { 1 } else { totalRacers / 2 };
@@ -1127,7 +1145,7 @@ module {
       };
 
       #Legendary({
-        boost = 1.20; // +20% speed this segment (catchup, not slingshot)
+        boost = 1.0 + (0.14 * accelScale); // +7% to +14% speed based on accel
         description = desc;
       });
     } else if (tierRoll < legendaryChance + majorChance) {
@@ -1140,7 +1158,7 @@ module {
       };
 
       #Major({
-        boost = 1.12; // +12% speed (catchup, not slingshot)
+        boost = 1.0 + (0.08 * accelScale); // +4% to +8% speed based on accel
         description = desc;
       });
     } else {
@@ -1153,7 +1171,7 @@ module {
       };
 
       #Minor({
-        boost = 1.06; // +6% speed (catchup, not slingshot)
+        boost = 1.0 + (0.04 * accelScale); // +2% to +4% speed based on accel
         description = desc;
       });
     };
@@ -1290,8 +1308,8 @@ module {
       // Power Core: Universal endurance (28% penalty range, buffed from 25%)
       let powerUniversal = 1.0 + ((100.0 - powerCore) / 350.0);
 
-      // Acceleration: Universal responsiveness (28% penalty range)
-      let accelUniversal = 1.0 + ((100.0 - acceleration) / 350.0);
+      // Acceleration: Universal responsiveness (40% penalty range, buffed from 28%)
+      let accelUniversal = 1.0 + ((100.0 - acceleration) / 250.0);
 
       // Stability: Universal consistency (28% penalty range, buffed from 25%)
       let stabilityUniversal = 1.0 + ((100.0 - stability) / 350.0);
@@ -1310,12 +1328,17 @@ module {
         1.0;
       };
 
-      // Acceleration: Bonus on roads, momentum recovery
+      // Acceleration: Affects all terrains - burst speed and corner exit
       let accelSituational = switch (segment.terrain) {
         case (#MetalRoads) {
-          1.0 + ((100.0 - acceleration) / 200.0); // +50% penalty on roads (reduced from 62%)
+          1.0 + ((100.0 - acceleration) / 160.0); // +62% penalty on roads (biggest impact)
         };
-        case _ { 1.0 };
+        case (#WastelandSand) {
+          1.0 + ((100.0 - acceleration) / 280.0); // +36% penalty on sand (traction matters)
+        };
+        case (#ScrapHeaps) {
+          1.0 + ((100.0 - acceleration) / 320.0); // +31% penalty on heaps (quick reactions)
+        };
       };
 
       let momentumLoss = if (previousDifficulty > 1.0) {
@@ -1345,9 +1368,12 @@ module {
 
       // Short sprints (<10km) - Acceleration & Speed matter more
       let sprintFactor : Float = if (raceDistance < 10) {
-        let accelWeight = 1.0 + ((acceleration - 50.0) / 200.0); // 0.75x to 1.25x
+        let accelWeight = 1.0 + ((acceleration - 50.0) / 150.0); // 0.67x to 1.33x (buffed from 0.75-1.25)
         let speedWeight = 1.0 - ((speed - 50.0) / 400.0); // 1.125x to 0.875x
         accelWeight / speedWeight; // High accel gets bonus, high speed gets slight penalty
+      } else if (raceDistance < 15) {
+        // Medium distances (10-15km) - Accel still matters but less
+        1.0 + ((acceleration - 50.0) / 400.0); // 0.875x to 1.125x
       } else { 1.0 };
 
       // Long treks (>20km) - Power & Stability matter more
@@ -1600,6 +1626,7 @@ module {
               let luckSeed = (segmentSeed * 7331 + i * 9973 + lap * 54321) % 10000;
               let luckCheck = checkLuckProc(
                 racer.participant.stats.luck,
+                racer.participant.stats.acceleration,
                 racer.dailyAffinity,
                 racer.currentPosition,
                 participants.size(),
@@ -2095,13 +2122,13 @@ module {
           };
         };
 
-        // Base parts awarded by race class (flattened curve: Scrap ~70, SilentKlan ~200)
+        // Base parts awarded by race class (flattened curve: Scrap ~18, SilentKlan ~50)
         let baseParts : Nat = switch (race.raceClass) {
-          case (#Scrap) { 70 };
-          case (#Junker) { 100 };
-          case (#Raider) { 135 };
-          case (#Elite) { 170 };
-          case (#SilentKlan) { 200 };
+          case (#Scrap) { 18 };
+          case (#Junker) { 25 };
+          case (#Raider) { 34 };
+          case (#Elite) { 43 };
+          case (#SilentKlan) { 50 };
         };
 
         // Position multiplier (flattened: winner gets 1.5x, participation gets 1x)

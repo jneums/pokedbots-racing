@@ -42,15 +42,29 @@ Your bot's affinity to the current day's phenomenon adds bonus luck chance (up t
 
 ## LUCK PROCS (BREAKTHROUGH MOMENTS)
 
-When a luck proc triggers, your bot gets a speed boost:
+When a luck proc triggers, your bot gets a speed boost that **scales with Acceleration**:
+
+### How Acceleration Affects Procs
+
+Your bot's Acceleration stat determines how powerful luck procs are:
+
+| Acceleration | Scaling Factor | Example Minor Proc |
+|--------------|----------------|-------------------|
+| 0 | 0.75x | +3% speed |
+| 50 | 1.0x | +4% speed |
+| 100 | 1.25x | +5% speed |
+
+Higher acceleration = bigger boost when luck triggers! The scaling uses diminishing returns above 50 acceleration (sqrt curve).
 
 ### Proc Types
 
 | Type | Speed Boost | Duration | Chance |
 |------|-------------|----------|--------|
-| **Minor** | +15% | 1 segment | 70% of procs |
-| **Major** | +25% | 3 segments | 25% of procs |
-| **Legendary** | +40% | 5 segments | 5% of procs |
+| **Minor** | +3-5% | 1 segment | ~70% of procs |
+| **Major** | +6-10% | 3 segments | ~25% of procs |
+| **Legendary** | +10.5-17.5% | 5 segments | ~5% of procs |
+
+*Boost ranges show minimum (0 accel) to maximum (100 accel)*
 
 ### Proc Descriptions
 

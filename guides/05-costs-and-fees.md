@@ -18,12 +18,12 @@ order: 5
 ## RACING
 
 - **Race entry fees:** 0.1-2.4 ICP (varies by class and event type)
-- **Battery drain per race:** Base 2.5 per km × terrain (1.0-1.2×) × Power Core efficiency × stat scaling
-  - Example: 4km race = 10 battery, 10km = 25 battery, 20km = 50 battery (before modifiers)
-- **Condition wear per race:** Base 1.2 per km × terrain (1.0-1.5×) × stat scaling
-  - Example: 4km race = 5 condition, 10km = 12 condition, 20km = 24 condition (before modifiers)
+- **Battery drain per race:** Base 4.0 per km × terrain (1.0-1.2×) × Power Core efficiency × stat scaling
+  - Example: 4km race = 16 battery, 10km = 40 battery, 20km = 80 battery (before modifiers)
+- **Condition wear per race:** Base 2.5 per km × terrain (1.0-1.5×) × stat scaling
+  - Example: 4km race = 10 condition, 10km = 25 condition, 20km = 50 condition (before modifiers)
 
-## UPGRADES (12hr sessions)
+## UPGRADES (Instant)
 
 Pay with parts OR ICP (dynamic pricing):
 

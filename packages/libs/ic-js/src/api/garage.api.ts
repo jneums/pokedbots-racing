@@ -955,6 +955,17 @@ export interface GaragePowerStatus {
   currentDrawWatts: number;
   botsCharging: number;
   efficiency: number;
+  smrCapacityWatts: number;
+  installedSMRCount: number;
+  // Battery charging info
+  surplusWatts: number;
+  batteriesCharging: number;
+  batteryDrawWatts: number;
+  effectiveBatteryDrawWatts: number;
+  // SMR lifetime tracking
+  smrLifetimeTotalMwh: number;
+  smrLifetimeUsedMwh: number;
+  smrLifetimePercent: number;
 }
 
 /**
@@ -977,7 +988,109 @@ export const getGaragePowerStatus = async (
     totalCapacityWatts: Number(result.totalCapacityWatts),
     currentDrawWatts: Number(result.currentDrawWatts),
     botsCharging: Number(result.botsCharging),
-    efficiency: result.efficiency
+    efficiency: result.efficiency,
+    smrCapacityWatts: Number(result.smrCapacityWatts),
+    installedSMRCount: Number(result.installedSMRCount),
+    surplusWatts: Number(result.surplusWatts),
+    batteriesCharging: Number(result.batteriesCharging),
+    batteryDrawWatts: Number(result.batteryDrawWatts),
+    effectiveBatteryDrawWatts: Number(result.effectiveBatteryDrawWatts),
+    smrLifetimeTotalMwh: Number(result.smrLifetimeTotalMwh),
+    smrLifetimeUsedMwh: result.smrLifetimeUsedMwh,
+    smrLifetimePercent: result.smrLifetimePercent
+  };
+};
+
+/**
+ * SMR (Small Modular Reactor) model types
+ */
+export type SMRModelId = 'smr-basic' | 'smr-standard' | 'smr-advanced' | 'smr-premium' | 
+                         'WR250' | 'WR-250' | 'WR500' | 'WR-500' | 'WR880' | 'WR-880' | 'WR1210' | 'WR-1210';
+
+export interface SMRPurchaseResult {
+  message: string;
+  model: string;
+  powerOutput: number;
+  newTotalCapacity: number;
+  cost: number;
+}
+
+export interface InstalledSMR {
+  model: string;
+  powerOutput: number;
+  installedAt: bigint;
+  lifetimeMwh: number;
+  usedMwh: number;
+  lifetimePercent: number;
+}
+
+export interface UserSMRStorage {
+  installedSMRs: InstalledSMR[];
+  totalPowerOutput: number;
+}
+
+/**
+ * Purchase and install an SMR to increase garage power capacity.
+ * @param modelId The SMR model ID (e.g., 'smr-basic', 'WR250', 'WR-500')
+ * @param identityOrAgent Required identity for authentication
+ * @returns Purchase result with new capacity info
+ */
+export const purchaseSMR = async (
+  modelId: SMRModelId,
+  identityOrAgent: IdentityOrAgent
+): Promise<SMRPurchaseResult> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_purchase_smr(modelId);
+  
+  if ('ok' in result) {
+    const data = result.ok as {
+      message: string;
+      model: string;
+      powerOutput: bigint;
+      newTotalCapacity: bigint;
+      cost: bigint;
+    };
+    return {
+      message: data.message,
+      model: data.model,
+      powerOutput: Number(data.powerOutput),
+      newTotalCapacity: Number(data.newTotalCapacity),
+      cost: Number(data.cost)
+    };
+  } else if ('err' in result) {
+    throw new Error(result.err as string);
+  }
+  throw new Error('Unexpected response from canister');
+};
+
+/**
+ * Get user's installed SMRs with lifetime tracking.
+ * @param identityOrAgent Required identity for authentication
+ * @returns User's SMR storage with per-SMR lifetime data
+ */
+export const getUserSMRs = async (
+  identityOrAgent: IdentityOrAgent
+): Promise<UserSMRStorage> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_get_user_smrs();
+  
+  return {
+    installedSMRs: (result.installedSMRs as Array<{ 
+      model: string; 
+      powerOutput: bigint; 
+      installedAt: bigint;
+      lifetimeMwh: bigint;
+      usedMwh: number;
+      lifetimePercent: number;
+    }>).map(smr => ({
+      model: smr.model,
+      powerOutput: Number(smr.powerOutput),
+      installedAt: smr.installedAt,
+      lifetimeMwh: Number(smr.lifetimeMwh),
+      usedMwh: smr.usedMwh,
+      lifetimePercent: smr.lifetimePercent
+    })),
+    totalPowerOutput: Number(result.totalPowerOutput)
   };
 };
 
@@ -1075,6 +1188,29 @@ export const convertParts = async (
   const actor = await getActor(identityOrAgent);
   
   const result = await actor.web_convert_parts(fromType, toType, BigInt(amount));
+  
+  if ('ok' in result) {
+    return result.ok as string;
+  } else if ('err' in result) {
+    throw new Error(result.err as string);
+  }
+  throw new Error('Unexpected response from canister');
+};
+
+/**
+ * Combine parts to create Universal parts (1 of each specialized type = 1 Universal).
+ * Takes 1 SPD + 1 PWR + 1 ACC + 1 STB to create 1 Universal Part.
+ * @param amount Number of Universal parts to create (requires amount of each specialized type)
+ * @param identityOrAgent Required identity for authentication
+ * @returns Success message with combination details
+ */
+export const combinePartsToUniversal = async (
+  amount: number,
+  identityOrAgent: IdentityOrAgent
+): Promise<string> => {
+  const actor = await getActor(identityOrAgent);
+  
+  const result = await actor.web_combine_parts_to_universal(BigInt(amount));
   
   if ('ok' in result) {
     return result.ok as string;
@@ -1257,4 +1393,596 @@ export const getUserWalletNFTs = async (identityOrAgent: IdentityOrAgent): Promi
   }));
   
   return walletNFTs;
+};
+
+// ===== Battery Storage System API =====
+
+/**
+ * Battery info for display
+ */
+export interface BatteryInfo {
+  id: bigint;
+  batteryType: 'ScrapCell' | 'SalvagePack' | 'IndustrialBank' | 'PlasmaVault';
+  healthPercent: bigint;
+  storedKwh: number;
+  maxCapacityKwh: number;
+  baseCapacityKwh: number;
+  cyclesPercent: number;
+  kwhThroughput: number;
+  discoveredAt: bigint;
+  totalJoltsDelivered: bigint;
+  isOperational: boolean;
+  isEnabled: boolean;
+}
+
+/**
+ * Summary of user's battery storage
+ */
+export interface BatteryStorageSummary {
+  totalBatteries: bigint;
+  operationalBatteries: bigint;
+  totalStoredKwh: number;
+  totalCapacityKwh: number;
+}
+
+/**
+ * Response from getBatteries
+ */
+export interface GetBatteriesResponse {
+  batteries: BatteryInfo[];
+  summary: BatteryStorageSummary;
+}
+
+/**
+ * Heat status for a bot
+ */
+export interface BotHeatStatus {
+  heatStacks: bigint;
+  maxHeat: bigint;
+  lastJoltTime: bigint;
+  overheatUntil: bigint | undefined;
+  isOverheated: boolean;
+  minutesUntilCooldown: bigint | undefined;
+}
+
+/**
+ * Result from jolting a bot
+ */
+export interface JoltResult {
+  energyDelivered: number;
+  energyConsumed: number;
+  newBotBattery: bigint;
+  newBatteryCharge: number;
+  newBatteryHealth: bigint;
+  newHeatStacks: bigint;
+  overheated: boolean;
+  message: string;
+}
+
+/**
+ * Result from repairing a battery
+ */
+export interface RepairBatteryResult {
+  healthGained: bigint;
+  newHealth: bigint;
+  cyclesPercent: number;
+  partsCost: bigint;
+}
+
+/**
+ * Result from rebuilding a battery core
+ */
+export interface RebuildBatteryResult {
+  message: string;
+}
+
+/**
+ * Result from salvaging a battery
+ */
+export interface SalvageBatteryResult {
+  partsReturned: bigint;
+  batteryType: string;
+}
+
+/**
+ * Battery type information
+ */
+export interface BatteryTypeInfo {
+  name: string;
+  baseCapacityKwh: number;
+  repairCostParts: bigint;
+  rebuildCostParts: bigint;
+  rebuildCostIcp: bigint;
+  salvageReturnParts: bigint;
+  drawRateWatts: bigint;
+}
+
+/**
+ * Get all batteries owned by the user along with a summary
+ * @param identityOrAgent Required identity for authentication
+ * @returns Battery list and summary
+ */
+export const getBatteries = async (identityOrAgent: IdentityOrAgent): Promise<GetBatteriesResponse> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_get_batteries();
+  
+  return {
+    batteries: result.batteries.map((b: any) => ({
+      id: b.id,
+      batteryType: b.batteryType as BatteryInfo['batteryType'],
+      healthPercent: b.healthPercent,
+      storedKwh: b.storedKwh,
+      maxCapacityKwh: b.maxCapacityKwh,
+      baseCapacityKwh: b.baseCapacityKwh,
+      cyclesPercent: b.cyclesPercent,
+      kwhThroughput: b.kwhThroughput,
+      discoveredAt: b.discoveredAt,
+      totalJoltsDelivered: b.totalJoltsDelivered,
+      isOperational: b.isOperational,
+      isEnabled: b.isEnabled,
+    })),
+    summary: {
+      totalBatteries: result.summary.totalBatteries,
+      operationalBatteries: result.summary.operationalBatteries,
+      totalStoredKwh: result.summary.totalStoredKwh,
+      totalCapacityKwh: result.summary.totalCapacityKwh,
+    },
+  };
+};
+
+/**
+ * Get heat status for a specific bot
+ * @param tokenIndex Bot token index
+ * @param identityOrAgent Required identity for authentication
+ * @returns Heat status information
+ */
+export const getBotHeat = async (
+  tokenIndex: bigint,
+  identityOrAgent: IdentityOrAgent
+): Promise<BotHeatStatus> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_get_bot_heat(tokenIndex);
+  
+  return {
+    heatStacks: result.heatStacks,
+    maxHeat: result.maxHeat,
+    lastJoltTime: result.lastJoltTime,
+    overheatUntil: result.overheatUntil.length > 0 ? result.overheatUntil[0] : undefined,
+    isOverheated: result.isOverheated,
+    minutesUntilCooldown: result.minutesUntilCooldown.length > 0 ? result.minutesUntilCooldown[0] : undefined,
+  };
+};
+
+/**
+ * Jolt a bot using a battery to restore its battery level
+ * @param batteryId Battery ID to use
+ * @param tokenIndex Bot token index
+ * @param identityOrAgent Required identity for authentication
+ * @returns Jolt result with energy transferred and new states
+ */
+export const joltBot = async (
+  batteryId: bigint,
+  tokenIndex: bigint,
+  identityOrAgent: IdentityOrAgent
+): Promise<JoltResult> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_jolt_bot(batteryId, tokenIndex);
+  
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  
+  return {
+    energyDelivered: result.ok.energyDelivered,
+    energyConsumed: result.ok.energyConsumed,
+    newBotBattery: result.ok.newBotBattery,
+    newBatteryCharge: result.ok.newBatteryCharge,
+    newBatteryHealth: result.ok.newBatteryHealth,
+    newHeatStacks: result.ok.newHeatStacks,
+    overheated: result.ok.overheated,
+    message: result.ok.message,
+  };
+};
+
+/**
+ * Repair a battery's health using parts from inventory
+ * @param batteryId Battery ID to repair
+ * @param identityOrAgent Required identity for authentication
+ * @returns Repair result
+ */
+export const repairBattery = async (
+  batteryId: bigint,
+  identityOrAgent: IdentityOrAgent
+): Promise<RepairBatteryResult> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_repair_battery(batteryId);
+  
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  
+  return {
+    healthGained: result.ok.healthGained,
+    newHealth: result.ok.newHealth,
+    cyclesPercent: result.ok.cyclesPercent,
+    partsCost: result.ok.partsCost,
+  };
+};
+
+/**
+ * Rebuild a battery's core to restore cycle capacity
+ * @param batteryId Battery ID to rebuild
+ * @param useIcp If true, pay with ICP. If false, pay with parts
+ * @param identityOrAgent Required identity for authentication
+ * @returns Rebuild result
+ */
+export const rebuildBattery = async (
+  batteryId: bigint,
+  useIcp: boolean,
+  identityOrAgent: IdentityOrAgent
+): Promise<RebuildBatteryResult> => {
+  const actor = await getActor(identityOrAgent);
+  
+  // If paying with ICP, we need ICRC-2 approval first
+  if (useIcp) {
+    // Approve max amount (PlasmaVault cost is highest at 250 parts worth)
+    // ICP cost = parts / 100
+    const maxCostE8s = BigInt(250_000_000); // 2.5 ICP = 250 parts
+    const racingCanisterId = getCanisterId('pokedbots_racing');
+    await approveICRC2(identityOrAgent, racingCanisterId, maxCostE8s);
+  }
+  
+  const result = await actor.web_rebuild_battery(batteryId, useIcp);
+  
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  
+  return {
+    message: result.ok,
+  };
+};
+
+/**
+ * Salvage a battery to recover some parts
+ * @param batteryId Battery ID to salvage
+ * @param identityOrAgent Required identity for authentication
+ * @returns Salvage result
+ */
+export const salvageBattery = async (
+  batteryId: bigint,
+  identityOrAgent: IdentityOrAgent
+): Promise<SalvageBatteryResult> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_salvage_battery(batteryId);
+  
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  
+  return {
+    partsReturned: result.ok.partsReturned,
+    batteryType: result.ok.batteryType,
+  };
+};
+
+/**
+ * Get static battery type information (costs, capacities, etc.)
+ * @param identityOrAgent Required identity for authentication
+ * @returns Array of battery type info
+ */
+export const getBatteryInfo = async (identityOrAgent: IdentityOrAgent): Promise<BatteryTypeInfo[]> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_get_battery_info();
+  
+  return result.types.map((t: any) => ({
+    name: t.name,
+    baseCapacityKwh: t.baseCapacityKwh,
+    repairCostParts: t.repairCostParts,
+    rebuildCostParts: t.rebuildCostParts,
+    rebuildCostIcp: t.rebuildCostIcp,
+    salvageReturnParts: t.salvageReturnParts,
+    drawRateWatts: t.drawRateWatts,
+  }));
+};
+
+/**
+ * Toggle battery charging on/off
+ */
+export interface ToggleBatteryResult {
+  isEnabled: boolean;
+  message: string;
+}
+
+/**
+ * Toggle battery enabled state (on/off for charging)
+ * @param batteryId Battery ID to toggle
+ * @param identityOrAgent Required identity for authentication
+ * @returns New enabled state and message
+ */
+export const toggleBattery = async (
+  batteryId: bigint,
+  identityOrAgent: IdentityOrAgent
+): Promise<ToggleBatteryResult> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_toggle_battery(batteryId);
+  
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  
+  return {
+    isEnabled: result.ok.isEnabled,
+    message: result.ok.message,
+  };
+};
+
+// ===============================
+// REPAIR BAY API FUNCTIONS
+// ===============================
+
+/**
+ * Repair Bay tier configuration
+ */
+export interface RepairBayTierConfig {
+  tier: number;
+  name: string;
+  repairRatePerHour: number;
+  powerDrawWatts: number;
+  partsCost: number;
+  icpCostE8s: bigint;
+  buildTimeSeconds: bigint;
+}
+
+/**
+ * Upgrade in progress info
+ */
+export interface RepairBayUpgradeProgress {
+  targetTier: number;
+  targetTierName: string;
+  startTime: bigint;
+  completionTime: bigint;
+  remainingSeconds: bigint;
+}
+
+/**
+ * Individual repair bay info
+ */
+export interface RepairBayInfo {
+  bayId: number;
+  tier: number;
+  tierName: string;
+  repairRatePerHour: number;
+  powerDrawWatts: number;
+  currentBotToken: number | null;
+  repairStartTime: bigint | null;
+  repairStartCondition: number | null;
+  upgradeInProgress: RepairBayUpgradeProgress | null;
+}
+
+/**
+ * User's repair bay storage
+ */
+export interface UserRepairBayStorage {
+  bays: RepairBayInfo[];
+  totalBays: number;
+  maxBays: number;
+  totalPartsInvested: number;
+  totalIcpInvested: bigint;
+  nextSlotCost: { parts: number; icpE8s: bigint } | null;
+  fallbackRepairRate: number;
+}
+
+/**
+ * Repair bay upgrade cost info
+ */
+export interface RepairBayUpgradeCost {
+  currentTier: number;
+  currentTierName: string;
+  nextTier: number;
+  nextTierName: string;
+  partsCost: number;
+  icpCostE8s: bigint;
+  buildTimeSeconds: bigint;
+  newRepairRate: number;
+  newPowerDraw: number;
+}
+
+/**
+ * Get user's repair bays with current status
+ * @param identityOrAgent Required identity for authentication
+ * @returns User's repair bay storage
+ */
+export const getUserRepairBays = async (
+  identityOrAgent: IdentityOrAgent
+): Promise<UserRepairBayStorage> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_get_user_repair_bays();
+  
+  return {
+    bays: result.bays.map((bay: any) => ({
+      bayId: Number(bay.bayId),
+      tier: Number(bay.tier),
+      tierName: bay.tierName,
+      repairRatePerHour: Number(bay.repairRatePerHour),
+      powerDrawWatts: Number(bay.powerDrawWatts),
+      currentBotToken: bay.currentBotToken.length > 0 ? Number(bay.currentBotToken[0]) : null,
+      repairStartTime: bay.repairStartTime.length > 0 ? bay.repairStartTime[0] : null,
+      repairStartCondition: bay.repairStartCondition.length > 0 ? Number(bay.repairStartCondition[0]) : null,
+      upgradeInProgress: bay.upgradeInProgress.length > 0 ? {
+        targetTier: Number(bay.upgradeInProgress[0].targetTier),
+        targetTierName: bay.upgradeInProgress[0].targetTierName,
+        startTime: bay.upgradeInProgress[0].startTime,
+        completionTime: bay.upgradeInProgress[0].completionTime,
+        remainingSeconds: bay.upgradeInProgress[0].remainingSeconds,
+      } : null,
+    })),
+    totalBays: Number(result.totalBays),
+    maxBays: Number(result.maxBays),
+    totalPartsInvested: Number(result.totalPartsInvested),
+    totalIcpInvested: result.totalIcpInvested,
+    nextSlotCost: result.nextSlotCost.length > 0 && result.nextSlotCost[0] ? {
+      parts: Number(result.nextSlotCost[0].parts),
+      icpE8s: result.nextSlotCost[0].icpE8s,
+    } : null,
+    fallbackRepairRate: Number(result.fallbackRepairRate),
+  };
+};
+
+/**
+ * Get upgrade cost for a specific repair bay
+ * @param bayId Bay ID to get upgrade cost for
+ * @param identityOrAgent Required identity for authentication
+ * @returns Upgrade cost info
+ */
+export const getRepairBayUpgradeCost = async (
+  bayId: number,
+  identityOrAgent: IdentityOrAgent
+): Promise<RepairBayUpgradeCost> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_get_repair_bay_upgrade_cost(BigInt(bayId));
+  
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  
+  const data = result.ok;
+  return {
+    currentTier: Number(data.currentTier),
+    currentTierName: data.currentTierName,
+    nextTier: Number(data.nextTier),
+    nextTierName: data.nextTierName,
+    partsCost: Number(data.partsCost),
+    icpCostE8s: data.icpCostE8s,
+    buildTimeSeconds: data.buildTimeSeconds,
+    newRepairRate: Number(data.newRepairRate),
+    newPowerDraw: Number(data.newPowerDraw),
+  };
+};
+
+/**
+ * Purchase result for repair bay slot
+ */
+export interface PurchaseRepairBaySlotResult {
+  message: string;
+  bayId: number;
+  totalBays: number;
+}
+
+/**
+ * Purchase a new repair bay slot
+ * @param identityOrAgent Required identity for authentication
+ * @returns Purchase result
+ */
+export const purchaseRepairBaySlot = async (
+  identityOrAgent: IdentityOrAgent
+): Promise<PurchaseRepairBaySlotResult> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_purchase_repair_bay_slot();
+  
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  
+  return {
+    message: result.ok.message,
+    bayId: Number(result.ok.bayId),
+    totalBays: Number(result.ok.totalBays),
+  };
+};
+
+/**
+ * Upgrade result for repair bay
+ */
+export interface UpgradeRepairBayResult {
+  message: string;
+  bayId: number;
+  newTier: number;
+  newTierName: string;
+  completionTime: bigint;
+}
+
+/**
+ * Start upgrading a repair bay to the next tier
+ * @param bayId Bay ID to upgrade
+ * @param identityOrAgent Required identity for authentication
+ * @returns Upgrade result
+ */
+export const upgradeRepairBay = async (
+  bayId: number,
+  identityOrAgent: IdentityOrAgent
+): Promise<UpgradeRepairBayResult> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_upgrade_repair_bay(BigInt(bayId));
+  
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  
+  return {
+    message: result.ok.message,
+    bayId: Number(result.ok.bayId),
+    newTier: Number(result.ok.newTier),
+    newTierName: result.ok.newTierName,
+    completionTime: result.ok.completionTime,
+  };
+};
+
+/**
+ * Complete upgrade result for repair bay
+ */
+export interface CompleteRepairBayUpgradeResult {
+  message: string;
+  bayId: number;
+  newTier: number;
+  newTierName: string;
+  newRepairRate: number;
+}
+
+/**
+ * Complete a repair bay upgrade after build time has passed
+ * @param bayId Bay ID to complete upgrade for
+ * @param identityOrAgent Required identity for authentication
+ * @returns Completion result
+ */
+export const completeRepairBayUpgrade = async (
+  bayId: number,
+  identityOrAgent: IdentityOrAgent
+): Promise<CompleteRepairBayUpgradeResult> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_complete_repair_bay_upgrade(BigInt(bayId));
+  
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  
+  return {
+    message: result.ok.message,
+    bayId: Number(result.ok.bayId),
+    newTier: Number(result.ok.newTier),
+    newTierName: result.ok.newTierName,
+    newRepairRate: Number(result.ok.newRepairRate),
+  };
+};
+
+/**
+ * Get all repair bay tier configurations
+ * @param identityOrAgent Optional identity for authentication
+ * @returns Array of tier configurations
+ */
+export const getRepairBayTiers = async (
+  identityOrAgent?: IdentityOrAgent
+): Promise<RepairBayTierConfig[]> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_get_repair_bay_tiers();
+  
+  return result.map((t: any) => ({
+    tier: Number(t.tier),
+    name: t.name,
+    repairRatePerHour: Number(t.repairRatePerHour),
+    powerDrawWatts: Number(t.powerDrawWatts),
+    partsCost: Number(t.partsCost),
+    icpCostE8s: t.icpCostE8s,
+    buildTimeSeconds: t.buildTimeSeconds,
+  }));
 };

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useMyBots, useUserInventory, useCollectionBonuses, useGaragePowerStatus, useUserWalletNFTs, useRechargeBot, useRepairBot, useBatchRechargeBots, useBatchRepairBots, useBatchCompleteScavenging, useBatchStartScavenging, useStarredBots, useSetStarredBots, useRacerBots, useSetRacerBots, useScavengerBots, useSetScavengerBots, useBatchDedicationInfo } from '../../hooks/useGarage';
+import { useMyBots, useUserInventory, useCollectionBonuses, useGaragePowerStatus, useUserSMRs, useUserWalletNFTs, useRechargeBot, useRepairBot, useBatchRechargeBots, useBatchRepairBots, useBatchCompleteScavenging, useBatchStartScavenging, useStarredBots, useSetStarredBots, useRacerBots, useSetRacerBots, useScavengerBots, useSetScavengerBots, useBatchDedicationInfo, usePurchaseSMR } from '../../hooks/useGarage';
 import { useGetUpcomingEventsWithRaces } from '../../hooks/useRacing';
 import { useBackgrounds } from '../../hooks/useBackgrounds';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
@@ -9,11 +9,14 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../components/ui/alert-dialog';
 import { ToggleGroup, ToggleGroupItem } from '../../components/ui/toggle-group';
 import { WalletConnect } from '../../components/WalletConnect';
 import { BotCard } from '../../components/BotCard';
 import { PartsConverter } from '../../components/PartsConverter';
-import { Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical, Plus, ChevronDown, ChevronRight, Search, CheckSquare, Square, Filter, X, MapPin } from 'lucide-react';
+import { BatteryPanel } from '../../components/BatteryPanel';
+import { RepairBayPanel } from '../../components/RepairBayPanel';
+import { Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical, Plus, ChevronDown, ChevronRight, Search, CheckSquare, Square, Filter, X, MapPin, RefreshCw } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { BotListItem, BatchDedicationInfo } from '@pokedbots-racing/ic-js';
 import { Progress } from '../../components/ui/progress';
@@ -197,8 +200,17 @@ export default function GaragePage() {
   const [conditionRange, setConditionRange] = useState<[number, number]>([0, 100]);
   
   // Bulk scavenging state
-  const [bulkScavengeZone, setBulkScavengeZone] = useState<string>('ScrapHeaps');
+  const [bulkScavengeZone, setBulkScavengeZone] = useState<string>('ChargingStation');
   const [bulkScavengeDuration, setBulkScavengeDuration] = useState<number | undefined>(undefined);
+  
+  // Confirmation dialog state for bulk actions
+  const [showRechargeConfirm, setShowRechargeConfirm] = useState(false);
+  const [showRepairConfirm, setShowRepairConfirm] = useState(false);
+  const [pendingRechargeCount, setPendingRechargeCount] = useState(0);
+  const [pendingRepairCount, setPendingRepairCount] = useState(0);
+  
+  // Manual refresh state
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   
   // Bulk action mutations
   const rechargeMutation = useRechargeBot();
@@ -234,13 +246,17 @@ export default function GaragePage() {
   const [botStarringStates, setBotStarringStates] = useState<Map<string, boolean>>(new Map());
   
   // Use React Query hooks - isFetching is true during both initial load and refetch
-  const { data: bots = [], isLoading, isFetching, error: botsError } = useMyBots();
+  const { data: bots = [], isLoading, isFetching, error: botsError, refetch: refetchBotsList } = useMyBots();
   const { data: inventory, isLoading: inventoryLoading, refetch: refetchInventory } = useUserInventory();
   const { data: bonuses, isLoading: bonusesLoading } = useCollectionBonuses();
   const { data: powerStatus, isLoading: powerStatusLoading } = useGaragePowerStatus();
+  const { data: userSMRs } = useUserSMRs();
   const { data: walletNFTs = [], isLoading: walletNFTsLoading, error: walletNFTsError } = useUserWalletNFTs();
   const { data: backgroundData } = useBackgrounds();
   const { data: upcomingEvents = [] } = useGetUpcomingEventsWithRaces(7); // Next 7 days
+  
+  // SMR purchase mutation
+  const purchaseSMRMutation = usePurchaseSMR();
   
   // Batch fetch dedication info for all bots
   const botTokenIndices = useMemo(() => bots.map(b => Number(b.tokenIndex)), [bots]);
@@ -653,8 +669,8 @@ export default function GaragePage() {
     });
   };
 
-  // Bulk actions
-  const handleBulkRecharge = async () => {
+  // Bulk actions - show confirmation dialog
+  const handleBulkRechargeClick = () => {
     const botsToRecharge = filteredBots.filter(bot => 
       selectedBots.has(bot.tokenIndex.toString()) &&
       bot.isInitialized &&
@@ -664,6 +680,24 @@ export default function GaragePage() {
     
     if (botsToRecharge.length === 0) {
       toast.info('No bots selected that need recharging');
+      return;
+    }
+    
+    setPendingRechargeCount(botsToRecharge.length);
+    setShowRechargeConfirm(true);
+  };
+  
+  const handleBulkRecharge = async () => {
+    setShowRechargeConfirm(false);
+    
+    const botsToRecharge = filteredBots.filter(bot => 
+      selectedBots.has(bot.tokenIndex.toString()) &&
+      bot.isInitialized &&
+      bot.stats &&
+      Number(bot.stats.battery) < 100
+    );
+    
+    if (botsToRecharge.length === 0) {
       return;
     }
 
@@ -703,7 +737,7 @@ export default function GaragePage() {
     }
   };
 
-  const handleBulkRepair = async () => {
+  const handleBulkRepairClick = () => {
     const botsToRepair = filteredBots.filter(bot => 
       selectedBots.has(bot.tokenIndex.toString()) &&
       bot.isInitialized &&
@@ -713,6 +747,24 @@ export default function GaragePage() {
     
     if (botsToRepair.length === 0) {
       toast.info('No bots selected that need repair');
+      return;
+    }
+    
+    setPendingRepairCount(botsToRepair.length);
+    setShowRepairConfirm(true);
+  };
+  
+  const handleBulkRepair = async () => {
+    setShowRepairConfirm(false);
+    
+    const botsToRepair = filteredBots.filter(bot => 
+      selectedBots.has(bot.tokenIndex.toString()) &&
+      bot.isInitialized &&
+      bot.stats &&
+      Number(bot.stats.condition) < 100
+    );
+    
+    if (botsToRepair.length === 0) {
       return;
     }
 
@@ -1314,7 +1366,7 @@ export default function GaragePage() {
         <Card className={`xl:hidden border-2 mb-6 ${
           powerStatus.botsCharging > 0 && powerStatus.efficiency < 0.5 
             ? 'border-red-500/40 bg-red-950/20' 
-            : powerStatus.botsCharging > 0 && powerStatus.efficiency < 0.8 
+            : powerStatus.botsCharging > 0 && powerStatus.efficiency < 1 
               ? 'border-yellow-500/30 bg-yellow-950/10' 
               : powerStatus.botsCharging > 0
                 ? 'border-green-500/30 bg-green-950/10'
@@ -1325,7 +1377,7 @@ export default function GaragePage() {
               <Zap className={`h-4 w-4 ${
                 powerStatus.botsCharging === 0 ? 'text-muted-foreground'
                 : powerStatus.efficiency < 0.5 ? 'text-red-500' 
-                : powerStatus.efficiency < 0.8 ? 'text-yellow-500' 
+                : powerStatus.efficiency < 1 ? 'text-yellow-500' 
                 : 'text-green-500'
               }`} />
               Garage Power Grid
@@ -1345,7 +1397,7 @@ export default function GaragePage() {
               <span className={`font-bold ${
                 powerStatus.botsCharging === 0 ? 'text-muted-foreground'
                 : powerStatus.efficiency < 0.5 ? 'text-red-500' 
-                : powerStatus.efficiency < 0.8 ? 'text-yellow-500' 
+                : powerStatus.efficiency < 1 ? 'text-yellow-500' 
                 : 'text-green-500'
               }`}>
                 {Math.round(powerStatus.efficiency * 100)}% efficiency
@@ -1356,7 +1408,7 @@ export default function GaragePage() {
               className={`h-2 ${
                 powerStatus.botsCharging === 0 ? '[&>div]:bg-muted-foreground'
                 : powerStatus.efficiency < 0.5 ? '[&>div]:bg-red-500' 
-                : powerStatus.efficiency < 0.8 ? '[&>div]:bg-yellow-500' 
+                : powerStatus.efficiency < 1 ? '[&>div]:bg-yellow-500' 
                 : '[&>div]:bg-green-500'
               }`}
             />
@@ -1365,6 +1417,61 @@ export default function GaragePage() {
                 ⚠️ Over capacity! Charging speed reduced. Recall some bots to charge faster.
               </p>
             )}
+            {/* Battery charging info */}
+            {powerStatus.batteriesCharging > 0 && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-border/50 pt-2 mt-1">
+                <span>🔋</span>
+                <span>
+                  {powerStatus.batteriesCharging} batter{powerStatus.batteriesCharging === 1 ? 'y' : 'ies'} charging
+                  {powerStatus.surplusWatts > 0 ? (
+                    <span> at {powerStatus.effectiveBatteryDrawWatts}W
+                      {powerStatus.batteryDrawWatts > powerStatus.surplusWatts && (
+                        <span className="text-yellow-500"> (reduced - low surplus)</span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-red-400"> — paused (no surplus power, recall bots to resume)</span>
+                  )}
+                </span>
+              </div>
+            )}
+            
+            {/* SMR Reactor Indicators - Mobile (compact inline display) */}
+            {userSMRs && userSMRs.installedSMRs.length > 0 && (
+              <div className="border-t border-border/50 pt-3 space-y-2">
+                {userSMRs.installedSMRs.map((smr, index) => (
+                  <div key={index} className="flex items-center gap-2 p-2 rounded bg-gradient-to-r from-amber-950/30 to-transparent border-l-2 border-amber-500/50">
+                    <div className="relative flex-shrink-0">
+                      <img 
+                        src={smr.powerOutput >= 1210 ? '/xl_smr_hi.webp' 
+                          : smr.powerOutput >= 880 ? '/lg_smr_hi.webp'
+                          : smr.powerOutput >= 500 ? '/md_smr_hi.webp'
+                          : '/sm_smr_hi.webp'
+                        }
+                        alt={smr.model}
+                        className="w-8 h-8 object-contain drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <Radiation className="h-3 w-3 text-amber-500" />
+                        <span className="text-xs font-medium text-amber-400">{smr.model}</span>
+                        <span className="text-[10px] text-amber-300/60">+{smr.powerOutput}W</span>
+                      </div>
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                        smr.lifetimePercent >= 90 ? 'bg-red-500/20 text-red-400' 
+                        : smr.lifetimePercent >= 70 ? 'bg-orange-500/20 text-orange-400'
+                        : smr.lifetimePercent >= 50 ? 'bg-yellow-500/20 text-yellow-400'
+                        : 'bg-green-500/20 text-green-400'
+                      }`}>
+                        {(100 - smr.lifetimePercent).toFixed(0)}% life
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
             {/* SMR Upgrade Button */}
             <Button
               variant="outline"
@@ -1384,9 +1491,17 @@ export default function GaragePage() {
         isOpen={smrDialogOpen}
         onClose={() => setSmrDialogOpen(false)}
         onPurchase={async (tier: SMRTier) => {
-          // TODO: Implement actual SMR purchase logic
-          toast.info(`SMR purchase coming soon! Selected: ${tier.name}`);
-          throw new Error('SMR purchases are not yet available');
+          // Map tier ID to backend model ID
+          const modelMap: Record<string, string> = {
+            'smr-basic': 'WR250',
+            'smr-standard': 'WR500',
+            'smr-advanced': 'WR880',
+            'smr-premium': 'WR1210',
+          };
+          const modelId = modelMap[tier.id] || tier.id;
+          
+          const result = await purchaseSMRMutation.mutateAsync(modelId as 'WR250' | 'WR500' | 'WR880' | 'WR1210');
+          toast.success(result.message);
         }}
         currentCapacity={powerStatus?.totalCapacityWatts || 500}
       />
@@ -1639,97 +1754,105 @@ export default function GaragePage() {
       {selectionMode && (
         <div className="sticky top-20 z-40 mb-6">
           <Card className="border-2 border-primary bg-card/95 backdrop-blur shadow-lg">
-            <CardContent className="py-4">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Badge variant="secondary" className="text-sm font-bold">
-                    {selectedBots.size} bot{selectedBots.size > 1 ? 's' : ''} selected
-                  </Badge>
+            <CardContent className="py-4 space-y-4">
+              {/* Header Row - Selection info and selection controls */}
+              <div className="flex items-center justify-between">
+                <Badge variant="secondary" className="text-sm font-bold px-3 py-1">
+                  {selectedBots.size} bot{selectedBots.size !== 1 ? 's' : ''} selected
+                </Badge>
+                <div className="flex items-center gap-2">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={selectAllVisible}
+                    className="text-xs"
                   >
-                    Select All Visible
+                    Select All
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={deselectAll}
+                    className="text-xs"
                   >
-                    Deselect All
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    size="sm"
-                    onClick={handleBulkRecharge}
-                    disabled={batchRechargeMutation.isPending}
-                  >
-                    <Battery className="h-4 w-4 mr-2" />
-                    Recharge Selected
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleBulkRepair}
-                    disabled={batchRepairMutation.isPending}
-                  >
-                    <Wrench className="h-4 w-4 mr-2" />
-                    Repair Selected
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={handleBulkRecall}
-                    disabled={batchRecallMutation.isPending}
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Recall Selected
+                    Clear
                   </Button>
                 </div>
               </div>
+
+              {/* Action Buttons Row */}
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleBulkRechargeClick}
+                  disabled={batchRechargeMutation.isPending}
+                  className="justify-start"
+                >
+                  <Battery className="h-4 w-4 mr-2 text-yellow-500" />
+                  Recharge
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleBulkRepairClick}
+                  disabled={batchRepairMutation.isPending}
+                  className="justify-start"
+                >
+                  <Wrench className="h-4 w-4 mr-2 text-blue-500" />
+                  Repair
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleBulkRecall}
+                  disabled={batchRecallMutation.isPending}
+                  className="justify-start text-destructive hover:text-destructive"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Recall
+                </Button>
+              </div>
               
-              {/* Scavenging Controls */}
-              <div className="mt-3 pt-3 border-t flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                <div className="flex items-center gap-2 flex-wrap flex-1">
-                  <span className="text-sm font-medium">Send to Scavenge:</span>
-                  <Select value={bulkScavengeZone} onValueChange={setBulkScavengeZone}>
-                    <SelectTrigger className="w-[180px] h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ScrapHeaps">Scrap Heaps (Safe)</SelectItem>
-                      <SelectItem value="AbandonedSettlements">Settlements (Moderate)</SelectItem>
-                      <SelectItem value="DeadMachineFields">Machine Fields (Dangerous)</SelectItem>
-                      <SelectItem value="RepairBay">Repair Bay</SelectItem>
-                      <SelectItem value="ChargingStation">Charging Station</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select 
-                    value={bulkScavengeDuration?.toString() || "continuous"} 
-                    onValueChange={(v) => setBulkScavengeDuration(v === "continuous" ? undefined : parseInt(v))}
-                  >
-                    <SelectTrigger className="w-[140px] h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="continuous">Continuous</SelectItem>
-                      <SelectItem value="60">1 hour</SelectItem>
-                      <SelectItem value="120">2 hours</SelectItem>
-                      <SelectItem value="180">3 hours</SelectItem>
-                      <SelectItem value="360">6 hours</SelectItem>
-                      <SelectItem value="720">12 hours</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    size="sm"
-                    onClick={handleBulkScavenge}
-                    disabled={batchScavengeMutation.isPending}
-                  >
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Send Selected
-                  </Button>
-                </div>
+              {/* Scavenging Options - Always visible */}
+              <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                <MapPin className="h-4 w-4 text-green-500 shrink-0" />
+                <Select value={bulkScavengeZone} onValueChange={setBulkScavengeZone}>
+                  <SelectTrigger className="h-8 text-xs flex-1 min-w-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ChargingStation">⚡ Charging Station</SelectItem>
+                    <SelectItem value="RepairBay">🔧 Repair Bay</SelectItem>
+                    <SelectItem value="ScrapHeaps">Scrap Heaps (Safe)</SelectItem>
+                    <SelectItem value="AbandonedSettlements">Settlements (Moderate)</SelectItem>
+                    <SelectItem value="DeadMachineFields">Machine Fields (Dangerous)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select 
+                  value={bulkScavengeDuration?.toString() || "continuous"} 
+                  onValueChange={(v) => setBulkScavengeDuration(v === "continuous" ? undefined : parseInt(v))}
+                >
+                  <SelectTrigger className="h-8 text-xs w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="continuous">Continuous</SelectItem>
+                    <SelectItem value="60">1 hour</SelectItem>
+                    <SelectItem value="120">2 hours</SelectItem>
+                    <SelectItem value="180">3 hours</SelectItem>
+                    <SelectItem value="360">6 hours</SelectItem>
+                    <SelectItem value="720">12 hours</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  onClick={handleBulkScavenge}
+                  disabled={batchScavengeMutation.isPending}
+                  className="h-8"
+                >
+                  {batchScavengeMutation.isPending ? 'Sending...' : 'Send'}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -1852,7 +1975,30 @@ export default function GaragePage() {
             </div>
             <CardHeader className="pb-3">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <CardTitle className="text-lg">Your Bots ({bots.length})</CardTitle>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-lg">Your Bots ({bots.length})</CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={async () => {
+                      setIsManualRefreshing(true);
+                      try {
+                        await Promise.all([
+                          refetchBotsList(),
+                          refetchInventory(),
+                          queryClient.invalidateQueries({ queryKey: ['garage-power-status'] }),
+                        ]);
+                      } finally {
+                        setIsManualRefreshing(false);
+                      }
+                    }}
+                    disabled={isManualRefreshing}
+                    title="Refresh bot status"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isManualRefreshing ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground hidden sm:inline">Group by:</span>
@@ -2513,12 +2659,48 @@ export default function GaragePage() {
                 <CardDescription className="text-xs">Your inventory and collection bonuses</CardDescription>
               </CardHeader>
               <CardContent className="text-sm space-y-3">
+                {/* Parts Inventory - Moved above Power Grid */}
+                <div className="pb-3 border-b border-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase">Parts Inventory</h4>
+                    <PartsConverter 
+                      inventory={inventory}
+                      identityOrAgent={user?.agent}
+                      onConversionComplete={() => {
+                        queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+                      }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="flex items-center justify-between p-1.5 bg-muted/30 rounded">
+                      <span className="text-muted-foreground">SPD</span>
+                      <span className="font-bold">{inventory ? Number(inventory.speedChips) : '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-1.5 bg-muted/30 rounded">
+                      <span className="text-muted-foreground">PWR</span>
+                      <span className="font-bold">{inventory ? Number(inventory.powerCoreFragments) : '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-1.5 bg-muted/30 rounded">
+                      <span className="text-muted-foreground">ACC</span>
+                      <span className="font-bold">{inventory ? Number(inventory.thrusterKits) : '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-1.5 bg-muted/30 rounded">
+                      <span className="text-muted-foreground">STB</span>
+                      <span className="font-bold">{inventory ? Number(inventory.gyroModules) : '—'}</span>
+                    </div>
+                    <div className="col-span-2 flex items-center justify-between p-1.5 bg-primary/10 border border-primary/30 rounded">
+                      <span className="text-primary font-medium">Universal</span>
+                      <span className="font-bold text-primary">{inventory ? Number(inventory.universalParts) : '—'}</span>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Power Grid Status - Always visible */}
                 {powerStatus && (
                   <div className={`pb-3 border-b space-y-2 ${
                     powerStatus.botsCharging > 0 && powerStatus.efficiency < 0.5 
                       ? 'border-red-500/40' 
-                      : powerStatus.botsCharging > 0 && powerStatus.efficiency < 0.8 
+                      : powerStatus.botsCharging > 0 && powerStatus.efficiency < 1 
                         ? 'border-yellow-500/30' 
                         : 'border-border'
                   }`}>
@@ -2526,11 +2708,12 @@ export default function GaragePage() {
                       <Zap className={`h-3 w-3 ${
                         powerStatus.botsCharging === 0 ? 'text-muted-foreground'
                         : powerStatus.efficiency < 0.5 ? 'text-red-500' 
-                        : powerStatus.efficiency < 0.8 ? 'text-yellow-500' 
+                        : powerStatus.efficiency < 1 ? 'text-yellow-500' 
                         : 'text-green-500'
                       }`} />
                       Power Grid
                     </h4>
+                    
                     <div className="space-y-2">
                       {/* Watts usage bar */}
                       <div className="flex items-center justify-between text-xs">
@@ -2540,7 +2723,7 @@ export default function GaragePage() {
                         <span className={`font-bold ${
                           powerStatus.botsCharging === 0 ? 'text-muted-foreground'
                           : powerStatus.efficiency < 0.5 ? 'text-red-500' 
-                          : powerStatus.efficiency < 0.8 ? 'text-yellow-500' 
+                          : powerStatus.efficiency < 1 ? 'text-yellow-500' 
                           : 'text-green-500'
                         }`}>
                           {Math.round(powerStatus.efficiency * 100)}% efficiency
@@ -2551,7 +2734,7 @@ export default function GaragePage() {
                         className={`h-1.5 ${
                           powerStatus.botsCharging === 0 ? '[&>div]:bg-muted-foreground'
                           : powerStatus.efficiency < 0.5 ? '[&>div]:bg-red-500' 
-                          : powerStatus.efficiency < 0.8 ? '[&>div]:bg-yellow-500' 
+                          : powerStatus.efficiency < 1 ? '[&>div]:bg-yellow-500' 
                           : '[&>div]:bg-green-500'
                         }`}
                       />
@@ -2562,7 +2745,58 @@ export default function GaragePage() {
                         {powerStatus.botsCharging > 0 && powerStatus.efficiency < 1 && (
                           <span className="block">⚠️ Over capacity! Charging slowed.</span>
                         )}
+                        {powerStatus.batteriesCharging > 0 && (
+                          <span className="block mt-0.5">
+                            🔋 {powerStatus.batteriesCharging} batter{powerStatus.batteriesCharging === 1 ? 'y' : 'ies'} charging
+                            {powerStatus.surplusWatts > 0 ? (
+                              <span> at {powerStatus.effectiveBatteryDrawWatts}W
+                                {powerStatus.batteryDrawWatts > powerStatus.surplusWatts && (
+                                  <span className="text-yellow-500"> (reduced)</span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-red-400"> — paused (no surplus)</span>
+                            )}
+                          </span>
+                        )}
                       </div>
+                      
+                      {/* SMR Reactor Indicators - Compact inline display */}
+                      {userSMRs && userSMRs.installedSMRs.length > 0 && (
+                        <div className="pt-2 border-t border-border/50 space-y-1.5">
+                          {userSMRs.installedSMRs.map((smr, index) => (
+                            <div key={index} className="flex items-center gap-2 p-1.5 rounded bg-gradient-to-r from-amber-950/30 to-transparent border-l-2 border-amber-500/50">
+                              <div className="relative flex-shrink-0">
+                                <img 
+                                  src={smr.powerOutput >= 1210 ? '/xl_smr_hi.webp' 
+                                    : smr.powerOutput >= 880 ? '/lg_smr_hi.webp'
+                                    : smr.powerOutput >= 500 ? '/md_smr_hi.webp'
+                                    : '/sm_smr_hi.webp'
+                                  }
+                                  alt={smr.model}
+                                  className="w-6 h-6 object-contain drop-shadow-[0_0_4px_rgba(251,191,36,0.5)]"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0 flex items-center justify-between gap-1">
+                                <div className="flex items-center gap-1">
+                                  <Radiation className="h-2.5 w-2.5 text-amber-500" />
+                                  <span className="text-[10px] font-medium text-amber-400">{smr.model}</span>
+                                  <span className="text-[9px] text-amber-300/60">+{smr.powerOutput}W</span>
+                                </div>
+                                <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${
+                                  smr.lifetimePercent >= 90 ? 'bg-red-500/20 text-red-400' 
+                                  : smr.lifetimePercent >= 70 ? 'bg-orange-500/20 text-orange-400'
+                                  : smr.lifetimePercent >= 50 ? 'bg-yellow-500/20 text-yellow-400'
+                                  : 'bg-green-500/20 text-green-400'
+                                }`}>
+                                  {(100 - smr.lifetimePercent).toFixed(0)}% life
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
                       {/* SMR Upgrade Button - Desktop sidebar */}
                       <Button
                         variant="outline"
@@ -2576,6 +2810,19 @@ export default function GaragePage() {
                     </div>
                   </div>
                 )}
+                
+                {/* Battery Storage - Right after Power Grid */}
+                <div className="pb-3 border-b border-border">
+                  <BatteryPanel bots={bots.map(b => ({
+                    tokenIndex: b.tokenIndex,
+                    name: b.name,
+                  }))} />
+                </div>
+
+                {/* Repair Bays - After Battery Storage */}
+                <div className="pb-3 border-b border-border">
+                  <RepairBayPanel bots={bots} />
+                </div>
 
                 {bonusesLoading ? (
                   <p className="text-muted-foreground">Loading...</p>
@@ -2583,42 +2830,6 @@ export default function GaragePage() {
                   <p className="text-muted-foreground">Collect faction bots for bonuses</p>
                 ) : (
                   <>
-                    {/* Parts Inventory */}
-                    <div className="pb-3 border-b border-border">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-xs font-semibold text-muted-foreground uppercase">Parts Inventory</h4>
-                        <PartsConverter 
-                          inventory={inventory}
-                          identityOrAgent={user?.agent}
-                          onConversionComplete={() => {
-                            queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
-                          }}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="flex items-center justify-between p-1.5 bg-muted/30 rounded">
-                          <span className="text-muted-foreground">SPD</span>
-                          <span className="font-bold">{inventory ? Number(inventory.speedChips) : '—'}</span>
-                        </div>
-                        <div className="flex items-center justify-between p-1.5 bg-muted/30 rounded">
-                          <span className="text-muted-foreground">PWR</span>
-                          <span className="font-bold">{inventory ? Number(inventory.powerCoreFragments) : '—'}</span>
-                        </div>
-                        <div className="flex items-center justify-between p-1.5 bg-muted/30 rounded">
-                          <span className="text-muted-foreground">ACC</span>
-                          <span className="font-bold">{inventory ? Number(inventory.thrusterKits) : '—'}</span>
-                        </div>
-                        <div className="flex items-center justify-between p-1.5 bg-muted/30 rounded">
-                          <span className="text-muted-foreground">STB</span>
-                          <span className="font-bold">{inventory ? Number(inventory.gyroModules) : '—'}</span>
-                        </div>
-                        <div className="col-span-2 flex items-center justify-between p-1.5 bg-primary/10 border border-primary/30 rounded">
-                          <span className="text-primary font-medium">Universal</span>
-                          <span className="font-bold text-primary">{inventory ? Number(inventory.universalParts) : '—'}</span>
-                        </div>
-                      </div>
-                    </div>
-
                     {/* Stat Bonuses */}
                     <div className="pb-3 border-b border-border space-y-2">
                       <h4 className="text-xs font-semibold text-muted-foreground uppercase">Stat Bonuses</h4>
@@ -2826,6 +3037,58 @@ export default function GaragePage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Bulk Recharge Confirmation Dialog */}
+      <AlertDialog open={showRechargeConfirm} onOpenChange={setShowRechargeConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Bulk Recharge</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  You are about to recharge <span className="font-bold text-foreground">{pendingRechargeCount} bot{pendingRechargeCount > 1 ? 's' : ''}</span>.
+                </p>
+                <p className="text-amber-500 font-medium">
+                  This will cost approximately <span className="font-bold">{(pendingRechargeCount * 0.1).toFixed(2)} ICP</span> (0.1 ICP per bot).
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkRecharge}>
+              <Battery className="h-4 w-4 mr-2" />
+              Recharge {pendingRechargeCount} Bot{pendingRechargeCount > 1 ? 's' : ''}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Repair Confirmation Dialog */}
+      <AlertDialog open={showRepairConfirm} onOpenChange={setShowRepairConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Bulk Repair</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  You are about to repair <span className="font-bold text-foreground">{pendingRepairCount} bot{pendingRepairCount > 1 ? 's' : ''}</span>.
+                </p>
+                <p className="text-amber-500 font-medium">
+                  This will cost approximately <span className="font-bold">{(pendingRepairCount * 0.05).toFixed(2)} ICP</span> (0.05 ICP per bot).
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkRepair}>
+              <Wrench className="h-4 w-4 mr-2" />
+              Repair {pendingRepairCount} Bot{pendingRepairCount > 1 ? 's' : ''}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );

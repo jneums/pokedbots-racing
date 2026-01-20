@@ -231,6 +231,7 @@ function calculateDailyAffinity(
 // Check if luck proc triggers (returns null if no proc)
 function checkLuckProc(
   luck: number,
+  acceleration: number,
   dailyAffinity: number,
   position: number,
   totalRacers: number,
@@ -286,6 +287,15 @@ function checkLuckProc(
   // Luck stat gives small bonus to tier (up to +5% Legendary, +10% Major)
   const luckBonus = luck / 100.0;
   
+  // Acceleration scaling with diminishing returns:
+  // - 0 accel: 0.75x (reduced)
+  // - 50 accel: 1.0x (base nerfed values)
+  // - 100 accel: 1.25x (halfway to old values, sqrt curve)
+  const accelCapped = Math.min(100, acceleration);
+  const accelScale = accelCapped <= 50
+    ? 0.75 + 0.25 * (accelCapped / 50.0)  // Linear from 0.75 to 1.0
+    : 1.0 + 0.25 * Math.sqrt((accelCapped - 50) / 50.0);  // Sqrt from 1.0 to 1.25
+  
   const legendaryChance = Math.floor(3.0 + underdogRatio * 12.0 + luckBonus * 5.0); // 3-20%
   const majorChance = Math.floor(20.0 + underdogRatio * 20.0 + luckBonus * 10.0); // 20-50%
   
@@ -296,7 +306,7 @@ function checkLuckProc(
       "COSMIC BLESSING! Bot channels wasteland energy!",
       "UNSTOPPABLE! Bot enters god mode!"
     ];
-    return { type: 'Legendary', boost: 1.20, description: descriptions[segmentSeed % 4] };
+    return { type: 'Legendary', boost: 1.0 + (0.14 * accelScale), description: descriptions[segmentSeed % 4] };
   }
   else if (tierRoll < legendaryChance + majorChance) {
     const descriptions = [
@@ -305,7 +315,7 @@ function checkLuckProc(
       "Perfect line through debris!",
       "Engine surge! Extra power!"
     ];
-    return { type: 'Major', boost: 1.12, description: descriptions[segmentSeed % 4] };
+    return { type: 'Major', boost: 1.0 + (0.08 * accelScale), description: descriptions[segmentSeed % 4] };
   }
   else {
     const descriptions = [
@@ -314,7 +324,7 @@ function checkLuckProc(
       "Smooth patch ahead!",
       "Debris clears perfectly!"
     ];
-    return { type: 'Minor', boost: 1.06, description: descriptions[segmentSeed % 4] };
+    return { type: 'Minor', boost: 1.0 + (0.04 * accelScale), description: descriptions[segmentSeed % 4] };
   }
 }
 
@@ -421,6 +431,7 @@ interface RaceResult {
     luck?: number; // Luck stat for luck system
     overcharge?: number; // Overcharge level (0-40) snapshotted at race entry
     perfectTuneUp?: boolean; // Whether bot had perfect tune-up at race entry
+    baseAvgRating?: number; // Unbuffed average rating for MomentumShift phenomenon
   };
 }
 
@@ -987,7 +998,9 @@ function calculateSegmentTimeEstimate(
   
   // Power Core: Universal endurance (28% penalty range)
   const powerUniversal = 1.0 + ((100.0 - powerCore) / 350.0);
-  const accelUniversal = 1.0 + ((100.0 - acceleration) / 350.0);
+  
+  // Acceleration: Universal responsiveness (40% penalty range, buffed from 28%)
+  const accelUniversal = 1.0 + ((100.0 - acceleration) / 250.0);
   
   // Stability: Universal consistency (28% penalty range)
   const stabilityUniversal = 1.0 + ((100.0 - stability) / 350.0);
@@ -1005,10 +1018,14 @@ function calculateSegmentTimeEstimate(
     powerSituational = 1.0 + ((100.0 - powerCore) / 400.0); // Small uphill penalty
   }
   
-  // Acceleration: Bonus on roads, momentum recovery
+  // Acceleration: Affects all terrains - burst speed and corner exit
   let accelSituational = 1.0;
   if (segment.terrain === 'MetalRoads') {
-    accelSituational = 1.0 + ((100.0 - acceleration) / 200.0); // +50% penalty on roads
+    accelSituational = 1.0 + ((100.0 - acceleration) / 160.0); // +62% penalty on roads (biggest impact)
+  } else if (segment.terrain === 'WastelandSand') {
+    accelSituational = 1.0 + ((100.0 - acceleration) / 280.0); // +36% penalty on sand (traction matters)
+  } else if (segment.terrain === 'ScrapHeaps') {
+    accelSituational = 1.0 + ((100.0 - acceleration) / 320.0); // +31% penalty on heaps (quick reactions)
   }
   
   const momentumLoss = previousDifficulty > 1.0 
@@ -1032,9 +1049,12 @@ function calculateSegmentTimeEstimate(
   // Short sprints (<10km) - Acceleration & Speed matter more
   let sprintFactor = 1.0;
   if (raceDistance < 10) {
-    const accelWeight = 1.0 + ((acceleration - 50.0) / 200.0); // 0.75x to 1.25x
+    const accelWeight = 1.0 + ((acceleration - 50.0) / 150.0); // 0.67x to 1.33x (buffed from 0.75-1.25)
     const speedWeight = 1.0 - ((speed - 50.0) / 400.0); // 1.125x to 0.875x
     sprintFactor = accelWeight / speedWeight; // High accel gets bonus, high speed gets slight penalty
+  } else if (raceDistance < 15) {
+    // Medium distances (10-15km) - Accel still matters but less
+    sprintFactor = 1.0 + ((acceleration - 50.0) / 400.0); // 0.875x to 1.125x
   }
   
   // Long treks (>20km) - Power & Stability matter more  
@@ -1074,7 +1094,7 @@ function calculateSegmentTimeEstimate(
 }
 
 // Calculate segment-by-segment times for a bot
-function calculateBotSegmentTimes(
+export function calculateBotSegmentTimes(
   trackId: number, 
   trackSeed: bigint, 
   participantIndex: number,
@@ -1118,7 +1138,9 @@ function calculateBotSegmentTimes(
   const tokenIndex = nftId ? parseInt(nftId) || 0 : 0;
   const luck = stats.luck ?? 10; // Default luck if not provided
   const timestamp = raceCreatedAt ?? BigInt(Date.now() * 1_000_000);
-  const dailyAffinity = calculateDailyAffinity(tokenIndex, stats, faction || '', timestamp, overridePhenomenon);
+  // Use baseAvgRating from stats if available (for MomentumShift phenomenon)
+  const baseAvgRating = (stats as any).baseAvgRating;
+  const dailyAffinity = calculateDailyAffinity(tokenIndex, stats, faction || '', timestamp, overridePhenomenon, baseAvgRating);
 
   const segmentTimes: SegmentTime[] = [];
   let cumulativeTime = 0;
@@ -1187,7 +1209,8 @@ function calculateBotSegmentTimes(
       } else {
         // No active buff - check for new proc using separate seed
         const luckSeed = Number((segmentSeed * 7331n + BigInt(participantIndex * 9973) + BigInt(lap * 54321)) % 10000n);
-        const luckCheck = checkLuckProc(luck, dailyAffinity, currentPosition, totalRacers, luckSeed);
+        const acceleration = botStats?.acceleration ?? 50;
+        const luckCheck = checkLuckProc(luck, acceleration, dailyAffinity, currentPosition, totalRacers, luckSeed);
         
         if (luckCheck) {
           // New luck proc!
@@ -1496,6 +1519,8 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     const racerProgress: RacerProgress[] = results.map((result, idx) => {
       const tokenIndex = parseInt(result.nftId) || 0;
       const luck = result.stats?.luck ?? 10;
+      // Get baseAvgRating from stats if available (for MomentumShift phenomenon)
+      const baseAvgRating = result.stats?.baseAvgRating;
       return {
         nftId: result.nftId,
         participantIndex: botOrder ? botOrder.indexOf(result.nftId) : results.findIndex(r => r.nftId === result.nftId),
@@ -1507,7 +1532,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
         segments: [],
         // Luck system
         activeLuckBuff: null,
-        dailyAffinity: calculateDailyAffinity(tokenIndex, result.stats || { speed: 10, powerCore: 10, acceleration: 10, stability: 10 }, result.faction || '', timestamp, overridePhenomenon),
+        dailyAffinity: calculateDailyAffinity(tokenIndex, result.stats || { speed: 10, powerCore: 10, acceleration: 10, stability: 10 }, result.faction || '', timestamp, overridePhenomenon, baseAvgRating),
         currentPosition: 0, // Will be set after sorting
       };
     }).sort((a, b) => a.participantIndex - b.participantIndex); // CRITICAL: Sort by participantIndex to match backend order
@@ -1529,6 +1554,15 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     const segmentDistance = (track.segments.reduce((sum, seg) => sum + seg.length, 0) * track.laps) / 1000;
     // Distance is always in km (both from backend races and simulator)
     const distanceForCalc = (distance && distance > 0) ? distance : segmentDistance;
+    
+    // Debug for race 949
+    if (raceId === 949) {
+      console.log(`[RACE 949] Track: ${trackId}, Laps: ${track.laps}, Segments per lap: ${track.segments.length}`);
+      console.log(`[RACE 949] Total segments: ${track.laps * track.segments.length}`);
+      console.log(`[RACE 949] Distance prop: ${distance}, segmentDistance: ${segmentDistance.toFixed(2)}, distanceForCalc: ${distanceForCalc}`);
+      console.log(`[RACE 949] trackSeed: ${trackSeed}`);
+      console.log(`[RACE 949] Participants:`, racerProgress.map(r => ({ nftId: r.nftId, participantIndex: r.participantIndex, stats: r.stats })));
+    }
     
     // Simulate segment by segment for all bots
     for (let lap = 0; lap < track.laps; lap++) {
@@ -1643,10 +1677,8 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
           } else {
             // No active buff - check for new proc using separate seed (matches backend)
             const luckSeed = Number((segmentSeed * 7331n + BigInt(racer.participantIndex * 9973) + BigInt(lap * 54321)) % 10000n);
-            const luckCheck = checkLuckProc(luck, racer.dailyAffinity, racer.currentPosition, racerProgress.length, luckSeed);
-            
-            // DEBUG: Log luck check for ALL bots in ALL races
-            console.log(`LUCK CHECK: Bot ${racer.nftId} seg ${globalSegmentIdx} | pos ${racer.currentPosition}/${racerProgress.length} | aff ${racer.dailyAffinity} | seed ${luckSeed} | result: ${luckCheck ? luckCheck.type : 'none'}`);
+            const acceleration = racer.stats?.acceleration ?? 50;
+            const luckCheck = checkLuckProc(luck, acceleration, racer.dailyAffinity, racer.currentPosition, racerProgress.length, luckSeed);
             
             if (luckCheck) {
               // New luck proc!
@@ -1681,8 +1713,8 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
           
           segmentTime = segmentTime * segmentPerformance * slipstreamBonus * luckBoost;
           
-          // Debug logging for first 3 segments (only for race 724)
-          if (raceId === 724 && globalSegmentIdx < 3) {
+          // Debug logging for first 3 segments (for race 724 or 949)
+          if ((raceId === 724 || raceId === 949) && globalSegmentIdx < 3) {
             console.log(`=== FRONTEND SEGMENT ${globalSegmentIdx} BOT ${i} (${racer.nftId}) ===`);
             console.log(`participantIndex: ${racer.participantIndex}`);
             console.log(`Stats:`, botStats);
@@ -1728,16 +1760,27 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
   // Find the slowest finisher based on actual segment-calculated times
   const maxTime = useMemo(() => {
     let slowestTime = 0;
-    segmentTimesMap.forEach((segmentTimes) => {
+    segmentTimesMap.forEach((segmentTimes, nftId) => {
       const finalTime = segmentTimes[segmentTimes.length - 1]?.cumulativeTime || 0;
       if (finalTime > slowestTime) {
         slowestTime = finalTime;
       }
+      // Debug for race 949
+      if (raceId === 949) {
+        console.log(`[RACE 949] Bot ${nftId} frontend calculated time: ${finalTime.toFixed(4)}s`);
+      }
     });
     // Filter out null finalTime values (InProgress races)
     const validFinalTimes = results.filter(r => r.finalTime !== null && r.finalTime < 100000).map(r => r.finalTime);
+    
+    // Debug for race 949
+    if (raceId === 949) {
+      console.log(`[RACE 949] Backend final times:`, results.map(r => ({ nftId: r.nftId, finalTime: r.finalTime })));
+      console.log(`[RACE 949] Frontend slowest: ${slowestTime.toFixed(4)}s`);
+    }
+    
     return slowestTime > 0 ? slowestTime : (validFinalTimes.length > 0 ? Math.max(...validFinalTimes) : 60);
-  }, [segmentTimesMap, results]);
+  }, [segmentTimesMap, results, raceId]);
   
   // Calculate actual track distance from segments (more accurate than distance prop)
   // Returns distance in meters for position calculations
@@ -2414,12 +2457,14 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                 const tokenIndex = parseInt(bot.nftId) || 0;
                 const baseLuck = result?.stats?.luck ?? 10;
                 const timestamp = raceCreatedAt ?? BigInt(Date.now() * 1_000_000);
+                const baseAvgRating = result?.stats?.baseAvgRating;
                 const dailyAffinity = result?.stats ? calculateDailyAffinity(
                   tokenIndex,
                   result.stats,
                   result.faction || '',
                   timestamp,
-                  overridePhenomenon
+                  overridePhenomenon,
+                  baseAvgRating
                 ) : 0;
                 const effectiveLuck = Math.round((baseLuck + dailyAffinity) / 2);
                 

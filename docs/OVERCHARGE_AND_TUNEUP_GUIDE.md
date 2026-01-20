@@ -18,9 +18,9 @@ When you recharge your bot, if the battery was low, you get a bonus:
 
 | Overcharge Amount | Speed/Accel Boost | Trade-off |
 |-------------------|-------------------|-----------|
-| 10% overcharge | +2% Speed & Acceleration | -1.3% Power Core & Stability |
-| 20% overcharge | +4% Speed & Acceleration | -2.7% Power Core & Stability |
-| 40% overcharge (max) | +8% Speed & Acceleration | -5.3% Power Core & Stability |
+| 10% overcharge | +2.5% Speed & Acceleration | -1.3% Power Core & Stability |
+| 20% overcharge | +5% Speed & Acceleration | -2.7% Power Core & Stability |
+| 40% overcharge (max) | +10% Speed & Acceleration | -5.3% Power Core & Stability |
 
 ### The Trade-off
 

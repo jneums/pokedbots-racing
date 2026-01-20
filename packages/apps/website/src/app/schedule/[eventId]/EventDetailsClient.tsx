@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useGetEventDetails, useGetRaceById, useGetBotProfilesBatch, useRegisterForEvent, useUnregisterFromEvent } from "@/hooks/useRacing";
+import { useGetEventDetails, useGetRaceById, useGetBotProfilesBatch, useRegisterForEvent, useUnregisterFromEvent, useGetEventResults } from "@/hooks/useRacing";
 import { useMyBots, useEnterRace } from "@/hooks/useGarage";
 import { useAuth } from "@/hooks/useAuth";
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
@@ -89,12 +89,15 @@ function getTrackName(trackId: number): string {
 
 
 // Simple display component that doesn't use hooks
-function BotNameDisplay({ tokenIndex, profile }: { tokenIndex: number; profile?: any }) {
+function BotNameDisplay({ tokenIndex, profile, compact = false }: { tokenIndex: number; profile?: any; compact?: boolean }) {
   if (profile?.name && profile.name.length > 0 && profile.name[0]) {
+    if (compact) {
+      return <>{profile.name[0]}</>;
+    }
     return <>PokedBot #{tokenIndex} - {profile.name[0]}</>;
   }
   
-  return <>PokedBot #{tokenIndex}</>;
+  return <>Bot #{tokenIndex}</>;
 }
 
 // Helper to get readable class name from variant
@@ -147,6 +150,301 @@ function isBotEligibleForClass(bot: any, raceClass: any): boolean {
   if ('Elite' in raceClass) return rating >= 40 && rating < 50;
   if ('SilentKlan' in raceClass) return rating >= 50;
   return false;
+}
+
+// Event Standings component for completed multi-stage events
+function EventStandings({ eventId }: { eventId: number }) {
+  const { data: results, isLoading } = useGetEventResults(eventId);
+  
+  // Get bot indices from standings for profile batch query
+  // Include both cumulative standings and faction member standings
+  const cumulativeIndices = results?.cumulativeStandings?.map((s: any) => Number(s.tokenIndex)) || [];
+  const factionMemberIndices = results?.factionStandings?.flatMap((f: any) => 
+    f.members?.map((m: any) => Number(m.tokenIndex)) || []
+  ) || [];
+  const botIndices = [...new Set([...cumulativeIndices, ...factionMemberIndices])];
+  const { data: botProfiles = [] } = useGetBotProfilesBatch(botIndices);
+  
+  if (isLoading) {
+    return (
+      <Card className="border-2 border-primary/20 bg-card/50 backdrop-blur mb-8">
+        <CardContent className="py-8 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mr-3"></div>
+          <p className="text-muted-foreground">Loading event standings...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  if (!results) return null;
+  
+  const hasCumulativeStandings = results.cumulativeStandings && results.cumulativeStandings.length > 0;
+  const hasFactionStandings = results.factionStandings && results.factionStandings.length > 0;
+  
+  if (!hasCumulativeStandings && !hasFactionStandings) return null;
+
+  // Get faction icon
+  const getFactionIcon = (faction: string) => {
+    const icons: Record<string, string> = {
+      // Ultra-Rare
+      'UltimateMaster': '👑',
+      'Wild': '🐺',
+      'Golden': '✨',
+      'Ultimate': '⚡',
+      // Super-Rare
+      'Blackhole': '🕳️',
+      'Dead': '💀',
+      'Master': '🎓',
+      // Rare
+      'Bee': '🐝',
+      'Food': '🍔',
+      'Box': '📦',
+      'Murder': '🔪',
+      // Common
+      'Game': '🎮',
+      'Animal': '🐾',
+      'Industrial': '⚙️',
+    };
+    return icons[faction] || '🤖';
+  };
+  
+  // Get scoring mode display
+  const getScoringModeDisplay = () => {
+    if (!results.scoringMode) return 'Points';
+    if ('Cumulative' in results.scoringMode) return 'Cumulative Points';
+    if ('TeamAggregate' in results.scoringMode) return 'Faction Wars';
+    if ('Elimination' in results.scoringMode) return 'Elimination';
+    return 'Points';
+  };
+
+  return (
+    <Card className="border-2 border-amber-500/40 bg-gradient-to-br from-amber-500/5 to-purple-500/5 backdrop-blur mb-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <span className="text-2xl">🏆</span>
+          Final Standings
+          <Badge variant="default" className="bg-amber-600 ml-2">
+            {getScoringModeDisplay()}
+          </Badge>
+        </CardTitle>
+        <CardDescription>
+          Total Prize Pool: <span className="font-bold text-amber-400">{formatICP(results.totalPrizePool)}</span>
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Faction Standings (for TeamAggregate mode) */}
+        {hasFactionStandings && results.factionStandings && (
+          <div>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              ⚔️ Faction Results
+            </h3>
+            <div className="space-y-3">
+              {[...results.factionStandings]
+                .sort((a: any, b: any) => Number(b.totalPoints) - Number(a.totalPoints))
+                .map((faction: any, idx: number) => (
+                <div 
+                  key={faction.faction}
+                  className={`flex items-center gap-4 p-4 rounded-lg border-2 ${
+                    idx === 0 
+                      ? 'bg-amber-500/10 border-amber-500/40' 
+                      : idx === 1 
+                        ? 'bg-gray-400/10 border-gray-400/40'
+                        : idx === 2
+                          ? 'bg-orange-700/10 border-orange-700/40'
+                          : 'bg-card/50 border-border/40'
+                  }`}
+                >
+                  <div className="text-3xl font-bold w-12 text-center">
+                    {idx === 0 && '🥇'}
+                    {idx === 1 && '🥈'}
+                    {idx === 2 && '🥉'}
+                    {idx > 2 && `#${idx + 1}`}
+                  </div>
+                  <div className="text-3xl">{getFactionIcon(faction.faction)}</div>
+                  <div className="flex-1">
+                    <p className="text-lg font-bold">{faction.faction}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {Number(faction.memberCount)} participant{Number(faction.memberCount) !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-primary">{Number(faction.totalPoints)} pts</p>
+                    {faction.prizePerMember > 0n && (
+                      <p className="text-sm text-green-500 font-semibold">+{formatICP(BigInt(faction.prizePerMember) * BigInt(faction.memberCount))}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Show winning faction's members if TeamAggregate */}
+            {results.scoringMode && 'TeamAggregate' in results.scoringMode && results.factionStandings && results.factionStandings[0]?.members && (() => {
+              const winningFaction = [...results.factionStandings].sort((a: any, b: any) => Number(b.totalPoints) - Number(a.totalPoints))[0];
+              return (
+              <div className="mt-4 pt-4 border-t border-primary/20">
+                <p className="text-sm font-semibold mb-3 text-amber-400">
+                  🎉 Winning Faction Members ({winningFaction.faction})
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {winningFaction.members.map((member: any) => {
+                    const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(member.tokenIndex));
+                    const imageUrl = generateExtThumbnailLink(tokenId);
+                    const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === Number(member.tokenIndex));
+                    
+                    return (
+                      <Link 
+                        key={member.tokenIndex.toString()} 
+                        to={`/bot/${member.tokenIndex}`}
+                        className="flex items-center gap-2 p-2 bg-card/50 rounded border border-amber-500/20 hover:border-amber-500/50 transition-colors"
+                      >
+                        <img src={imageUrl} alt="" className="w-8 h-8 rounded border border-amber-500/30" />
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <p className="text-xs font-semibold truncate">
+                            <BotNameDisplay tokenIndex={Number(member.tokenIndex)} profile={profile} compact />
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {Number(member.points)} pts
+                          </p>
+                        </div>
+                        {winningFaction.prizePerMember > 0n && (
+                          <p className="text-xs text-green-500 font-semibold shrink-0">
+                            +{formatICP(winningFaction.prizePerMember)}
+                          </p>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+              );
+            })()}
+          </div>
+        )}
+        
+        {/* Individual Cumulative Standings */}
+        {hasCumulativeStandings && results.cumulativeStandings && (
+          <div>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              📊 Individual Standings
+            </h3>
+            <div className="space-y-2">
+              {results.cumulativeStandings.map((standing: any) => {
+                const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(standing.tokenIndex));
+                const imageUrl = generateExtThumbnailLink(tokenId);
+                const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === Number(standing.tokenIndex));
+                const position = Number(standing.position);
+                const hasPrize = standing.prizeAmount > 0n;
+                
+                return (
+                  <Link 
+                    key={standing.tokenIndex.toString()} 
+                    to={`/bot/${standing.tokenIndex}`}
+                    className="block hover:bg-card/70 transition-colors rounded-lg"
+                  >
+                    <div className={`flex items-center gap-3 p-3 border-2 rounded-lg ${
+                      position <= 3
+                        ? 'bg-amber-500/10 border-amber-500/30'
+                        : hasPrize 
+                          ? 'bg-green-500/5 border-green-500/20' 
+                          : 'bg-card/50 border-border/40'
+                    }`}>
+                      <div className="text-2xl font-bold w-10 text-center">
+                        {position === 1 && '🥇'}
+                        {position === 2 && '🥈'}
+                        {position === 3 && '🥉'}
+                        {position > 3 && `#${position}`}
+                      </div>
+                      <img
+                        src={imageUrl}
+                        alt={`Bot #${standing.tokenIndex}`}
+                        className={`w-12 h-12 rounded border-2 ${
+                          position <= 3 ? 'border-amber-500/40' : 'border-border/40'
+                        }`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold">
+                          {profile?.name?.[0] || `Bot #${standing.tokenIndex}`}
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {standing.raceResults?.slice(0, 4).map((race: any) => (
+                            <Badge 
+                              key={race.raceId.toString()} 
+                              variant="outline" 
+                              className="text-xs"
+                            >
+                              {race.stageName || `Race ${race.raceId}`}: P{Number(race.position)} ({Number(race.points)}pts)
+                            </Badge>
+                          ))}
+                          {standing.raceResults?.length > 4 && (
+                            <Badge variant="outline" className="text-xs text-muted-foreground">
+                              +{standing.raceResults.length - 4} more
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xl font-bold text-primary">
+                          {Number(standing.cumulativePoints)} pts
+                        </p>
+                        {hasPrize && (
+                          <p className="text-sm text-green-500 font-semibold">
+                            +{formatICP(standing.prizeAmount)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        
+        {/* Race Summary */}
+        {results.raceResultsSummary && results.raceResultsSummary.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              🏁 Race Summary
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {results.raceResultsSummary.map((race: any) => (
+                <div 
+                  key={race.raceId.toString()}
+                  className="p-3 bg-card/50 border border-primary/20 rounded-lg"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span>{getTerrainIcon(race.terrain)}</span>
+                      <span className="font-semibold text-sm">
+                        {race.stageName || `Race #${race.raceId}`}
+                      </span>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {getRaceClassName(race.raceClass)}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {Number(race.distance)} km • {getTerrainName(race.terrain)}
+                  </p>
+                  {race.results && race.results.length > 0 && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-amber-400">🏆</span>
+                      <span className="font-semibold">
+                        Bot #{race.results[0].tokenIndex.toString()}
+                      </span>
+                      <span className="text-muted-foreground">
+                        ({race.results[0].finalTime.toFixed(2)}s)
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 // Event Registration Section component
@@ -275,6 +573,18 @@ function EventRegistrationSection({ event }: { event: any }) {
             <p className="text-sm font-semibold text-primary">{formatDate(event.registrationCloses)}</p>
           </div>
         </div>
+        
+        {/* Minimum Participants Warning */}
+        {Number(totalRegistrations) < Number(event.metadata.minEntries) && !registrationClosed && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">⚠️</span>
+              <p className="text-sm font-medium text-amber-500">
+                {Number(event.metadata.minEntries) - Number(totalRegistrations)} more participant{Number(event.metadata.minEntries) - Number(totalRegistrations) !== 1 ? 's' : ''} needed (minimum {Number(event.metadata.minEntries)} required for event to proceed)
+              </p>
+            </div>
+          </div>
+        )}
         
         {/* Registration Slots by Division */}
         <div>
@@ -1290,6 +1600,10 @@ function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolea
 export function EventDetailsClient({ eventId }: { eventId: string }) {
   const navigate = useNavigate();
   const { data: event } = useGetEventDetails(Number(eventId));
+  
+  // Determine if completed early to conditionally fetch results
+  const isCompleted = event && 'Completed' in event.status;
+  const { data: eventResults } = useGetEventResults(isCompleted ? Number(eventId) : 0);
 
   if (!event) {
     return (
@@ -1302,8 +1616,14 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
   // Determine the actual status based on time and completion
   const now = Date.now() * 1_000_000; // Convert to nanoseconds
   const isPast = Number(event.scheduledTime) < now;
-  const isCompleted = 'Completed' in event.status;
   const registrationClosed = Number(event.registrationCloses) < now;
+  
+  // Check if this is a multi-stage event (has non-Individual scoring or multiple races per class)
+  const isMultiStage = eventResults?.isMultiStage || 
+    (event.metadata.scoringMode && !('Individual' in event.metadata.scoringMode)) ||
+    ('Automatic' in event.raceCreationMode && 
+     event.raceCreationMode.Automatic.racesPerClass?.[0] && 
+     Number(event.raceCreationMode.Automatic.racesPerClass[0]) > 1);
   
   const getStatusBadge = () => {
     if ('Cancelled' in event.status) {
@@ -1354,7 +1674,7 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
               <CardTitle>Event Details</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="text-center p-4 bg-card/50 border border-primary/20 rounded-lg">
                   <p className="text-sm text-muted-foreground mb-1">Start Time</p>
                   <p className="text-base font-bold text-primary">{formatDate(event.scheduledTime)}</p>
@@ -1364,12 +1684,23 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
                   <p className="text-xl font-bold text-primary">{event.raceIds.length}</p>
                 </div>
                 <div className="text-center p-4 bg-card/50 border border-primary/20 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Registered</p>
+                  <p className="text-xl font-bold text-primary">
+                    {Number(event.registrationCounts?.total || 0)}
+                  </p>
+                </div>
+                <div className="text-center p-4 bg-card/50 border border-primary/20 rounded-lg">
                   <p className="text-sm text-muted-foreground mb-1">Points</p>
                   <p className="text-xl font-bold text-primary">{event.metadata.pointsMultiplier}x</p>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Event Standings for completed multi-stage events */}
+          {isCompleted && isMultiStage && (
+            <EventStandings eventId={Number(eventId)} />
+          )}
 
           {/* Registration Section for events without races yet */}
           {event.raceIds.length === 0 && (

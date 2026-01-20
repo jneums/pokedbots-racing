@@ -20,7 +20,7 @@ A luck system that adds excitement and unpredictability to races without removin
 
 **Luck Stat (0-100)**:
 - Derived from token index (birthdate affinity)
-- Can be upgraded like other stats (same 12-hour timer, ICP/parts cost)
+- Can be upgraded like other stats (instant, ICP/parts cost)
 - Formula: `baseLuck = (tokenIndex % 100) + traitInfluences`
 
 **Trait Influences on Luck**:
@@ -508,7 +508,7 @@ let segmentTime = baseSegmentTime * segmentPerformance * slipstreamBonus / luckB
 A: No. Luck procs happen ~10-15% of the time for average bots, and even legendary procs only give +40% for one segment. A bot that's 30 rating points below still loses 85%+ of the time.
 
 **Q: Can I upgrade my luck stat?**
-A: Yes! Same mechanics as other stats - 12 hour timer, ICP or parts cost, progressive difficulty.
+A: Yes! Same mechanics as other stats - instant results, ICP or parts cost, progressive difficulty.
 
 **Q: What if I miss my cosmic alignment day?**
 A: Phenomena cycle every 13 days, so you'll get another shot soon. Plus, you have affinity with multiple phenomena based on your stats/traits.

@@ -6,6 +6,7 @@ import {
   getPastEvents,
   getEventDetails,
   getEventWithRaces,
+  getEventResults,
   getRaceById,
   getBotProfile,
   getBotProfilesBatch,
@@ -104,6 +105,24 @@ export const useGetEventWithRaces = (eventId: number | null) => {
     },
     enabled: eventId !== null,
     refetchInterval: 30000, // Refetch every 30 seconds
+  });
+};
+
+/**
+ * React Query hook to fetch comprehensive results for a multi-stage event.
+ * Includes cumulative standings, faction standings, and race summaries.
+ */
+export const useGetEventResults = (eventId: number | null) => {
+  return useQuery({
+    queryKey: ['eventResults', eventId],
+    queryFn: () => {
+      if (eventId === null) {
+        return null;
+      }
+      return getEventResults(eventId);
+    },
+    enabled: eventId !== null,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes (results don't change often)
   });
 };
 

@@ -76,9 +76,9 @@ Each stat tracked independently (Speed, Power Core, Acceleration, Stability):
 - Reduces financial risk for both payment types
 - Refund matches payment method used
 
-### Upgrade Duration
+### Instant Upgrades
 
-**Duration:** 12 hours (can race during upgrade)
+**Duration:** Instant! Results determined immediately with RNG.
 
 ## STRATEGY TIPS
 
@@ -87,7 +87,7 @@ Each stat tracked independently (Speed, Power Core, Acceleration, Stability):
 - Soft cap at +15 (15% success, then 1%)
 - Use Universal Parts to avoid scavenging for specific types
 - Pity system prevents long losing streaks
-- 12 hours per upgrade (can race during it)
+- Upgrades complete instantly - no waiting!
 - Spreading stats is more cost-effective than specializing
 
 **Example:** Rating 20 bot upgrading Speed from 20→21 costs 0.43 ICP, 85% success, 15% chance for +2.

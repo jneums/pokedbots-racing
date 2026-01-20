@@ -31,29 +31,29 @@ Send your bots into the wasteland to gather upgrade parts. **No ICP cost** - onl
 **ScrapHeaps - Safe & Balanced**
 - 1.0x parts, 1.0x battery drain, 1.0x condition wear
 - **40% Universal Parts**, 60% specialized (15% each type)
-- ~10 parts/hour, ~20 battery/hour, ~8 condition/hour
+- ~10 parts/hour, ~30 battery/hour, ~12 condition/hour
 - Best for: New bots, low-risk farming, safest option
 
 **AbandonedSettlements - Moderate Risk/Reward**
 - 1.6x parts, 2.0x battery drain, 2.0x condition wear
 - **40% Universal Parts**, 60% specialized (15% each type)
-- ~16 parts/hour, ~40 battery/hour, ~16 condition/hour
+- ~16 parts/hour, ~60 battery/hour, ~24 condition/hour
 - Best for: More parts than ScrapHeaps, manageable costs
 
 **DeadMachineFields - High Risk/Reward**
 - 2.5x parts, 3.5x battery drain, 3.5x condition wear
 - **40% Universal Parts**, 60% specialized (15% each type)
-- ~25 parts/hour, ~70 battery/hour, ~28 condition/hour
+- ~25 parts/hour, ~105 battery/hour, ~42 condition/hour
 - Best for: High stats bots, maximum parts (but highest costs)
 
 ### Maintenance Zones (Free Repairs - No Parts)
 
 **RepairBay - Free Condition Restore**
-- 0x parts, 2.0x battery drain, **RESTORES +12-18 condition/hour**
+- 0x parts, **NO battery drain**, **RESTORES +24-36 condition/hour**
 - Bypasses 12h repair cooldown and 0.05 ICP cost
-- ~40 battery/hour, +12-18 condition/hour (with stat bonuses)
-- **✅ NEW: No battery depletion penalty!** Safe zone for dead bots (0 battery)
-- Best for: Free repairs, damaged bots under 50% condition, dead bots (0% battery/condition)
+- 0 battery/hour, +24-36 condition/hour (with stat bonuses)
+- **Completely FREE** - no battery cost, just like ChargingStation!
+- Best for: Free repairs, damaged bots under 50% condition, any bot needing condition
 
 **ChargingStation - Free Battery Restore**
 - 0x parts, **RESTORES battery** (stepped charging curve - slower at low battery)
@@ -66,12 +66,12 @@ Send your bots into the wasteland to gather upgrade parts. **No ICP cost** - onl
 - Best for: Patient players, saving ICP, low-priority bots, dead bots
 
 **💡 Pro Tip: Overcharge Strategy**
-- Use **RepairBay** to spend battery while getting free condition repairs
+- Use **scavenging zones** (ScrapHeaps/AbandonedSettlements) to spend battery while farming parts
 - Overcharge formula: (100 - battery) × 0.4 × efficiency (capped at 60%)
 - Lower battery at recharge = bigger overcharge potential (10% battery → ~36% overcharge avg)
 - Efficiency varies by condition + RNG: 100% condition = 0.55-1.35× (highly random!)
-- Overcharge bonus: +0.20% Speed/Accel per 1% overcharge (max +8% at 40%)
-- Strategy: Drop battery low in RepairBay, then recharge for big one-time race boost!
+- Overcharge bonus: +0.25% Speed/Accel per 1% overcharge (max +10% at 40%)
+- Strategy: Drop battery low scavenging, then recharge for big one-time race boost!
 
 ## Part Types & Distribution
 
@@ -83,9 +83,12 @@ Send your bots into the wasteland to gather upgrade parts. **No ICP cost** - onl
 - **Gyro Modules** - Stability upgrades only
 
 **Part Exchange:**
-- Convert specialized parts to other types at **25% cost**
-- Example: 100 Speed Chips → 75 Thruster Kits
-- Universal Parts are always better (no conversion loss!)
+- **Convert** specialized parts to other specialized types at **25% cost**
+  - Example: 100 Speed Chips → 75 Thruster Kits
+- **Combine** 1 of each specialized type to create Universal Parts
+  - Formula: 1 SPD + 1 PWR + 1 ACC + 1 STB = 1 Universal
+  - No loss! Just need equal amounts of all 4 types.
+- Universal Parts are always better (no conversion loss when using them!)
 
 **Zone Strategy:**
 - All zones have the same 40% Universal / 60% Specialized split

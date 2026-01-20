@@ -204,17 +204,20 @@ export interface McpServer {
   'admin_adjust_leaderboard_points' : ActorMethod<[Array<bigint>], string>,
   'admin_clear_active_mission' : ActorMethod<[bigint], string>,
   'admin_compensate_resimulated_winners' : ActorMethod<[Array<bigint>], string>,
-  'admin_create_betting_pool' : ActorMethod<[bigint], Result_1>,
+  'admin_create_betting_pool' : ActorMethod<[bigint], Result_2>,
   'admin_create_event_for_orphaned_races' : ActorMethod<
     [bigint, Array<bigint>],
     string
   >,
   'admin_get_active_mission' : ActorMethod<[bigint], string>,
-  'admin_get_resonance' : ActorMethod<[bigint], Result_11>,
-  'admin_get_stat_breakdown' : ActorMethod<[bigint], Result_10>,
+  'admin_get_resonance' : ActorMethod<[bigint], Result_20>,
+  'admin_get_stat_breakdown' : ActorMethod<[bigint], Result_19>,
+  'admin_grant_battery' : ActorMethod<[Principal, string], string>,
   'admin_rebuild_bot_histories' : ActorMethod<[Array<bigint>], string>,
-  'admin_remove_race_entry' : ActorMethod<[bigint, bigint], Result_1>,
-  'admin_resimulate_race' : ActorMethod<[bigint], Result_1>,
+  'admin_remove_battery' : ActorMethod<[Principal, bigint], string>,
+  'admin_remove_race_entry' : ActorMethod<[bigint, bigint], Result_2>,
+  'admin_reset_elos' : ActorMethod<[], string>,
+  'admin_resimulate_race' : ActorMethod<[bigint], Result_2>,
   'admin_resimulate_races_batch' : ActorMethod<[Array<bigint>], string>,
   'admin_update_event_heat_allocation' : ActorMethod<[string, string], string>,
   'admin_update_prize_amounts' : ActorMethod<[Array<bigint>], string>,
@@ -224,7 +227,7 @@ export interface McpServer {
   'cancel_races_by_ids' : ActorMethod<[Array<bigint>], Array<[bigint, string]>>,
   'cleanup_duplicate_race_create_timers' : ActorMethod<[], string>,
   'clear_event_races' : ActorMethod<[Array<bigint>], string>,
-  'clear_race_create_diagnostics' : ActorMethod<[], Result_9>,
+  'clear_race_create_diagnostics' : ActorMethod<[], Result_18>,
   'clear_reconstitution_traces' : ActorMethod<[], undefined>,
   'create_my_api_key' : ActorMethod<[string, Array<string>], string>,
   'debug_get_all_tracks' : ActorMethod<
@@ -241,7 +244,7 @@ export interface McpServer {
       }
     >
   >,
-  'debug_regenerate_race_commentary' : ActorMethod<[bigint], Result_1>,
+  'debug_regenerate_race_commentary' : ActorMethod<[bigint], Result_2>,
   'debug_resimulate_race' : ActorMethod<
     [bigint],
     [] | [
@@ -405,9 +408,10 @@ export interface McpServer {
   'delete_events_and_races' : ActorMethod<[Array<bigint>], string>,
   'emergency_clear_all_timers' : ActorMethod<[], bigint>,
   'encode_token_identifier' : ActorMethod<[number], string>,
+  'force_finalize_event' : ActorMethod<[bigint], string>,
   'force_finish_race' : ActorMethod<[bigint], string>,
   'force_release_lock' : ActorMethod<[], [] | [Time]>,
-  'force_schedule_race_create' : ActorMethod<[], Result_8>,
+  'force_schedule_race_create' : ActorMethod<[], Result_17>,
   'force_system_timer_cancel' : ActorMethod<[], boolean>,
   'get_actions_by_filter' : ActorMethod<[ActionFilter], Array<ActionDetail>>,
   'get_all_scheduled_events' : ActorMethod<[], Array<ScheduledEvent>>,
@@ -747,11 +751,11 @@ export interface McpServer {
     }
   >,
   'recalculate_bot_stats' : ActorMethod<[], string>,
-  'register_for_event' : ActorMethod<[bigint, bigint], Result_1>,
+  'register_for_event' : ActorMethod<[bigint, bigint], Result_2>,
   'revoke_my_api_key' : ActorMethod<[string], undefined>,
-  'set_ext_canister' : ActorMethod<[Principal], Result_5>,
-  'set_icp_ledger' : ActorMethod<[Principal], Result_5>,
-  'set_owner' : ActorMethod<[Principal], Result_7>,
+  'set_ext_canister' : ActorMethod<[Principal], Result_14>,
+  'set_icp_ledger' : ActorMethod<[Principal], Result_14>,
+  'set_owner' : ActorMethod<[Principal], Result_16>,
   'transformJwksResponse' : ActorMethod<
     [{ 'context' : Uint8Array | number[], 'response' : HttpRequestResult }],
     HttpRequestResult
@@ -759,7 +763,7 @@ export interface McpServer {
   'trigger_race_creation' : ActorMethod<[], string>,
   'trigger_race_finish' : ActorMethod<[bigint], string>,
   'trigger_race_start' : ActorMethod<[bigint], string>,
-  'unregister_from_event' : ActorMethod<[bigint, bigint], Result_6>,
+  'unregister_from_event' : ActorMethod<[bigint, bigint], Result_15>,
   'upload_base_stats_batch' : ActorMethod<
     [
       Array<
@@ -777,24 +781,27 @@ export interface McpServer {
     ],
     undefined
   >,
-  'upload_nft_stats_batch' : ActorMethod<[Array<[bigint, NFTStats]>], Result_5>,
-  'upload_trait_schema' : ActorMethod<[TraitSchema], Result_5>,
+  'upload_nft_stats_batch' : ActorMethod<
+    [Array<[bigint, NFTStats]>],
+    Result_14
+  >,
+  'upload_trait_schema' : ActorMethod<[TraitSchema], Result_14>,
   'validate_timer_state' : ActorMethod<[], Array<string>>,
   'web_batch_complete_scavenging' : ActorMethod<
     [Array<bigint>],
-    Array<{ 'result' : Result_1, 'tokenIndex' : bigint }>
+    Array<{ 'result' : Result_2, 'tokenIndex' : bigint }>
   >,
   'web_batch_recharge_bots' : ActorMethod<
     [Array<bigint>],
-    Array<{ 'result' : Result_1, 'tokenIndex' : bigint }>
+    Array<{ 'result' : Result_2, 'tokenIndex' : bigint }>
   >,
   'web_batch_repair_bots' : ActorMethod<
     [Array<bigint>],
-    Array<{ 'result' : Result_1, 'tokenIndex' : bigint }>
+    Array<{ 'result' : Result_2, 'tokenIndex' : bigint }>
   >,
   'web_batch_start_scavenging' : ActorMethod<
     [Array<bigint>, string, [] | [bigint]],
-    Array<{ 'result' : Result_1, 'tokenIndex' : bigint }>
+    Array<{ 'result' : Result_2, 'tokenIndex' : bigint }>
   >,
   'web_betting_get_my_bets' : ActorMethod<
     [bigint],
@@ -887,14 +894,16 @@ export interface McpServer {
   >,
   'web_betting_place_bet' : ActorMethod<
     [bigint, bigint, BetType, bigint],
-    Result_4
+    Result_13
   >,
-  'web_cancel_upgrade' : ActorMethod<[bigint], Result_1>,
-  'web_complete_scavenging' : ActorMethod<[bigint], Result_1>,
-  'web_convert_parts' : ActorMethod<[string, string, bigint], Result_1>,
-  'web_deregister_bot' : ActorMethod<[bigint], Result_1>,
-  'web_enter_race' : ActorMethod<[bigint, bigint], Result_1>,
-  'web_full_maintenance' : ActorMethod<[bigint], Result_1>,
+  'web_cancel_upgrade' : ActorMethod<[bigint], Result_2>,
+  'web_combine_parts_to_universal' : ActorMethod<[bigint], Result_2>,
+  'web_complete_repair_bay_upgrade' : ActorMethod<[bigint], Result_12>,
+  'web_complete_scavenging' : ActorMethod<[bigint], Result_2>,
+  'web_convert_parts' : ActorMethod<[string, string, bigint], Result_2>,
+  'web_deregister_bot' : ActorMethod<[bigint], Result_2>,
+  'web_enter_race' : ActorMethod<[bigint, bigint], Result_2>,
+  'web_full_maintenance' : ActorMethod<[bigint], Result_2>,
   'web_get_batch_dedication_info' : ActorMethod<
     [Array<bigint>],
     Array<
@@ -919,7 +928,50 @@ export interface McpServer {
       ]
     >
   >,
-  'web_get_bot_details' : ActorMethod<[bigint], Result_3>,
+  'web_get_batteries' : ActorMethod<
+    [],
+    {
+      'batteries' : Array<
+        {
+          'id' : bigint,
+          'cyclesPercent' : number,
+          'totalJoltsDelivered' : bigint,
+          'healthPercent' : bigint,
+          'isEnabled' : boolean,
+          'batteryType' : string,
+          'isOperational' : boolean,
+          'storedKwh' : number,
+          'kwhThroughput' : number,
+          'discoveredAt' : bigint,
+          'baseCapacityKwh' : number,
+          'maxCapacityKwh' : number,
+        }
+      >,
+      'summary' : {
+        'operationalBatteries' : bigint,
+        'totalStoredKwh' : number,
+        'totalBatteries' : bigint,
+        'totalCapacityKwh' : number,
+      },
+    }
+  >,
+  'web_get_battery_info' : ActorMethod<
+    [],
+    {
+      'types' : Array<
+        {
+          'salvageReturnParts' : bigint,
+          'rebuildCostIcp' : bigint,
+          'name' : string,
+          'repairCostParts' : bigint,
+          'drawRateWatts' : bigint,
+          'rebuildCostParts' : bigint,
+          'baseCapacityKwh' : number,
+        }
+      >,
+    }
+  >,
+  'web_get_bot_details' : ActorMethod<[bigint], Result_11>,
   'web_get_bot_details_batch' : ActorMethod<
     [Array<bigint>],
     Array<
@@ -938,6 +990,17 @@ export interface McpServer {
         'winRate' : number,
       }
     >
+  >,
+  'web_get_bot_heat' : ActorMethod<
+    [bigint],
+    {
+      'heatStacks' : bigint,
+      'lastJoltTime' : bigint,
+      'minutesUntilCooldown' : [] | [bigint],
+      'isOverheated' : boolean,
+      'overheatUntil' : [] | [bigint],
+      'maxHeat' : bigint,
+    }
   >,
   'web_get_collection_bonuses' : ActorMethod<
     [],
@@ -985,20 +1048,95 @@ export interface McpServer {
   'web_get_garage_power_status' : ActorMethod<
     [],
     {
+      'effectiveBatteryDrawWatts' : bigint,
       'efficiency' : number,
+      'batteriesCharging' : bigint,
       'wattsPerBotRequired' : bigint,
+      'repairBayDrawWatts' : bigint,
+      'smrLifetimeUsedMwh' : number,
       'wattsPerBot' : bigint,
+      'smrLifetimePercent' : number,
+      'activeRepairBays' : bigint,
       'botsCharging' : bigint,
       'currentDrawWatts' : bigint,
+      'smrCapacityWatts' : bigint,
+      'smrLifetimeTotalMwh' : bigint,
       'basePowerWatts' : bigint,
+      'surplusWatts' : bigint,
+      'batteryDrawWatts' : bigint,
+      'installedSMRCount' : bigint,
       'totalCapacityWatts' : bigint,
     }
   >,
   'web_get_racer_bots' : ActorMethod<[], Array<bigint>>,
+  'web_get_repair_bay_tiers' : ActorMethod<
+    [],
+    Array<
+      {
+        'repairRatePerHour' : bigint,
+        'partsCost' : bigint,
+        'icpCostE8s' : bigint,
+        'name' : string,
+        'tier' : bigint,
+        'powerDrawWatts' : bigint,
+        'buildTimeSeconds' : bigint,
+      }
+    >
+  >,
+  'web_get_repair_bay_upgrade_cost' : ActorMethod<[bigint], Result_10>,
   'web_get_scavenger_bots' : ActorMethod<[], Array<bigint>>,
   'web_get_starred_bots' : ActorMethod<[], Array<bigint>>,
   'web_get_user_inventory' : ActorMethod<[], UserInventory>,
-  'web_initialize_bot' : ActorMethod<[bigint, [] | [string]], Result_1>,
+  'web_get_user_repair_bays' : ActorMethod<
+    [],
+    {
+      'nextSlotCost' : [] | [{ 'icpE8s' : bigint, 'parts' : bigint }],
+      'bays' : Array<
+        {
+          'repairStartCondition' : [] | [bigint],
+          'tierName' : string,
+          'repairRatePerHour' : bigint,
+          'tier' : bigint,
+          'upgradeInProgress' : [] | [
+            {
+              'startTime' : bigint,
+              'completionTime' : bigint,
+              'targetTierName' : string,
+              'targetTier' : bigint,
+              'remainingSeconds' : bigint,
+            }
+          ],
+          'powerDrawWatts' : bigint,
+          'bayId' : bigint,
+          'repairStartTime' : [] | [bigint],
+          'currentBotToken' : [] | [bigint],
+        }
+      >,
+      'totalBays' : bigint,
+      'totalIcpInvested' : bigint,
+      'fallbackRepairRate' : bigint,
+      'totalPartsInvested' : bigint,
+      'maxBays' : bigint,
+    }
+  >,
+  'web_get_user_smrs' : ActorMethod<
+    [],
+    {
+      'totalPowerOutput' : bigint,
+      'installedSMRs' : Array<
+        {
+          'model' : string,
+          'powerOutput' : bigint,
+          'lifetimePercent' : number,
+          'usedMwh' : number,
+          'installedAt' : bigint,
+          'lifetimeMwh' : bigint,
+        }
+      >,
+    }
+  >,
+  'web_initialize_bot' : ActorMethod<[bigint, [] | [string]], Result_2>,
+  'web_jolt_bot' : ActorMethod<[bigint, bigint], Result_9>,
   'web_list_my_bots' : ActorMethod<
     [],
     Array<
@@ -1122,20 +1260,27 @@ export interface McpServer {
       }
     >
   >,
-  'web_recharge_bot' : ActorMethod<[bigint], Result_1>,
-  'web_repair_bot' : ActorMethod<[bigint], Result_1>,
-  'web_respec_bot' : ActorMethod<[bigint, Array<string>], Result_2>,
-  'web_set_racer_bots' : ActorMethod<[Array<bigint>], Result_1>,
-  'web_set_scavenger_bots' : ActorMethod<[Array<bigint>], Result_1>,
-  'web_set_starred_bots' : ActorMethod<[Array<bigint>], Result_1>,
+  'web_purchase_repair_bay_slot' : ActorMethod<[], Result_8>,
+  'web_purchase_smr' : ActorMethod<[string], Result_7>,
+  'web_rebuild_battery' : ActorMethod<[bigint, boolean], Result_2>,
+  'web_recharge_bot' : ActorMethod<[bigint], Result_2>,
+  'web_repair_battery' : ActorMethod<[bigint], Result_6>,
+  'web_repair_bot' : ActorMethod<[bigint], Result_2>,
+  'web_respec_bot' : ActorMethod<[bigint, Array<string>], Result_5>,
+  'web_salvage_battery' : ActorMethod<[bigint], Result_4>,
+  'web_set_racer_bots' : ActorMethod<[Array<bigint>], Result_2>,
+  'web_set_scavenger_bots' : ActorMethod<[Array<bigint>], Result_2>,
+  'web_set_starred_bots' : ActorMethod<[Array<bigint>], Result_2>,
   'web_start_scavenging' : ActorMethod<
     [bigint, string, [] | [bigint]],
-    Result_1
+    Result_2
   >,
+  'web_toggle_battery' : ActorMethod<[bigint], Result_3>,
   'web_upgrade_bot' : ActorMethod<
     [bigint, UpgradeType, { 'icp' : null } | { 'parts' : null }],
-    Result_1
+    Result_2
   >,
+  'web_upgrade_repair_bay' : ActorMethod<[bigint], Result_1>,
   'withdraw' : ActorMethod<[Principal, bigint, Destination], Result>,
 }
 export type NFTMetadata = Array<[string, string]>;
@@ -1315,6 +1460,7 @@ export interface RacingStats {
   'acceleration' : bigint,
   'powerCore' : bigint,
   'perfectTuneUp' : boolean,
+  'baseAvgRating' : [] | [bigint],
 }
 export interface ReconstitutionTrace {
   'errors' : Array<string>,
@@ -1327,9 +1473,86 @@ export interface ReconstitutionTrace {
 }
 export type Result = { 'ok' : bigint } |
   { 'err' : TreasuryError };
-export type Result_1 = { 'ok' : string } |
+export type Result_1 = {
+    'ok' : {
+      'completionTime' : bigint,
+      'newTierName' : string,
+      'message' : string,
+      'bayId' : bigint,
+      'newTier' : bigint,
+    }
+  } |
   { 'err' : string };
 export type Result_10 = {
+    'ok' : {
+      'currentTierName' : string,
+      'newRepairRate' : bigint,
+      'partsCost' : bigint,
+      'icpCostE8s' : bigint,
+      'currentTier' : bigint,
+      'newPowerDraw' : bigint,
+      'nextTierName' : string,
+      'nextTier' : bigint,
+      'buildTimeSeconds' : bigint,
+    }
+  } |
+  { 'err' : string };
+export type Result_11 = {
+    'ok' : {
+      'activeUpgrade' : [] | [UpgradeSession],
+      'isInitialized' : boolean,
+      'stats' : [] | [PokedBotRacingStats],
+      'baseStats' : {
+        'stability' : bigint,
+        'speed' : bigint,
+        'acceleration' : bigint,
+        'powerCore' : bigint,
+      },
+      'isOwner' : boolean,
+      'currentBattery' : [] | [bigint],
+      'upgradeCosts' : [] | [
+        {
+          'Gyro' : { 'icp' : bigint, 'parts' : bigint },
+          'PowerCore' : { 'icp' : bigint, 'parts' : bigint },
+          'Thruster' : { 'icp' : bigint, 'parts' : bigint },
+          'Velocity' : { 'icp' : bigint, 'parts' : bigint },
+        }
+      ],
+      'currentCondition' : [] | [bigint],
+    }
+  } |
+  { 'err' : string };
+export type Result_12 = {
+    'ok' : {
+      'newRepairRate' : bigint,
+      'newTierName' : string,
+      'message' : string,
+      'bayId' : bigint,
+      'newTier' : bigint,
+    }
+  } |
+  { 'err' : string };
+export type Result_13 = {
+    'ok' : {
+      'currentOdds' : number,
+      'potentialPayout' : bigint,
+      'betId' : bigint,
+    }
+  } |
+  { 'err' : string };
+export type Result_14 = { 'ok' : null } |
+  { 'err' : string };
+export type Result_15 = {
+    'ok' : { 'refundAmount' : bigint, 'penalty' : bigint }
+  } |
+  { 'err' : string };
+export type Result_16 = { 'ok' : null } |
+  { 'err' : TreasuryError };
+export type Result_17 = { 'ok' : { 'id' : bigint, 'time' : bigint } } |
+  { 'err' : string };
+export type Result_18 = { 'ok' : bigint } |
+  { 'err' : string };
+export type Result_19 = {
     'ok' : {
       'tokenIndex' : bigint,
       'owner' : [] | [Principal],
@@ -1389,7 +1612,9 @@ export type Result_10 = {
     }
   } |
   { 'err' : string };
-export type Result_11 = {
+export type Result_2 = { 'ok' : string } |
+  { 'err' : string };
+export type Result_20 = {
     'ok' : {
       'repair' : {
         'hoursUntilDrift' : bigint,
@@ -1412,7 +1637,15 @@ export type Result_11 = {
     }
   } |
   { 'err' : string };
-export type Result_2 = {
+export type Result_3 = {
+    'ok' : { 'isEnabled' : boolean, 'message' : string }
+  } |
+  { 'err' : string };
+export type Result_4 = {
+    'ok' : { 'partsReturned' : bigint, 'batteryType' : string }
+  } |
+  { 'err' : string };
+export type Result_5 = {
     'ok' : {
       'stabilityPartsRefunded' : bigint,
       'speedPartsRefunded' : bigint,
@@ -1423,50 +1656,41 @@ export type Result_2 = {
     }
   } |
   { 'err' : string };
-export type Result_3 = {
-    'ok' : {
-      'activeUpgrade' : [] | [UpgradeSession],
-      'isInitialized' : boolean,
-      'stats' : [] | [PokedBotRacingStats],
-      'baseStats' : {
-        'stability' : bigint,
-        'speed' : bigint,
-        'acceleration' : bigint,
-        'powerCore' : bigint,
-      },
-      'isOwner' : boolean,
-      'currentBattery' : [] | [bigint],
-      'upgradeCosts' : [] | [
-        {
-          'Gyro' : { 'icp' : bigint, 'parts' : bigint },
-          'PowerCore' : { 'icp' : bigint, 'parts' : bigint },
-          'Thruster' : { 'icp' : bigint, 'parts' : bigint },
-          'Velocity' : { 'icp' : bigint, 'parts' : bigint },
-        }
-      ],
-      'currentCondition' : [] | [bigint],
-    }
-  } |
-  { 'err' : string };
-export type Result_4 = {
-    'ok' : {
-      'currentOdds' : number,
-      'potentialPayout' : bigint,
-      'betId' : bigint,
-    }
-  } |
-  { 'err' : string };
-export type Result_5 = { 'ok' : null } |
-  { 'err' : string };
 export type Result_6 = {
-    'ok' : { 'refundAmount' : bigint, 'penalty' : bigint }
+    'ok' : {
+      'cyclesPercent' : number,
+      'partsCost' : bigint,
+      'healthGained' : bigint,
+      'newHealth' : bigint,
+    }
   } |
   { 'err' : string };
-export type Result_7 = { 'ok' : null } |
-  { 'err' : TreasuryError };
-export type Result_8 = { 'ok' : { 'id' : bigint, 'time' : bigint } } |
+export type Result_7 = {
+    'ok' : {
+      'model' : string,
+      'newTotalCapacity' : bigint,
+      'powerOutput' : bigint,
+      'cost' : bigint,
+      'message' : string,
+    }
+  } |
   { 'err' : string };
-export type Result_9 = { 'ok' : bigint } |
+export type Result_8 = {
+    'ok' : { 'totalBays' : bigint, 'message' : string, 'bayId' : bigint }
+  } |
+  { 'err' : string };
+export type Result_9 = {
+    'ok' : {
+      'energyDelivered' : number,
+      'newBotBattery' : bigint,
+      'newBatteryCharge' : number,
+      'message' : string,
+      'energyConsumed' : number,
+      'overheated' : boolean,
+      'newBatteryHealth' : bigint,
+      'newHeatStacks' : bigint,
+    }
+  } |
   { 'err' : string };
 export interface ScavengingMission {
   'pendingConditionRestored' : bigint,

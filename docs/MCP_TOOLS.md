@@ -163,7 +163,7 @@ Repair damage to improve condition.
 
 ### `garage_upgrade_robot`
 
-Start a 12-hour V2 upgrade session with RNG mechanics.
+Instantly upgrade a stat with RNG mechanics.
 
 **V2 System Features:**
 - **Flexible Payment:** Pay with ICP or parts (100 parts = 1 ICP equivalent)
@@ -175,7 +175,7 @@ Start a 12-hour V2 upgrade session with RNG mechanics.
 - **Double Lottery:** 15% → 2% chance for +2 points (disabled after +15)
 - **50% Refund on Failure:** Both ICP and parts are refunded at 50% rate
 
-**Duration:** 12 hours  
+**Duration:** Instant - results determined immediately  
 **Types:** Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability)
 
 **Input:**
@@ -195,9 +195,9 @@ Start a 12-hour V2 upgrade session with RNG mechanics.
 - `double_chance`: Lottery chance for +2 points
 - `attempt_number`: Which upgrade attempt this is
 - `pity_counter`: Consecutive failures
-- `message`: "🔧 Upgrade in progress. Check back in 12 hours."
+- `message`: Success/failure message with results
 
-**Note:** Success/failure determined after 12 hours. Failures grant pity bonus for next attempt.
+**Note:** Results are instant! Failures grant pity bonus for next attempt.
 
 ---
 

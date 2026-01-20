@@ -280,7 +280,7 @@ Next upgrade would cost 83 ICP (25 parts) for maybe +0-1...
 
 2. **Consume Materials**: Parts deducted from inventory
 
-3. **Installation Time**: 12 hours (upgrade in progress)
+3. **Instant Results**: RNG determines success/failure immediately
 
 4. **Completion**: 
    - Stat gain applied (probabilistic, weighted by current stat)
@@ -325,7 +325,7 @@ let newStat = min(currentStat + actualGain, 100);
 
 ## Upgrade Constraints
 
-- Only one upgrade session active per robot (12-hour cooldown while upgrade processes)
+- Upgrades complete instantly with RNG-based success
 - Stat gains use progressive cost curve (3→5→8→12→18→25 parts for successive upgrades to same stat)
 - Upgrades can be started at any battery/condition level
 
@@ -358,7 +358,7 @@ let newStat = min(currentStat + actualGain, 100);
 
 **For Platform:**
 - ✅ Revenue stream for platform sustainability
-- ✅ Deflationary pressure on ICP (12-hour upgrade burns)
+- ✅ Deflationary pressure on ICP (upgrade burns)
 - ✅ Economic incentive to maintain bots (must have battery/condition)
 - ✅ Natural stat distribution (not everyone at 100)
 - ✅ Preserves value of naturally high-stat bots

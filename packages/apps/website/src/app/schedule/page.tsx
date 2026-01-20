@@ -258,7 +258,9 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
                 <span>•</span>
                 <span>{event.raceIds.length || '—'} races</span>
                 <span>•</span>
-                <span>👥 {Number(event.registrationCounts.total)}</span>
+                <span>👥 {Number(event.registrationCounts.total)} registered</span>
+                <span>•</span>
+                <span className="text-muted-foreground">min {Number(event.metadata.minEntries)}/class</span>
               </div>
               
               {/* Status line */}
@@ -281,9 +283,21 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
               {event.metadata.divisions.slice(0, 4).map((division, idx) => {
                 const className = Object.keys(division)[0];
                 const count = event.registrationCounts.byClass.find((c: any) => Object.keys(c[0])[0] === className)?.[1] || 0;
+                const minEntries = Number(event.metadata.minEntries);
+                const isBelowMin = Number(count) < minEntries && Number(count) > 0;
+                const isEmpty = Number(count) === 0;
                 return (
-                  <Badge key={idx} variant="outline" className="text-xs px-1.5 py-0 bg-primary/5">
-                    {getDivisionName(division).slice(0, 3)} ({Number(count)}/{Number(event.metadata.maxEntries)})
+                  <Badge 
+                    key={idx} 
+                    variant="outline" 
+                    className={`text-xs px-1.5 py-0 ${
+                      isBelowMin ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' : 
+                      isEmpty ? 'bg-primary/5' : 
+                      'bg-green-500/10 border-green-500/30'
+                    }`}
+                    title={`Min ${minEntries} required per class`}
+                  >
+                    {getDivisionName(division).slice(0, 3)} ({Number(count)}/{minEntries})
                   </Badge>
                 );
               })}

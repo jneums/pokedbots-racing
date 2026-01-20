@@ -206,84 +206,51 @@ type ScavengingMission =
 type Result_9 = 
  variant {
    err: text;
-   ok: nat;
+   ok:
+    record {
+      energyConsumed: float64;
+      energyDelivered: float64;
+      message: text;
+      newBatteryCharge: float64;
+      newBatteryHealth: nat;
+      newBotBattery: nat;
+      newHeatStacks: nat;
+      overheated: bool;
+    };
  };
 type Result_8 = 
  variant {
    err: text;
    ok: record {
-         id: nat;
-         time: nat;
+         bayId: nat;
+         message: text;
+         totalBays: nat;
        };
  };
 type Result_7 = 
  variant {
-   err: TreasuryError;
-   ok;
+   err: text;
+   ok:
+    record {
+      cost: nat;
+      message: text;
+      model: text;
+      newTotalCapacity: nat;
+      powerOutput: nat;
+    };
  };
 type Result_6 = 
  variant {
    err: text;
-   ok: record {
-         penalty: nat;
-         refundAmount: nat;
-       };
- };
-type Result_5 = 
- variant {
-   err: text;
-   ok;
- };
-type Result_4 = 
- variant {
-   err: text;
-   ok: record {
-         betId: nat;
-         currentOdds: float64;
-         potentialPayout: nat;
-       };
- };
-type Result_3 = 
- variant {
-   err: text;
    ok:
     record {
-      activeUpgrade: opt UpgradeSession;
-      baseStats:
-       record {
-         acceleration: nat;
-         powerCore: nat;
-         speed: nat;
-         stability: nat;
-       };
-      currentBattery: opt nat;
-      currentCondition: opt nat;
-      isInitialized: bool;
-      isOwner: bool;
-      stats: opt PokedBotRacingStats;
-      upgradeCosts:
-       opt
-        record {
-          Gyro: record {
-                  icp: nat;
-                  parts: nat;
-                };
-          PowerCore: record {
-                       icp: nat;
-                       parts: nat;
-                     };
-          Thruster: record {
-                      icp: nat;
-                      parts: nat;
-                    };
-          Velocity: record {
-                      icp: nat;
-                      parts: nat;
-                    };
-        };
+      cyclesPercent: float64;
+      healthGained: nat;
+      newHealth: nat;
+      partsCost: nat;
     };
  };
-type Result_2 = 
+type Result_5 = 
  variant {
    err: text;
    ok:
@@ -296,7 +263,23 @@ type Result_2 =
       totalRefunded: nat;
     };
  };
-type Result_11 = 
+type Result_4 = 
+ variant {
+   err: text;
+   ok: record {
+         batteryType: text;
+         partsReturned: nat;
+       };
+ };
+type Result_3 = 
+ variant {
+   err: text;
+   ok: record {
+         isEnabled: bool;
+         message: text;
+       };
+ };
+type Result_20 = 
  variant {
    err: text;
    ok:
@@ -323,7 +306,12 @@ type Result_11 =
       tokenIndex: nat;
     };
  };
-type Result_10 = 
+type Result_2 = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type Result_19 = 
  variant {
    err: text;
    ok:
@@ -389,10 +377,125 @@ type Result_10 =
       tokenIndex: nat;
     };
  };
+type Result_18 = 
+ variant {
+   err: text;
+   ok: nat;
+ };
+type Result_17 = 
+ variant {
+   err: text;
+   ok: record {
+         id: nat;
+         time: nat;
+       };
+ };
+type Result_16 = 
+ variant {
+   err: TreasuryError;
+   ok;
+ };
+type Result_15 = 
+ variant {
+   err: text;
+   ok: record {
+         penalty: nat;
+         refundAmount: nat;
+       };
+ };
+type Result_14 = 
+ variant {
+   err: text;
+   ok;
+ };
+type Result_13 = 
+ variant {
+   err: text;
+   ok: record {
+         betId: nat;
+         currentOdds: float64;
+         potentialPayout: nat;
+       };
+ };
+type Result_12 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      bayId: nat;
+      message: text;
+      newRepairRate: nat;
+      newTier: nat;
+      newTierName: text;
+    };
+ };
+type Result_11 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      activeUpgrade: opt UpgradeSession;
+      baseStats:
+       record {
+         acceleration: nat;
+         powerCore: nat;
+         speed: nat;
+         stability: nat;
+       };
+      currentBattery: opt nat;
+      currentCondition: opt nat;
+      isInitialized: bool;
+      isOwner: bool;
+      stats: opt PokedBotRacingStats;
+      upgradeCosts:
+       opt
+        record {
+          Gyro: record {
+                  icp: nat;
+                  parts: nat;
+                };
+          PowerCore: record {
+                       icp: nat;
+                       parts: nat;
+                     };
+          Thruster: record {
+                      icp: nat;
+                      parts: nat;
+                    };
+          Velocity: record {
+                      icp: nat;
+                      parts: nat;
+                    };
+        };
+    };
+ };
+type Result_10 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      buildTimeSeconds: int;
+      currentTier: nat;
+      currentTierName: text;
+      icpCostE8s: nat;
+      newPowerDraw: nat;
+      newRepairRate: nat;
+      nextTier: nat;
+      nextTierName: text;
+      partsCost: nat;
+    };
+ };
 type Result_1 = 
  variant {
    err: text;
-   ok: text;
+   ok:
+    record {
+      bayId: nat;
+      completionTime: int;
+      message: text;
+      newTier: nat;
+      newTierName: text;
+    };
  };
 type Result = 
  variant {
@@ -412,6 +515,7 @@ type ReconstitutionTrace =
 type RacingStats = 
  record {
    acceleration: nat;
+   baseAvgRating: opt nat;
    luck: nat;
    overcharge: nat;
    perfectTuneUp: bool;
@@ -647,18 +751,23 @@ type McpServer =
    admin_compensate_resimulated_winners: (raceIds: vec nat) -> (text);
    /// Admin function to manually create betting pool for an existing race
    /// Useful for testing and recovery when races are created in advance
-   admin_create_betting_pool: (raceId: nat) -> (Result_1);
+   admin_create_betting_pool: (raceId: nat) -> (Result_2);
    admin_create_event_for_orphaned_races: (scheduledTimeNanos: int, raceIds:
     vec nat) -> (text);
    admin_get_active_mission: (tokenIndex: nat) -> (text) query;
    /// Get resonance info for a bot (admin only) - for verifying the resonance system
-   admin_get_resonance: (tokenIndex: nat) -> (Result_11) query;
+   admin_get_resonance: (tokenIndex: nat) -> (Result_20) query;
    /// Get detailed stat breakdown for debugging (admin only)
-   admin_get_stat_breakdown: (tokenIndex: nat) -> (Result_10) query;
+   admin_get_stat_breakdown: (tokenIndex: nat) -> (Result_19) query;
+   admin_grant_battery: (targetPrincipal: principal, batteryType: text) ->
+    (text);
    admin_rebuild_bot_histories: (tokenIndices: vec nat) -> (text);
+   admin_remove_battery: (targetPrincipal: principal, batteryId: nat) ->
+    (text);
    /// Admin method to remove a bot from a race (for fixing bugs/errors)
-   admin_remove_race_entry: (raceId: nat, tokenIndex: nat) -> (Result_1);
-   admin_resimulate_race: (raceId: nat) -> (Result_1);
+   admin_remove_race_entry: (raceId: nat, tokenIndex: nat) -> (Result_2);
+   admin_reset_elos: () -> (text);
+   admin_resimulate_race: (raceId: nat) -> (Result_2);
    admin_resimulate_races_batch: (raceIds: vec nat) -> (text);
    admin_update_event_heat_allocation: (eventType: text, newStrategy:
     text) -> (text);
@@ -673,7 +782,7 @@ type McpServer =
    cleanup_duplicate_race_create_timers: () -> (text);
    clear_event_races: (eventIds: vec nat) -> (text);
    /// Clear race_create timer diagnostic logs (owner only)
-   clear_race_create_diagnostics: () -> (Result_9);
+   clear_race_create_diagnostics: () -> (Result_18);
    clear_reconstitution_traces: () -> ();
    /// * Creates a new API key. This API key is linked to the caller's principal.
    ///    * @param name A human-readable name for the key.
@@ -691,7 +800,7 @@ type McpServer =
         totalDistance: nat;
         trackId: nat;
       }) query;
-   debug_regenerate_race_commentary: (raceId: nat) -> (Result_1);
+   debug_regenerate_race_commentary: (raceId: nat) -> (Result_2);
    /// Debug: Re-simulate an existing race using its stored data
    /// This helps debug mismatches between frontend and backend simulations
    debug_resimulate_race: (raceId: nat) ->
@@ -872,10 +981,12 @@ type McpServer =
    emergency_clear_all_timers: () -> (nat);
    /// Encode token index to EXT token identifier (public query)
    encode_token_identifier: (tokenIndex: nat32) -> (text) query;
+   /// Admin method to force event finalization (for recovering stuck events)
+   force_finalize_event: (eventId: nat) -> (text);
    force_finish_race: (raceId: nat) -> (text);
    force_release_lock: () -> (opt Time);
    /// Manually trigger a race_create timer if none exist (owner only, emergency recovery)
-   force_schedule_race_create: () -> (Result_8);
+   force_schedule_race_create: () -> (Result_17);
    force_system_timer_cancel: () -> (bool);
    get_actions_by_filter: (filter: ActionFilter) -> (vec ActionDetail) query;
    get_all_scheduled_events: () -> (vec ScheduledEvent) query;
@@ -1227,17 +1338,17 @@ type McpServer =
      }) query;
    recalculate_bot_stats: () -> (text);
    /// Register a bot for an event (with ICRC-2 payment for entry fee)
-   register_for_event: (eventId: nat, tokenIndex: nat) -> (Result_1);
+   register_for_event: (eventId: nat, tokenIndex: nat) -> (Result_2);
    /// Revoke (delete) an API key owned by the caller.
    ///    * @param key_id The ID of the key to revoke.
    ///    * @returns True if the key was found and revoked, false otherwise.
    revoke_my_api_key: (key_id: text) -> ();
    /// Set the EXT NFT canister ID. Only the current owner can call this.
-   set_ext_canister: (canister_id: principal) -> (Result_5);
+   set_ext_canister: (canister_id: principal) -> (Result_14);
    /// Set the ICP ledger canister ID. Only the current owner can call this.
-   set_icp_ledger: (ledger_id: principal) -> (Result_5);
+   set_icp_ledger: (ledger_id: principal) -> (Result_14);
    /// Set a new owner for the canister. Only the current owner can call this.
-   set_owner: (new_owner: principal) -> (Result_7);
+   set_owner: (new_owner: principal) -> (Result_16);
    transformJwksResponse:
     (record {
        context: blob;
@@ -1247,7 +1358,7 @@ type McpServer =
    trigger_race_finish: (raceId: nat) -> (text);
    trigger_race_start: (raceId: nat) -> (text);
    /// Unregister from an event and get a refund based on timing
-   unregister_from_event: (eventId: nat, tokenIndex: nat) -> (Result_6);
+   unregister_from_event: (eventId: nat, tokenIndex: nat) -> (Result_15);
    /// Upload a batch of pre-computed base stats
    upload_base_stats_batch: (batch:
     vec
@@ -1266,33 +1377,33 @@ type McpServer =
    upload_nft_stats_batch: (batch: vec record {
                                          nat;
                                          NFTStats;
-                                       }) -> (Result_5);
+                                       }) -> (Result_14);
    /// Upload trait schema (owner only, done once)
-   upload_trait_schema: (schemaData: TraitSchema) -> (Result_5);
+   upload_trait_schema: (schemaData: TraitSchema) -> (Result_14);
    validate_timer_state: () -> (vec text) query;
    /// Batch complete scavenging missions for multiple bots
    web_batch_complete_scavenging: (tokenIndices: vec nat) ->
     (vec record {
-           result: Result_1;
+           result: Result_2;
            tokenIndex: nat;
          });
    /// Batch recharge multiple bots (0.1 ICP each + fees via ICRC-2)
    web_batch_recharge_bots: (tokenIndices: vec nat) ->
     (vec record {
-           result: Result_1;
+           result: Result_2;
            tokenIndex: nat;
          });
    /// Batch repair multiple bots (0.05 ICP each + fees via ICRC-2)
    web_batch_repair_bots: (tokenIndices: vec nat) ->
     (vec record {
-           result: Result_1;
+           result: Result_2;
            tokenIndex: nat;
          });
    /// Batch start scavenging missions for multiple bots
    web_batch_start_scavenging: (tokenIndices: vec nat, zone: text,
     durationMinutes: opt nat) ->
     (vec record {
-           result: Result_1;
+           result: Result_2;
            tokenIndex: nat;
          });
    /// Get user's betting history for UI
@@ -1382,22 +1493,26 @@ type McpServer =
          };}) query;
    /// Place a bet for UI
    web_betting_place_bet: (raceId: nat, tokenIndex: nat, betType: BetType,
-    amountE8s: nat) -> (Result_4);
+    amountE8s: nat) -> (Result_13);
    /// Cancel an in-progress upgrade (DEPRECATED - upgrades are now instant)
    /// Settle a legacy upgrade that was in progress when we switched to instant upgrades
    /// This runs the RNG and completes the upgrade for users who were mid-upgrade
-   web_cancel_upgrade: (tokenIndex: nat) -> (Result_1);
+   web_cancel_upgrade: (tokenIndex: nat) -> (Result_2);
+   /// Combine parts to create Universal parts (1 of each type = 1 Universal)
+   web_combine_parts_to_universal: (amount: nat) -> (Result_2);
+   /// Complete a repair bay upgrade after build time has passed
+   web_complete_repair_bay_upgrade: (bayId: nat) -> (Result_12);
    /// Complete a scavenging mission and collect rewards (web method)
-   web_complete_scavenging: (tokenIndex: nat) -> (Result_1);
+   web_complete_scavenging: (tokenIndex: nat) -> (Result_2);
    /// Convert parts from one type to another (25% conversion cost)
    web_convert_parts: (fromType: text, toType: text, amount: nat) ->
-    (Result_1);
+    (Result_2);
    /// De-register a bot (removes control, preserves stats)
-   web_deregister_bot: (tokenIndex: nat) -> (Result_1);
+   web_deregister_bot: (tokenIndex: nat) -> (Result_2);
    /// Enter a race (with ICRC-2 payment for entry fee)
-   web_enter_race: (raceId: nat, tokenIndex: nat) -> (Result_1);
+   web_enter_race: (raceId: nat, tokenIndex: nat) -> (Result_2);
    /// Full Maintenance - combines recharge and repair in a single transaction (0.15 ICP + fee via ICRC-2)
-   web_full_maintenance: (tokenIndex: nat) -> (Result_1);
+   web_full_maintenance: (tokenIndex: nat) -> (Result_2);
    /// Get batch dedication info for multiple bots (optimized for garage list)
    web_get_batch_dedication_info: (tokenIndices: vec nat) ->
     (vec
@@ -1421,8 +1536,49 @@ type McpServer =
           totalDP: nat;
         };
       }) query;
+   /// Get user's battery storage (batteries + heat status for bots)
+   web_get_batteries: () ->
+    (record {
+       batteries:
+        vec
+         record {
+           baseCapacityKwh: float64;
+           batteryType: text;
+           cyclesPercent: float64;
+           discoveredAt: int;
+           healthPercent: nat;
+           id: nat;
+           isEnabled: bool;
+           isOperational: bool;
+           kwhThroughput: float64;
+           maxCapacityKwh: float64;
+           storedKwh: float64;
+           totalJoltsDelivered: nat;
+         };
+       summary:
+        record {
+          operationalBatteries: nat;
+          totalBatteries: nat;
+          totalCapacityKwh: float64;
+          totalStoredKwh: float64;
+        };
+     }) query;
+   /// Get battery type info (costs, capacities, etc.)
+   web_get_battery_info: () ->
+    (record {
+       types:
+        vec
+         record {
+           baseCapacityKwh: float64;
+           drawRateWatts: nat;
+           name: text;
+           rebuildCostIcp: nat;
+           rebuildCostParts: nat;
+           repairCostParts: nat;
+           salvageReturnParts: nat;
+         };}) query;
    /// Get detailed stats for a specific bot
-   web_get_bot_details: (tokenIndex: nat) -> (Result_3);
+   web_get_bot_details: (tokenIndex: nat) -> (Result_11);
    /// Get bot details for multiple token indices (query call for performance)
    web_get_bot_details_batch: (tokenIndices: vec nat) ->
     (vec
@@ -1440,6 +1596,16 @@ type McpServer =
         winRate: float64;
         wins: nat;
       }) query;
+   /// Get heat status for a specific bot
+   web_get_bot_heat: (tokenIndex: nat) ->
+    (record {
+       heatStacks: nat;
+       isOverheated: bool;
+       lastJoltTime: int;
+       maxHeat: nat;
+       minutesUntilCooldown: opt nat;
+       overheatUntil: opt int;
+     }) query;
    /// Get faction synergy bonuses for the caller's collection
    web_get_collection_bonuses: () ->
     (record {
@@ -1491,24 +1657,100 @@ type McpServer =
    /// Shows total capacity, current draw, number of bots charging, and efficiency
    web_get_garage_power_status: () ->
     (record {
+       activeRepairBays: nat;
        basePowerWatts: nat;
+       batteriesCharging: nat;
+       batteryDrawWatts: nat;
        botsCharging: nat;
        currentDrawWatts: nat;
+       effectiveBatteryDrawWatts: nat;
        efficiency: float64;
+       installedSMRCount: nat;
+       repairBayDrawWatts: nat;
+       smrCapacityWatts: nat;
+       smrLifetimePercent: float64;
+       smrLifetimeTotalMwh: nat;
+       smrLifetimeUsedMwh: float64;
+       surplusWatts: nat;
        totalCapacityWatts: nat;
        wattsPerBot: nat;
        wattsPerBotRequired: nat;
      }) query;
    /// Get user's bots tagged as racers
    web_get_racer_bots: () -> (vec nat) query;
+   /// Get all repair bay tier configurations (for UI display)
+   web_get_repair_bay_tiers: () ->
+    (vec
+      record {
+        buildTimeSeconds: int;
+        icpCostE8s: nat;
+        name: text;
+        partsCost: nat;
+        powerDrawWatts: nat;
+        repairRatePerHour: nat;
+        tier: nat;
+      }) query;
+   /// Get upgrade costs for a specific repair bay
+   web_get_repair_bay_upgrade_cost: (bayId: nat) -> (Result_10) query;
    /// Get user's bots tagged as scavengers
    web_get_scavenger_bots: () -> (vec nat) query;
    /// Get user's starred bots
    web_get_starred_bots: () -> (vec nat) query;
    /// Get user's parts inventory
    web_get_user_inventory: () -> (UserInventory) query;
+   /// Get user's repair bays with current status
+   web_get_user_repair_bays: () ->
+    (record {
+       bays:
+        vec
+         record {
+           bayId: nat;
+           currentBotToken: opt nat;
+           powerDrawWatts: nat;
+           repairRatePerHour: nat;
+           repairStartCondition: opt nat;
+           repairStartTime: opt int;
+           tier: nat;
+           tierName: text;
+           upgradeInProgress:
+            opt
+             record {
+               completionTime: int;
+               remainingSeconds: int;
+               startTime: int;
+               targetTier: nat;
+               targetTierName: text;
+             };
+         };
+       fallbackRepairRate: nat;
+       maxBays: nat;
+       nextSlotCost: opt record {
+                           icpE8s: nat;
+                           parts: nat;
+                         };
+       totalBays: nat;
+       totalIcpInvested: nat;
+       totalPartsInvested: nat;
+     }) query;
+   /// Get user's installed SMRs with individual lifetime tracking
+   web_get_user_smrs: () ->
+    (record {
+       installedSMRs:
+        vec
+         record {
+           installedAt: int;
+           lifetimeMwh: nat;
+           lifetimePercent: float64;
+           model: text;
+           powerOutput: nat;
+           usedMwh: float64;
+         };
+       totalPowerOutput: nat;
+     }) query;
    /// Initialize a bot for racing (web equivalent of garage_initialize_pokedbot)
-   web_initialize_bot: (tokenIndex: nat, name: opt text) -> (Result_1);
+   web_initialize_bot: (tokenIndex: nat, name: opt text) -> (Result_2);
+   /// Jolt a bot using a battery
+   web_jolt_bot: (batteryId: nat, tokenIndex: nat) -> (Result_9);
    /// List all PokedBots owned by the caller in their wallet
    web_list_my_bots: () ->
     (vec
@@ -1661,30 +1903,47 @@ type McpServer =
                       };
          };
       }) query;
+   /// Purchase a new repair bay slot
+   /// Uses ICRC-2 transfer_from to pull ICP and deducts parts from inventory
+   web_purchase_repair_bay_slot: () -> (Result_8);
+   /// Purchase and install an SMR (Small Modular Reactor) to increase garage power capacity
+   /// Uses ICRC-2 transfer_from to pull ICP from user
+   web_purchase_smr: (modelId: text) -> (Result_7);
+   /// Rebuild battery core with parts or ICP
+   web_rebuild_battery: (batteryId: nat, useIcp: bool) -> (Result_2);
    /// Recharge a bot's battery (0.1 ICP + fee via ICRC-2)
-   web_recharge_bot: (tokenIndex: nat) -> (Result_1);
+   web_recharge_bot: (tokenIndex: nat) -> (Result_2);
+   /// Repair a battery with parts
+   web_repair_battery: (batteryId: nat) -> (Result_6);
    /// Repair a bot to restore condition (0.05 ICP + fee via ICRC-2)
-   web_repair_bot: (tokenIndex: nat) -> (Result_1);
+   web_repair_bot: (tokenIndex: nat) -> (Result_2);
    /// Respec a bot - reset selected stat upgrades and refund parts (with penalty)
    /// Cost: FREE
    /// statsToStrip: Array of stat names to reset (["speed", "powerCore", "acceleration", "stability"])
    /// Empty array strips all stats (backward compatible)
-   web_respec_bot: (tokenIndex: nat, statsToStrip: vec text) -> (Result_2);
+   web_respec_bot: (tokenIndex: nat, statsToStrip: vec text) -> (Result_5);
+   /// Salvage a battery for parts
+   web_salvage_battery: (batteryId: nat) -> (Result_4);
    /// Set user's bots tagged as racers (replaces entire list)
-   web_set_racer_bots: (racerBots: vec nat) -> (Result_1);
+   web_set_racer_bots: (racerBots: vec nat) -> (Result_2);
    /// Set user's bots tagged as scavengers (replaces entire list)
-   web_set_scavenger_bots: (scavengerBots: vec nat) -> (Result_1);
+   web_set_scavenger_bots: (scavengerBots: vec nat) -> (Result_2);
    /// Set user's starred bots (replaces entire list)
-   web_set_starred_bots: (starredBots: vec nat) -> (Result_1);
+   web_set_starred_bots: (starredBots: vec nat) -> (Result_2);
    /// Start a scavenging mission (web method)
    web_start_scavenging: (tokenIndex: nat, zone: text, durationMinutes:
-    opt nat) -> (Result_1);
+    opt nat) -> (Result_2);
+   /// Toggle battery charging on/off
+   web_toggle_battery: (batteryId: nat) -> (Result_3);
    /// Upgrade a bot stat (via ICRC-2 payment or parts)
    web_upgrade_bot: (tokenIndex: nat, upgradeType: UpgradeType,
     paymentMethod: variant {
                      icp;
                      parts;
-                   }) -> (Result_1);
+                   }) -> (Result_2);
+   /// Start upgrading a repair bay to the next tier
+   /// Uses ICRC-2 transfer_from to pull ICP and deducts parts from inventory
+   web_upgrade_repair_bay: (bayId: nat) -> (Result_1);
    /// Withdraw tokens from the canister's treasury to a specified destination.
    withdraw: (ledger_id: principal, amount: nat, destination: Destination) ->
     (Result);

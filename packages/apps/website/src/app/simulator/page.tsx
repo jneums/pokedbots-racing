@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shuffle, Play, Loader2, X, Plus, ChevronUp, ChevronDown } from "lucide-react";
-import { RaceVisualizer, PhenomenonType } from "@/components/RaceVisualizer";
+import { RaceVisualizer, PhenomenonType, calculateBotSegmentTimes } from "@/components/RaceVisualizer";
 import { useDebugTestSimulation } from "@/hooks/useRacing";
 import { getBotProfile } from "@pokedbots-racing/ic-js";
 
@@ -90,6 +90,75 @@ const RaceVisualizerWithBackend = ({ raceData, overridePhenomenon, phenomenonInd
 
   // Get createdAt from backend results (all results have the same createdAt)
   const raceCreatedAt = backendResults?.[0]?.createdAt;
+
+  // Solo race stat impact analysis - log time difference for +1 to each stat
+  useEffect(() => {
+    // Only run for solo races (1 bot) when we have results
+    if (raceData.results.length !== 1) return;
+    
+    const result = resultsWithBackend[0];
+    if (!result?.stats) return;
+    
+    const stats = result.stats;
+    const trackSeed = BigInt(raceData.trackSeed);
+    const trackId = raceData.trackId;
+    const distance = raceData.distance;
+    const terrain = raceData.terrain;
+    const nftId = result.nftId;
+    const faction = result.faction;
+    const preferredTerrain = result.preferredTerrain;
+    
+    // Calculate baseline time
+    const baselineSegments = calculateBotSegmentTimes(
+      trackId, trackSeed, 0, stats, null,
+      faction, preferredTerrain, terrain,
+      nftId, true, distance, raceCreatedAt, overridePhenomenon
+    );
+    const baselineTime = baselineSegments.length > 0 
+      ? baselineSegments[baselineSegments.length - 1].cumulativeTime 
+      : 0;
+    
+    if (baselineTime === 0) return;
+    
+    const statNames = ['speed', 'powerCore', 'acceleration', 'stability'] as const;
+    const impacts: Record<string, { newTime: number; diff: number; pctImprovement: number }> = {};
+    
+    for (const statName of statNames) {
+      const modifiedStats = { ...stats, [statName]: stats[statName] + 1 };
+      const modifiedSegments = calculateBotSegmentTimes(
+        trackId, trackSeed, 0, modifiedStats, null,
+        faction, preferredTerrain, terrain,
+        nftId, true, distance, raceCreatedAt, overridePhenomenon
+      );
+      const modifiedTime = modifiedSegments.length > 0 
+        ? modifiedSegments[modifiedSegments.length - 1].cumulativeTime 
+        : 0;
+      
+      const diff = baselineTime - modifiedTime;
+      const pctImprovement = (diff / baselineTime) * 100;
+      
+      impacts[statName] = {
+        newTime: modifiedTime,
+        diff,
+        pctImprovement
+      };
+    }
+    
+    console.log('\n=== SOLO RACE STAT IMPACT ANALYSIS ===');
+    console.log(`Bot #${nftId} | Track: ${trackId} | Seed: ${raceData.trackSeed} | Distance: ${distance}km`);
+    console.log(`Current stats: Speed=${stats.speed}, PowerCore=${stats.powerCore}, Accel=${stats.acceleration}, Stability=${stats.stability}`);
+    console.log(`Baseline time: ${baselineTime.toFixed(3)}s`);
+    console.log('\nImpact of +1 to each stat:');
+    console.log('----------------------------');
+    for (const statName of statNames) {
+      const impact = impacts[statName];
+      const arrow = impact.diff > 0 ? '↓' : impact.diff < 0 ? '↑' : '→';
+      console.log(
+        `${statName.padEnd(12)} +1: ${impact.newTime.toFixed(3)}s (${arrow} ${Math.abs(impact.diff).toFixed(4)}s, ${impact.pctImprovement.toFixed(3)}% improvement)`
+      );
+    }
+    console.log('====================================\n');
+  }, [resultsWithBackend, raceData.trackSeed, raceData.trackId, raceData.distance, raceData.terrain, raceData.results.length, raceCreatedAt, overridePhenomenon]);
 
   return (
     <RaceVisualizer

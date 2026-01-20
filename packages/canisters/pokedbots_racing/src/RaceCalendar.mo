@@ -793,7 +793,7 @@ module {
         minEntries = 2;
         prizePoolBonus = 25_000_000; // Platform adds 0.25 ICP (smaller prize pool since free)
         pointsMultiplier = 0.5; // Half points (encourages paid events for serious competition)
-        divisions = [#Scrap, #Junker, #Raider, #Elite]; // All classes welcome
+        divisions = [#Scrap, #Junker, #Raider]; // Casual classes only (no Elite)
         scoringMode = #Individual;
         eventBonusPrize = 0;
       };
@@ -2145,7 +2145,7 @@ module {
         };
 
         case (#TopBottom) {
-          // Sort by ELO
+          // Sort by ELO (highest to lowest)
           let sorted = Array.sort<EventRegistration>(
             registrations,
             func(a, b) {
@@ -2153,33 +2153,93 @@ module {
             },
           );
 
-          // Split in half: top ELO in first heat(s), bottom ELO in last heat(s)
-          let midPoint = sorted.size() / 2;
-          let numTopHeats = (midPoint + maxPerHeat - 1) / maxPerHeat;
-          let numBottomHeats = (sorted.size() - midPoint + maxPerHeat - 1) / maxPerHeat;
+          // Create skill-tiered heats: Heat 1 = S tier, Heat 2 = A tier, etc.
+          // Calculate balanced sizes (e.g., 17 players / 3 heats = 6-6-5, not 8-8-1)
+          let baseSize = sorted.size() / numHeats;
+          let remainder = sorted.size() % numHeats;
 
-          let heats = Buffer.Buffer<Buffer.Buffer<EventRegistration>>(numTopHeats + numBottomHeats);
-
-          // Initialize top heats
-          for (i in Iter.range(0, numTopHeats - 1)) {
+          let heats = Buffer.Buffer<Buffer.Buffer<EventRegistration>>(numHeats);
+          for (i in Iter.range(0, numHeats - 1)) {
             heats.add(Buffer.Buffer<EventRegistration>(maxPerHeat));
           };
 
-          // Initialize bottom heats
-          for (i in Iter.range(0, numBottomHeats - 1)) {
-            heats.add(Buffer.Buffer<EventRegistration>(maxPerHeat));
+          // Fill heats sequentially - top players in first heat, etc.
+          var playerIndex = 0;
+          for (heatIndex in Iter.range(0, numHeats - 1)) {
+            // First 'remainder' heats get one extra player
+            let heatSize = baseSize + (if (heatIndex < remainder) { 1 } else { 0 });
+            for (_ in Iter.range(0, heatSize - 1)) {
+              if (playerIndex < sorted.size()) {
+                heats.get(heatIndex).add(sorted[playerIndex]);
+                playerIndex += 1;
+              };
+            };
           };
 
-          // Fill top heats
-          for (i in Iter.range(0, midPoint - 1)) {
-            let heatIndex = i / maxPerHeat;
-            heats.get(heatIndex).add(sorted[i]);
-          };
+          // === OUTLIER SMOOTHING STEP ===
+          // Check each heat (except first) for a leading outlier: if the top bot
+          // in a heat has a significantly larger ELO gap to the 2nd bot than
+          // the average gap in that heat, move them up to the previous heat.
+          // This prevents a "fast fish in a slow pond" situation.
 
-          // Fill bottom heats
-          for (i in Iter.range(midPoint, sorted.size() - 1)) {
-            let heatIndex = numTopHeats + (Nat.sub(i, midPoint) / maxPerHeat);
-            heats.get(heatIndex).add(sorted[i]);
+          if (numHeats > 1) {
+            // Process heats from 2nd to last (index 1 to numHeats-1)
+            for (heatIdx in Iter.range(1, numHeats - 1)) {
+              let heat = heats.get(heatIdx);
+              let prevHeat = heats.get(heatIdx - 1);
+
+              // Need at least 3 bots in heat to detect outlier pattern
+              if (heat.size() >= 3) {
+                // Get ELOs of first 3 bots in this heat (sorted high to low)
+                let elo1 = getElo(heat.get(0).tokenIndex);
+                let elo2 = getElo(heat.get(1).tokenIndex);
+                let elo3 = getElo(heat.get(2).tokenIndex);
+
+                // Gap between 1st and 2nd place
+                let topGap = if (elo1 > elo2) { elo1 - elo2 } else { 0 };
+                // Gap between 2nd and 3rd place (represents "normal" gap in this tier)
+                let normalGap = if (elo2 > elo3) { elo2 - elo3 } else { 1 };
+
+                // If top bot's gap is more than 2.5x the normal gap, they're an outlier
+                // Also require a minimum absolute gap (15 ELO points) to avoid noise
+                if (topGap > normalGap * 5 / 2 and topGap >= 15) {
+                  // Check if previous heat can accept one more (or swap)
+                  // Get the weakest bot in previous heat
+                  if (prevHeat.size() > 0) {
+                    let prevWeakestElo = getElo(prevHeat.get(prevHeat.size() - 1).tokenIndex);
+
+                    // Only move up if the outlier would fit better in prev heat
+                    // (their ELO is closer to prevHeat's weakest than to their current heat's 2nd)
+                    let gapToPrev = if (prevWeakestElo > elo1) {
+                      prevWeakestElo - elo1;
+                    } else { elo1 - prevWeakestElo };
+
+                    if (gapToPrev < topGap) {
+                      // Swap: move outlier up, move prev heat's weakest down
+                      let outlier = heat.get(0);
+                      let demoted = prevHeat.get(prevHeat.size() - 1);
+
+                      // Remove from current positions
+                      ignore heat.remove(0);
+                      ignore prevHeat.remove(prevHeat.size() - 1);
+
+                      // Add to new positions (outlier goes to prev, demoted goes to current)
+                      prevHeat.add(outlier);
+                      // Insert demoted at front of current heat (they're the strongest now)
+                      let tempHeat = Buffer.Buffer<EventRegistration>(heat.size() + 1);
+                      tempHeat.add(demoted);
+                      for (reg in heat.vals()) {
+                        tempHeat.add(reg);
+                      };
+                      heat.clear();
+                      for (reg in tempHeat.vals()) {
+                        heat.add(reg);
+                      };
+                    };
+                  };
+                };
+              };
+            };
           };
 
           Buffer.toArray(

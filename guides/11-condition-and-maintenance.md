@@ -13,13 +13,13 @@ After recent balance changes, **you cannot maintain 100% condition racing contin
 ## RACING CONDITION DAMAGE
 
 ### Base Formula
-**5.0 condition per km** × Terrain Modifier × Stability Protection
+**2.5 condition per km** × Terrain Modifier × Stability Protection
 
 ### Example Damage (10km Race)
-- **Base damage:** 50 condition
-- **Low stability (20):** 50 × 0.85 = 42 condition
-- **High stability (80):** 50 × 0.74 = 37 condition  
-- **Max stability (100):** 50 × 0.70 = 35 condition
+- **Base damage:** 25 condition
+- **Low stability (20):** 25 × 0.85 = 21 condition
+- **High stability (80):** 25 × 0.74 = 19 condition  
+- **Max stability (100):** 25 × 0.70 = 18 condition
 
 ### Terrain Modifiers
 - **Easy terrain (0.8×):** Reduces damage by 20%
@@ -27,8 +27,8 @@ After recent balance changes, **you cannot maintain 100% condition racing contin
 - **Harsh terrain (1.2×):** Increases damage by 20%
 
 ### Worst/Best Case (17km Race)
-- **Worst case:** 17km × 5.0 × 1.2 (harsh) × 0.85 (low stability) = **87 condition**
-- **Best case:** 17km × 5.0 × 0.8 (easy) × 0.70 (max stability) = **48 condition**
+- **Worst case:** 17km × 2.5 × 1.2 (harsh) × 0.85 (low stability) = **43 condition**
+- **Best case:** 17km × 2.5 × 0.8 (easy) × 0.70 (max stability) = **24 condition**
 
 ## STABILITY'S PROTECTIVE EFFECT
 
@@ -52,9 +52,9 @@ Stability uses logarithmic scaling (same formula as Power Core efficiency):
 - **Cooldown:** 3 hours
 
 ### The Deficit Math
-- 10km race costs: ~35-50 condition (depending on stability/terrain)
+- 10km race costs: ~18-25 condition (depending on stability/terrain)
 - Repair restores: 30 condition
-- **Net deficit:** -5 to -20 condition per race cycle
+- **Net result:** Slight surplus per race cycle with repairs
 
 **Result:** You'll slowly bleed condition racing continuously, even with regular repairs.
 
@@ -79,19 +79,19 @@ Low condition reduces your bot's effectiveness:
 3. **Low-value races** - Not worth the condition wear if prize is small
 
 ### Recovery Options
-1. **ScavengingBay** - Slow free repair while earning parts
+1. **ScrapHeaps** - Slow free repair while earning parts
 2. **RepairBay** - Faster free repair but no parts (best for urgent recovery)
 3. **Paid repair** - Instant but only restores 30, use strategically
 
 ## SCAVENGING CONDITION DAMAGE
 
 ### Base Rate
-**22 condition per hour** × Zone Modifier × Faction Bonuses × Stability Protection
+**12 condition per hour** × Zone Modifier × Faction Bonuses × Stability Protection
 
 ### Zone Modifiers
-- **SafeZone:** 1.0× (base 22/hr)
-- **Moderate zones:** 1.3-1.5× (29-33/hr)
-- **Dangerous zones:** 2.0-3.0× (44-66/hr)
+- **ScrapHeaps:** 1.0× (base 12/hr)
+- **Moderate zones:** 1.3-1.5× (16-18/hr)
+- **Dangerous zones:** 2.0-3.0× (24-36/hr)
 
 ### Duration Bonus
 Longer missions have better efficiency:
@@ -113,34 +113,40 @@ Longer missions have better efficiency:
 ### Budget-Conscious Approach
 1. Race only highest-value events
 2. Maximize free repair zones (RepairBay/ChargingStation)
-3. Do overnight SafeZone scavenging for slow natural recovery
+3. Do overnight ScrapHeaps scavenging for slow natural recovery
 4. Only pay for repair when critical races require full stats
 
 ### Power Racing (Whale Strategy)
 1. Race everything
 2. Paid repair after every race
-3. Accept -20 condition deficit per cycle
-4. Rotate multiple bots to avoid condition bottleneck
-5. Use RepairBay during work/sleep to recover deficit
+3. Manage battery more frequently than condition
+4. Rotate multiple bots to spread battery usage
+5. Use RepairBay during work/sleep to recover condition
 
 ## CONDITION VS BATTERY
 
-Both resources drain, but manage differently:
+Both resources drain, but **battery drains faster**:
 
 | Resource | Racing Drain | Scavenging Drain | Free Recovery | Paid Recovery |
 |----------|--------------|------------------|---------------|---------------|
-| **Battery** | 10-25/race | 4-20/hr | ChargingStation (very slow) | 0.1 ICP (50-90 restore) |
-| **Condition** | 35-90/race | 22-66/hr | RepairBay/ScavengingBay (moderate) | 0.05 ICP (30 restore) |
+| **Battery** | 16-80/race | 30-105/hr | ChargingStation (slow) | 0.1 ICP (50-90 restore) |
+| **Condition** | 10-50/race | 12-42/hr | RepairBay (fast, ~30/hr) | 0.05 ICP (30 restore) |
 
-**Battery** is the immediate constraint (races require 50+ battery).  
-**Condition** is the long-term durability constraint (slowly bleeds down).
+**Battery** is the immediate constraint (races require 50+ battery, drains faster).  
+**Condition** is the long-term durability constraint (drains slower, easier to maintain).
+**RepairBay** is now FREE and FAST - no battery drain, ~24-36 condition restored per hour!
 
 ## PERFECT TUNE-UP BONUS
 
-If repair brings bot to exactly 100% condition while overcharge is active:
-- **Bonus:** Keep overcharge speed boost WITHOUT stability/power penalties
-- **Requirements:** condition + 30 must equal exactly 100, overcharge > 0%
-- **Strategy:** Time repairs to hit 70% condition after recharge for max efficiency
+Repair while overcharged AND within your bot's resonance window to achieve Perfect Tune-Up:
+
+- **Bonus:** Keep overcharge Speed/Accel boost WITHOUT the Stability/PowerCore penalties!
+- **Requirements:** Have active overcharge AND repair within resonance zone
+- **Peak Resonance (±3% of optimal):** 100% of penalties removed
+- **Good Resonance (±10% of optimal):** 70% of penalties removed
+- **Outside Resonance:** Overcharge preserved but penalties still apply in next race
+
+**Strategy:** Each bot has unique resonance points that drift over time - experiment to find your bot's sweet spots!
 
 ## ROTATION MANAGEMENT
 
@@ -156,7 +162,7 @@ With 5+ bots, stagger maintenance:
 
 ✅ **Stability matters** - Invest in durable bots for long-term sustainability  
 ✅ **Plan rest periods** - Can't race 24/7 without condition decay  
-✅ **Free zones work** - RepairBay/ScavengingBay are viable alternatives to paid repair  
+✅ **Free zones work** - RepairBay/ScrapHeaps are viable alternatives to paid repair  
 ✅ **Deficit is intentional** - Forces strategic decisions about when to race vs rest  
 ✅ **Rotate smartly** - Multiple bots prevent condition bottleneck
 
