@@ -422,7 +422,7 @@ interface RaceResult {
   rating?: number;
   faction?: string;
   preferredTerrain?: string;
-  dnf?: boolean; // Did Not Finish - bot was too slow (exceeded 3x median time cap)
+  dnf?: boolean; // Did Not Finish - bot was too slow (exceeded 2x winner's time cap)
   stats?: {
     speed: number;
     stability: number;
@@ -431,6 +431,7 @@ interface RaceResult {
     luck?: number; // Luck stat for luck system
     overcharge?: number; // Overcharge level (0-40) snapshotted at race entry
     perfectTuneUp?: boolean; // Whether bot had perfect tune-up at race entry
+    tuneupQuality?: number; // 1.0 = Peak (100% penalty removal), 0.7 = Good, 0.3 = Weak
     baseAvgRating?: number; // Unbuffed average rating for MomentumShift phenomenon
   };
 }
@@ -1411,55 +1412,103 @@ function simulateRaceProgression(
 }
 
 export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain, botOrder, isValidating = false, raceStartTime, raceCreatedAt, raceStatus, bonusesAlreadyApplied = false, startAtEnd = false, onRaceWatched, events = [], disableAutoplay = false, overridePhenomenon, raceId }: RaceVisualizerProps) {
-  // Determine if race is currently in progress (live mode)
-  // Race is live if status is InProgress
-  const isLive = useMemo(() => {
-
-    
-    // Check if status is InProgress (handle both string keys and object structure)
-    if (!raceStatus) return false;
-    
-    // Check for string key variant
-    if ('InProgress' in raceStatus) return true;
-    
-    // Check if race started within the last 15 minutes (grace period for recently completed races)
-    if (raceStartTime) {
+  // Buffer times to account for polling delays
+  // Start buffer: delay live playback start so all clients have time to receive race data
+  const LIVE_START_BUFFER_SECONDS = 45; // Wait 45s after race start time before starting playback
+  
+  // Track if we've started a live viewing session - once started, it should complete naturally
+  // regardless of backend status changes. Use ref to persist across renders.
+  const liveSessionStartedRef = useRef(false);
+  
+  // Check if this was a live race when first mounted - this never changes
+  // Uses a ref to "lock in" the initial state
+  const wasLiveOnMount = useRef<boolean | null>(null);
+  if (wasLiveOnMount.current === null) {
+    // Calculate once on first render
+    const isStatusLive = raceStatus && 'InProgress' in raceStatus;
+    const isTimeBasedLive = (() => {
+      if (!raceStartTime) return false;
       const now = Date.now() * 1_000_000;
-      const hasStarted = Number(raceStartTime) <= now;
-      const withinGracePeriod = (now - Number(raceStartTime)) < (15 * 60 * 1_000_000_000); // Less than 15 minutes ago
-      
-      // Show live view if race started and is within 15 minutes, even if completed
-      if (hasStarted && withinGracePeriod) {
-        return true;
-      }
-    }
+      const raceStartNs = Number(raceStartTime);
+      const bufferedStartTime = raceStartNs + (LIVE_START_BUFFER_SECONDS * 1_000_000_000);
+      const maxLiveWindow = 10 * 60 * 1_000_000_000; // 10 minutes
+      return now >= bufferedStartTime && (now - raceStartNs) < maxLiveWindow;
+    })();
+    wasLiveOnMount.current = isStatusLive || isTimeBasedLive;
+  }
+  
+  // Determine if we should treat this as a live race
+  // CRITICAL: Once mounted as live, STAY live until animation completes naturally
+  // This prevents backend status changes from disrupting the viewing experience
+  const isLive = useMemo(() => {
+    // If we mounted as a live race, keep treating it as live
+    // The animation will complete naturally regardless of backend status
+    if (wasLiveOnMount.current) return true;
+    
+    // For races that weren't live on mount, check current status
+    if (raceStatus && 'InProgress' in raceStatus) return true;
     
     return false;
-  }, [raceStatus, raceStartTime, results]);
+  }, [raceStatus]);
   
   // Track if user has watched this race (via localStorage)
   const raceKey = `race_watched_${trackSeed.toString()}`;
   const raceTimeKey = `race_time_${trackSeed.toString()}`;
   const hasWatchedBefore = useRef(typeof window !== 'undefined' && localStorage.getItem(raceKey) === 'true');
   
-  // Load saved playback position from localStorage
+  // Calculate live elapsed time based on actual race start (synced for all viewers)
+  // Subtract the start buffer so everyone's playback is synced
+  const getLiveElapsedTime = useMemo(() => {
+    if (!raceStartTime || !isLive) return 0;
+    const now = Date.now() * 1_000_000; // Convert to nanoseconds
+    const elapsed = (now - Number(raceStartTime)) / 1_000_000_000; // Convert ns to seconds
+    // Subtract start buffer - playback starts LIVE_START_BUFFER_SECONDS after race start time
+    const bufferedElapsed = elapsed - LIVE_START_BUFFER_SECONDS;
+    return Math.max(0, bufferedElapsed);
+  }, [raceStartTime, isLive]);
+  
+  // Calculate time until race visualization starts (includes buffer)
+  const timeUntilStart = useMemo(() => {
+    if (!raceStartTime) return null;
+    const now = Date.now() * 1_000_000;
+    // Add buffer to start time
+    const bufferedStartTime = Number(raceStartTime) + (LIVE_START_BUFFER_SECONDS * 1_000_000_000);
+    const diff = (bufferedStartTime - now) / 1_000_000_000; // seconds
+    return diff > 0 ? diff : null;
+  }, [raceStartTime]);
+  
+  // Load saved playback position from localStorage (only for non-live races)
   const savedTime = useMemo(() => {
     if (typeof window === 'undefined') return 0;
+    // For live races, start at live elapsed time
+    if (isLive && getLiveElapsedTime > 0) return getLiveElapsedTime;
     const saved = localStorage.getItem(raceTimeKey);
     return saved ? parseFloat(saved) : 0;
-  }, [raceTimeKey]);
+  }, [raceTimeKey, isLive, getLiveElapsedTime]);
   
   // Autoplay if within live window and never watched before (unless disabled)
   const shouldAutoplay = isLive && !hasWatchedBefore.current && !disableAutoplay;
   
   const [isPlaying, setIsPlaying] = useState(shouldAutoplay);
-  const [currentTime, setCurrentTime] = useState(savedTime); // Resume from saved position
+  const [currentTime, setCurrentTime] = useState(savedTime); // Resume from saved position or live time
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [liveMode, setLiveMode] = useState(isLive);
+  const [isSyncedToLive, setIsSyncedToLive] = useState(isLive); // Track if synced to real-time
   const [animationCompleted, setAnimationCompleted] = useState(false); // Track if animation has finished
   const animationRef = useRef<number | undefined>(undefined);
   const lastFrameTimeRef = useRef<number>(0);
   const hasSetFinalPosition = useRef<boolean>(false);
+  const hasInitializedLiveTime = useRef<boolean>(false);
+  
+  // For live mode, sync to real elapsed time on mount
+  useEffect(() => {
+    if (isLive && !hasInitializedLiveTime.current && getLiveElapsedTime > 0) {
+      setCurrentTime(getLiveElapsedTime);
+      setIsPlaying(true);
+      setIsSyncedToLive(true);
+      hasInitializedLiveTime.current = true;
+    }
+  }, [isLive, getLiveElapsedTime]);
   
   // Filter events that should be visible based on current time
   const visibleEvents = useMemo(() => {
@@ -1757,10 +1806,36 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     return map;
   }, [results, trackId, trackSeed, bonusesAlreadyApplied, botOrder, terrain, distance, raceCreatedAt, overridePhenomenon]);
   
-  // Find the slowest finisher based on actual segment-calculated times
+  // Find the slowest NON-DNF finisher
+  // CRITICAL: Use BACKEND times (results[x].finalTime) when available, as these determine
+  // when the backend marks the race as Completed. Using frontend-calculated times causes
+  // a mismatch where the animation is still running but the backend has already finished.
   const maxTime = useMemo(() => {
+    // Get set of DNF bot IDs to exclude
+    const dnfBotIds = new Set(results.filter(r => r.dnf === true).map(r => r.nftId));
+    
+    // FIRST: Check if we have valid backend times (finalTime from race results)
+    // These are the authoritative times that the backend uses to schedule race_finish
+    const validBackendTimes = results
+      .filter(r => r.finalTime !== null && r.finalTime !== undefined && r.finalTime > 0 && r.finalTime < 100000 && r.dnf !== true)
+      .map(r => r.finalTime as number);
+    
+    if (validBackendTimes.length > 0) {
+      // Use the slowest backend time - this matches what the backend uses
+      const backendMaxTime = Math.max(...validBackendTimes);
+      // Debug for race 949
+      if (raceId === 949) {
+        console.log(`[RACE 949] Using BACKEND max time: ${backendMaxTime.toFixed(4)}s (from ${validBackendTimes.length} finishers)`);
+      }
+      return backendMaxTime;
+    }
+    
+    // FALLBACK: For races without results yet (InProgress), calculate from frontend simulation
     let slowestTime = 0;
     segmentTimesMap.forEach((segmentTimes, nftId) => {
+      // Skip DNF bots when calculating max time
+      if (dnfBotIds.has(nftId)) return;
+      
       const finalTime = segmentTimes[segmentTimes.length - 1]?.cumulativeTime || 0;
       if (finalTime > slowestTime) {
         slowestTime = finalTime;
@@ -1770,16 +1845,13 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
         console.log(`[RACE 949] Bot ${nftId} frontend calculated time: ${finalTime.toFixed(4)}s`);
       }
     });
-    // Filter out null finalTime values (InProgress races)
-    const validFinalTimes = results.filter(r => r.finalTime !== null && r.finalTime < 100000).map(r => r.finalTime);
     
     // Debug for race 949
     if (raceId === 949) {
-      console.log(`[RACE 949] Backend final times:`, results.map(r => ({ nftId: r.nftId, finalTime: r.finalTime })));
-      console.log(`[RACE 949] Frontend slowest: ${slowestTime.toFixed(4)}s`);
+      console.log(`[RACE 949] No backend times, using frontend slowest: ${slowestTime.toFixed(4)}s`);
     }
     
-    return slowestTime > 0 ? slowestTime : (validFinalTimes.length > 0 ? Math.max(...validFinalTimes) : 60);
+    return slowestTime > 0 ? slowestTime : 60; // Default to 60s if no data
   }, [segmentTimesMap, results, raceId]);
   
   // Calculate actual track distance from segments (more accurate than distance prop)
@@ -2301,6 +2373,11 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                 const hasOvercharge = overcharge > 0 || isPerfectTuneUp;
                 const maxOvercharge = 40;
                 const overchargePercent = Math.round((overcharge / maxOvercharge) * 100);
+                // tuneupQuality: 1.0 = Peak (100%), 0.7 = Good (70%), 0.3 = Weak (30%)
+                // Legacy data: if perfectTuneUp is true but tuneupQuality is 0/missing, assume peak (1.0)
+                const rawTuneupQuality = Number(result?.stats?.tuneupQuality ?? 0);
+                const tuneupQuality = isPerfectTuneUp && rawTuneupQuality === 0 ? 1.0 : rawTuneupQuality;
+                const ringPercent = isPerfectTuneUp ? Math.round(tuneupQuality * 100) : overchargePercent;
                 
                 if (isDNF) return null;
                 
@@ -2372,7 +2449,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                               fill="none"
                               stroke={isPerfectTuneUp ? "rgb(249, 115, 22)" : "rgb(6, 182, 212)"}
                               strokeWidth="2"
-                              strokeDasharray={`${(overchargePercent / 100) * 106.8} 106.8`}
+                              strokeDasharray={`${(ringPercent / 100) * 106.8} 106.8`}
                               strokeLinecap="round"
                               className={isPerfectTuneUp ? "animate-pulse" : ""}
                               style={{ 
@@ -2452,6 +2529,11 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                 const hasOvercharge = overcharge > 0 || isPerfectTuneUp;
                 const maxOvercharge = 40;
                 const overchargePercent = Math.round((overcharge / maxOvercharge) * 100);
+                // tuneupQuality: 1.0 = Peak (100%), 0.7 = Good (70%), 0.3 = Weak (30%)
+                // Legacy data: if perfectTuneUp is true but tuneupQuality is 0/missing, assume peak (1.0)
+                const rawTuneupQuality = Number(result?.stats?.tuneupQuality ?? 0);
+                const tuneupQuality = isPerfectTuneUp && rawTuneupQuality === 0 ? 1.0 : rawTuneupQuality;
+                const ringPercent = isPerfectTuneUp ? Math.round(tuneupQuality * 100) : overchargePercent;
                 
                 // Calculate effective luck (base luck + daily affinity) / 2
                 const tokenIndex = parseInt(bot.nftId) || 0;
@@ -2519,7 +2601,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                             fill="none"
                             stroke={isPerfectTuneUp ? "rgb(249, 115, 22)" : "rgb(6, 182, 212)"}
                             strokeWidth="2"
-                            strokeDasharray={`${(overchargePercent / 100) * 136} 136`}
+                            strokeDasharray={`${(ringPercent / 100) * 136} 136`}
                             strokeLinecap="round"
                             className={isPerfectTuneUp ? "animate-pulse" : ""}
                             style={{ 

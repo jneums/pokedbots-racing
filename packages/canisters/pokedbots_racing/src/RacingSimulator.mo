@@ -49,7 +49,8 @@ module {
     luck : Nat; // Base: 10-50 (derived from tokenIndex % 100 / 2), max with upgrades: 100+
     // Maintenance buffs (snapshotted at race start for visualization)
     overcharge : Nat; // 0-40, consumed in race for stat boost
-    perfectTuneUp : Bool; // True if repaired at resonance, removes overcharge penalties
+    perfectTuneUp : Bool; // True if repaired at resonance, enables tuneup bonus
+    tuneupQuality : Float; // Quality of tuneup: 1.0 = Peak (100% penalty removal), 0.7 = Good, 0.3 = Weak, 0.0 = None
     // Base average rating (unbuffed) for MomentumShift phenomenon calculation
     baseAvgRating : ?Nat; // Optional for backwards compatibility with existing races
   };

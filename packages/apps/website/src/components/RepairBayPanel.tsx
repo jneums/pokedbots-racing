@@ -51,6 +51,30 @@ function getTierStyle(tier: number) {
   return TIER_STYLES[tier] || TIER_STYLES[1];
 }
 
+// Map tier to image filename
+const TIER_IMAGES: Record<number, string> = {
+  1: 'salvage-arm.png',
+  2: 'scrap-crane.png',
+  3: 'junk-lifter.png',
+  4: 'parts-handler.png',
+  5: 'torch-station.png',
+  6: 'welding-bench.png',
+  7: 'fusion-welder.png',
+  8: 'plasma-cutter.png',
+  9: 'gantry-rig.png',
+  10: 'tech-station.png',
+  11: 'diagnostic-bay.png',
+  12: 'cyber-workshop.png',
+  13: 'factory-arm.png',
+  14: 'assembly-line.png',
+  15: 'forge-station.png',
+  16: 'foundry-core.png',
+};
+
+function getTierImage(tier: number): string {
+  return `/bays/${TIER_IMAGES[tier] || TIER_IMAGES[1]}`;
+}
+
 // Format build time for display
 function formatBuildTime(seconds: bigint): string {
   const totalSeconds = Number(seconds);
@@ -163,25 +187,30 @@ function RepairBayCard({
     <div className={`p-2.5 rounded-lg border ${style.borderColor} ${style.bgColor}`}>
       {/* Header: Bay ID and Tier */}
       <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          <Wrench className={`w-3.5 h-3.5 ${style.color}`} />
-          <span className={`font-semibold text-sm ${style.color}`}>Bay {bay.bayId + 1}</span>
+        <div className="flex items-center gap-1">
+          {/* Bay image with glow effect */}
+          <img 
+            src={getTierImage(bay.tier)} 
+            alt={bay.tierName}
+            className={`w-14 h-14 rounded object-cover ${isOccupied ? 'bay-glow-active' : 'bay-glow-idle'}`}
+          />
+          <div className="flex flex-col">
+            <span className={`font-semibold text-sm ${style.color}`}>Bay {bay.bayId}</span>
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Wrench className="w-2.5 h-2.5" />
+                <span>{bay.repairRatePerHour}/hr</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Zap className="w-2.5 h-2.5" />
+                <span>{bay.powerDrawWatts}W</span>
+              </div>
+            </div>
+          </div>
         </div>
         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${style.color} ${style.borderColor}`}>
           T{bay.tier} {bay.tierName}
         </Badge>
-      </div>
-      
-      {/* Stats Row */}
-      <div className="flex items-center gap-3 text-[10px] mb-2">
-        <div className="flex items-center gap-1 text-muted-foreground">
-          <Wrench className="w-2.5 h-2.5" />
-          <span className="font-bold">{bay.repairRatePerHour}/hr</span>
-        </div>
-        <div className="flex items-center gap-1 text-muted-foreground">
-          <Zap className="w-2.5 h-2.5" />
-          <span className="font-bold">{bay.powerDrawWatts}W</span>
-        </div>
       </div>
       
       {/* Occupied Bot Display */}
@@ -367,7 +396,7 @@ export function RepairBayPanel({ bots = [] }: RepairBayPanelProps) {
   const handlePurchaseSlot = async () => {
     try {
       const result = await purchaseSlot.mutateAsync();
-      toast.success(`Purchased Bay ${result.bayId + 1}!`);
+      toast.success(`Purchased Bay ${result.bayId}!`);
       setShowPurchaseDialog(false);
       refetchBays();
       queryClient.invalidateQueries({ queryKey: ['userInventory'] });

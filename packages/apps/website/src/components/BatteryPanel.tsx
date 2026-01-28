@@ -35,13 +35,10 @@ function getChargeState(chargePercent: number): string {
   return 'hi';
 }
 
-// Health percentage to glow color (from docs: orange for fresh, red for depleted)
-// Returns values for CSS drop-shadow filter (follows image shape, not rectangular box)
+// Health percentage to glow color - DEPRECATED, use getGlowStyleFromCapacity instead
+// Kept for backwards compatibility
 function getGlowStyle(healthPercent: number): { glowColor: string; glowIntensity: string } {
-  if (healthPercent <= 0) return { glowColor: '', glowIntensity: '' }; // Dead - no glow
-  if (healthPercent <= 32) return { glowColor: 'rgba(239, 68, 68, 0.8)', glowIntensity: '0 0 12px' }; // Red glow - depleted
-  if (healthPercent <= 65) return { glowColor: 'rgba(251, 146, 60, 0.7)', glowIntensity: '0 0 10px' }; // Dim orange - worn
-  return { glowColor: 'rgba(249, 115, 22, 0.9)', glowIntensity: '0 0 14px' }; // Bright orange - fresh
+  return getGlowStyleFromCapacity(healthPercent); // Just forward to new function
 }
 
 // Get battery image path (based on charge level, not health)
@@ -59,39 +56,30 @@ const BATTERY_STYLES: Record<string, { color: string; bgColor: string }> = {
   'PlasmaVault': { color: 'text-purple-400', bgColor: 'bg-purple-500/20' },
 };
 
-// Estimate repair amount based on cycles (matches backend logic)
-// Higher cycles = less effective repairs
-// Note: cyclesPercent is actually the raw cycle count from backend (misnamed variable)
-function getEstimatedRepairAmount(cycles: number, currentHealth: number): { repairAmount: number; efficiency: string } {
-  // Backend efficiency tiers based on cycle count
-  let efficiency: number;
-  let efficiencyLabel: string;
-  
-  if (cycles < 10) {
-    efficiency = 1.0;
-    efficiencyLabel = '100%';
-  } else if (cycles < 30) {
-    efficiency = 0.8;
-    efficiencyLabel = '80%';
-  } else if (cycles < 60) {
-    efficiency = 0.6;
-    efficiencyLabel = '60%';
-  } else if (cycles < 120) {
-    efficiency = 0.4;
-    efficiencyLabel = '40%';
+// Calculate capacity percentage from cycles (matches backend realistic curve)
+// - 0-100 cycles: Plateau phase (100% → 90%)
+// - 100-150 cycles: Early decline (90% → 70%)
+// - 150-200 cycles: "Knee" region (70% → 30%)
+// - 200-250 cycles: End of life (30% → 0%)
+function getCapacityFromCycles(cycles: number): number {
+  if (cycles < 100) {
+    return Math.round((1.0 - (cycles * 0.001)) * 100);
+  } else if (cycles < 150) {
+    return Math.round((0.9 - ((cycles - 100) * 0.004)) * 100);
+  } else if (cycles < 200) {
+    return Math.round((0.7 - ((cycles - 150) * 0.008)) * 100);
   } else {
-    efficiency = 0.2;
-    efficiencyLabel = '20%';
+    const remaining = 0.3 - ((cycles - 200) * 0.006);
+    return Math.max(0, Math.round(remaining * 100));
   }
-  
-  const baseRepair = 25;
-  const repairAmount = Math.floor(baseRepair * efficiency);
-  const cappedRepairAmount = Math.min(100 - currentHealth, repairAmount);
-  
-  return { 
-    repairAmount: cappedRepairAmount, 
-    efficiency: efficiencyLabel 
-  };
+}
+
+// Get glow style based on capacity (instead of old health system)
+function getGlowStyleFromCapacity(capacityPercent: number): { glowColor: string; glowIntensity: string } {
+  if (capacityPercent <= 0) return { glowColor: '', glowIntensity: '' }; // Dead - no glow
+  if (capacityPercent <= 30) return { glowColor: 'rgba(239, 68, 68, 0.8)', glowIntensity: '0 0 12px' }; // Red glow - critical
+  if (capacityPercent <= 70) return { glowColor: 'rgba(251, 146, 60, 0.7)', glowIntensity: '0 0 10px' }; // Orange glow - worn
+  return { glowColor: 'rgba(249, 115, 22, 0.9)', glowIntensity: '0 0 14px' }; // Bright orange - fresh
 }
 
 function BatteryCard({ battery, onJolt, onRepair, onRebuild, onSalvage, onToggle, bots, isJolting, togglingBatteryId }: {
@@ -113,13 +101,14 @@ function BatteryCard({ battery, onJolt, onRepair, onRebuild, onSalvage, onToggle
   const chargePercent = battery.maxCapacityKwh > 0 
     ? Math.round((battery.storedKwh / battery.maxCapacityKwh) * 100) 
     : 0;
-  const healthPercent = Number(battery.healthPercent);
-  const cyclesPercent = Math.round(battery.cyclesPercent);
+  // Calculate capacity from cycles (new system - replaces healthPercent)
+  const cycles = Math.round(battery.cyclesPercent); // Note: cyclesPercent is actually raw cycle count
+  const capacityPercent = getCapacityFromCycles(cycles);
   
-  // Get battery image based on charge level, glow based on health
-  // Show dead icon if battery is not operational (regardless of charge)
+  // Get battery image based on charge level, glow based on capacity
+  // Show dead icon if battery is not operational (capacity = 0%)
   const imagePath = getBatteryImagePath(battery.batteryType, battery.isOperational ? chargePercent : 0);
-  const { glowColor, glowIntensity } = getGlowStyle(healthPercent);
+  const { glowColor, glowIntensity } = getGlowStyleFromCapacity(capacityPercent);
   
   // Check if this specific battery is being toggled
   const isToggling = togglingBatteryId === battery.id;
@@ -138,7 +127,7 @@ function BatteryCard({ battery, onJolt, onRepair, onRebuild, onSalvage, onToggle
             alt={battery.batteryType}
             className="w-9 h-9 object-contain"
             style={{
-              filter: healthPercent > 0 
+              filter: capacityPercent > 0 
                 ? `drop-shadow(${glowIntensity} ${glowColor}) drop-shadow(0 0 8px ${glowColor})` 
                 : 'brightness(0.5)',
             }}
@@ -178,15 +167,15 @@ function BatteryCard({ battery, onJolt, onRepair, onRebuild, onSalvage, onToggle
         <span className="text-[10px] text-muted-foreground whitespace-nowrap">{battery.storedKwh.toFixed(1)}/{battery.maxCapacityKwh.toFixed(0)} kWh</span>
       </div>
       
-      {/* Stats Row: Health, Cycles, Jolts inline */}
+      {/* Stats Row: Capacity, Cycles, Jolts inline */}
       <div className="flex items-center gap-3 text-[10px] mb-2">
-        <div className={`flex items-center gap-1 ${healthPercent < 30 ? 'text-red-400' : 'text-muted-foreground'}`}>
-          <span>HP</span>
-          <span className="font-bold">{healthPercent}%</span>
+        <div className={`flex items-center gap-1 ${capacityPercent < 30 ? 'text-red-400' : capacityPercent < 70 ? 'text-orange-400' : 'text-muted-foreground'}`}>
+          <span>Cap</span>
+          <span className="font-bold">{capacityPercent}%</span>
         </div>
-        <div className={`flex items-center gap-1 ${cyclesPercent > 90 ? 'text-red-400' : cyclesPercent > 70 ? 'text-orange-400' : 'text-muted-foreground'}`}>
+        <div className={`flex items-center gap-1 ${cycles > 200 ? 'text-red-400' : cycles > 150 ? 'text-orange-400' : 'text-muted-foreground'}`}>
           <span>Cyc</span>
-          <span className="font-bold">{cyclesPercent}%</span>
+          <span className="font-bold">{cycles}</span>
         </div>
         <div className="flex items-center gap-1 text-muted-foreground">
           <Zap className="w-2.5 h-2.5" />
@@ -282,41 +271,22 @@ function BatteryCard({ battery, onJolt, onRepair, onRebuild, onSalvage, onToggle
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            {/* Repair Option */}
-            {(() => {
-              const { repairAmount, efficiency } = getEstimatedRepairAmount(cyclesPercent, healthPercent);
-              const newHealth = Math.min(100, healthPercent + repairAmount);
-              return (
-                <div className="p-3 rounded-lg border bg-muted/20">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Wrench className="w-4 h-4" />
-                      <span className="font-medium">Repair Health</span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-1">
-                    Restore +{repairAmount}% health ({healthPercent}% → {newHealth}%)
-                  </p>
-                  <p className="text-xs text-muted-foreground/70 mb-2">
-                    Repair efficiency: {efficiency} (reduced by cycle wear)
-                  </p>
-                  <Button 
-                    size="sm" 
-                    variant="secondary"
-                    disabled={healthPercent >= 100}
-                    onClick={() => {
-                      onRepair(battery.id);
-                      setShowMaintenanceDialog(false);
-                    }}
-                  >
-                    {battery.batteryType === 'ScrapCell' && '50 Parts'}
-                    {battery.batteryType === 'SalvagePack' && '150 Parts'}
-                    {battery.batteryType === 'IndustrialBank' && '400 Parts'}
-                    {battery.batteryType === 'PlasmaVault' && '1,000 Parts'}
-                  </Button>
+            {/* Battery Status */}
+            <div className="p-3 rounded-lg border bg-muted/20">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Battery className="w-4 h-4" />
+                  <span className="font-medium">Battery Status</span>
                 </div>
-              );
-            })()}
+              </div>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p>Cycles: <span className={`font-medium ${cycles > 200 ? 'text-red-400' : cycles > 150 ? 'text-orange-400' : ''}`}>{cycles}</span></p>
+                <p>Capacity: <span className={`font-medium ${capacityPercent < 30 ? 'text-red-400' : capacityPercent < 70 ? 'text-orange-400' : ''}`}>{capacityPercent}%</span></p>
+                <p className="text-xs text-muted-foreground/70 mt-2">
+                  Capacity decreases as cycles increase. At 250+ cycles, capacity reaches 0%.
+                </p>
+              </div>
+            </div>
             
             {/* Rebuild Option */}
             <div className="p-3 rounded-lg border bg-muted/20">
@@ -327,7 +297,7 @@ function BatteryCard({ battery, onJolt, onRepair, onRebuild, onSalvage, onToggle
                 </div>
               </div>
               <p className="text-sm text-muted-foreground mb-2">
-                Reset cycles to 0 and restore 100% health. Current cycles: {cyclesPercent.toFixed(1)}
+                Reset cycles to 0, restoring 100% capacity. Current: {cycles} cycles → {capacityPercent}% capacity
               </p>
               <p className="text-xs text-muted-foreground mb-3">
                 ⚠️ Battery will be EMPTY after rebuild
@@ -336,7 +306,7 @@ function BatteryCard({ battery, onJolt, onRepair, onRebuild, onSalvage, onToggle
                 <Button 
                   size="sm" 
                   variant="secondary"
-                  disabled={cyclesPercent >= 100}
+                  disabled={cycles < 10}
                   onClick={() => {
                     onRebuild(battery.id, false);
                     setShowMaintenanceDialog(false);
@@ -350,7 +320,7 @@ function BatteryCard({ battery, onJolt, onRepair, onRebuild, onSalvage, onToggle
                 <Button 
                   size="sm" 
                   variant="outline"
-                  disabled={cyclesPercent >= 100}
+                  disabled={cycles < 10}
                   onClick={() => {
                     onRebuild(battery.id, true);
                     setShowMaintenanceDialog(false);
@@ -536,6 +506,29 @@ export function BatteryPanel({ bots }: BatteryPanelProps) {
               </div>
               <p className="text-sm">No batteries yet</p>
               <p className="text-xs mt-1">Find batteries while scavenging!</p>
+              
+              {/* First battery progress */}
+              {summary && !summary.firstBatteryDiscovered && (
+                <div className="mt-3 pt-3 border-t border-dashed">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-muted-foreground">First battery guaranteed:</span>
+                    <span className="font-medium text-primary">
+                      {Math.min(summary.cumulativeScavengingHours, 20).toFixed(1)} / 20 hrs
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary transition-all duration-300"
+                      style={{ width: `${Math.min((summary.cumulativeScavengingHours / 20) * 100, 100)}%` }}
+                    />
+                  </div>
+                  {summary.cumulativeScavengingHours < 20 && (
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      ~{(20 - summary.cumulativeScavengingHours).toFixed(1)} more hours of scavenging
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -561,7 +554,7 @@ export function BatteryPanel({ bots }: BatteryPanelProps) {
   );
 }
 
-// Heat indicator for bot cards
+// Heat indicator for bot cards - shows overheat stacks from rapid jolting
 export function BotHeatIndicator({ tokenIndex }: { tokenIndex: number }) {
   const { data: heat, isLoading } = useBotHeat(tokenIndex);
   
@@ -569,11 +562,21 @@ export function BotHeatIndicator({ tokenIndex }: { tokenIndex: number }) {
   
   const stacks = Number(heat.heatStacks);
   if (stacks === 0 && !heat.isOverheated) return null;
+
+  // Generate tooltip text based on current state
+  const getTooltipText = () => {
+    if (heat.isOverheated) {
+      const mins = heat.minutesUntilCooldown ? Number(heat.minutesUntilCooldown) : 0;
+      return `🔥 OVERHEATED! Cannot jolt until cooled down (${mins}m remaining). Heat builds from rapid jolting - wait between jolts to avoid this.`;
+    }
+    const penalty = stacks * 15;
+    return `⚡ Heat: ${stacks}/4 stacks (-${penalty}% jolt effectiveness). Stacks decay 1 per hour. At 4 stacks, the bot overheats and can't be jolted.`;
+  };
   
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1" title={getTooltipText()}>
       {heat.isOverheated ? (
-        <Badge variant="destructive" className="text-xs">
+        <Badge variant="destructive" className="text-xs cursor-help">
           <Flame className="w-3 h-3 mr-1" />
           Overheated
           {heat.minutesUntilCooldown && (
@@ -581,7 +584,8 @@ export function BotHeatIndicator({ tokenIndex }: { tokenIndex: number }) {
           )}
         </Badge>
       ) : (
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 cursor-help">
+          <Flame className="w-3 h-3 text-orange-500" />
           {Array.from({ length: 4 }).map((_, i) => (
             <div 
               key={i}

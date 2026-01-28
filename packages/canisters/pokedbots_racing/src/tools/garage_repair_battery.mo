@@ -12,12 +12,12 @@ import PokedBotsGarage "../PokedBotsGarage";
 module {
   public func config() : McpTypes.Tool = {
     name = "garage_repair_battery";
-    title = ?"Repair Battery";
-    description = ?"Repair a battery to restore health (not charge). Each repair restores 25% health, reduced by cycles. Does NOT restore stored kWh - recharge separately.\n\n**REPAIR COSTS (parts):**\n• ScrapCell: 50 parts\n• SalvagePack: 150 parts\n• IndustrialBank: 400 parts\n• PlasmaVault: 1000 parts\n\n**IMPORTANT:**\n• Repairs restore HEALTH, not charge\n• Health affects jolt damage resistance\n• Battery must be <100% health to repair\n• Effective repair decreases as cycles increase";
+    title = ?"Repair Battery (Deprecated)";
+    description = ?"**DEPRECATED**: Health-based repair has been removed. Batteries now degrade based on cycles only.\n\n**NEW SYSTEM:**\n• Cycles increase with each jolt\n• Capacity decreases as cycles increase (realistic degradation curve)\n• At 250+ cycles, capacity reaches 0% and battery is dead\n• Use **garage_rebuild_battery** to reset cycles and restore full capacity\n\nThis tool will return an error directing you to use rebuild instead.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("battery_id", Json.obj([("type", Json.str("number")), ("description", Json.str("The ID of the battery to repair (from garage_list_batteries)"))]))])),
+      ("properties", Json.obj([("battery_id", Json.obj([("type", Json.str("number")), ("description", Json.str("The ID of the battery (from garage_list_batteries)"))]))])),
       ("required", Json.arr([Json.str("battery_id")])),
     ]);
     outputSchema = null;

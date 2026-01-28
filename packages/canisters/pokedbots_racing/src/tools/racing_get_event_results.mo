@@ -239,7 +239,7 @@ module {
                 };
               };
 
-              // Build cumulative standings (sorted by points)
+              // Build cumulative standings (sorted by points) with tie-splitting
               var cumulativeStandingsArray : [Json.Json] = [];
               if (event.metadata.scoringMode == #Cumulative) {
                 let botEntries = Iter.toArray(Map.entries(botPoints));
@@ -256,40 +256,73 @@ module {
                   },
                 );
 
-                var pos : Nat = 1;
-                for ((tokenIdx, points) in sortedBots.vals()) {
-                  let owner = switch (Map.get(botOwners, Map.nhash, tokenIdx)) {
-                    case (?o) { o };
-                    case (null) { Principal.fromText("aaaaa-aa") };
-                  };
-                  let raceResults = switch (Map.get(botRaceResults, Map.nhash, tokenIdx)) {
-                    case (?rr) { rr };
-                    case (null) { [] };
+                // Prize percentages for positions 1-4: 45%, 28%, 18%, 9%
+                let prizePercentages : [Nat] = [45, 28, 18, 9];
+
+                // Process with tie-splitting
+                var pos : Nat = 0;
+                while (pos < sortedBots.size()) {
+                  let (currentTokenIdx, currentPoints) = sortedBots[pos];
+
+                  // Find all bots tied at this position
+                  var tieGroupSize : Nat = 1;
+                  var tieGroupEnd : Nat = pos + 1;
+                  while (tieGroupEnd < sortedBots.size()) {
+                    let (_, nextPoints) = sortedBots[tieGroupEnd];
+                    if (nextPoints == currentPoints) {
+                      tieGroupSize += 1;
+                      tieGroupEnd += 1;
+                    } else {
+                      tieGroupEnd := sortedBots.size(); // Exit loop
+                    };
                   };
 
-                  // Calculate prize based on position (only top 4 get prizes)
-                  let prizeAmount : Nat = if (pos == 1) {
-                    (netPrizePool * 45) / 100;
-                  } else if (pos == 2) {
-                    (netPrizePool * 28) / 100;
-                  } else if (pos == 3) {
-                    (netPrizePool * 18) / 100;
-                  } else if (pos == 4) {
-                    (netPrizePool * 9) / 100;
+                  // Calculate combined prize percentage for all positions in tie group
+                  var combinedPrizePercent : Nat = 0;
+                  var posIdx : Nat = pos;
+                  while (posIdx < pos + tieGroupSize and posIdx < 4) {
+                    combinedPrizePercent += prizePercentages[posIdx];
+                    posIdx += 1;
+                  };
+
+                  // Each bot in tie group gets equal share
+                  let sharedPrizeAmount : Nat = if (tieGroupSize > 0 and combinedPrizePercent > 0) {
+                    (netPrizePool * combinedPrizePercent) / (100 * tieGroupSize);
                   } else { 0 };
 
-                  let prizeIcp = Float.fromInt(prizeAmount) / 100_000_000.0;
+                  let prizeIcp = Float.fromInt(sharedPrizeAmount) / 100_000_000.0;
 
-                  let standingJson = Json.obj([
-                    ("position", Json.int(pos)),
-                    ("nft_id", Json.str(Nat.toText(tokenIdx))),
-                    ("owner", Json.str(Principal.toText(owner))),
-                    ("cumulative_points", Json.int(points)),
-                    ("prize_amount_icp", Json.float(prizeIcp)),
-                    ("race_results", Json.arr(raceResults)),
-                  ]);
-                  cumulativeStandingsArray := Array.append(cumulativeStandingsArray, [standingJson]);
-                  pos += 1;
+                  // Add each bot in the tie group with shared position notation
+                  var tieIdx : Nat = pos;
+                  while (tieIdx < pos + tieGroupSize) {
+                    let (tokenIdx, points) = sortedBots[tieIdx];
+                    let owner = switch (Map.get(botOwners, Map.nhash, tokenIdx)) {
+                      case (?o) { o };
+                      case (null) { Principal.fromText("aaaaa-aa") };
+                    };
+                    let raceResults = switch (Map.get(botRaceResults, Map.nhash, tokenIdx)) {
+                      case (?rr) { rr };
+                      case (null) { [] };
+                    };
+
+                    // Display position: show "T1" for tie at position 1, etc.
+                    let displayPos : Nat = pos + 1;
+
+                    let standingJson = Json.obj([
+                      ("position", Json.int(displayPos)),
+                      ("tied", Json.bool(tieGroupSize > 1)),
+                      ("tie_group_size", Json.int(tieGroupSize)),
+                      ("nft_id", Json.str(Nat.toText(tokenIdx))),
+                      ("owner", Json.str(Principal.toText(owner))),
+                      ("cumulative_points", Json.int(points)),
+                      ("prize_amount_icp", Json.float(prizeIcp)),
+                      ("race_results", Json.arr(raceResults)),
+                    ]);
+                    cumulativeStandingsArray := Array.append(cumulativeStandingsArray, [standingJson]);
+                    tieIdx += 1;
+                  };
+
+                  pos += tieGroupSize;
                 };
               };
 

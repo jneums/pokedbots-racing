@@ -244,4 +244,22 @@
     --tw-prose-th-borders: oklch(0.28 0.03 40) !important;
     --tw-prose-td-borders: oklch(0.28 0.03 40) !important;
   }
+
+  /* Repair bay glow effects */
+  .bay-glow-idle {
+    filter: drop-shadow(0 0 4px rgba(150, 150, 150, 0.3));
+  }
+  
+  .bay-glow-active {
+    animation: bayGlowPulse 4s ease-in-out infinite;
+  }
+  
+  @keyframes bayGlowPulse {
+    0%, 100% {
+      filter: drop-shadow(0 0 4px rgba(251, 146, 60, 0.4)) drop-shadow(0 0 8px rgba(251, 146, 60, 0.2));
+    }
+    50% {
+      filter: drop-shadow(0 0 6px rgba(251, 146, 60, 0.6)) drop-shadow(0 0 12px rgba(251, 146, 60, 0.35));
+    }
+  }
 }

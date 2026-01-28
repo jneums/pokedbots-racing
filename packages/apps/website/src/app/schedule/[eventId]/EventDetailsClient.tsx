@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useGetEventDetails, useGetRaceById, useGetBotProfilesBatch, useRegisterForEvent, useUnregisterFromEvent, useGetEventResults } from "@/hooks/useRacing";
 import { useMyBots, useEnterRace } from "@/hooks/useGarage";
@@ -152,9 +153,9 @@ function isBotEligibleForClass(bot: any, raceClass: any): boolean {
   return false;
 }
 
-// Event Standings component for completed multi-stage events
-function EventStandings({ eventId }: { eventId: number }) {
-  const { data: results, isLoading } = useGetEventResults(eventId);
+// Event Standings component for multi-stage events (in-progress or completed)
+function EventStandings({ eventId, isInProgress = false }: { eventId: number; isInProgress?: boolean }) {
+  const { data: results, isLoading } = useGetEventResults(eventId, isInProgress);
   
   // Get bot indices from standings for profile batch query
   // Include both cumulative standings and faction member standings
@@ -218,17 +219,22 @@ function EventStandings({ eventId }: { eventId: number }) {
   };
 
   return (
-    <Card className="border-2 border-amber-500/40 bg-gradient-to-br from-amber-500/5 to-purple-500/5 backdrop-blur mb-8">
+    <Card className={`border-2 ${isInProgress ? 'border-orange-500/40 bg-gradient-to-br from-orange-500/5 to-yellow-500/5' : 'border-amber-500/40 bg-gradient-to-br from-amber-500/5 to-purple-500/5'} backdrop-blur mb-8`}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <span className="text-2xl">🏆</span>
-          Final Standings
-          <Badge variant="default" className="bg-amber-600 ml-2">
+          <span className="text-2xl">{isInProgress ? '📊' : '🏆'}</span>
+          {isInProgress ? 'Current Standings' : 'Final Standings'}
+          <Badge variant="default" className={`${isInProgress ? 'bg-orange-600' : 'bg-amber-600'} ml-2`}>
             {getScoringModeDisplay()}
           </Badge>
+          {isInProgress && (
+            <Badge variant="outline" className="ml-2 animate-pulse border-orange-500 text-orange-500">
+              Live
+            </Badge>
+          )}
         </CardTitle>
         <CardDescription>
-          Total Prize Pool: <span className="font-bold text-amber-400">{formatICP(results.totalPrizePool)}</span>
+          {isInProgress ? 'Projected ' : ''}Prize Pool: <span className={`font-bold ${isInProgress ? 'text-orange-400' : 'text-amber-400'}`}>{formatICP(results.totalPrizePool)}</span>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -334,6 +340,7 @@ function EventStandings({ eventId }: { eventId: number }) {
                 const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === Number(standing.tokenIndex));
                 const position = Number(standing.position);
                 const hasPrize = standing.prizeAmount > 0n;
+                const isTied = standing.tied === true;
                 
                 return (
                   <Link 
@@ -348,11 +355,12 @@ function EventStandings({ eventId }: { eventId: number }) {
                           ? 'bg-green-500/5 border-green-500/20' 
                           : 'bg-card/50 border-border/40'
                     }`}>
-                      <div className="text-2xl font-bold w-10 text-center">
+                      <div className="text-2xl font-bold w-10 text-center" title={isTied ? `Tied for position ${position}` : undefined}>
                         {position === 1 && '🥇'}
                         {position === 2 && '🥈'}
                         {position === 3 && '🥉'}
                         {position > 3 && `#${position}`}
+                        {isTied && <span className="text-xs text-amber-400 block">TIE</span>}
                       </div>
                       <img
                         src={imageUrl}
@@ -458,6 +466,13 @@ function EventRegistrationSection({ event }: { event: any }) {
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [withdrawingBotId, setWithdrawingBotId] = useState<number | null>(null);
   
+  // Get user's registered bot indices for profile lookup
+  const userRegisteredIndices = event.registrations?.filter(
+    (reg: any) => reg.owner.toString() === user?.principal
+  ).map((r: any) => Number(r.tokenIndex)) || [];
+  const { data: botProfiles = [] } = useGetBotProfilesBatch(userRegisteredIndices);
+  const [withdrawConfirmBot, setWithdrawConfirmBot] = useState<{ tokenIndex: number; raceClass: any } | null>(null);
+  
   const now = Date.now() * 1_000_000; // nanoseconds
   const registrationOpen = Number(event.registrationOpens) < now && Number(event.registrationCloses) > now;
   const registrationClosed = Number(event.registrationCloses) < now;
@@ -497,9 +512,26 @@ function EventRegistrationSection({ event }: { event: any }) {
     }
   };
   
+  // Calculate refund percentage based on cancellation deadlines
+  const getRefundInfo = (tokenIndex: number, raceClass: any): { percentage: number; refundAmount: bigint; penalty: number; entryFee: bigint } => {
+    const nowNs = BigInt(Date.now() * 1_000_000); // Convert to nanoseconds
+    const entryFee = calculateBracketEntryFee(BigInt(event.metadata?.entryFee || 0), raceClass);
+    
+    if (nowNs <= BigInt(event.cancellationDeadlines?.fullRefund || 0)) {
+      return { percentage: 100, refundAmount: entryFee, penalty: 0, entryFee };
+    } else if (nowNs <= BigInt(event.cancellationDeadlines?.halfRefund || 0)) {
+      return { percentage: 50, refundAmount: entryFee / 2n, penalty: 50, entryFee };
+    } else if (nowNs <= BigInt(event.cancellationDeadlines?.quarterRefund || 0)) {
+      return { percentage: 25, refundAmount: entryFee / 4n, penalty: 75, entryFee };
+    } else {
+      return { percentage: 0, refundAmount: 0n, penalty: 100, entryFee };
+    }
+  };
+
   // Handle unregistration
   const handleUnregister = async (tokenIndex: number) => {
     setWithdrawingBotId(tokenIndex);
+    setWithdrawConfirmBot(null);
     try {
       const result = await unregisterMutation.mutateAsync({
         eventId: Number(event.eventId),
@@ -763,6 +795,7 @@ function EventRegistrationSection({ event }: { event: any }) {
               {userRegistrations.map((reg: any) => {
                 const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(reg.tokenIndex));
                 const imageUrl = generateExtThumbnailLink(tokenId);
+                const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === Number(reg.tokenIndex));
                 
                 return (
                   <div key={reg.tokenIndex.toString()} className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
@@ -772,7 +805,7 @@ function EventRegistrationSection({ event }: { event: any }) {
                       className="w-10 h-10 rounded border-2 border-green-500/40"
                     />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold">Bot #{reg.tokenIndex.toString()}</p>
+                      <p className="text-sm font-semibold"><BotNameDisplay tokenIndex={Number(reg.tokenIndex)} profile={profile} /></p>
                       <p className="text-xs text-muted-foreground">
                         {getRaceClassName(reg.raceClass)} Division
                       </p>
@@ -781,7 +814,7 @@ function EventRegistrationSection({ event }: { event: any }) {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => handleUnregister(Number(reg.tokenIndex))}
+                        onClick={() => setWithdrawConfirmBot({ tokenIndex: Number(reg.tokenIndex), raceClass: reg.raceClass })}
                         disabled={withdrawingBotId !== null}
                       >
                         {withdrawingBotId === Number(reg.tokenIndex) ? 'Withdrawing...' : 'Withdraw'}
@@ -968,6 +1001,76 @@ function EventRegistrationSection({ event }: { event: any }) {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Withdrawal Confirmation Dialog */}
+        <AlertDialog open={!!withdrawConfirmBot} onOpenChange={(open) => !open && setWithdrawConfirmBot(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Withdraw from Event?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3">
+                  <p>
+                    You are about to withdraw Bot #{withdrawConfirmBot?.tokenIndex} from <span className="font-semibold">{event.metadata?.name || `Event #${event.eventId}`}</span>.
+                  </p>
+                  
+                  {withdrawConfirmBot && (() => {
+                    const refundInfo = getRefundInfo(withdrawConfirmBot.tokenIndex, withdrawConfirmBot.raceClass);
+                    
+                    return (
+                      <div className={`p-3 rounded-lg ${
+                        refundInfo.percentage === 100 ? 'bg-green-500/10 border border-green-500/30' :
+                        refundInfo.percentage === 50 ? 'bg-yellow-500/10 border border-yellow-500/30' :
+                        refundInfo.percentage === 25 ? 'bg-orange-500/10 border border-orange-500/30' :
+                        'bg-red-500/10 border border-red-500/30'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium">Refund Rate:</span>
+                          <span className={`font-bold ${
+                            refundInfo.percentage === 100 ? 'text-green-500' :
+                            refundInfo.percentage === 50 ? 'text-yellow-500' :
+                            refundInfo.percentage === 25 ? 'text-orange-500' :
+                            'text-red-500'
+                          }`}>{refundInfo.percentage}%</span>
+                        </div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-muted-foreground">Entry Fee Paid:</span>
+                          <span className="text-sm">{formatICP(refundInfo.entryFee)}</span>
+                        </div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-muted-foreground">You Will Receive:</span>
+                          <span className="text-sm font-semibold text-green-400">{formatICP(refundInfo.refundAmount)}</span>
+                        </div>
+                        {refundInfo.penalty > 0 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Penalty ({refundInfo.penalty}%):</span>
+                            <span className="text-sm text-red-400">-{formatICP(refundInfo.entryFee - refundInfo.refundAmount)}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  
+                  <p className="text-xs text-muted-foreground">
+                    ⚠️ Cancellation penalties increase as the event approaches. Early cancellations get full refunds.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep Registration</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (withdrawConfirmBot) {
+                    handleUnregister(withdrawConfirmBot.tokenIndex);
+                  }
+                }}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                Withdraw
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   );
@@ -1049,6 +1152,13 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
       luck: Number(statsData.luck ?? 10), // Default luck of 10 if not present
       overcharge: Number(statsData.overcharge ?? 0),
       perfectTuneUp: statsData.perfectTuneUp === true,
+      // Include baseAvgRating for MomentumShift phenomenon calculation
+      // This is the unbuffed average rating that was snapshotted at race start
+      baseAvgRating: statsData.baseAvgRating ? Number(
+        Array.isArray(statsData.baseAvgRating) && statsData.baseAvgRating.length > 0 
+          ? statsData.baseAvgRating[0] 
+          : statsData.baseAvgRating
+      ) : undefined,
     } : undefined;
     
     return {
@@ -1601,9 +1711,11 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
   const navigate = useNavigate();
   const { data: event } = useGetEventDetails(Number(eventId));
   
-  // Determine if completed early to conditionally fetch results
+  // Determine if completed or in progress early to conditionally fetch results
   const isCompleted = event && 'Completed' in event.status;
-  const { data: eventResults } = useGetEventResults(isCompleted ? Number(eventId) : 0);
+  const isInProgress = !!(event && 'InProgress' in event.status);
+  const shouldFetchResults = isCompleted || isInProgress;
+  const { data: eventResults } = useGetEventResults(shouldFetchResults ? Number(eventId) : 0, isInProgress);
 
   if (!event) {
     return (
@@ -1697,9 +1809,9 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
             </CardContent>
           </Card>
 
-          {/* Event Standings for completed multi-stage events */}
-          {isCompleted && isMultiStage && (
-            <EventStandings eventId={Number(eventId)} />
+          {/* Event Standings for in-progress or completed multi-stage events */}
+          {(isCompleted || isInProgress) && isMultiStage && (
+            <EventStandings eventId={Number(eventId)} isInProgress={isInProgress} />
           )}
 
           {/* Registration Section for events without races yet */}

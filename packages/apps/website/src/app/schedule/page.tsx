@@ -140,14 +140,9 @@ function getEventTypeName(eventType: ScheduledEvent['eventType']): string {
   return 'Race Event';
 }
 
-function getStatusBadge(status: ScheduledEvent['status'], registrationCloses: bigint, isPastEvent: boolean = false) {
+function getStatusBadge(status: ScheduledEvent['status'], registrationCloses: bigint) {
   const now = Date.now() * 1_000_000; // Convert to nanoseconds
   const registrationClosed = Number(registrationCloses) < now;
-
-  // Override status for past events
-  if (isPastEvent) {
-    return <Badge className="bg-gray-600/90 hover:bg-gray-600 border-gray-500/50 text-white">Completed</Badge>;
-  }
   
   if ('Announced' in status) {
     return <Badge className="bg-blue-500/90 hover:bg-blue-500 border-blue-400/50">Announced</Badge>;
@@ -248,8 +243,7 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
                 {isMultiStage && hasUpcomingRaces && !isPastEvent && completedRaces > 0 && (
                   <Badge className="bg-purple-500/80 text-xs px-1.5 py-0">{completedRaces}/{totalRaces}</Badge>
                 )}
-                {!hasStarted && !isPastEvent && getStatusBadge(event.status, event.registrationCloses, isPastEvent)}
-                {isPastEvent && getStatusBadge(event.status, event.registrationCloses, isPastEvent)}
+                {getStatusBadge(event.status, event.registrationCloses)}
               </div>
               
               {/* Meta line */}

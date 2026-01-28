@@ -20,13 +20,13 @@ import ResonanceSystem "../ResonanceSystem";
 module {
   let REPAIR_COST = 5000000 : Nat; // 0.05 ICP
   let TRANSFER_FEE = 10000 : Nat;
-  let REPAIR_COOLDOWN : Int = 10800000000000; // 3 hours in nanoseconds
+  let REPAIR_COOLDOWN : Int = 3600000000000; // 1 hour in nanoseconds
   let REPAIR_AMOUNT : Nat = 30; // Base repair restores 30 condition
 
   public func config() : McpTypes.Tool = {
     name = "garage_repair_robot";
     title = ?"Repair Robot Condition";
-    description = ?"Repair a robot to restore condition. Costs 0.05 ICP + 0.0001 ICP transfer fee. Restores 30 Condition. Cooldown: 3 hours.\n\n**RESONANCE SYSTEM (NEW!):**\n• Each bot has a unique 'resonance field' that determines optimal repair points\n• Resonance drifts slowly over time (~weekly cycle with daily micro-shifts)\n• Peak Zone (±3% of optimal): Full Perfect Tune-Up - ALL overcharge penalties removed!\n• Good Zone (±10% of optimal): Partial Tune-Up - 70% of overcharge penalties removed\n• Outside Resonance: Standard repair - overcharge is RESET to prevent exploit loops\n• Use garage_get_robot_details to check your bot's current resonance\n\n**PERFECT TUNE-UP:**\n• Achieved by repairing within your bot's resonance window while having overcharge\n• Removes the Stability/PowerCore penalties from overcharge, keeping the Speed/Accel boost!\n• Strategic depth: Each bot's optimal point is different and changes over time";
+    description = ?"Repair a robot to restore condition. Costs 0.05 ICP + 0.0001 ICP transfer fee. Restores 30 Condition. Cooldown: 1 hour.\n\n**RESONANCE SYSTEM (NEW!):**\n• Each bot has a unique 'resonance field' that determines optimal repair points\n• Resonance drifts slowly over time (~weekly cycle with daily micro-shifts)\n• Peak Zone (±3% of optimal): Full Perfect Tune-Up - ALL overcharge penalties removed!\n• Good Zone (±10% of optimal): Partial Tune-Up - 70% of overcharge penalties removed\n• Outside Resonance: Standard repair - overcharge is RESET to prevent exploit loops\n• Use garage_get_robot_details to check your bot's current resonance\n\n**PERFECT TUNE-UP:**\n• Achieved by repairing within your bot's resonance window while having overcharge\n• Removes the Stability/PowerCore penalties from overcharge, keeping the Speed/Accel boost!\n• Strategic depth: Each bot's optimal point is different and changes over time";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
@@ -140,7 +140,7 @@ module {
             let perfectTuneUp = hasOvercharge and (resonance.inPeakZone or resonance.inGoodZone or resonance.inWeakZone);
 
             // Calculate tune-up quality (affects how much penalty is removed)
-            // Peak: 100% penalty removal, Good: 70% penalty removal
+            // Peak: 100% penalty removal, Good: 70% penalty removal, Weak: 30% penalty removal
             let tuneupQuality = ResonanceSystem.getPerfectTuneupQuality(resonance);
 
             // Determine what happens to overcharge
@@ -153,6 +153,7 @@ module {
               condition = newCondition;
               lastRepaired = ?now;
               perfectTuneUp = perfectTuneUp;
+              tuneupQuality = tuneupQuality; // Store the quality for racing simulation
               overcharge = finalOvercharge;
             };
 

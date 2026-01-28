@@ -87,7 +87,8 @@ module {
     condition : Nat;
     experience : Nat;
     overcharge : Nat; // Overcharge (0-75%), earned by recharging at low battery, consumed in next race for stat boost
-    perfectTuneUp : Bool; // True if repaired to exactly 100% condition with overcharge - removes penalties but keeps speed boost
+    perfectTuneUp : Bool; // True if repaired within resonance zone with overcharge - enables tuneup bonus
+    tuneupQuality : Float; // Quality of tuneup: 1.0 = Peak (100% penalty removal), 0.7 = Good (70%), 0.3 = Weak (30%), 0.0 = None
 
     // Preferences
     preferredDistance : Distance;
@@ -298,15 +299,18 @@ module {
     };
   };
 
-  /// Get SMR lifetime capacity in MWh (megawatt-hours)
-  /// Based on ~1 month of continuous operation at full capacity
-  /// Lifetime = powerOutput * 720 hours / 1000 (convert W to MW, hours to MWh)
-  public func getSMRLifetimeMwh(model : SMRModel) : Nat {
+  /// Get SMR lifetime capacity in kWh (kilowatt-hours)
+  /// Pricing gives 10-50% discount vs paid recharges (0.143 ICP/charge)
+  /// WR-250: 5 ICP / 42 charges = 0.12 ICP (~15% discount)
+  /// WR-500: 8 ICP / 83 charges = 0.10 ICP (~30% discount)
+  /// WR-880: 12 ICP / 146 charges = 0.08 ICP (~44% discount)
+  /// WR-1210: 15 ICP / 229 charges = 0.07 ICP (~51% discount)
+  public func getSMRLifetimeKwh(model : SMRModel) : Nat {
     switch (model) {
-      case (#WR250) { 20 }; // 20 MWh
-      case (#WR500) { 80 }; // 80 MWh
-      case (#WR880) { 160 }; // 160 MWh
-      case (#WR1210) { 300 }; // 300 MWh
+      case (#WR250) { 50 }; // 50 kWh (~42 charges, ~83 days at max output)
+      case (#WR500) { 100 }; // 100 kWh (~83 charges, ~83 days at max output)
+      case (#WR880) { 175 }; // 175 kWh (~146 charges, ~83 days at max output)
+      case (#WR1210) { 275 }; // 275 kWh (~229 charges, ~95 days at max output)
     };
   };
 
@@ -315,7 +319,7 @@ module {
     model : SMRModel;
     installedAt : Int; // Time.now() when installed
     powerOutput : Nat; // Power in watts
-    totalMwhGenerated : Float; // Total MWh generated since installation (for lifetime tracking)
+    totalMwhGenerated : Float; // NOTE: Despite the name, this now stores kWh for stable storage compatibility
     lastUpdateTime : Int; // Last time usage was accumulated
   };
 
@@ -358,7 +362,7 @@ module {
     {
       tier = 1;
       name = "Salvage Arm";
-      repairRatePerHour = 6;
+      repairRatePerHour = 12;
       powerDrawWatts = 40;
       partsCost = 0;
       icpCostE8s = 0;
@@ -367,135 +371,135 @@ module {
     {
       tier = 2;
       name = "Scrap Crane";
-      repairRatePerHour = 8;
+      repairRatePerHour = 16;
       powerDrawWatts = 55;
-      partsCost = 500;
+      partsCost = 100;
       icpCostE8s = 0;
       buildTimeNanos = 3_600_000_000_000;
     },
     {
       tier = 3;
       name = "Junk Lifter";
-      repairRatePerHour = 10;
+      repairRatePerHour = 20;
       powerDrawWatts = 70;
-      partsCost = 750;
+      partsCost = 250;
       icpCostE8s = 0;
       buildTimeNanos = 3_600_000_000_000;
     },
     {
       tier = 4;
       name = "Parts Handler";
-      repairRatePerHour = 12;
+      repairRatePerHour = 24;
       powerDrawWatts = 85;
-      partsCost = 1000;
+      partsCost = 500;
       icpCostE8s = 0;
       buildTimeNanos = 3_600_000_000_000;
     },
     {
       tier = 5;
       name = "Torch Station";
-      repairRatePerHour = 15;
+      repairRatePerHour = 30;
       powerDrawWatts = 100;
-      partsCost = 1250;
+      partsCost = 750;
       icpCostE8s = 50_000_000;
       buildTimeNanos = 7_200_000_000_000;
     },
     {
       tier = 6;
       name = "Welding Bench";
-      repairRatePerHour = 18;
+      repairRatePerHour = 36;
       powerDrawWatts = 115;
-      partsCost = 1500;
+      partsCost = 1000;
       icpCostE8s = 100_000_000;
       buildTimeNanos = 7_200_000_000_000;
     },
     {
       tier = 7;
       name = "Fusion Welder";
-      repairRatePerHour = 22;
+      repairRatePerHour = 44;
       powerDrawWatts = 130;
-      partsCost = 2000;
+      partsCost = 1500;
       icpCostE8s = 200_000_000;
       buildTimeNanos = 7_200_000_000_000;
     },
     {
       tier = 8;
       name = "Plasma Cutter";
-      repairRatePerHour = 26;
+      repairRatePerHour = 52;
       powerDrawWatts = 145;
-      partsCost = 2500;
+      partsCost = 2000;
       icpCostE8s = 300_000_000;
       buildTimeNanos = 14_400_000_000_000;
     },
     {
       tier = 9;
       name = "Gantry Rig";
-      repairRatePerHour = 32;
+      repairRatePerHour = 64;
       powerDrawWatts = 160;
-      partsCost = 3500;
+      partsCost = 3000;
       icpCostE8s = 500_000_000;
       buildTimeNanos = 14_400_000_000_000;
     },
     {
       tier = 10;
       name = "Tech Station";
-      repairRatePerHour = 38;
+      repairRatePerHour = 76;
       powerDrawWatts = 175;
-      partsCost = 5000;
+      partsCost = 4000;
       icpCostE8s = 800_000_000;
       buildTimeNanos = 14_400_000_000_000;
     },
     {
       tier = 11;
       name = "Diagnostic Bay";
-      repairRatePerHour = 45;
+      repairRatePerHour = 90;
       powerDrawWatts = 190;
-      partsCost = 7000;
+      partsCost = 5500;
       icpCostE8s = 1_200_000_000;
       buildTimeNanos = 28_800_000_000_000;
     },
     {
       tier = 12;
       name = "Cyber Workshop";
-      repairRatePerHour = 54;
+      repairRatePerHour = 108;
       powerDrawWatts = 205;
-      partsCost = 9000;
+      partsCost = 7500;
       icpCostE8s = 1_800_000_000;
       buildTimeNanos = 28_800_000_000_000;
     },
     {
       tier = 13;
       name = "Factory Arm";
-      repairRatePerHour = 65;
+      repairRatePerHour = 130;
       powerDrawWatts = 220;
-      partsCost = 12000;
+      partsCost = 10000;
       icpCostE8s = 2_500_000_000;
       buildTimeNanos = 43_200_000_000_000;
     },
     {
       tier = 14;
       name = "Assembly Line";
-      repairRatePerHour = 78;
+      repairRatePerHour = 156;
       powerDrawWatts = 235;
-      partsCost = 16000;
+      partsCost = 13000;
       icpCostE8s = 3_500_000_000;
       buildTimeNanos = 43_200_000_000_000;
     },
     {
       tier = 15;
       name = "Forge Station";
-      repairRatePerHour = 95;
+      repairRatePerHour = 190;
       powerDrawWatts = 250;
-      partsCost = 22000;
+      partsCost = 17000;
       icpCostE8s = 5_000_000_000;
       buildTimeNanos = 86_400_000_000_000;
     },
     {
       tier = 16;
       name = "Foundry Core";
-      repairRatePerHour = 120;
+      repairRatePerHour = 240;
       powerDrawWatts = 265;
-      partsCost = 30000;
+      partsCost = 22000;
       icpCostE8s = 6_500_000_000;
       buildTimeNanos = 86_400_000_000_000;
     },
@@ -515,7 +519,7 @@ module {
   public let MAX_REPAIR_BAYS : Nat = 5;
 
   /// Fallback repair rate when no bay available (cond/hr)
-  public let FALLBACK_REPAIR_RATE : Nat = 6;
+  public let FALLBACK_REPAIR_RATE : Nat = 12;
 
   /// Get tier config by tier number (1-indexed)
   public func getRepairBayTierConfig(tier : Nat) : ?RepairBayTierConfig {
@@ -739,16 +743,29 @@ module {
     kwhThroughput / capacity;
   };
 
-  /// Get max capacity multiplier based on cycles (cycle degradation)
-  /// Higher cycles = lower max capacity
+  /// Get max capacity multiplier based on cycles (realistic battery degradation curve)
+  /// Models real Li-ion behavior: slow decline initially, then a "knee" where degradation accelerates
+  /// - 0-100 cycles: Plateau phase (100% → 90%) - barely noticeable decline
+  /// - 100-150 cycles: Early decline (90% → 70%) - starting to notice
+  /// - 150-200 cycles: "Knee" region (70% → 30%) - rapid capacity loss
+  /// - 200+ cycles: End of life (30% → 0%) - battery is dying
   public func getBatteryCapacityMultiplier(kwhThroughput : Float, batteryType : BatteryType) : Float {
     let cycles = calculateBatteryCycles(kwhThroughput, batteryType);
 
-    if (cycles < 10.0) { return 1.0 }; // 100% capacity
-    if (cycles < 30.0) { return 0.9 }; // 90% capacity
-    if (cycles < 60.0) { return 0.75 }; // 75% capacity
-    if (cycles < 120.0) { return 0.5 }; // 50% capacity
-    return 0.25; // 120+ cycles - 25% capacity
+    if (cycles < 100.0) {
+      // Plateau phase: 100% → 90% over 100 cycles (slow: -0.1% per cycle)
+      1.0 - (cycles * 0.001);
+    } else if (cycles < 150.0) {
+      // Early decline: 90% → 70% over 50 cycles (-0.4% per cycle)
+      0.9 - ((cycles - 100.0) * 0.004);
+    } else if (cycles < 200.0) {
+      // "Knee" region: 70% → 30% over 50 cycles (-0.8% per cycle)
+      0.7 - ((cycles - 150.0) * 0.008);
+    } else {
+      // End of life: 30% → 0% over 50 cycles (-0.6% per cycle)
+      let remaining = 0.3 - ((cycles - 200.0) * 0.006);
+      if (remaining > 0.0) { remaining } else { 0.0 };
+    };
   };
 
   /// Get CURRENT max capacity (affected by cycles)
@@ -758,42 +775,15 @@ module {
     baseCapacity * multiplier;
   };
 
-  /// Get repair efficiency based on cycles
-  /// Higher cycles = less effective repairs
-  public func getBatteryRepairEfficiency(kwhThroughput : Float, batteryType : BatteryType) : Float {
-    let cycles = calculateBatteryCycles(kwhThroughput, batteryType);
-
-    if (cycles < 10.0) { return 1.0 }; // 100% - full +25% per repair
-    if (cycles < 30.0) { return 0.8 }; // 80% - +20% per repair
-    if (cycles < 60.0) { return 0.6 }; // 60% - +15% per repair
-    if (cycles < 120.0) { return 0.4 }; // 40% - +10% per repair
-    return 0.2; // 120+ cycles - +5% per repair
-  };
-
-  /// Calculate effective repair amount based on core wear
-  public func getEffectiveBatteryRepair(baseRepair : Nat, kwhThroughput : Float, batteryType : BatteryType) : Nat {
-    let efficiency = getBatteryRepairEfficiency(kwhThroughput, batteryType);
-    Int.abs(Float.toInt(Float.fromInt(baseRepair) * efficiency));
-  };
-
-  /// Get health damage per jolt (larger batteries are more durable)
-  public func getBatteryHealthLossPerJolt(batteryType : BatteryType) : Float {
-    switch (batteryType) {
-      case (#ScrapCell) { 2.0 }; // ~50 jolts to dead
-      case (#SalvagePack) { 1.0 }; // ~100 jolts to dead
-      case (#IndustrialBank) { 0.5 }; // ~200 jolts to dead
-      case (#PlasmaVault) { 0.25 }; // ~400 jolts to dead
-    };
-  };
-
-  /// Apply health damage after a jolt
-  public func applyBatteryJoltDamage(battery : Battery) : Battery {
-    let damage = getBatteryHealthLossPerJolt(battery.batteryType);
-    let newHealth = if (Float.fromInt(battery.healthPercent) > damage) {
-      Int.abs(Float.toInt(Float.fromInt(battery.healthPercent) - damage));
-    } else { 0 };
-
-    { battery with healthPercent = newHealth };
+  /// Get battery condition tier based on capacity multiplier (for display)
+  /// This replaces the old health-based tiers
+  public func getBatteryConditionTier(kwhThroughput : Float, batteryType : BatteryType) : BatteryHealthTier {
+    let capacityMult = getBatteryCapacityMultiplier(kwhThroughput, batteryType);
+    if (capacityMult >= 0.90) { #Fresh } // 90-100% capacity - like new
+    else if (capacityMult >= 0.70) { #Worn } // 70-90% capacity - showing wear
+    else if (capacityMult >= 0.30) { #Depleted } // 30-70% capacity - significant degradation
+    else if (capacityMult > 0.0) { #Critical } // 1-30% capacity - nearly dead
+    else { #Dead }; // 0% capacity - must rebuild
   };
 
   /// Track throughput when jolting (discharge wears the core)
@@ -804,10 +794,10 @@ module {
   };
 
   /// Check if battery is operational (can charge and jolt)
-  /// Battery is operational as long as it has health > 0
-  /// Lower health reduces jolt efficiency but doesn't prevent usage
+  /// Battery is operational as long as it has capacity > 0% (based on cycles)
+  /// At 250+ cycles, capacity reaches 0% and battery is dead
   public func isBatteryOperational(battery : Battery) : Bool {
-    battery.healthPercent > 0;
+    getBatteryCapacityMultiplier(battery.kwhThroughput, battery.batteryType) > 0.0;
   };
 
   /// Check if battery is actively charging (enabled AND operational)
@@ -822,34 +812,26 @@ module {
     isBatteryOperational(battery) and battery.storedKwh >= joltCost;
   };
 
-  /// Get battery health tier for display
+  /// Get battery health tier for display (legacy - now based on cycles/capacity)
+  /// Kept for API compatibility, maps capacity to tiers
   public func getBatteryHealthTier(healthPercent : Nat) : BatteryHealthTier {
-    if (healthPercent == 100) { #Fresh } else if (healthPercent >= 66) { #Worn } else if (healthPercent >= 33) {
+    // This is now a legacy function - actual condition is based on cycles
+    // healthPercent is kept at 100 for all operational batteries
+    if (healthPercent >= 90) { #Fresh } else if (healthPercent >= 70) { #Worn } else if (healthPercent >= 30) {
       #Depleted;
     } else if (healthPercent >= 1) { #Critical } else { #Dead };
   };
 
-  /// Get repair cost in parts
+  /// DEPRECATED: Repair cost - health repairs no longer exist
+  /// Returns 0 for API compatibility. Use rebuild instead.
   public func getBatteryRepairCost(batteryType : BatteryType) : Nat {
-    switch (batteryType) {
-      case (#ScrapCell) { 50 };
-      case (#SalvagePack) { 150 };
-      case (#IndustrialBank) { 400 };
-      case (#PlasmaVault) { 1000 };
-    };
+    // Repair is deprecated - health system removed
+    // Keep function for API compatibility, return 0
+    ignore batteryType;
+    0;
   };
 
-  /// Get full restore ICP cost (in e8s) - restores to 100% but doesn't reset cycles
-  public func getBatteryFullRestoreIcpCost(batteryType : BatteryType) : Nat {
-    switch (batteryType) {
-      case (#ScrapCell) { 100_000_000 }; // 1 ICP
-      case (#SalvagePack) { 200_000_000 }; // 2 ICP
-      case (#IndustrialBank) { 500_000_000 }; // 5 ICP
-      case (#PlasmaVault) { 1_000_000_000 }; // 10 ICP
-    };
-  };
-
-  /// Get core rebuild cost in parts (resets cycles AND restores health)
+  /// Get core rebuild cost in parts (resets cycles, restoring full capacity)
   public func getBatteryRebuildCost(batteryType : BatteryType) : Nat {
     switch (batteryType) {
       case (#ScrapCell) { 300 };
@@ -1150,6 +1132,7 @@ module {
                 luck = botStats.luckBase + botStats.luckBonus;
                 overcharge = botStats.overcharge;
                 perfectTuneUp = botStats.perfectTuneUp;
+                tuneupQuality = botStats.tuneupQuality;
                 baseAvgRating = ?baseAvg;
               };
             };
@@ -1197,6 +1180,7 @@ module {
                 luck = botStats.luckBase + botStats.luckBonus;
                 overcharge = botStats.overcharge;
                 perfectTuneUp = botStats.perfectTuneUp;
+                tuneupQuality = botStats.tuneupQuality;
                 baseAvgRating = ?baseAvg;
               };
             };
@@ -1250,6 +1234,7 @@ module {
                 luck = botStats.luckBase + botStats.luckBonus;
                 overcharge = 0; // At 100% stats, no overcharge active
                 perfectTuneUp = false;
+                tuneupQuality = 0.0;
                 baseAvgRating = ?baseAvg;
               };
             };
@@ -1326,6 +1311,7 @@ module {
                 luck = 10; // Fixed luck for all bots
                 overcharge = 0; // Uninitialized bots have no overcharge
                 perfectTuneUp = false;
+                tuneupQuality = 0.0;
                 baseAvgRating = ?baseAvg;
               };
             };
@@ -1606,6 +1592,7 @@ module {
                 condition = Nat.sub(botStats.condition, finalConditionWear);
                 overcharge = 0; // Overcharge consumed after race
                 perfectTuneUp = false; // Reset perfect tune-up flag after race
+                tuneupQuality = 0.0; // Reset tuneup quality after race
                 worldBuff = null; // World buff consumed after race
               };
               updateStats(idx, updatedStats);
@@ -1684,6 +1671,7 @@ module {
         experience = 0;
         overcharge = 0;
         perfectTuneUp = false;
+        tuneupQuality = 0.0;
         preferredDistance = derivePreferredDistance(baseStats.powerCore, baseStats.speed);
         preferredTerrain = switch (metadata) {
           case (?traits) { derivePreferredTerrain(traits) };
@@ -1847,13 +1835,16 @@ module {
     /// No floor - if you have 100 bots charging, efficiency is 5%
     public func getGaragePowerEfficiency(owner : Principal) : Float {
       let botsCharging = countBotsInChargingStation(owner);
-      if (botsCharging == 0) {
-        return 1.0; // No bots charging = full efficiency (not used)
+      let repairBayDraw = getRepairBayTotalPowerDraw(owner);
+      let totalDemand = botsCharging * WATTS_PER_BOT + repairBayDraw;
+
+      if (totalDemand == 0) {
+        return 1.0; // No power demand = full efficiency (not used)
       };
 
       let smrPower = getUserSMRPower(owner);
       let totalCapacity = Float.fromInt(BASE_POWER_WATTS + smrPower);
-      let totalDraw = Float.fromInt(botsCharging * WATTS_PER_BOT);
+      let totalDraw = Float.fromInt(totalDemand);
 
       // efficiency = capacity / draw (capped at 1.0)
       Float.min(1.0, totalCapacity / totalDraw);
@@ -1955,7 +1946,7 @@ module {
         model = model;
         installedAt = now;
         powerOutput = powerOutput;
-        totalMwhGenerated = 0.0;
+        totalMwhGenerated = 0.0; // NOTE: Actually stores kWh now
         lastUpdateTime = now;
       };
 
@@ -1978,8 +1969,9 @@ module {
         case (?storage) {
           if (storage.installedSMRs.size() == 0) { return };
 
-          // Convert Wh to MWh
-          let energyMwh = energyWh / 1_000_000.0;
+          // Convert Wh to kWh (stored in totalMwhGenerated field for stable storage compat)
+          // Using 10,000 divisor = 100x faster depletion than old MWh rate
+          let energyKwh = energyWh / 10_000.0;
 
           // Distribute energy proportionally across all SMRs based on their power output
           let totalPower = Float.fromInt(storage.totalPowerOutput);
@@ -1987,12 +1979,12 @@ module {
             storage.installedSMRs,
             func(smr : InstalledSMR) : InstalledSMR {
               let powerRatio = Float.fromInt(smr.powerOutput) / totalPower;
-              let smrEnergyShare = energyMwh * powerRatio;
+              let smrEnergyShare = energyKwh * powerRatio;
               {
                 model = smr.model;
                 installedAt = smr.installedAt;
                 powerOutput = smr.powerOutput;
-                totalMwhGenerated = smr.totalMwhGenerated + smrEnergyShare;
+                totalMwhGenerated = smr.totalMwhGenerated + smrEnergyShare; // Actually kWh
                 lastUpdateTime = now;
               };
             },
@@ -2012,8 +2004,8 @@ module {
 
     /// Get total SMR lifetime stats for an owner
     public func getSMRLifetimeStats(owner : Principal) : {
-      totalLifetimeMwh : Nat; // Total lifetime capacity across all SMRs
-      totalUsedMwh : Float; // Total energy generated across all SMRs
+      totalLifetimeKwh : Nat; // Total lifetime capacity across all SMRs
+      totalUsedKwh : Float; // Total energy generated across all SMRs
       oldestSMRAge : Int; // Age of oldest SMR in nanoseconds
     } {
       switch (Map.get(userSMRs, phash, owner)) {
@@ -2023,20 +2015,20 @@ module {
           var oldestAge : Int = 0;
 
           for (smr in storage.installedSMRs.vals()) {
-            totalLifetime += getSMRLifetimeMwh(smr.model);
-            totalUsed += smr.totalMwhGenerated;
+            totalLifetime += getSMRLifetimeKwh(smr.model);
+            totalUsed += smr.totalMwhGenerated; // Actually kWh for stable compat
             let smrAge = Time.now() - smr.installedAt;
             if (smrAge > oldestAge) { oldestAge := smrAge };
           };
 
           {
-            totalLifetimeMwh = totalLifetime;
-            totalUsedMwh = totalUsed;
+            totalLifetimeKwh = totalLifetime;
+            totalUsedKwh = totalUsed;
             oldestSMRAge = oldestAge;
           };
         };
         case (null) {
-          { totalLifetimeMwh = 0; totalUsedMwh = 0.0; oldestSMRAge = 0 };
+          { totalLifetimeKwh = 0; totalUsedKwh = 0.0; oldestSMRAge = 0 };
         };
       };
     };
@@ -2119,6 +2111,26 @@ module {
 
       // Bot not in any bay - use fallback rate
       FALLBACK_REPAIR_RATE;
+    };
+
+    /// Get the power draw for the repair bay a specific bot is in
+    /// Returns 0 if bot is not in any repair bay
+    public func getBotRepairBayPowerDraw(owner : Principal, tokenIndex : Nat) : Nat {
+      let storage = getUserRepairBayStorage(owner);
+
+      for (bay in storage.bays.vals()) {
+        switch (bay.currentBotToken) {
+          case (?botToken) {
+            if (botToken == tokenIndex) {
+              return getRepairBayPowerDraw(bay.tier);
+            };
+          };
+          case (null) {};
+        };
+      };
+
+      // Bot not in any bay - no power draw
+      0;
     };
 
     /// Assign a bot to the best available repair bay
@@ -2393,12 +2405,16 @@ module {
       bayId : Nat;
       currentTier : Nat;
       repairRate : Nat;
+      effectiveRepairRate : Float;
+      powerEfficiency : Float;
       startCondition : Nat;
       hoursElapsed : Float;
       conditionRestored : Nat;
       currentCondition : Nat;
     } {
       let storage = getUserRepairBayStorage(owner);
+      // Get power efficiency for this owner's garage
+      let efficiency = getGaragePowerEfficiency(owner);
 
       for (bay in storage.bays.vals()) {
         switch (bay.currentBotToken) {
@@ -2411,13 +2427,17 @@ module {
 
                   switch (getRepairBayTierConfig(bay.tier)) {
                     case (?config) {
-                      let conditionRestored = Int.abs(Float.toInt(hoursElapsed * Float.fromInt(config.repairRatePerHour)));
+                      // Apply power efficiency to repair rate (effectiveRepairRate = baseRate × efficiency)
+                      let effectiveRate = Float.fromInt(config.repairRatePerHour) * efficiency;
+                      let conditionRestored = Int.abs(Float.toInt(hoursElapsed * effectiveRate));
                       let currentCondition = Nat.min(100, startCondition + conditionRestored);
 
                       return ?{
                         bayId = bay.bayId;
                         currentTier = bay.tier;
                         repairRate = config.repairRatePerHour;
+                        effectiveRepairRate = effectiveRate;
+                        powerEfficiency = efficiency;
                         startCondition = startCondition;
                         hoursElapsed = hoursElapsed;
                         conditionRestored = conditionRestored;
@@ -2586,23 +2606,18 @@ module {
       let accelOvercharge = 1.0 + (overchargeBonus * 0.25); // 1.0 to 1.10
 
       // Perfect Tune-Up: Penalty removal based on tune-up quality
-      // perfectTuneUp = true means resonance was achieved, but quality varies:
+      // tuneupQuality varies by resonance zone:
       // - Peak resonance: 100% penalty removal (tuneupQuality = 1.0)
       // - Good resonance: 70% penalty removal (tuneupQuality = 0.7)
-      // For backward compatibility, we use the bool flag and default to full removal
-      let penaltyRemoval = if (botStats.perfectTuneUp) { 1.0 } else { 0.0 };
+      // - Weak resonance: 30% penalty removal (tuneupQuality = 0.3)
+      // - No resonance: 0% penalty removal (tuneupQuality = 0.0)
+      let penaltyRemoval = botStats.tuneupQuality; // Use stored quality value
       let remainingPenalty = 1.0 - penaltyRemoval;
 
-      let stabilityOvercharge = if (botStats.perfectTuneUp) {
-        1.0; // No penalty with perfect tune-up!
-      } else {
-        1.0 - (overchargeBonus * 0.133); // 1.0 to 0.947
-      };
-      let powerCoreOvercharge = if (botStats.perfectTuneUp) {
-        1.0; // No penalty with perfect tune-up!
-      } else {
-        1.0 - (overchargeBonus * 0.133); // 1.0 to 0.947
-      };
+      // Calculate stability/powerCore penalties with partial removal based on tuneup quality
+      let basePenalty = overchargeBonus * 0.133; // Base penalty from overcharge
+      let stabilityOvercharge = 1.0 - (basePenalty * remainingPenalty);
+      let powerCoreOvercharge = 1.0 - (basePenalty * remainingPenalty);
 
       // WORLD BUFF BONUSES (from scavenging missions, expires in 48h)
       // Apply flat stat bonuses from world buffs
@@ -2627,11 +2642,17 @@ module {
         case (null) {}; // No buff active
       };
 
+      // Helper function to round floats properly (Float.toInt truncates, we want rounding)
+      func roundFloat(f : Float) : Int {
+        Float.toInt(f + 0.5);
+      };
+
       // Apply penalties to appropriate stats, then add synergy bonuses and world buffs
-      let speedWithPenalty = Float.toInt(Float.fromInt(base.speed + botStats.speedBonus) * batteryPenalty * speedOvercharge) + speedBuff + synergySpeed;
-      let accelerationWithPenalty = Float.toInt(Float.fromInt(base.acceleration + botStats.accelerationBonus) * batteryPenalty * accelOvercharge) + accelerationBuff + synergyAcceleration;
-      let powerCoreWithPenalty = Float.toInt(Float.fromInt(base.powerCore + botStats.powerCoreBonus) * conditionPenalty * powerCoreOvercharge) + powerCoreBuff + synergyPowerCore;
-      let stabilityWithPenalty = Float.toInt(Float.fromInt(base.stability + botStats.stabilityBonus) * conditionPenalty * stabilityOvercharge) + stabilityBuff + synergyStability;
+      // Use roundFloat instead of Float.toInt to avoid truncation (e.g., 17.9 -> 17 instead of 18)
+      let speedWithPenalty = roundFloat(Float.fromInt(base.speed + botStats.speedBonus) * batteryPenalty * speedOvercharge) + speedBuff + synergySpeed;
+      let accelerationWithPenalty = roundFloat(Float.fromInt(base.acceleration + botStats.accelerationBonus) * batteryPenalty * accelOvercharge) + accelerationBuff + synergyAcceleration;
+      let powerCoreWithPenalty = roundFloat(Float.fromInt(base.powerCore + botStats.powerCoreBonus) * conditionPenalty * powerCoreOvercharge) + powerCoreBuff + synergyPowerCore;
+      let stabilityWithPenalty = roundFloat(Float.fromInt(base.stability + botStats.stabilityBonus) * conditionPenalty * stabilityOvercharge) + stabilityBuff + synergyStability;
 
       // Apply Bot Dedication tier bonuses (flat stat bonuses that stack)
       let tierBenefits = statsProvider.getBenefitsForBot(botStats.tokenIndex);
@@ -2784,24 +2805,29 @@ module {
       let dedicationAcceleration = tierBenefits.accelerationBonus;
       let dedicationStability = tierBenefits.stabilityBonus;
 
-      // Calculate intermediate values
+      // Helper function to round floats properly (Float.toInt truncates, we want rounding)
+      func roundFloat(f : Float) : Int {
+        Float.toInt(f + 0.5);
+      };
+
+      // Calculate intermediate values (using roundFloat for proper rounding)
       let speedBeforePenalty = base.speed + botStats.speedBonus;
-      let speedAfterBattery = Float.toInt(Float.fromInt(speedBeforePenalty) * batteryPenalty * speedOvercharge);
+      let speedAfterBattery = roundFloat(Float.fromInt(speedBeforePenalty) * batteryPenalty * speedOvercharge);
       let speedBatteryEffect = speedAfterBattery - speedBeforePenalty;
       let speedFinal = Nat.min(100, Int.abs(speedAfterBattery) + speedBuff + synergySpeed + dedicationSpeed);
 
       let accelBeforePenalty = base.acceleration + botStats.accelerationBonus;
-      let accelAfterBattery = Float.toInt(Float.fromInt(accelBeforePenalty) * batteryPenalty * accelOvercharge);
+      let accelAfterBattery = roundFloat(Float.fromInt(accelBeforePenalty) * batteryPenalty * accelOvercharge);
       let accelBatteryEffect = accelAfterBattery - accelBeforePenalty;
       let accelFinal = Nat.min(100, Int.abs(accelAfterBattery) + accelerationBuff + synergyAcceleration + dedicationAcceleration);
 
       let powerCoreBeforePenalty = base.powerCore + botStats.powerCoreBonus;
-      let powerCoreAfterCondition = Float.toInt(Float.fromInt(powerCoreBeforePenalty) * conditionPenalty * powerCoreOvercharge);
+      let powerCoreAfterCondition = roundFloat(Float.fromInt(powerCoreBeforePenalty) * conditionPenalty * powerCoreOvercharge);
       let powerCoreConditionEffect = powerCoreAfterCondition - powerCoreBeforePenalty;
       let powerCoreFinal = Nat.min(100, Int.abs(powerCoreAfterCondition) + powerCoreBuff + synergyPowerCore + dedicationPowerCore);
 
       let stabilityBeforePenalty = base.stability + botStats.stabilityBonus;
-      let stabilityAfterCondition = Float.toInt(Float.fromInt(stabilityBeforePenalty) * conditionPenalty * stabilityOvercharge);
+      let stabilityAfterCondition = roundFloat(Float.fromInt(stabilityBeforePenalty) * conditionPenalty * stabilityOvercharge);
       let stabilityConditionEffect = stabilityAfterCondition - stabilityBeforePenalty;
       let stabilityFinal = Nat.min(100, Int.abs(stabilityAfterCondition) + stabilityBuff + synergyStability + dedicationStability);
 
@@ -2812,7 +2838,7 @@ module {
           batteryPenalty = batteryPenalty;
           batteryEffect = speedBatteryEffect;
           overcharge = speedOvercharge;
-          overchargeEffect = Float.toInt(Float.fromInt(speedBeforePenalty) * (speedOvercharge - 1.0));
+          overchargeEffect = roundFloat(Float.fromInt(speedBeforePenalty) * (speedOvercharge - 1.0));
           synergy = synergySpeed;
           worldBuff = speedBuff;
           dedication = dedicationSpeed;
@@ -2824,7 +2850,7 @@ module {
           conditionPenalty = conditionPenalty;
           conditionEffect = powerCoreConditionEffect;
           overcharge = powerCoreOvercharge;
-          overchargeEffect = Float.toInt(Float.fromInt(powerCoreBeforePenalty) * (powerCoreOvercharge - 1.0));
+          overchargeEffect = roundFloat(Float.fromInt(powerCoreBeforePenalty) * (powerCoreOvercharge - 1.0));
           synergy = synergyPowerCore;
           worldBuff = powerCoreBuff;
           dedication = dedicationPowerCore;
@@ -2836,7 +2862,7 @@ module {
           batteryPenalty = batteryPenalty;
           batteryEffect = accelBatteryEffect;
           overcharge = accelOvercharge;
-          overchargeEffect = Float.toInt(Float.fromInt(accelBeforePenalty) * (accelOvercharge - 1.0));
+          overchargeEffect = roundFloat(Float.fromInt(accelBeforePenalty) * (accelOvercharge - 1.0));
           synergy = synergyAcceleration;
           worldBuff = accelerationBuff;
           dedication = dedicationAcceleration;
@@ -2848,7 +2874,7 @@ module {
           conditionPenalty = conditionPenalty;
           conditionEffect = stabilityConditionEffect;
           overcharge = stabilityOvercharge;
-          overchargeEffect = Float.toInt(Float.fromInt(stabilityBeforePenalty) * (stabilityOvercharge - 1.0));
+          overchargeEffect = roundFloat(Float.fromInt(stabilityBeforePenalty) * (stabilityOvercharge - 1.0));
           synergy = synergyStability;
           worldBuff = stabilityBuff;
           dedication = dedicationStability;
@@ -3505,9 +3531,10 @@ module {
         case (null) { return #err("Battery not found in your garage") };
       };
 
-      // 2. Check battery is operational (healthPercent > 0)
+      // 2. Check battery is operational (capacity > 0% based on cycles)
       if (not isBatteryOperational(battery)) {
-        return #err("Battery is dead. Rebuild or salvage it. Current health: " # Nat.toText(battery.healthPercent) # "%");
+        let cycles = calculateBatteryCycles(battery.kwhThroughput, battery.batteryType);
+        return #err("Battery is dead (250+ cycles, 0% capacity). Rebuild or salvage it. Current cycles: " # Float.toText(cycles));
       };
 
       // 3. Check battery has enough charge for a jolt (10% of base capacity)
@@ -3553,14 +3580,13 @@ module {
       // Apply to bot
       let newBotBattery = Nat.min(100, botStats.battery + Int.abs(Float.toInt(finalJolt)));
 
-      // Deduct from battery AND track throughput (only jolts wear the core!)
+      // Deduct from battery AND track throughput (jolts wear the core via cycles)
       var updatedBattery = {
         battery with storedKwh = battery.storedKwh - joltCost
       };
       updatedBattery := addBatteryJoltThroughput(updatedBattery, joltCost);
 
-      // Apply health damage from jolt
-      updatedBattery := applyBatteryJoltDamage(updatedBattery);
+      // Increment jolt counter
       updatedBattery := {
         updatedBattery with totalJoltsDelivered = updatedBattery.totalJoltsDelivered + 1
       };
@@ -3604,7 +3630,8 @@ module {
       });
     };
 
-    /// Repair a battery with parts
+    /// Repair a battery - DEPRECATED: Health system removed, use rebuildBatteryCore instead
+    /// Kept for API compatibility, now just returns an error directing users to rebuild
     public func repairBattery(
       owner : Principal,
       batteryId : Nat,
@@ -3614,36 +3641,17 @@ module {
         case (null) { return #err("Battery not found in your garage") };
       };
 
-      if (battery.healthPercent >= 100) {
-        return #err("Battery is already at 100% health");
-      };
-
-      let repairCost = getBatteryRepairCost(battery.batteryType);
-
-      // Check and remove parts
-      if (not removeParts(owner, #UniversalPart, repairCost)) {
-        return #err("Insufficient Universal Parts. Need " # Nat.toText(repairCost) # " parts.");
-      };
-
-      // Calculate effective repair based on cycles
-      let baseRepair = 25; // Base +25% health
       let cycles = calculateBatteryCycles(battery.kwhThroughput, battery.batteryType);
-      let effectiveRepair = getEffectiveBatteryRepair(baseRepair, battery.kwhThroughput, battery.batteryType);
+      let capacityPct = getBatteryCapacityMultiplier(battery.kwhThroughput, battery.batteryType) * 100.0;
 
-      let newHealth = Nat.min(100, battery.healthPercent + effectiveRepair);
-
-      // Update battery
-      ignore updateBattery(owner, batteryId, { battery with healthPercent = newHealth });
-
-      #ok({
-        healthGained = effectiveRepair;
-        newHealth = newHealth;
-        cycles = cycles;
-        partsCost = repairCost;
-      });
+      #err(
+        "Battery repair has been replaced by the rebuild system. Your battery has " #
+        Float.toText(cycles) # " cycles (" # Float.toText(capacityPct) # "% capacity). " #
+        "Use 'Rebuild Core' to reset cycles and restore full capacity."
+      );
     };
 
-    /// Rebuild battery core (resets cycles AND restores health)
+    /// Rebuild battery core (resets cycles to 0, restoring full capacity)
     public func rebuildBatteryCore(
       owner : Principal,
       batteryId : Nat,
@@ -3662,10 +3670,10 @@ module {
       };
       // Note: ICP payment handled separately via ICRC-2 in main.mo
 
-      // Full rebuild: 100% health + reset wear + reset stored charge
+      // Full rebuild: reset cycles (which restores capacity) + empty stored charge
       let rebuiltBattery = {
         battery with
-        healthPercent = 100;
+        healthPercent = 100; // Keep for API compatibility
         kwhThroughput = 0.0; // Reset cycles!
         storedKwh = 0.0; // Empty after rebuild
       };
@@ -3673,8 +3681,9 @@ module {
       ignore updateBattery(owner, batteryId, rebuiltBattery);
 
       let cycles = calculateBatteryCycles(battery.kwhThroughput, battery.batteryType);
+      let oldCapacity = getBatteryCapacityMultiplier(battery.kwhThroughput, battery.batteryType) * 100.0;
       #ok({
-        message = "Core rebuilt! Health: 100%, Cycles reset from " # Float.toText(cycles) # " to 0. Max capacity restored to 100%.";
+        message = "Core rebuilt! Cycles reset from " # Float.toText(cycles) # " to 0. Capacity restored from " # Float.toText(oldCapacity) # "% to 100%.";
       });
     };
 
@@ -4652,7 +4661,7 @@ module {
       // Zone multipliers and faction bonuses are fully preserved
       // Battery drains faster than condition (battery is immediate constraint, condition is long-term durability)
       {
-        basePartsPerHour = 10.0; // 10 parts per hour base
+        basePartsPerHour = 15.0; // 15 parts per hour base
         baseBatteryDrain = 30.0; // 30 battery drain per hour base (faster than condition)
         baseConditionLoss = 12.0; // 12 condition loss per hour base (slower than battery)
       };
@@ -5191,7 +5200,17 @@ module {
                 stabilityBonus; // Apply stability modifier for damage
               };
 
-              let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionConditionMult * effectiveStabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
+              // For RepairBay: use actual repair bay infrastructure rate instead of hardcoded zone multiplier
+              let conditionLoss = if (isRestorationZone) {
+                // Get the repair rate from the user's repair bay infrastructure (tier-based)
+                let repairRate = getBotRepairRate(botStats.ownerPrincipal, tokenIndex);
+                // POWER GRID: Apply garage power efficiency to repair rate (same as ChargingStation)
+                let powerEfficiency = getGaragePowerEfficiency(botStats.ownerPrincipal);
+                // Negative value indicates restoration; apply duration bonus and power efficiency
+                -Float.fromInt(repairRate) * hoursElapsed * powerEfficiency / durationBonus;
+              } else {
+                rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionConditionMult * effectiveStabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
+              };
 
               // Add variance to battery and condition costs (±20% random variation)
               // This creates more unpredictable resource management - sometimes lucky, sometimes not
@@ -5201,8 +5220,6 @@ module {
 
               let batteryDrainWithVariance = batteryDrain * (1.0 + batteryVariance);
               let conditionLossWithVariance = conditionLoss * (1.0 + conditionVariance);
-
-              Debug.print("SCAVENGE ACCUMULATION bot " # debug_show (tokenIndex) # " zone=" # debug_show (mission.zone) # " baseBattery=" # debug_show (rates.baseBatteryDrain) # " zoneMult=" # debug_show (zoneMultipliers.battery) # " factionMult=" # debug_show (factionBonus.batteryMultiplier) # " powerCoreBonus=" # debug_show (powerCoreBonus) # " durationBonus=" # debug_show (durationBonus) # " variance=" # debug_show (batteryVariance) # " finalDrain=" # debug_show (batteryDrainWithVariance));
 
               // Probabilistic rounding: use fractional part as probability
               // E.g., 1.9 = 90% chance of 2, 10% chance of 1
@@ -5217,8 +5234,6 @@ module {
               } else {
                 batteryFloor;
               };
-
-              Debug.print("BATTERY ROUNDING bot " # debug_show (tokenIndex) # " floor=" # debug_show (batteryFloor) # " fraction=" # debug_show (batteryFraction) # " rng=" # debug_show (batteryRng) # " rounded=" # debug_show (batteryDrainRounded));
 
               // Negative batteryDrain means restoration (Charging Station)
               let newBattery = if (batteryDrainWithVariance < 0.0) {
@@ -5308,6 +5323,23 @@ module {
                 newCondition - botStats.condition;
               } else {
                 0;
+              };
+
+              // Track SMR energy usage when repairing in RepairBay
+              // Repair bays draw power from the grid, SMR provides power above base 500W
+              if (mission.zone == #RepairBay and conditionRestored > 0) {
+                let smrPower = getUserSMRPower(botStats.ownerPrincipal);
+                if (smrPower > 0) {
+                  // Get the repair bay's power draw (tier-based)
+                  let repairBayPowerDraw = Float.fromInt(getBotRepairBayPowerDraw(botStats.ownerPrincipal, tokenIndex));
+                  // Calculate energy used: power (watts) × time (hours) = watt-hours
+                  let energyWh = repairBayPowerDraw * hoursElapsed;
+                  // Calculate SMR share based on power contribution
+                  let totalCapacity = BASE_POWER_WATTS + smrPower;
+                  let smrPowerRatio = Float.fromInt(smrPower) / Float.fromInt(totalCapacity);
+                  let smrEnergyWh = energyWh * smrPowerRatio;
+                  accumulateSMRUsage(botStats.ownerPrincipal, smrEnergyWh, now);
+                };
               };
 
               // Probabilistic rounding for parts
@@ -5617,7 +5649,15 @@ module {
             stabilityBonus; // Apply stability modifier for damage
           };
 
-          let conditionLoss = rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionConditionMult * effectiveStabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
+          // For RepairBay: use actual repair bay infrastructure rate instead of hardcoded zone multiplier
+          let conditionLoss = if (isRestorationZone) {
+            // Get the repair rate from the user's repair bay infrastructure (tier-based)
+            let repairRate = getBotRepairRate(botStats.ownerPrincipal, tokenIndex);
+            // Negative value indicates restoration; apply duration bonus
+            -Float.fromInt(repairRate) * hoursElapsed / durationBonus;
+          } else {
+            rates.baseConditionLoss * hoursElapsed * zoneMultipliers.condition * factionConditionMult * effectiveStabilityBonus / durationBonus * synergies.drainMultipliers.scavengingDrain;
+          };
 
           // Add variance to battery and condition costs (±20% random variation) - MATCH UPDATE FUNCTION
           // Use lastAccumulation in seed for deterministic results (must match actual accumulate)
@@ -5747,6 +5787,8 @@ module {
           // This locks in their gains at the CURRENT efficiency before this bot changes the power balance
           if (zone == #ChargingStation) {
             ignore snapshotChargingStationBots(botStats.ownerPrincipal, now, ?tokenIndex);
+            // Also accumulate battery charge before power balance changes
+            accumulateBatteryCharge(botStats.ownerPrincipal, now);
           };
 
           // REPAIR BAY: If joining RepairBay zone, assign to a specific bay
@@ -5811,15 +5853,18 @@ module {
               // at the current efficiency before power grid changes
               if (mission.zone == #ChargingStation) {
                 ignore snapshotChargingStationBots(botStats.ownerPrincipal, now, ?tokenIndex);
+                // Also accumulate battery charge before power balance changes
+                accumulateBatteryCharge(botStats.ownerPrincipal, now);
               };
 
-              // If leaving RepairBay, release the bay slot
+              // Force final accumulation BEFORE releasing from RepairBay
+              // This ensures getBotRepairRate() can still find which bay the bot is in
+              ignore accumulateScavengingRewards(tokenIndex, now);
+
+              // If leaving RepairBay, release the bay slot AFTER accumulation
               if (mission.zone == #RepairBay) {
                 ignore releaseBotFromRepairBay(botStats.ownerPrincipal, tokenIndex);
               };
-
-              // Force final accumulation before pulling
-              ignore accumulateScavengingRewards(tokenIndex, now);
 
               // Get updated stats with final accumulation
               let finalStats = switch (getStats(tokenIndex)) {
@@ -5890,15 +5935,18 @@ module {
               // at the current efficiency before power grid changes
               if (mission.zone == #ChargingStation) {
                 ignore snapshotChargingStationBots(botStats.ownerPrincipal, now, ?tokenIndex);
+                // Also accumulate battery charge before power balance changes
+                accumulateBatteryCharge(botStats.ownerPrincipal, now);
               };
 
-              // If leaving RepairBay, release the bay slot
+              // Force final accumulation for any partial interval BEFORE releasing from RepairBay
+              // This ensures getBotRepairRate() can still find which bay the bot is in
+              ignore accumulateScavengingRewards(tokenIndex, now);
+
+              // If leaving RepairBay, release the bay slot AFTER accumulation
               if (mission.zone == #RepairBay) {
                 ignore releaseBotFromRepairBay(botStats.ownerPrincipal, tokenIndex);
               };
-
-              // Force final accumulation for any partial interval
-              ignore accumulateScavengingRewards(tokenIndex, now);
 
               // Get updated mission with final accumulation
               let finalStats = switch (getStats(tokenIndex)) {

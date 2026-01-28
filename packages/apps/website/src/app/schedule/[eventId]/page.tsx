@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { EventDetailsClient } from './EventDetailsClient';
+import { EventDetailsClient } from './EventDetailsClientNew';
 
 export default function EventDetailsPage() {
   const { eventId } = useParams<{ eventId: string }>();

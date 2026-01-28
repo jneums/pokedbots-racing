@@ -128,9 +128,9 @@ export function PartsConverter({ inventory, identityOrAgent, onConversionComplet
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <RefreshCw className="h-4 w-4" />
-          Convert
+        <Button variant="outline" size="sm" className="flex-1 h-7 text-xs gap-1.5">
+          <RefreshCw className="h-3.5 w-3.5" />
+          Convert Parts
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">

@@ -16,6 +16,7 @@ import GuidePage from './app/guides/[slug]/page';
 import NewsPage from './app/news/page';
 import NewsArticlePage from './app/news/[slug]/page';
 import BotDetailsPage from './app/bot/[tokenIndex]/page';
+import RaceDetailsPage from './app/race/[raceId]/page';
 import { WalletDrawerProvider } from './contexts/WalletDrawerContext';
 import { WalletDrawer } from './components/WalletDrawer';
 import { useAuth } from './hooks/useAuth';
@@ -149,6 +150,7 @@ export default function App() {
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/betting" element={<BettingPage />} />
           <Route path="/simulator" element={<SimulatorPage />} />
+          <Route path="/race/:raceId" element={<RaceDetailsPage />} />
           <Route path="/bot/:tokenIndex" element={<BotDetailsPage />} />
           <Route path="/guides" element={<GuidesListPage />} />
           <Route path="/guides/:slug" element={<GuidePage />} />

@@ -54,12 +54,12 @@ SMRs (Small Modular Reactors) permanently increase your grid capacity. Buy them 
 
 ### Available Models
 
-| Model | Capacity | Price | Lifetime | Features |
-|-------|----------|-------|----------|----------|
-| **WR-250** "Scrapyard Special" | +250W | 5 ICP | ~20 MWh | Entry-level, salvaged core |
-| **WR-500** "Rust Belt Reactor" | +500W | 8 ICP | ~80 MWh | Auto-regulating coolant |
-| **WR-880** "Deadzone Dynamo" | +880W | 12 ICP | ~160 MWh | Triple-redundant cooling |
-| **WR-1210** "Flux Capacitor Elite" | +1.21 GW! | 15 ICP | ~300 MWh | Pre-war military tech ⭐ Best value |
+| Model | Capacity | Price | Lifetime | Discount | Features |
+|-------|----------|-------|----------|----------|----------|
+| **WR-250** "Scrapyard Special" | +250W | 5 ICP | ~50 kWh (~42 charges) | ~15% off | Entry-level, salvaged core |
+| **WR-500** "Rust Belt Reactor" | +500W | 8 ICP | ~100 kWh (~83 charges) | ~30% off | Auto-regulating coolant |
+| **WR-880** "Deadzone Dynamo" | +880W | 12 ICP | ~175 kWh (~146 charges) | ~44% off | Triple-redundant cooling |
+| **WR-1210** "Flux Capacitor Elite" | +1.21 GW! | 15 ICP | ~275 kWh (~229 charges) | ~51% off | Pre-war military tech ⭐ Best value |
 
 ### Calculating Your Needs
 
@@ -73,21 +73,19 @@ SMRs (Small Modular Reactors) permanently increase your grid capacity. Buy them 
 
 ### SMR Lifetime
 
+Each SMR has a lifetime measured in kWh (kilowatt-hours). The reactor depletes as it delivers power to charging bots. The lifetime is based on total energy delivered—not time.
 
-Each SMR has a lifetime measured in MWh (megawatt-hours). The reactor depletes as it delivers power to charging bots. The lifetime is based on total energy delivered—not time.
-
-- **1 MWh = 1,000 kWh**
 - **Each full bot charge from the grid = 10 kWh** (from 0% to 100% battery)
 
 **Lifetime Formula (Grid Charging):**
 ```
-Total full grid charges = Lifetime MWh × 1,000 / 10
+Total full grid charges = Lifetime kWh / 10
 ```
 
-For WR-250: `20 MWh × 1,000 / 10 = 2,000 full grid charges`
+For WR-250: `20 kWh / 10 = 2 full grid charges` (but SMR only contributes proportionally)
 
-**At max output (250W, 24/7), the WR-250 SMR will last about 3.3 days. WR-1210 will last about 50 days.**
-If you use less than max output, the SMR will last longer.
+**Compared to paid recharges (0.1 ICP for 50-90% battery), SMRs provide 15-51% savings depending on tier.**
+The WR-1210 offers the best value at ~0.07 ICP per equivalent full charge vs ~0.14 ICP for paid recharges.
 
 **UI Indicator:** Your SMR shows "XX% life" remaining. At 100%, it's brand new.
 

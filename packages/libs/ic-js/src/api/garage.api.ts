@@ -123,6 +123,11 @@ export interface BotListItem {
     expiresAt: bigint;
     stats: Array<[string, bigint]>;
   };
+  heatStatus?: {
+    heatStacks: number;
+    isOverheated: boolean;
+    minutesUntilCooldown?: number;
+  };
 }
 
 export interface BotDetailsResponse {
@@ -360,6 +365,15 @@ export const listMyBots = async (identityOrAgent: IdentityOrAgent): Promise<BotL
         entryFee: race.entryFee,
         terrain: race.terrain,
       })).sort((a, b) => Number(a.startTime - b.startTime)),
+      heatStatus: (() => {
+        const hs = bot.heatStatus?.[0];
+        if (!hs) return undefined;
+        return {
+          heatStacks: Number(hs.heatStacks),
+          isOverheated: hs.isOverheated,
+          minutesUntilCooldown: hs.minutesUntilCooldown?.[0] !== undefined ? Number(hs.minutesUntilCooldown[0]) : undefined,
+        };
+      })(),
     };
   });
 };
@@ -962,9 +976,12 @@ export interface GaragePowerStatus {
   batteriesCharging: number;
   batteryDrawWatts: number;
   effectiveBatteryDrawWatts: number;
+  // Repair bay info
+  repairBayDrawWatts: number;
+  activeRepairBays: number;
   // SMR lifetime tracking
-  smrLifetimeTotalMwh: number;
-  smrLifetimeUsedMwh: number;
+  smrLifetimeTotalKwh: number;
+  smrLifetimeUsedKwh: number;
   smrLifetimePercent: number;
 }
 
@@ -995,8 +1012,10 @@ export const getGaragePowerStatus = async (
     batteriesCharging: Number(result.batteriesCharging),
     batteryDrawWatts: Number(result.batteryDrawWatts),
     effectiveBatteryDrawWatts: Number(result.effectiveBatteryDrawWatts),
-    smrLifetimeTotalMwh: Number(result.smrLifetimeTotalMwh),
-    smrLifetimeUsedMwh: result.smrLifetimeUsedMwh,
+    repairBayDrawWatts: Number(result.repairBayDrawWatts),
+    activeRepairBays: Number(result.activeRepairBays),
+    smrLifetimeTotalKwh: Number(result.smrLifetimeTotalKwh),
+    smrLifetimeUsedKwh: result.smrLifetimeUsedKwh,
     smrLifetimePercent: result.smrLifetimePercent
   };
 };
@@ -1019,8 +1038,8 @@ export interface InstalledSMR {
   model: string;
   powerOutput: number;
   installedAt: bigint;
-  lifetimeMwh: number;
-  usedMwh: number;
+  lifetimeKwh: number;
+  usedKwh: number;
   lifetimePercent: number;
 }
 
@@ -1064,6 +1083,49 @@ export const purchaseSMR = async (
 };
 
 /**
+ * Result type for parts purchase
+ */
+export interface PartsPurchaseResult {
+  message: string;
+  partsReceived: number;
+  cost: number;
+  newTotal: number;
+}
+
+/**
+ * Purchase Universal Parts with ICP.
+ * Cost: 1 ICP for 500 Universal Parts
+ * @param amount Number of parts to buy (must be multiple of 500)
+ * @param identityOrAgent Required identity for authentication
+ * @returns Purchase result with new total
+ */
+export const purchaseParts = async (
+  amount: number,
+  identityOrAgent: IdentityOrAgent
+): Promise<PartsPurchaseResult> => {
+  const racingActor = await getActor(identityOrAgent);
+  const result = await racingActor.web_purchase_parts(BigInt(amount));
+  
+  if ('ok' in result) {
+    const data = result.ok as {
+      message: string;
+      partsReceived: bigint;
+      cost: bigint;
+      newTotal: bigint;
+    };
+    return {
+      message: data.message,
+      partsReceived: Number(data.partsReceived),
+      cost: Number(data.cost),
+      newTotal: Number(data.newTotal)
+    };
+  } else if ('err' in result) {
+    throw new Error(result.err as string);
+  }
+  throw new Error('Unexpected response from canister');
+};
+
+/**
  * Get user's installed SMRs with lifetime tracking.
  * @param identityOrAgent Required identity for authentication
  * @returns User's SMR storage with per-SMR lifetime data
@@ -1079,15 +1141,15 @@ export const getUserSMRs = async (
       model: string; 
       powerOutput: bigint; 
       installedAt: bigint;
-      lifetimeMwh: bigint;
-      usedMwh: number;
+      lifetimeKwh: bigint;
+      usedKwh: number;
       lifetimePercent: number;
     }>).map(smr => ({
       model: smr.model,
       powerOutput: Number(smr.powerOutput),
       installedAt: smr.installedAt,
-      lifetimeMwh: Number(smr.lifetimeMwh),
-      usedMwh: smr.usedMwh,
+      lifetimeKwh: Number(smr.lifetimeKwh),
+      usedKwh: smr.usedKwh,
       lifetimePercent: smr.lifetimePercent
     })),
     totalPowerOutput: Number(result.totalPowerOutput)
@@ -1423,6 +1485,8 @@ export interface BatteryStorageSummary {
   operationalBatteries: bigint;
   totalStoredKwh: number;
   totalCapacityKwh: number;
+  firstBatteryDiscovered: boolean;
+  cumulativeScavengingHours: number;
 }
 
 /**
@@ -1526,6 +1590,8 @@ export const getBatteries = async (identityOrAgent: IdentityOrAgent): Promise<Ge
       operationalBatteries: result.summary.operationalBatteries,
       totalStoredKwh: result.summary.totalStoredKwh,
       totalCapacityKwh: result.summary.totalCapacityKwh,
+      firstBatteryDiscovered: result.summary.firstBatteryDiscovered,
+      cumulativeScavengingHours: result.summary.cumulativeScavengingHours,
     },
   };
 };

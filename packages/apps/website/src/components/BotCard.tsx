@@ -572,7 +572,14 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   const maxOvercharge = 40;
   const overchargePercent = Math.round((overcharge / maxOvercharge) * 100);
   const isPerfectTuneUp = stats.perfectTuneUp === true;
-  const hasOvercharge = overcharge > 0 || isPerfectTuneUp;
+  // Legacy data: if perfectTuneUp is true but tuneupQuality is 0/missing, assume peak (1.0)
+  const rawTuneupQuality = Number(stats.tuneupQuality ?? 0);
+  const tuneupQuality = isPerfectTuneUp && rawTuneupQuality === 0 ? 1.0 : rawTuneupQuality;
+  const tuneupPercent = Math.round(tuneupQuality * 100);
+  const hasOvercharge = overcharge > 0;
+  // For the radial ring: always show overcharge percent (the actual boost amount)
+  // The color indicates if perfect tune-up is active (gold) or not (cyan)
+  const ringPercent = overchargePercent;
 
   return (
     <Card className="border-2 border-primary/20 bg-card/80 backdrop-blur">
@@ -618,7 +625,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                       fill="none"
                       stroke={isPerfectTuneUp ? "url(#goldGradient)" : "rgb(6, 182, 212)"}
                       strokeWidth="4"
-                      strokeDasharray={`${(overchargePercent / 100) * 207.3} 207.3`}
+                      strokeDasharray={`${(ringPercent / 100) * 207.3} 207.3`}
                       strokeLinecap="round"
                       className={isPerfectTuneUp ? "animate-pulse" : "transition-all duration-1000"}
                       style={isPerfectTuneUp ? { animationDuration: '1.5s', filter: 'drop-shadow(0 0 6px rgba(251, 191, 36, 0.8))' } : { filter: 'drop-shadow(0 0 4px rgba(6, 182, 212, 0.6))' }}
@@ -708,57 +715,93 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           </div>
         )}
 
-        {/* Overcharge Status - Always visible to encourage usage */}
+        {/* Overcharge & Tune-Up Status - Always visible to encourage usage */}
         {(() => {
           const overcharge = Number(stats.overcharge);
           const maxOvercharge = 40; // Max overcharge is 40 (capped in recharge logic)
           const percentOfMax = Math.round((overcharge / maxOvercharge) * 100);
           const perfectTuneUp = stats.perfectTuneUp === true;
+          // tuneupQuality: 1.0 = Peak (100% penalty removal), 0.7 = Good (70%), 0.3 = Weak (30%), 0.0 = None
+          // Legacy data: if perfectTuneUp is true but tuneupQuality is 0/missing, assume peak (1.0)
+          const rawTuneupQuality = Number(stats.tuneupQuality ?? 0);
+          const tuneupQuality = perfectTuneUp && rawTuneupQuality === 0 ? 1.0 : rawTuneupQuality;
+          const tuneupPercent = Math.round(tuneupQuality * 100);
+          
+          // Calculate actual penalties with tuneup quality applied
+          const basePenalty = overcharge * 0.133; // Base penalty per stat
+          const remainingPenalty = basePenalty * (1 - tuneupQuality);
           
           return (
-            <div className={`p-3 rounded-lg space-y-2 ${
+            <div className={`p-3 rounded-lg space-y-3 ${
               perfectTuneUp
                 ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-2 border-yellow-500/50 shadow-lg'
                 : overcharge > 0 
                   ? 'bg-cyan-500/10 border border-cyan-500/30' 
                   : 'bg-muted/50 border border-muted'
             }`}>
-              <div className="flex justify-between items-center">
-                <span className={`text-sm font-semibold ${
-                  perfectTuneUp
-                    ? 'text-yellow-600 dark:text-yellow-400'
-                    : overcharge > 0 
+              {/* Overcharge Bar - Shows the raw boost amount */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className={`text-sm font-semibold ${
+                    overcharge > 0 
                       ? 'text-cyan-600 dark:text-cyan-400' 
                       : 'text-muted-foreground'
-                }`}>
-                  {perfectTuneUp ? '⚡ PERFECT TUNE-UP! ⚡' : '⚡ Overcharge'}
-                </span>
-                <span className={`text-sm font-bold ${
-                  overcharge > 0 
-                    ? 'text-cyan-600 dark:text-cyan-400' 
-                    : 'text-muted-foreground'
-                }`}>
-                  {overcharge > 0 ? `${percentOfMax}%` : '0%'}
-                </span>
+                  }`}>
+                    ⚡ Overcharge
+                  </span>
+                  <span className={`text-sm font-bold ${
+                    overcharge > 0 
+                      ? 'text-cyan-600 dark:text-cyan-400' 
+                      : 'text-muted-foreground'
+                  }`}>
+                    {percentOfMax}%
+                  </span>
+                </div>
+                <div className="w-full bg-cyan-900/20 rounded-full h-2">
+                  <div
+                    className="h-2 rounded-full transition-all bg-gradient-to-r from-cyan-500 to-blue-500"
+                    style={{ width: `${percentOfMax}%` }}
+                  />
+                </div>
               </div>
-              <div className="w-full bg-cyan-900/20 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all ${
-                    perfectTuneUp 
-                      ? 'bg-gradient-to-r from-yellow-400 to-orange-500' 
-                      : 'bg-gradient-to-r from-cyan-500 to-blue-500'
-                  }`}
-                  style={{ width: `${percentOfMax}%` }}
-                />
-              </div>
+
+              {/* Tune-Up Quality Bar - Shows penalty removal (only when perfectTuneUp is active) */}
+              {perfectTuneUp && (
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
+                      🔧 {tuneupQuality >= 1.0 ? 'PERFECT TUNE-UP!' : tuneupQuality >= 0.7 ? 'Great Tune-Up!' : 'Good Tune-Up'}
+                    </span>
+                    <span className="text-sm font-bold text-yellow-600 dark:text-yellow-400">
+                      {tuneupPercent}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-yellow-900/20 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full transition-all bg-gradient-to-r from-yellow-400 to-orange-500"
+                      style={{ width: `${tuneupPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Boost/Penalty Info */}
               {perfectTuneUp ? (
                 <div className="text-xs space-y-0.5">
-                  <p className="font-semibold text-yellow-700 dark:text-yellow-400">🎯 Jackpot! Next race boost:</p>
+                  <p className="font-semibold text-yellow-700 dark:text-yellow-400">
+                    🎯 {tuneupQuality >= 1.0 ? 'Jackpot!' : tuneupQuality >= 0.7 ? 'Great!' : 'Good!'} Next race boost:
+                  </p>
                   <div className="flex justify-between">
                     <span className="text-green-600 font-semibold">+{(overcharge * 0.30).toFixed(1)}% Speed</span>
                     <span className="text-green-600 font-semibold">+{(overcharge * 0.30).toFixed(1)}% Accel</span>
                   </div>
-                  <p className="text-xs text-muted-foreground italic">No penalties! Perfect timing on repair.</p>
+                  {tuneupQuality >= 1.0 ? (
+                    <p className="text-xs text-muted-foreground italic">No penalties! Perfect timing on repair.</p>
+                  ) : (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Reduced penalties: -{remainingPenalty.toFixed(1)}% Power/Stab ({tuneupPercent}% removed)
+                    </p>
+                  )}
                 </div>
               ) : overcharge > 0 ? (
                 <div className="text-xs space-y-0.5">
@@ -1003,11 +1046,11 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
             // Apply both garage-wide synergy AND bot's individual dedication bonus
             const dedicationRechargeMult = dedicationInfo?.benefits.rechargeCooldownMult ?? 1.0;
             const dedicationRepairMult = dedicationInfo?.benefits.repairCooldownMult ?? 1.0;
-            const rechargeCooldownMs = 6 * 60 * 60 * 1000 * rechargeCooldownMultiplier * dedicationRechargeMult; // 6 hours * garage synergy * dedication bonus
+            const rechargeCooldownMs = 2 * 60 * 60 * 1000 * rechargeCooldownMultiplier * dedicationRechargeMult; // 2 hours * garage synergy * dedication bonus
             const rechargeReady = stats.lastRecharged 
               ? Number(stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
               : 0;
-            const repairCooldownMs = 3 * 60 * 60 * 1000 * dedicationRepairMult; // 3 hours * dedication bonus
+            const repairCooldownMs = 1 * 60 * 60 * 1000 * dedicationRepairMult; // 1 hour * dedication bonus
             const repairReady = stats.lastRepaired
               ? Number(stats.lastRepaired) / 1_000_000 + repairCooldownMs
               : 0;
@@ -2080,19 +2123,19 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                       <div className="text-xs text-muted-foreground pl-4 space-y-0.5">
                         <div className="flex justify-between">
                           <span>T1 Salvage Arm:</span>
-                          <span className="text-green-500 font-medium">+6/hr</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>T4 Parts Handler:</span>
                           <span className="text-green-500 font-medium">+12/hr</span>
                         </div>
                         <div className="flex justify-between">
+                          <span>T4 Parts Handler:</span>
+                          <span className="text-green-500 font-medium">+24/hr</span>
+                        </div>
+                        <div className="flex justify-between">
                           <span>T8 Plasma Cutter:</span>
-                          <span className="text-green-500 font-medium">+26/hr</span>
+                          <span className="text-green-500 font-medium">+52/hr</span>
                         </div>
                         <div className="flex justify-between">
                           <span>T16 Foundry Core:</span>
-                          <span className="text-green-500 font-medium">+120/hr</span>
+                          <span className="text-green-500 font-medium">+240/hr</span>
                         </div>
                       </div>
                     </div>

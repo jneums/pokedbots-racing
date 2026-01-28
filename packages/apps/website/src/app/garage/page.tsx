@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useMyBots, useUserInventory, useCollectionBonuses, useGaragePowerStatus, useUserSMRs, useUserWalletNFTs, useRechargeBot, useRepairBot, useBatchRechargeBots, useBatchRepairBots, useBatchCompleteScavenging, useBatchStartScavenging, useStarredBots, useSetStarredBots, useRacerBots, useSetRacerBots, useScavengerBots, useSetScavengerBots, useBatchDedicationInfo, usePurchaseSMR } from '../../hooks/useGarage';
 import { useGetUpcomingEventsWithRaces } from '../../hooks/useRacing';
@@ -14,9 +14,10 @@ import { ToggleGroup, ToggleGroupItem } from '../../components/ui/toggle-group';
 import { WalletConnect } from '../../components/WalletConnect';
 import { BotCard } from '../../components/BotCard';
 import { PartsConverter } from '../../components/PartsConverter';
+import { PartsPurchase } from '../../components/PartsPurchase';
 import { BatteryPanel } from '../../components/BatteryPanel';
 import { RepairBayPanel } from '../../components/RepairBayPanel';
-import { Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical, Plus, ChevronDown, ChevronRight, Search, CheckSquare, Square, Filter, X, MapPin, RefreshCw } from 'lucide-react';
+import { Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical, Plus, ChevronDown, ChevronRight, Search, CheckSquare, Square, Filter, X, MapPin, RefreshCw, Flame } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { BotListItem, BatchDedicationInfo } from '@pokedbots-racing/ic-js';
 import { Progress } from '../../components/ui/progress';
@@ -115,8 +116,8 @@ function BotCooldownBadges({
   const dedicationRechargeMult = dedicationInfo?.benefits.rechargeCooldownMult ?? 1.0;
   const dedicationRepairMult = dedicationInfo?.benefits.repairCooldownMult ?? 1.0;
   
-  const rechargeCooldownMs = 6 * 60 * 60 * 1000 * garageCooldownMult * dedicationRechargeMult;
-  const repairCooldownMs = 3 * 60 * 60 * 1000 * dedicationRepairMult; // Repair base is 3 hours
+  const rechargeCooldownMs = 2 * 60 * 60 * 1000 * garageCooldownMult * dedicationRechargeMult;
+  const repairCooldownMs = 1 * 60 * 60 * 1000 * dedicationRepairMult; // Repair base is 1 hour
   
   const rechargeReady = bot.stats.lastRecharged 
     ? Number(bot.stats.lastRecharged) / 1_000_000 + rechargeCooldownMs
@@ -177,7 +178,6 @@ function BotCooldownBadges({
 export default function GaragePage() {
   const { isAuthenticated, user } = useAuth();
   const queryClient = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedBotIndex, setSelectedBotIndex] = useState<bigint | null>(null);
   const [customOrder, setCustomOrder] = useState<string[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -1232,32 +1232,6 @@ export default function GaragePage() {
     ? sortedBots.find(b => b.tokenIndex === selectedBotIndex) 
     : null;
 
-  // Initialize selected bot from URL query param (only on mount or when URL/bots change)
-  useEffect(() => {
-    const botParam = searchParams.get('bot');
-    if (botParam && sortedBots.length > 0) {
-      const botIndex = BigInt(botParam);
-      const botExists = sortedBots.some(b => b.tokenIndex === botIndex);
-      if (botExists && selectedBotIndex !== botIndex) {
-        setSelectedBotIndex(botIndex);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, sortedBots]);
-
-  // Update URL when selected bot changes
-  useEffect(() => {
-    if (selectedBotIndex !== null) {
-      const currentBot = searchParams.get('bot');
-      const newBot = selectedBotIndex.toString();
-      if (currentBot !== newBot) {
-        setSearchParams({ bot: newBot }, { replace: true });
-      }
-    }
-    // Remove searchParams from deps to prevent circular loop
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedBotIndex, setSearchParams]);
-
   if (!isAuthenticated) {
     return (
       <div className="container mx-auto px-4 py-12">
@@ -1392,48 +1366,87 @@ export default function GaragePage() {
             {/* Power usage display */}
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground font-medium">
-                {powerStatus.currentDrawWatts}W / {powerStatus.totalCapacityWatts}W
+                {powerStatus.currentDrawWatts + powerStatus.effectiveBatteryDrawWatts}W / {powerStatus.totalCapacityWatts}W
               </span>
               <span className={`font-bold ${
-                powerStatus.botsCharging === 0 ? 'text-muted-foreground'
-                : powerStatus.efficiency < 0.5 ? 'text-red-500' 
+                powerStatus.efficiency < 0.5 ? 'text-red-500' 
                 : powerStatus.efficiency < 1 ? 'text-yellow-500' 
                 : 'text-green-500'
               }`}>
                 {Math.round(powerStatus.efficiency * 100)}% efficiency
               </span>
             </div>
-            <Progress 
-              value={powerStatus.totalCapacityWatts > 0 ? (powerStatus.currentDrawWatts / powerStatus.totalCapacityWatts) * 100 : 0} 
-              className={`h-2 ${
-                powerStatus.botsCharging === 0 ? '[&>div]:bg-muted-foreground'
-                : powerStatus.efficiency < 0.5 ? '[&>div]:bg-red-500' 
-                : powerStatus.efficiency < 1 ? '[&>div]:bg-yellow-500' 
-                : '[&>div]:bg-green-500'
-              }`}
-            />
-            {powerStatus.botsCharging > 0 && powerStatus.efficiency < 1 && (
-              <p className="text-xs text-muted-foreground/80">
-                ⚠️ Over capacity! Charging speed reduced. Recall some bots to charge faster.
-              </p>
-            )}
-            {/* Battery charging info */}
-            {powerStatus.batteriesCharging > 0 && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-border/50 pt-2 mt-1">
-                <span>🔋</span>
-                <span>
-                  {powerStatus.batteriesCharging} batter{powerStatus.batteriesCharging === 1 ? 'y' : 'ies'} charging
-                  {powerStatus.surplusWatts > 0 ? (
-                    <span> at {powerStatus.effectiveBatteryDrawWatts}W
-                      {powerStatus.batteryDrawWatts > powerStatus.surplusWatts && (
-                        <span className="text-yellow-500"> (reduced - low surplus)</span>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="text-red-400"> — paused (no surplus power, recall bots to resume)</span>
+            {/* Segmented power bar: bots (green) + repair bays (purple) + batteries (amber) */}
+            {(() => {
+              const botDraw = powerStatus.botsCharging * powerStatus.wattsPerBotRequired;
+              const repairDraw = powerStatus.repairBayDrawWatts || 0;
+              const batteryDraw = powerStatus.effectiveBatteryDrawWatts;
+              const total = powerStatus.totalCapacityWatts;
+              const botPct = total > 0 ? (botDraw / total) * 100 : 0;
+              const repairPct = total > 0 ? (repairDraw / total) * 100 : 0;
+              const batteryPct = total > 0 ? (batteryDraw / total) * 100 : 0;
+              return (
+                <div className="relative h-2 w-full bg-secondary rounded-full overflow-hidden">
+                  {/* Bot charging segment (green) */}
+                  {botDraw > 0 && (
+                    <div 
+                      className={`absolute left-0 top-0 h-full transition-all ${
+                        powerStatus.efficiency < 0.5 ? 'bg-red-500' 
+                        : powerStatus.efficiency < 1 ? 'bg-yellow-500' 
+                        : 'bg-green-500'
+                      }`}
+                      style={{ width: `${botPct}%` }}
+                    />
                   )}
-                </span>
-              </div>
+                  {/* Repair bay segment (purple) */}
+                  {repairDraw > 0 && (
+                    <div 
+                      className="absolute top-0 h-full bg-purple-500 transition-all"
+                      style={{ left: `${botPct}%`, width: `${repairPct}%` }}
+                    />
+                  )}
+                  {/* Battery charging segment (amber) */}
+                  {batteryDraw > 0 && (
+                    <div 
+                      className="absolute top-0 h-full bg-amber-500 transition-all"
+                      style={{ left: `${botPct + repairPct}%`, width: `${batteryPct}%` }}
+                    />
+                  )}
+                </div>
+              );
+            })()}
+            {/* Legend */}
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+              {powerStatus.botsCharging > 0 && (
+                <div className="flex items-center gap-1">
+                  <div className={`w-2 h-2 rounded-sm ${
+                    powerStatus.efficiency < 0.5 ? 'bg-red-500' 
+                    : powerStatus.efficiency < 1 ? 'bg-yellow-500' 
+                    : 'bg-green-500'
+                  }`} />
+                  <span>{powerStatus.botsCharging} bot{powerStatus.botsCharging !== 1 ? 's' : ''} ({powerStatus.botsCharging * powerStatus.wattsPerBotRequired}W)</span>
+                </div>
+              )}
+              {(powerStatus.repairBayDrawWatts || 0) > 0 && (
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-sm bg-purple-500" />
+                  <span>{powerStatus.activeRepairBays || 0} repair bay{(powerStatus.activeRepairBays || 0) !== 1 ? 's' : ''} ({powerStatus.repairBayDrawWatts}W)</span>
+                </div>
+              )}
+              {powerStatus.effectiveBatteryDrawWatts > 0 && (
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-sm bg-amber-500" />
+                  <span>{powerStatus.batteriesCharging} batter{powerStatus.batteriesCharging === 1 ? 'y' : 'ies'} ({powerStatus.effectiveBatteryDrawWatts}W{powerStatus.batteryDrawWatts > powerStatus.surplusWatts ? ' reduced' : ''})</span>
+                </div>
+              )}
+              {powerStatus.botsCharging === 0 && (powerStatus.repairBayDrawWatts || 0) === 0 && powerStatus.effectiveBatteryDrawWatts === 0 && (
+                <span className="text-muted-foreground/70">No active power draw</span>
+              )}
+            </div>
+            {powerStatus.efficiency < 1 && (
+              <p className="text-xs text-yellow-500/80">
+                ⚠️ Over capacity! Bot charging slowed to {Math.round(powerStatus.efficiency * 100)}%.
+              </p>
             )}
             
             {/* SMR Reactor Indicators - Mobile (compact inline display) */}
@@ -1485,6 +1498,23 @@ export default function GaragePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Battery Storage - Mobile/Tablet View (< xl screens) */}
+      <Card className="xl:hidden border-2 border-cyan-500/20 bg-card/80 backdrop-blur mb-6">
+        <CardContent className="pt-4">
+          <BatteryPanel bots={bots.map(b => ({
+            tokenIndex: b.tokenIndex,
+            name: b.name,
+          }))} />
+        </CardContent>
+      </Card>
+
+      {/* Repair Bays - Mobile/Tablet View (< xl screens) */}
+      <Card className="xl:hidden border-2 border-green-500/20 bg-card/80 backdrop-blur mb-6">
+        <CardContent className="pt-4">
+          <RepairBayPanel bots={bots} />
+        </CardContent>
+      </Card>
 
       {/* SMR Purchase Dialog */}
       <SMRPurchaseDialog
@@ -1964,13 +1994,20 @@ export default function GaragePage() {
                     <span className="text-xs text-primary">Universal</span>
                   </div>
                 </div>
-                <PartsConverter 
-                  inventory={inventory}
-                  identityOrAgent={user?.agent}
-                  onConversionComplete={() => {
-                    queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
-                  }}
-                />
+                <div className="flex gap-2">
+                  <PartsPurchase 
+                    onPurchaseComplete={() => {
+                      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+                    }}
+                  />
+                  <PartsConverter 
+                    inventory={inventory}
+                    identityOrAgent={user?.agent}
+                    onConversionComplete={() => {
+                      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+                    }}
+                  />
+                </div>
               </div>
             </div>
             <CardHeader className="pb-3">
@@ -2344,6 +2381,33 @@ export default function GaragePage() {
                                                 <Wrench className="h-3 w-3" />
                                                 <span className="font-mono">{Number(bot.stats.condition)}%</span>
                                               </div>
+                                              {/* Heat Indicator */}
+                                              {bot.heatStatus && (bot.heatStatus.heatStacks > 0 || bot.heatStatus.isOverheated) && (
+                                                <div 
+                                                  className="flex items-center gap-0.5 cursor-help"
+                                                  title={bot.heatStatus.isOverheated 
+                                                    ? `🔥 OVERHEATED! Cannot jolt until cooled down (${bot.heatStatus.minutesUntilCooldown ?? 0}m remaining)`
+                                                    : `⚡ Heat: ${bot.heatStatus.heatStacks}/4 stacks (-${bot.heatStatus.heatStacks * 15}% jolt effectiveness). Stacks decay 1 per hour.`
+                                                  }
+                                                >
+                                                  {bot.heatStatus.isOverheated ? (
+                                                    <Badge variant="destructive" className="text-xs px-1 py-0">
+                                                      <Flame className="w-3 h-3 mr-0.5" />
+                                                      {bot.heatStatus.minutesUntilCooldown}m
+                                                    </Badge>
+                                                  ) : (
+                                                    <>
+                                                      <Flame className="w-3 h-3 text-orange-500" />
+                                                      {Array.from({ length: 4 }).map((_, i) => (
+                                                        <div 
+                                                          key={i}
+                                                          className={`w-1.5 h-1.5 rounded-full ${i < bot.heatStatus!.heatStacks ? 'bg-orange-500' : 'bg-muted/30 border border-muted'}`}
+                                                        />
+                                                      ))}
+                                                    </>
+                                                  )}
+                                                </div>
+                                              )}
                                             </div>
                                           </>
                                         )}
@@ -2587,6 +2651,34 @@ export default function GaragePage() {
                                             </div>
                                             <span className="text-xs font-mono w-8 text-right">{Number(bot.stats.condition)}%</span>
                                           </div>
+
+                                          {/* Heat Indicator */}
+                                          {bot.heatStatus && (bot.heatStatus.heatStacks > 0 || bot.heatStatus.isOverheated) && (
+                                            <div 
+                                              className="flex items-center gap-0.5 cursor-help"
+                                              title={bot.heatStatus.isOverheated 
+                                                ? `🔥 OVERHEATED! Cannot jolt until cooled down (${bot.heatStatus.minutesUntilCooldown ?? 0}m remaining)`
+                                                : `⚡ Heat: ${bot.heatStatus.heatStacks}/4 stacks (-${bot.heatStatus.heatStacks * 15}% jolt effectiveness). Stacks decay 1 per hour.`
+                                              }
+                                            >
+                                              {bot.heatStatus.isOverheated ? (
+                                                <Badge variant="destructive" className="text-xs px-1 py-0">
+                                                  <Flame className="w-3 h-3 mr-0.5" />
+                                                  {bot.heatStatus.minutesUntilCooldown}m
+                                                </Badge>
+                                              ) : (
+                                                <>
+                                                  <Flame className="w-3 h-3 text-orange-500" />
+                                                  {Array.from({ length: 4 }).map((_, i) => (
+                                                    <div 
+                                                      key={i}
+                                                      className={`w-1.5 h-1.5 rounded-full ${i < bot.heatStatus!.heatStacks ? 'bg-orange-500' : 'bg-muted/30 border border-muted'}`}
+                                                    />
+                                                  ))}
+                                                </>
+                                              )}
+                                            </div>
+                                          )}
                                         </div>
                                       )}
 
@@ -2660,18 +2752,9 @@ export default function GaragePage() {
               </CardHeader>
               <CardContent className="text-sm space-y-3">
                 {/* Parts Inventory - Moved above Power Grid */}
-                <div className="pb-3 border-b border-border">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase">Parts Inventory</h4>
-                    <PartsConverter 
-                      inventory={inventory}
-                      identityOrAgent={user?.agent}
-                      onConversionComplete={() => {
-                        queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
-                      }}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="pb-3 border-b border-border space-y-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase">Parts Inventory</h4>
+                  <div className="grid grid-cols-2 gap-1.5 text-xs">
                     <div className="flex items-center justify-between p-1.5 bg-muted/30 rounded">
                       <span className="text-muted-foreground">SPD</span>
                       <span className="font-bold">{inventory ? Number(inventory.speedChips) : '—'}</span>
@@ -2688,10 +2771,24 @@ export default function GaragePage() {
                       <span className="text-muted-foreground">STB</span>
                       <span className="font-bold">{inventory ? Number(inventory.gyroModules) : '—'}</span>
                     </div>
-                    <div className="col-span-2 flex items-center justify-between p-1.5 bg-primary/10 border border-primary/30 rounded">
-                      <span className="text-primary font-medium">Universal</span>
-                      <span className="font-bold text-primary">{inventory ? Number(inventory.universalParts) : '—'}</span>
-                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-primary/10 border border-primary/30 rounded">
+                    <span className="text-primary font-medium text-xs">Universal</span>
+                    <span className="font-bold text-primary">{inventory ? Number(inventory.universalParts) : '—'}</span>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <PartsPurchase 
+                      onPurchaseComplete={() => {
+                        queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+                      }}
+                    />
+                    <PartsConverter 
+                      inventory={inventory}
+                      identityOrAgent={user?.agent}
+                      onConversionComplete={() => {
+                        queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+                      }}
+                    />
                   </div>
                 </div>
 
@@ -2718,48 +2815,88 @@ export default function GaragePage() {
                       {/* Watts usage bar */}
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground">
-                          {powerStatus.currentDrawWatts}W / {powerStatus.totalCapacityWatts}W
+                          {powerStatus.currentDrawWatts + powerStatus.effectiveBatteryDrawWatts}W / {powerStatus.totalCapacityWatts}W
                         </span>
                         <span className={`font-bold ${
-                          powerStatus.botsCharging === 0 ? 'text-muted-foreground'
-                          : powerStatus.efficiency < 0.5 ? 'text-red-500' 
+                          powerStatus.efficiency < 0.5 ? 'text-red-500' 
                           : powerStatus.efficiency < 1 ? 'text-yellow-500' 
                           : 'text-green-500'
                         }`}>
                           {Math.round(powerStatus.efficiency * 100)}% efficiency
                         </span>
                       </div>
-                      <Progress 
-                        value={powerStatus.totalCapacityWatts > 0 ? (powerStatus.currentDrawWatts / powerStatus.totalCapacityWatts) * 100 : 0} 
-                        className={`h-1.5 ${
-                          powerStatus.botsCharging === 0 ? '[&>div]:bg-muted-foreground'
-                          : powerStatus.efficiency < 0.5 ? '[&>div]:bg-red-500' 
-                          : powerStatus.efficiency < 1 ? '[&>div]:bg-yellow-500' 
-                          : '[&>div]:bg-green-500'
-                        }`}
-                      />
-                      <div className="text-[10px] text-muted-foreground/70">
-                        {powerStatus.botsCharging === 0 
-                          ? 'Send bots to Charging Station for free battery'
-                          : `${powerStatus.botsCharging} bot${powerStatus.botsCharging !== 1 ? 's' : ''} × ${powerStatus.wattsPerBotRequired}W each`}
-                        {powerStatus.botsCharging > 0 && powerStatus.efficiency < 1 && (
-                          <span className="block">⚠️ Over capacity! Charging slowed.</span>
-                        )}
-                        {powerStatus.batteriesCharging > 0 && (
-                          <span className="block mt-0.5">
-                            🔋 {powerStatus.batteriesCharging} batter{powerStatus.batteriesCharging === 1 ? 'y' : 'ies'} charging
-                            {powerStatus.surplusWatts > 0 ? (
-                              <span> at {powerStatus.effectiveBatteryDrawWatts}W
-                                {powerStatus.batteryDrawWatts > powerStatus.surplusWatts && (
-                                  <span className="text-yellow-500"> (reduced)</span>
-                                )}
-                              </span>
-                            ) : (
-                              <span className="text-red-400"> — paused (no surplus)</span>
+                      {/* Segmented power bar: bots (green) + repair bays (purple) + batteries (amber) */}
+                      {(() => {
+                        const botDraw = powerStatus.botsCharging * powerStatus.wattsPerBotRequired;
+                        const repairDraw = powerStatus.repairBayDrawWatts || 0;
+                        const batteryDraw = powerStatus.effectiveBatteryDrawWatts;
+                        const total = powerStatus.totalCapacityWatts;
+                        const botPct = total > 0 ? (botDraw / total) * 100 : 0;
+                        const repairPct = total > 0 ? (repairDraw / total) * 100 : 0;
+                        const batteryPct = total > 0 ? (batteryDraw / total) * 100 : 0;
+                        return (
+                          <div className="relative h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                            {/* Bot charging segment (green) */}
+                            {botDraw > 0 && (
+                              <div 
+                                className={`absolute left-0 top-0 h-full transition-all ${
+                                  powerStatus.efficiency < 0.5 ? 'bg-red-500' 
+                                  : powerStatus.efficiency < 1 ? 'bg-yellow-500' 
+                                  : 'bg-green-500'
+                                }`}
+                                style={{ width: `${botPct}%` }}
+                              />
                             )}
-                          </span>
+                            {/* Repair bay segment (purple) */}
+                            {repairDraw > 0 && (
+                              <div 
+                                className="absolute top-0 h-full bg-purple-500 transition-all"
+                                style={{ left: `${botPct}%`, width: `${repairPct}%` }}
+                              />
+                            )}
+                            {/* Battery charging segment (amber) */}
+                            {batteryDraw > 0 && (
+                              <div 
+                                className="absolute top-0 h-full bg-amber-500 transition-all"
+                                style={{ left: `${botPct + repairPct}%`, width: `${batteryPct}%` }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })()}
+                      {/* Legend */}
+                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+                        {powerStatus.botsCharging > 0 && (
+                          <div className="flex items-center gap-1">
+                            <div className={`w-1.5 h-1.5 rounded-sm ${
+                              powerStatus.efficiency < 0.5 ? 'bg-red-500' 
+                              : powerStatus.efficiency < 1 ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                            }`} />
+                            <span>{powerStatus.botsCharging} bot{powerStatus.botsCharging !== 1 ? 's' : ''} ({powerStatus.botsCharging * powerStatus.wattsPerBotRequired}W)</span>
+                          </div>
+                        )}
+                        {(powerStatus.repairBayDrawWatts || 0) > 0 && (
+                          <div className="flex items-center gap-1">
+                            <div className="w-1.5 h-1.5 rounded-sm bg-purple-500" />
+                            <span>{powerStatus.activeRepairBays || 0} bay{(powerStatus.activeRepairBays || 0) !== 1 ? 's' : ''} ({powerStatus.repairBayDrawWatts}W)</span>
+                          </div>
+                        )}
+                        {powerStatus.effectiveBatteryDrawWatts > 0 && (
+                          <div className="flex items-center gap-1">
+                            <div className="w-1.5 h-1.5 rounded-sm bg-amber-500" />
+                            <span>{powerStatus.batteriesCharging} batt ({powerStatus.effectiveBatteryDrawWatts}W)</span>
+                          </div>
+                        )}
+                        {powerStatus.botsCharging === 0 && (powerStatus.repairBayDrawWatts || 0) === 0 && powerStatus.effectiveBatteryDrawWatts === 0 && (
+                          <span className="text-muted-foreground/70">No active draw</span>
                         )}
                       </div>
+                      {powerStatus.efficiency < 1 && (
+                        <p className="text-[10px] text-yellow-500/80">
+                          ⚠️ Over capacity! Charging at {Math.round(powerStatus.efficiency * 100)}%
+                        </p>
+                      )}
                       
                       {/* SMR Reactor Indicators - Compact inline display */}
                       {userSMRs && userSMRs.installedSMRs.length > 0 && (

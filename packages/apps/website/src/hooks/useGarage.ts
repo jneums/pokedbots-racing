@@ -43,6 +43,7 @@ import {
   toggleBattery,
   getBatteryInfo,
   purchaseSMR,
+  purchaseParts,
   getUserSMRs,
   // Repair Bay APIs
   getUserRepairBays,
@@ -55,6 +56,7 @@ import {
   type PaymentMethod,
   type SMRModelId,
   type SMRPurchaseResult,
+  type PartsPurchaseResult,
   type InstalledSMR,
   type UserSMRStorage,
   type ApiKeyMetadata,
@@ -465,6 +467,7 @@ export function useBatchStartScavenging() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['user-repair-bays'], refetchType: 'all' });
     },
   });
 }
@@ -486,6 +489,7 @@ export function useBatchCompleteScavenging() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-bots'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['user-inventory'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['user-repair-bays'], refetchType: 'all' });
     },
   });
 }
@@ -652,6 +656,28 @@ export function usePurchaseSMR() {
 }
 
 /**
+ * Hook to purchase Universal Parts with ICP
+ * Cost: 1 ICP for 500 Universal Parts
+ */
+export function usePurchaseParts() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (amount: number): Promise<PartsPurchaseResult> => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return purchaseParts(amount, user.agent);
+    },
+    onSuccess: () => {
+      // Invalidate inventory to reflect new parts
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
+    },
+  });
+}
+
+/**
  * Hook to fetch user's installed SMRs with lifetime tracking
  */
 export function useUserSMRs() {
@@ -663,7 +689,23 @@ export function useUserSMRs() {
       if (!user?.agent) {
         throw new Error('Not authenticated');
       }
-      return getUserSMRs(user.agent);
+      const smrs = await getUserSMRs(user.agent);
+      console.log('=== SMR DEBUG INFO ===');
+      console.log('Total SMRs:', smrs.installedSMRs.length);
+      console.log('Total Power Output:', smrs.totalPowerOutput, 'W');
+      smrs.installedSMRs.forEach((smr, i) => {
+        console.log(`SMR #${i + 1}:`, {
+          model: smr.model,
+          powerOutput: smr.powerOutput,
+          installedAt: new Date(Number(smr.installedAt) / 1_000_000).toISOString(),
+          lifetimeKwh: smr.lifetimeKwh,
+          usedKwh: smr.usedKwh,
+          lifetimePercent: smr.lifetimePercent,
+          remainingLife: (100 - smr.lifetimePercent).toFixed(2) + '%'
+        });
+      });
+      console.log('=== END SMR DEBUG ===');
+      return smrs;
     },
     enabled: !!user?.agent,
     staleTime: 30 * 1000, // 30 seconds
@@ -1134,9 +1176,9 @@ export function usePurchaseRepairBaySlot() {
       return purchaseRepairBaySlot(user.agent);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-repair-bays'] });
-      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['garage-power-status'] });
+      queryClient.invalidateQueries({ queryKey: ['user-repair-bays'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['garage-power-status'], refetchType: 'all' });
     },
   });
 }
@@ -1156,9 +1198,9 @@ export function useUpgradeRepairBay() {
       return upgradeRepairBay(bayId, user.agent);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-repair-bays'] });
-      queryClient.invalidateQueries({ queryKey: ['user-inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['garage-power-status'] });
+      queryClient.invalidateQueries({ queryKey: ['user-repair-bays'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['user-inventory'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['garage-power-status'], refetchType: 'all' });
     },
   });
 }
@@ -1178,8 +1220,8 @@ export function useCompleteRepairBayUpgrade() {
       return completeRepairBayUpgrade(bayId, user.agent);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-repair-bays'] });
-      queryClient.invalidateQueries({ queryKey: ['garage-power-status'] });
+      queryClient.invalidateQueries({ queryKey: ['user-repair-bays'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['garage-power-status'], refetchType: 'all' });
     },
   });
 }

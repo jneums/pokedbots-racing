@@ -681,6 +681,26 @@ module {
       };
     };
 
+    // Update scoring mode for an event (admin fix)
+    public func updateEventScoringMode(eventId : Nat, newMode : ScoringMode, newBonusPrize : Nat) : ?ScheduledEvent {
+      switch (getEvent(eventId)) {
+        case (?event) {
+          let updatedMetadata = {
+            event.metadata with
+            scoringMode = newMode;
+            eventBonusPrize = newBonusPrize;
+          };
+          let updated = {
+            event with
+            metadata = updatedMetadata;
+          };
+          ignore Map.put(events, nhash, eventId, updated);
+          ?updated;
+        };
+        case (null) { null };
+      };
+    };
+
     // Create Weekly League event
     public func createWeeklyLeagueEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
@@ -787,11 +807,11 @@ module {
     public func createFreeSprintEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Free Sprint";
-        description = "Free racing for all! No entry fee, just pure wasteland fun. Perfect for practice, trying new strategies, or casual competition. Reduced prizes but zero risk!";
+        description = "Free racing for all! No entry fee, just pure wasteland fun. Perfect for practice, trying new strategies, or casual competition. No prizes - just the thrill of the race!";
         entryFee = 0; // FREE!
         maxEntries = 100; // No practical cap - heats handle overflow
         minEntries = 2;
-        prizePoolBonus = 25_000_000; // Platform adds 0.25 ICP (smaller prize pool since free)
+        prizePoolBonus = 0; // No prize pool - free races are for practice only
         pointsMultiplier = 0.5; // Half points (encourages paid events for serious competition)
         divisions = [#Scrap, #Junker, #Raider]; // Casual classes only (no Elite)
         scoringMode = #Individual;
@@ -915,9 +935,9 @@ module {
     // Weekend Warrior Tournament (Friday-Sunday progressive)
     public func createWeekendWarriorEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       // Weekend Warrior is a 3-day multi-stage event:
-      // - Friday 8pm: Sprint (15km on Metal Roads)
-      // - Saturday 8pm: Endurance (30km on Wasteland Sand)
-      // - Sunday 8pm: Championship (25km on Scrap Heaps)
+      // - Friday 10pm: Sprint (15km on Metal Roads)
+      // - Saturday 10pm: Endurance (30km on Wasteland Sand)
+      // - Sunday 10pm: Championship (25km on Scrap Heaps)
       // Each stage has separate races per class
       let metadata : EventMetadata = {
         name = "Weekend Warrior Tournament";
@@ -928,8 +948,8 @@ module {
         prizePoolBonus = 300_000_000; // 3 ICP bonus
         pointsMultiplier = 2.5;
         divisions = [#Scrap, #Junker, #Raider, #Elite];
-        scoringMode = #Individual;
-        eventBonusPrize = 0;
+        scoringMode = #Cumulative; // Sum points across all 3 stages
+        eventBonusPrize = 100_000_000; // 1 ICP bonus for cumulative winner
       };
 
       // Manual mode with 3 stages × 4 classes = 12 race templates
@@ -1057,37 +1077,139 @@ module {
       );
     };
 
-    // Terrain Master Series (Sand/Metal/Scrap specialists)
+    // Terrain Master Series (Sand/Metal/Scrap specialists) - 3-stage multi-day event
     public func createTerrainMasterEvent(terrain : Text, scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = terrain # " Master Championship";
-        description = "Only the best " # terrain # " racers survive. All races on specialized terrain.";
+        description = "Three-stage " # terrain # " terrain mastery challenge. Thursday to Saturday progression!";
         entryFee = 60_000_000; // 0.6 ICP
         maxEntries = 40;
         minEntries = 8;
-        prizePoolBonus = 150_000_000; // 1.5 ICP bonus
+        prizePoolBonus = 200_000_000; // 2 ICP bonus
         pointsMultiplier = 1.5;
         divisions = [#Scrap, #Junker, #Raider, #Elite];
-        scoringMode = #Individual;
-        eventBonusPrize = 0;
+        scoringMode = #Cumulative; // Sum points across all 3 stages
+        eventBonusPrize = 50_000_000; // 0.5 ICP bonus for cumulative winner
       };
 
-      // Determine terrain enum from text
-      let terrainType : Terrain = if (terrain == "ScrapHeaps") {
+      // Determine terrain enum from text (handles both full names and short names)
+      let terrainType : Terrain = if (terrain == "ScrapHeaps" or terrain == "Scrap") {
         #ScrapHeaps;
-      } else if (terrain == "WastelandSand") { #WastelandSand } else {
+      } else if (terrain == "WastelandSand" or terrain == "Sand") {
+        #WastelandSand;
+      } else {
         #MetalRoads;
       };
 
-      let raceMode : RaceCreationMode = #Automatic({
-        terrains = [terrainType]; // Single terrain specialization
-        distanceRange = { min = 9; max = 17 };
-        racesPerClass = null;
-        heatAllocation = #SkillTiered;
+      // Manual mode with 3 stages × 4 classes = 12 race templates
+      // All 3 stages within ~3 hours: Start -> +1h -> +2h
+      let raceMode : RaceCreationMode = #Manual({
+        raceTemplates = [
+          // === STAGE 1: DUST TRIAL (Start) ===
+          {
+            stageName = ?"Dust Trial";
+            raceClass = #Scrap;
+            terrain = terrainType;
+            distance = 10;
+            trackId = null;
+            startOffset = 0;
+          },
+          {
+            stageName = ?"Dust Trial";
+            raceClass = #Junker;
+            terrain = terrainType;
+            distance = 10;
+            trackId = null;
+            startOffset = 0;
+          },
+          {
+            stageName = ?"Dust Trial";
+            raceClass = #Raider;
+            terrain = terrainType;
+            distance = 10;
+            trackId = null;
+            startOffset = 0;
+          },
+          {
+            stageName = ?"Dust Trial";
+            raceClass = #Elite;
+            terrain = terrainType;
+            distance = 10;
+            trackId = null;
+            startOffset = 0;
+          },
+          // === STAGE 2: THE GAUNTLET (+1 hour) ===
+          {
+            stageName = ?"The Gauntlet";
+            raceClass = #Scrap;
+            terrain = terrainType;
+            distance = 15;
+            trackId = null;
+            startOffset = 3_600_000_000_000; // +1 hour
+          },
+          {
+            stageName = ?"The Gauntlet";
+            raceClass = #Junker;
+            terrain = terrainType;
+            distance = 15;
+            trackId = null;
+            startOffset = 3_600_000_000_000;
+          },
+          {
+            stageName = ?"The Gauntlet";
+            raceClass = #Raider;
+            terrain = terrainType;
+            distance = 15;
+            trackId = null;
+            startOffset = 3_600_000_000_000;
+          },
+          {
+            stageName = ?"The Gauntlet";
+            raceClass = #Elite;
+            terrain = terrainType;
+            distance = 15;
+            trackId = null;
+            startOffset = 3_600_000_000_000;
+          },
+          // === STAGE 3: DEATH CHARGE (+2 hours) ===
+          {
+            stageName = ?"Death Charge";
+            raceClass = #Scrap;
+            terrain = terrainType;
+            distance = 20;
+            trackId = null;
+            startOffset = 7_200_000_000_000; // +2 hours
+          },
+          {
+            stageName = ?"Death Charge";
+            raceClass = #Junker;
+            terrain = terrainType;
+            distance = 20;
+            trackId = null;
+            startOffset = 7_200_000_000_000;
+          },
+          {
+            stageName = ?"Death Charge";
+            raceClass = #Raider;
+            terrain = terrainType;
+            distance = 20;
+            trackId = null;
+            startOffset = 7_200_000_000_000;
+          },
+          {
+            stageName = ?"Death Charge";
+            raceClass = #Elite;
+            terrain = terrainType;
+            distance = 20;
+            trackId = null;
+            startOffset = 7_200_000_000_000;
+          },
+        ];
+        heatAllocation = #SnakeDraft;
       });
 
-      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Opens Thursday
-      let regCloses = scheduledTime - (1 * 3600 * 1_000_000_000); // Closes 1h before
+      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Opens Tuesday
+      let regCloses = scheduledTime - (2 * 3600 * 1_000_000_000); // Closes 2h before Thursday race
 
       scheduleEvent(
         #SpecialEvent(terrain # " Master"),
@@ -1097,8 +1219,8 @@ module {
         metadata,
         raceMode,
         {
-          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Friday 2pm
-          halfRefund = scheduledTime - (12 * 3600 * 1_000_000_000); // Saturday 2am
+          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Wednesday
+          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // Wednesday evening
           quarterRefund = regCloses; // At close
         },
         now,

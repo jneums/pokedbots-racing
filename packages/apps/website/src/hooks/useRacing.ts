@@ -1,4 +1,4 @@
-import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getUpcomingEvents,
   getUpcomingEventsWithRaces,
@@ -111,8 +111,10 @@ export const useGetEventWithRaces = (eventId: number | null) => {
 /**
  * React Query hook to fetch comprehensive results for a multi-stage event.
  * Includes cumulative standings, faction standings, and race summaries.
+ * @param eventId The event ID to fetch results for
+ * @param isLive If true, refetch every 30 seconds for live standings updates
  */
-export const useGetEventResults = (eventId: number | null) => {
+export const useGetEventResults = (eventId: number | null, isLive: boolean = false) => {
   return useQuery({
     queryKey: ['eventResults', eventId],
     queryFn: () => {
@@ -121,8 +123,9 @@ export const useGetEventResults = (eventId: number | null) => {
       }
       return getEventResults(eventId);
     },
-    enabled: eventId !== null,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes (results don't change often)
+    enabled: eventId !== null && eventId > 0,
+    staleTime: isLive ? 10 * 1000 : 5 * 60 * 1000, // 10s for live, 5min for completed
+    refetchInterval: isLive ? 30 * 1000 : false, // Refetch every 30s for live events
   });
 };
 
@@ -141,6 +144,27 @@ export const useGetRaceById = (raceId: number | null, isActiveOrImminent: boolea
     enabled: raceId !== null,
     refetchInterval: isActiveOrImminent ? 5000 : 30000, // 5s when race starting/running, 30s otherwise
   });
+};
+
+/**
+ * React Query hook to fetch multiple races by ID using useQueries.
+ * This correctly handles arrays of race IDs without violating hooks rules.
+ */
+export const useGetRacesByIds = (raceIds: number[], hasActiveRaces: boolean = false) => {
+  const queries = useQueries({
+    queries: raceIds.map(raceId => ({
+      queryKey: ['race', raceId],
+      queryFn: () => getRaceById(raceId),
+      enabled: raceId !== null,
+      refetchInterval: hasActiveRaces ? 5000 : 30000,
+    })),
+  });
+  
+  const races = queries.map(q => q.data).filter(Boolean) as Race[];
+  const isLoading = queries.some(q => q.isLoading);
+  const isError = queries.some(q => q.isError);
+  
+  return { races, isLoading, isError };
 };
 
 /**
