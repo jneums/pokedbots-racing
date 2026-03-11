@@ -67,22 +67,22 @@ Different factions excel at different aspects:
 - **Master**: +12% Speed, +8% PowerCore
 
 **Best for Scavenging:**
-- **Dead**: 1.40x DeadMachineFields (1.10x others), -50% condition loss, +15% Universal Parts
-- **Master**: 1.12x all zones, -25% battery, every 10th mission doubles parts, +15% Universal Parts
-- **Food**: 1.12x ScrapHeaps/Settlements, -20% battery, +30% world buff strength, +15% Universal Parts
-- **UltimateMaster**: 1.20x all zones, -30% battery, 15% double parts, +20 battery return, +15% Universal Parts
+- **Dead**: 1.40x DeadMachineFields (1.10x others), -50% condition loss
+- **Master**: 1.12x all zones, -25% battery, every 10th mission doubles parts
+- **Food**: 1.12x ScrapHeaps/Settlements, -20% battery
+- **UltimateMaster**: 1.20x all zones, -30% battery
+- **Wild**: -40% condition loss (great for DeadMachineFields survival)
+- **Golden**: 15% chance to double all parts on completion
+- **Box**: 5% chance to triple all parts on completion
+- **Game**: Every 5th mission grants +10 universal parts
 
 **Balanced/Versatile:**
 - **UltimateMaster**: Strongest overall (racing + scavenging)
 - **Master**: Good at both racing and scavenging
 - **Dead**: Strong racing stats + excellent dangerous zone scavenging
 
-**Scavenging Part Specializations:**
-- **Speed Specialists** (Bee, Wild): +30% Speed Chips
-- **Power Specialists** (Blackhole, Golden): +30% Power Core Fragments  
-- **Acceleration Specialists** (Game, Animal): +30% Thruster Kits
-- **Stability Specialists** (Industrial, Box): +30% Gyro Modules
-- **Balanced Factions** (Dead, Master, Murder, Food, UltimateMaster, Ultimate): +15% Universal Parts
+**Part Distribution:**
+All zones produce 40% Universal Parts and 15% each for Speed Chips, Power Core Fragments, Thruster Kits, and Gyro Modules. Faction bonuses shift specific part type weights.
 
 ## BEGINNER SHOPPING CHECKLIST
 

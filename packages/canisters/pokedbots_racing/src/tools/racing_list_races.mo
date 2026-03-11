@@ -40,6 +40,9 @@ module {
         case (?auth) { auth.principal };
       };
 
+      // Track this method call
+      ctx.trackMethodCall("racing_list_races", user);
+
       let now = Time.now();
       let tokenIndexOpt = Result.toOption(Json.getAsNat(_args, "token_index"));
       let afterRaceIdOpt = Result.toOption(Json.getAsNat(_args, "after_race_id"));

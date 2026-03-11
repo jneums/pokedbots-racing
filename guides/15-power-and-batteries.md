@@ -231,7 +231,7 @@ Each battery draws power up to its rate (25-200W). If surplus < total battery dr
 | WR-250 SMR | 5 ICP |
 | WR-500 SMR | 8 ICP |
 | WR-880 SMR | 12 ICP |
-| WR-1210 SMR | 18 ICP |
+| WR-1210 SMR | 15 ICP |
 | Scrap Cell Repair | 50 Universal Parts |
 | Salvage Pack Repair | 150 Universal Parts |
 | Industrial Bank Repair | 400 Universal Parts |

@@ -663,8 +663,8 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
   const getDefaultTab = (): string => {
     if (isCompleted) return 'standings';
     if (isInProgress) return 'schedule';
-    if (event?.raceIds.length === 0) return 'details';
-    return 'schedule';
+    // For upcoming events (not started), default to details tab
+    return 'details';
   };
   
   const [activeTab, setActiveTab] = useState<string>(() => getDefaultTab());

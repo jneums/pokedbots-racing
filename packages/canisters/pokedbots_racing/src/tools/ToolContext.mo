@@ -67,6 +67,8 @@ module ToolContext {
     getUserRacerBots : (Principal) -> [Nat];
     /// Get user's bots tagged as scavengers
     getUserScavengerBots : (Principal) -> [Nat];
+    /// Track method call for diagnostics (method name, caller principal)
+    trackMethodCall : (Text, Principal) -> ();
   };
 
   /// Helper function to create an error response and invoke callback

@@ -2352,25 +2352,25 @@ module {
       let (shortTracks, mediumTracks, longTracks, ultraTracks) = switch (terrain) {
         case (#ScrapHeaps) {
           (
-            [4, 8], // Junkyard Sprint (4.05km), Debris Field Dash (7.1km)
-            [1], // Scrap Mountain Circuit (10.1km)
-            [13], // Iron Crucible (28.8km) - ScrapHeaps/MetalRoads mixed
-            [15], // Survival Gauntlet (59km) - all terrains, ScrapHeaps primary
+            [4, 8], // Junkyard Sprint (4.5km), Debris Field Dash (7.1km)
+            [1], // Scrap Mountain Circuit (10.6km)
+            [13], // Iron Crucible (28.8km)
+            [15], // Survival Gauntlet (59km)
           );
         };
         case (#MetalRoads) {
           (
-            [2, 7, 9], // Highway (6.7km), Rust Belt Rally (9.2km), Velocity Viaduct (4.5km)
-            [5], // Metal Mesa Loop (7.4km)
-            [13], // Iron Crucible (28.8km) - MetalRoads primary
-            [15], // Survival Gauntlet (59km) - mixed
+            [9, 2], // Velocity Viaduct (4.5km), Highway (6.7km)
+            [5, 7], // Metal Mesa Loop (7.6km), Rust Belt Rally (9.2km)
+            [13], // Iron Crucible (28.8km)
+            [15], // Survival Gauntlet (59km)
           );
         };
         case (#WastelandSand) {
           (
             [11], // Desert Sprint (6.3km)
-            [10, 3, 6], // Sandstorm Circuit (10.8km), Wasteland Gauntlet (13.3km), Dune Runner (16.6km)
-            [12], // Wasteland Odyssey (22.6km)
+            [10, 3], // Sandstorm Circuit (10.8km), Wasteland Gauntlet (12.6km)
+            [6, 12], // Dune Runner (16.5km), Wasteland Odyssey (22.6km)
             [14], // Endless Expanse (50.5km)
           );
         };
@@ -2380,15 +2380,15 @@ module {
       let candidateTracks = if (distance <= 10) {
         // Short distance races (5-10km) - use short tracks
         shortTracks;
-      } else if (distance <= 20) {
-        // Medium distance races (11-20km) - prefer medium, fallback to short
+      } else if (distance <= 15) {
+        // Medium distance races (11-15km) - prefer medium, fallback to short
         if (mediumTracks.size() > 0) {
           mediumTracks;
         } else {
           shortTracks;
         };
       } else if (distance <= 40) {
-        // Long distance races (21-40km) - prefer long, fallback to medium
+        // Long distance races (16-40km) - prefer long, fallback to medium
         if (longTracks.size() > 0) {
           longTracks;
         } else if (mediumTracks.size() > 0) {

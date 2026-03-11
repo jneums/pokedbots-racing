@@ -10,42 +10,45 @@ order: 9
 
 PokedBots Racing is designed as a **player-first economy** where all ICP flowing into the system is redistributed back to players through prizes, rewards, and ecosystem growth. The platform operates transparently with no profit extraction.
 
-## CORE PRINCIPLE: ZERO PLATFORM PROFIT
+## CORE PRINCIPLE: PLAYER-FIRST ECONOMY
 
-**Every ICP that enters the system goes back to players.** There are no hidden fees, no profit margins, and no money leaving the ecosystem. This document explains exactly where your ICP goes.
+**Nearly all ICP that enters the system goes back to players.** A 5% platform tax on race prize pools funds ongoing platform bonuses and operations. There are no hidden fees, and the vast majority of value flows directly to players through prizes and rewards. This document explains exactly where your ICP goes.
 
 ## 1. RACE ENTRY FEES → PRIZE POOLS
 
-**Entry Fee Structure:**
-- Scrap: 0.1 ICP
-- Junker: 0.2 ICP  
-- Raider: 0.3 ICP
-- Elite: 0.4 ICP
-- SilentKlan: 0.5 ICP
+**Entry Fee Structure (Class Multipliers):**
+- Scrap: 1.0× base fee
+- Junker: 1.5× base fee
+- Raider: 2.0× base fee
+- Elite: 2.5× base fee
+- SilentKlan: 3.0× base fee
 
 **Where it goes:**
-- **100% → Prize Pool** - Your entry fee goes directly into the race's prize pool
+- **95% → Prize Pool** - Your entry fee goes into the race's prize pool (after 5% platform tax)
+- **5% → Platform Treasury** - Funds ongoing race bonuses and operations
 - **Platform Bonus Added** - Fixed amount added per race (see below)
 
 **Example (Junker Daily Sprint with 8 entries):**
 ```
-Entry fees collected:    8 × 0.2 = 1.6 ICP
-Platform bonus added:           0.4 ICP (fixed)
-Total prize pool:               2.0 ICP
+Entry fees collected:    8 × 0.15 = 1.2 ICP
+Platform tax (5%):              0.06 ICP
+Net to prize pool:              1.14 ICP
+Platform bonus added:           1.60 ICP (fixed)
+Total prize pool:               2.74 ICP
 ```
 
-Players put in 1.6 ICP, winners receive 2.0 ICP. The platform **adds** 0.4 ICP, it doesn't take anything.
+Players put in 1.2 ICP, winners receive 2.74 ICP. The platform **adds** 1.60 ICP bonus, it doesn't just take.
 
 ## 2. PLATFORM BONUS → PRIZE POOLS
 
 **Fixed platform contributions per race:**
 
 **Daily Sprint:**
-- Scrap: 0.20 ICP
-- Junker: 0.40 ICP
-- Raider: 0.60 ICP
-- Elite: 0.80 ICP
-- SilentKlan: 1.00 ICP
+- Scrap: 1.10 ICP
+- Junker: 1.60 ICP
+- Raider: 2.10 ICP
+- Elite: 2.70 ICP
+- SilentKlan: 3.20 ICP
 
 **Weekly League:**
 - Scrap: 0.80 ICP
@@ -55,8 +58,8 @@ Players put in 1.6 ICP, winners receive 2.0 ICP. The platform **adds** 0.4 ICP, 
 - SilentKlan: 4.80 ICP
 
 **Monthly Cup:**
-- Elite: 8.0 ICP
-- SilentKlan: 12.0 ICP
+- Elite: 8.00 ICP
+- SilentKlan: 12.00 ICP
 
 **Source of platform bonuses:**
 1. **Maintenance fees** - Recharge (0.1 ICP) and Repair (0.05 ICP) costs
@@ -80,6 +83,8 @@ The platform treasury is funded by player activity (maintenance, upgrades, betti
 - **8% → Future racing prize pools** - Funds platform bonuses for upcoming races
 - **2% → Platform operations** - Covers canister cycles, infrastructure costs
 
+**Betting limits:** Min 0.01 ICP per bet, max 100 ICP per bet, max 100 ICP total per race.
+
 **Example (100 ICP total betting pool):**
 ```
 Total bets:              100 ICP
@@ -94,8 +99,8 @@ Winners share:            90 ICP (distributed among winning bets)
 ## 4. MAINTENANCE COSTS → PLATFORM TREASURY
 
 **Maintenance fees:**
-- **Recharge**: 0.1 ICP (restores battery + potential overcharge bonus)
-- **Repair**: 0.05 ICP (restores condition)
+- **Recharge**: 0.1 ICP (restores 50-90 battery + potential overcharge bonus, 2hr base cooldown)
+- **Repair**: 0.05 ICP (restores 30 condition, 1hr base cooldown)
 - **Purpose**: Maintain competitive balance and bot value
 - **Allocation**: Goes to platform treasury to fund race prize pool bonuses
 - **Volume**: Active bots typically recharge 1-2x daily + repair 2-3x daily (~0.25-0.35 ICP/day per bot)
@@ -116,12 +121,13 @@ These fees serve dual purposes:
 
 ```
 INCOMING ICP
-├─ Race Entry Fees (100%)
-│  └─→ Race Prize Pools (100%)
+├─ Race Entry Fees
+│  ├─→ Race Prize Pools (95%)
+│  └─→ Platform Treasury (5% tax)
 │
 ├─ Maintenance Fees
-│  ├─ Recharge: 0.1 ICP
-│  ├─ Repair: 0.05 ICP
+│  ├─ Recharge: 0.1 ICP (2hr cooldown)
+│  ├─ Repair: 0.05 ICP (1hr cooldown)
 │  └─→ Platform Treasury → Race Bonuses
 │
 ├─ Upgrade Fees (optional ICP upgrades)

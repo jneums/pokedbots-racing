@@ -30,22 +30,23 @@ Entry fees range from 0.1-2.4 ICP depending on the event type and your bot's cla
 At the start of every race, the system simulates the race based on all bots' stats, condition, battery, terrain bonuses, and RNG.
 
 ### 5. Winners Get Paid
+After a 5% platform tax, prizes are distributed:
 - **1st place:** 45% of prize pool
 - **2nd place:** 28% of prize pool
 - **3rd place:** 18% of prize pool
 - **4th place:** 9% of prize pool
-- Others: No prize
+- Others: No prize, but all racers earn parts and leaderboard points
 
 ## KEY MECHANICS
 
 ### Battery (Energy)
 Drains each race. Low battery = HUGE speed/accel penalties. At 50% battery you lose ~25% performance.
-- **Recharge:** 0.1 ICP, restores 50-90 battery (RNG-based), 6hr cooldown
+- **Recharge:** 0.1 ICP, restores 50-90 battery (RNG-based), 2hr base cooldown (reduced by Dedication tier and Food synergy)
 - **Overcharge bonus:** Recharging at low battery gives temporary boost for next race: +0.25% Speed/Accel per 1% overcharge (max +10% at 40% overcharge), but -0.133% Power Core/Stability per 1% overcharge (max -5.3%)
 
 ### Condition (Health)
-Wears down each race. Low condition = reduced power core & stability stats (at 50% condition = -40% to those stats, at 0% condition = -90%).
-- **Repair:** 0.05 ICP, restores 25 condition, 3hr cooldown
+Wears down each race. Low condition = reduced power core & stability stats (at 50% condition = -40%, at 0% condition = -90%).
+- **Repair:** 0.05 ICP, restores 30 condition, 1hr base cooldown (reduced by Dedication tier)
 
 ### Terrain Bonuses
 Each bot prefers one terrain type (ScrapHeaps/WastelandSand/MetalRoads). Racing on your preferred terrain = +5% all stats.
@@ -59,7 +60,7 @@ Each bot belongs to a faction with unique bonuses (Dead/Master/Blackhole/etc). T
 2. **Match your bot to races** on their preferred terrain
 3. **Use scavenging** to earn free upgrade parts (no ICP cost!)
 4. **Upgrade carefully** - costs increase as your bot gets stronger
-5. **Manage maintenance costs** - recharge (0.1 ICP) + repair (0.05 ICP) = 0.15 ICP per cycle. To stay profitable, you need to win enough races to cover these costs. Consider using free maintenance zones (ChargingStation ~10-15h for full charge from 0%, RepairBay for repairs) when not racing urgently.
+5. **Manage maintenance costs** - recharge (0.1 ICP, 2hr cooldown) + repair (0.05 ICP, 1hr cooldown) = 0.15 ICP per cycle. To stay profitable, you need to win enough races to cover these costs. Consider using free maintenance zones (ChargingStation for free charging, RepairBay for free repairs) when not racing urgently.
 
 ## NEXT STEPS
 

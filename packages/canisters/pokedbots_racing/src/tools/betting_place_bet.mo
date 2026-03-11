@@ -52,6 +52,9 @@ module {
         case (?auth) { auth.principal };
       };
 
+      // Track this method call
+      ctx.trackMethodCall("betting_place_bet", user);
+
       // Parse arguments
       let raceId = switch (Result.toOption(Json.getAsNat(_args, "race_id"))) {
         case (null) {

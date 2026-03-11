@@ -47,6 +47,9 @@ module {
         case (?auth) { auth.principal };
       };
 
+      // Track this method call
+      ctx.trackMethodCall("garage_upgrade_robot", user);
+
       let tokenIndex = switch (Result.toOption(Json.getAsNat(_args, "token_index"))) {
         case (null) { return ToolContext.makeError("Missing token_index", cb) };
         case (?idx) { idx };

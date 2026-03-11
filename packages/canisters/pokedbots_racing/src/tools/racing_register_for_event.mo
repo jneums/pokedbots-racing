@@ -47,6 +47,9 @@ module {
         case (?auth) { auth.principal };
       };
 
+      // Track this method call
+      ctx.trackMethodCall("racing_register_for_event", user);
+
       // Parse arguments
       let eventId = switch (Result.toOption(Json.getAsNat(_args, "event_id"))) {
         case (null) {

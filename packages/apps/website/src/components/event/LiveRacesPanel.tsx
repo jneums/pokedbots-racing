@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -98,12 +98,34 @@ function LiveRaceCard({ race, isExpanded, botProfiles }: { race: any; isExpanded
   const LIVE_START_BUFFER_SECONDS = 45;
   const LIVE_END_BUFFER_SECONDS = 60;
   
+  // Countdown timer state for smooth animation
+  const [countdownSeconds, setCountdownSeconds] = useState<number>(0);
+  
   // Check if we're in the buffer period (race started but visualization hasn't begun)
-  const now = Date.now() * 1_000_000;
   const raceStartNs = Number(race.startTime);
   const bufferedStartTime = raceStartNs + (LIVE_START_BUFFER_SECONDS * 1_000_000_000);
+  
+  // Update countdown every second when in buffer period
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = Date.now() * 1_000_000;
+      const remaining = Math.ceil((bufferedStartTime - now) / 1_000_000_000);
+      setCountdownSeconds(Math.max(0, remaining));
+    };
+    
+    // Initial update
+    updateCountdown();
+    
+    // Set up interval for smooth countdown
+    const interval = setInterval(updateCountdown, 1000);
+    
+    return () => clearInterval(interval);
+  }, [bufferedStartTime]);
+  
+  const now = Date.now() * 1_000_000;
   const isInBufferPeriod = isLive && now < bufferedStartTime;
-  const bufferSecondsRemaining = isInBufferPeriod ? Math.ceil((bufferedStartTime - now) / 1_000_000_000) : 0;
+  // Use the state-based countdown for smooth updates
+  const bufferSecondsRemaining = countdownSeconds;
   
   // Check if race is still watchable (within end buffer after completion)
   // Use a generous 10 minute window to ensure animation can finish
@@ -268,11 +290,36 @@ function CompactRaceCard({ race, isSelected, onClick, botProfiles }: {
   const LIVE_END_BUFFER_SECONDS = 60;
   const maxRaceDuration = 5 * 60 * 1_000_000_000;
   const endBufferNs = LIVE_END_BUFFER_SECONDS * 1_000_000_000;
-  const now = Date.now() * 1_000_000;
   const raceStartNs = Number(race.startTime);
   const bufferedStartTime = raceStartNs + (LIVE_START_BUFFER_SECONDS * 1_000_000_000);
+  
+  // Countdown timer state for smooth animation
+  const [countdownSeconds, setCountdownSeconds] = useState<number>(0);
+  
+  // Update countdown every second when in buffer period
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = Date.now() * 1_000_000;
+      const remaining = Math.ceil((bufferedStartTime - now) / 1_000_000_000);
+      setCountdownSeconds(Math.max(0, remaining));
+    };
+    
+    // Initial update
+    updateCountdown();
+    
+    // Only set up interval if we might be in buffer period (to avoid unnecessary timers)
+    const now = Date.now() * 1_000_000;
+    const couldBeInBuffer = isLive && now < bufferedStartTime;
+    
+    if (couldBeInBuffer) {
+      const interval = setInterval(updateCountdown, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [bufferedStartTime, isLive]);
+  
+  const now = Date.now() * 1_000_000;
   const isInBufferPeriod = isLive && now < bufferedStartTime;
-  const bufferSecondsRemaining = isInBufferPeriod ? Math.ceil((bufferedStartTime - now) / 1_000_000_000) : 0;
+  const bufferSecondsRemaining = countdownSeconds;
   const isStillWatchable = isCompleted && (now - raceStartNs) < (maxRaceDuration + endBufferNs);
   const isImminent = race && 'Upcoming' in race.status;
   

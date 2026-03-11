@@ -43,6 +43,9 @@ module {
         case (?auth) { auth.principal };
       };
 
+      // Track this method call
+      ctx.trackMethodCall("garage_start_scavenging", user);
+
       // Parse arguments
       let tokenIndex = switch (Result.toOption(Json.getAsNat(_args, "token_index"))) {
         case (null) {

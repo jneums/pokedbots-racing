@@ -306,7 +306,7 @@ function RepairBayCard({
             ) : (
               <ChevronUp className="w-3 h-3 mr-1" />
             )}
-            Upgrade ({nextTier ? formatParts(nextTier.partsCost) : '?'})
+            Upgrade
           </Button>
         )}
         
@@ -333,6 +333,8 @@ export function RepairBayPanel({ bots = [] }: RepairBayPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showPurchaseDialog, setShowPurchaseDialog] = useState(false);
   const [showBotSelectDialog, setShowBotSelectDialog] = useState(false);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [upgradeTargetBay, setUpgradeTargetBay] = useState<RepairBayInfo | null>(null);
   const [selectedBayId, setSelectedBayId] = useState<number | null>(null);
   const [upgradingBayId, setUpgradingBayId] = useState<number | null>(null);
   const [completingBayId, setCompletingBayId] = useState<number | null>(null);
@@ -405,8 +407,18 @@ export function RepairBayPanel({ bots = [] }: RepairBayPanelProps) {
     }
   };
   
+  // Handle opening upgrade dialog
+  const handleOpenUpgradeDialog = (bayId: number) => {
+    const bay = bays.find(b => b.bayId === bayId);
+    if (bay) {
+      setUpgradeTargetBay(bay);
+      setShowUpgradeDialog(true);
+    }
+  };
+  
   // Handle upgrade bay
   const handleUpgradeBay = async (bayId: number) => {
+    setShowUpgradeDialog(false);
     setUpgradingBayId(bayId);
     try {
       const result = await upgradeBay.mutateAsync(bayId);
@@ -417,6 +429,7 @@ export function RepairBayPanel({ bots = [] }: RepairBayPanelProps) {
       toast.error(err.message || 'Failed to start upgrade');
     } finally {
       setUpgradingBayId(null);
+      setUpgradeTargetBay(null);
     }
   };
   
@@ -549,7 +562,7 @@ export function RepairBayPanel({ bots = [] }: RepairBayPanelProps) {
                   key={bay.bayId}
                   bay={bay}
                   tiers={tiers || []}
-                  onUpgrade={handleUpgradeBay}
+                  onUpgrade={handleOpenUpgradeDialog}
                   onCompleteUpgrade={handleCompleteUpgrade}
                   onSendBot={handleOpenBotSelect}
                   onPullBot={handlePullBot}
@@ -683,6 +696,127 @@ export function RepairBayPanel({ bots = [] }: RepairBayPanelProps) {
               ))
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Upgrade Bay Dialog */}
+      <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+        <DialogContent className="max-w-sm">
+          {upgradeTargetBay && (() => {
+            const nextTier = tiers?.find(t => t.tier === upgradeTargetBay.tier + 1);
+            const canAfford = nextTier ? userParts >= nextTier.partsCost : false;
+            const icpCost = nextTier ? Number(nextTier.icpCostE8s) / 100_000_000 : 0;
+            
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <ChevronUp className="w-5 h-5" />
+                    Upgrade Bay {upgradeTargetBay.bayId}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Upgrade from T{upgradeTargetBay.tier} to T{upgradeTargetBay.tier + 1}
+                  </DialogDescription>
+                </DialogHeader>
+                
+                {nextTier && (
+                  <div className="space-y-4 py-2">
+                    {/* Next tier image */}
+                    <div className="flex justify-center">
+                      <div className="relative">
+                        <img 
+                          src={getTierImage(nextTier.tier)} 
+                          alt={nextTier.name}
+                          className="w-32 h-32 rounded-lg object-cover border-2 border-primary/50 shadow-lg"
+                        />
+                        <Badge className="absolute -top-2 -right-2 bg-primary text-primary-foreground">
+                          T{nextTier.tier}
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    {/* Next tier name */}
+                    <div className="text-center">
+                      <h3 className="font-bold text-lg">{nextTier.name}</h3>
+                    </div>
+                    
+                    {/* Stats comparison */}
+                    <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-muted/50">
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground mb-1">Repair Rate</div>
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="text-sm text-muted-foreground">{upgradeTargetBay.repairRatePerHour}</span>
+                          <span className="text-primary">→</span>
+                          <span className="text-sm font-bold text-green-400">{nextTier.repairRatePerHour}/hr</span>
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground mb-1">Power Draw</div>
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="text-sm text-muted-foreground">{upgradeTargetBay.powerDrawWatts}W</span>
+                          <span className="text-primary">→</span>
+                          <span className="text-sm font-bold text-amber-400">{nextTier.powerDrawWatts}W</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Cost */}
+                    <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                      <div className="text-xs text-muted-foreground mb-2 text-center">Upgrade Cost</div>
+                      <div className="flex justify-center gap-4">
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-primary">{formatParts(nextTier.partsCost)}</div>
+                          <div className="text-xs text-muted-foreground">Parts</div>
+                        </div>
+                        {icpCost > 0 && (
+                          <>
+                            <div className="text-muted-foreground self-center">+</div>
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-amber-400">{icpCost}</div>
+                              <div className="text-xs text-muted-foreground">ICP</div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground text-center mt-2">
+                        Build time: {formatBuildTime(nextTier.buildTimeSeconds)}
+                      </div>
+                    </div>
+                    
+                    {/* Affordability warning */}
+                    {!canAfford && (
+                      <div className="text-sm text-red-400 text-center">
+                        You need {formatParts(nextTier.partsCost - userParts)} more parts
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button variant="outline" onClick={() => setShowUpgradeDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={() => handleUpgradeBay(upgradeTargetBay.bayId)}
+                    disabled={!canAfford || upgradeBay.isPending}
+                    className="bg-green-600 hover:bg-green-500"
+                  >
+                    {upgradeBay.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Upgrading...
+                      </>
+                    ) : (
+                      <>
+                        <ChevronUp className="w-4 h-4 mr-2" />
+                        Upgrade
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>

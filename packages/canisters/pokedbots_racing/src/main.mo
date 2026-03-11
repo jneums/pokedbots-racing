@@ -21,6 +21,7 @@ import Order "mo:base/Order";
 import HttpTypes "mo:http-types";
 import Map "mo:map/Map";
 import IC "mo:ic";
+import Json "mo:json";
 import ClassPlus "mo:class-plus";
 
 import AuthCleanup "mo:mcp-motoko-sdk/auth/Cleanup";
@@ -545,6 +546,77 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       );
     } else {
       stable_timer_diagnostics := newEntries;
+    };
+  };
+
+  // --- METHOD CALL TRACKING ---
+  // Track update method calls with caller information to diagnose cycle usage spikes
+  type MethodCallEntry = {
+    method : Text;
+    caller : Principal;
+    count : Nat;
+    lastCallTimestamp : Int;
+  };
+  // Map: "method:caller" -> call count and last timestamp
+  let stable_method_call_tracking = Map.new<Text, MethodCallEntry>();
+  var stable_method_tracking_start_time : Int = Time.now();
+
+  // Helper to track a method call
+  func trackMethodCall(method : Text, caller : Principal) {
+    let key = method # ":" # Principal.toText(caller);
+    let now = Time.now();
+    switch (Map.get(stable_method_call_tracking, Map.thash, key)) {
+      case (?entry) {
+        Map.set(
+          stable_method_call_tracking,
+          Map.thash,
+          key,
+          {
+            method = method;
+            caller = caller;
+            count = entry.count + 1;
+            lastCallTimestamp = now;
+          },
+        );
+      };
+      case (null) {
+        Map.set(
+          stable_method_call_tracking,
+          Map.thash,
+          key,
+          {
+            method = method;
+            caller = caller;
+            count = 1;
+            lastCallTimestamp = now;
+          },
+        );
+      };
+    };
+  };
+
+  // --- HTTP REQUEST UPDATE TRACKING ---
+  // Track ALL http_request_update calls to find untracked cycle burn
+  var stable_http_update_total_count : Nat = 0;
+  var stable_http_update_tracking_start : Int = Time.now();
+  // Track by JSON-RPC method name (initialize, tools/list, tools/call, ping, etc.)
+  let stable_http_update_by_method = Map.new<Text, Nat>();
+  // Track unparseable requests separately
+  var stable_http_update_unparseable : Nat = 0;
+
+  // Lightweight JSON-RPC method extractor
+  func extractJsonRpcMethod(body : Blob) : ?Text {
+    let bodyText = switch (Text.decodeUtf8(body)) {
+      case (?t) t;
+      case null return null;
+    };
+    let json = switch (Json.parse(bodyText)) {
+      case (#ok(j)) j;
+      case (#err(_)) return null;
+    };
+    switch (Json.getAsText(json, "method")) {
+      case (#ok(method)) ?method;
+      case (#err(_)) null;
     };
   };
 
@@ -1165,6 +1237,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             case (#Manual(manualConfig)) {
               var stageNumber = 0;
 
+              // Track which classes have already been refunded (to avoid duplicate refunds when
+              // multiple race templates exist for the same class that doesn't meet min entries)
+              let refundedClasses = Buffer.Buffer<RacingSimulator.RaceClass>(5);
+
               // Pre-calculate how many races (stages) each class will have
               // This is used to split entry fees proportionally across races
               func countRacesForClass(raceClass : RacingSimulator.RaceClass) : Nat {
@@ -1204,35 +1280,50 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
                 // Skip if not enough registrations for this class
                 if (classRegistrations.size() < event.metadata.minEntries) {
-                  Debug.print("Skipping stage " # Nat.toText(stageNumber) # " (" # debug_show (template.raceClass) # ") - only " # Nat.toText(classRegistrations.size()) # " registrations (need " # Nat.toText(event.metadata.minEntries) # "). Refunding entry fees.");
+                  Debug.print("Skipping stage " # Nat.toText(stageNumber) # " (" # debug_show (template.raceClass) # ") - only " # Nat.toText(classRegistrations.size()) # " registrations (need " # Nat.toText(event.metadata.minEntries) # ").");
 
-                  // Refund entry fees for registrations in classes that didn't fill
-                  var refundIndex : Nat = 0;
-                  for (registration in classRegistrations.vals()) {
-                    if (registration.entryFeePaid > 0) {
-                      // Use unique ID per refund: eventId * 1M + stageNumber * 1000 + refundIndex
-                      let uniqueRefundId = event.eventId * 1_000_000 + stageNumber * 1000 + refundIndex;
-                      let refundActionId = tt().setActionASync<system>(
-                        Int.abs(Time.now() + 1_000_000_000 + refundIndex * 100_000_000), // Stagger by 100ms
-                        {
-                          actionType = "prize_distribution";
-                          params = to_candid ({
-                            raceId = uniqueRefundId : Nat; // Unique ID to avoid duplicate key collision
-                            owner = registration.owner;
-                            amount = registration.entryFeePaid;
-                          });
-                        },
-                        3_600_000_000_000, // 1 hour timeout
-                      );
-                      Debug.print("Scheduled refund " # debug_show (refundActionId) # " of " # Nat.toText(registration.entryFeePaid) # " e8s to " # Principal.toText(registration.owner) # " (class didn't fill in multi-stage event, uniqueId: " # Nat.toText(uniqueRefundId) # ")");
-                      refundIndex += 1;
+                  // Check if we've already refunded this class (avoid duplicate refunds when
+                  // multiple templates exist for the same class)
+                  let alreadyRefunded = Buffer.contains<RacingSimulator.RaceClass>(
+                    refundedClasses,
+                    template.raceClass,
+                    func(a, b) { a == b },
+                  );
+
+                  if (alreadyRefunded) {
+                    Debug.print("Already refunded " # debug_show (template.raceClass) # " for this event - skipping duplicate refund");
+                  } else {
+                    Debug.print("Refunding entry fees for " # debug_show (template.raceClass) # " class.");
+                    refundedClasses.add(template.raceClass);
+
+                    // Refund entry fees for registrations in classes that didn't fill
+                    var refundIndex : Nat = 0;
+                    for (registration in classRegistrations.vals()) {
+                      if (registration.entryFeePaid > 0) {
+                        // Use unique ID per refund: eventId * 1M + stageNumber * 1000 + refundIndex
+                        let uniqueRefundId = event.eventId * 1_000_000 + stageNumber * 1000 + refundIndex;
+                        let refundActionId = tt().setActionASync<system>(
+                          Int.abs(Time.now() + 1_000_000_000 + refundIndex * 100_000_000), // Stagger by 100ms
+                          {
+                            actionType = "prize_distribution";
+                            params = to_candid ({
+                              raceId = uniqueRefundId : Nat; // Unique ID to avoid duplicate key collision
+                              owner = registration.owner;
+                              amount = registration.entryFeePaid;
+                            });
+                          },
+                          3_600_000_000_000, // 1 hour timeout
+                        );
+                        Debug.print("Scheduled refund " # debug_show (refundActionId) # " of " # Nat.toText(registration.entryFeePaid) # " e8s to " # Principal.toText(registration.owner) # " (class didn't fill in multi-stage event, uniqueId: " # Nat.toText(uniqueRefundId) # ")");
+                        refundIndex += 1;
+                      };
                     };
                   };
                 } else {
                   // Split into heats
                   let heats = eventCalendar.splitIntoHeats(
                     classRegistrations,
-                    8,
+                    12,
                     heatStrategy,
                     getElo,
                   );
@@ -1269,13 +1360,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                         0;
                       };
 
-                      // Platform bonus based on event type and class (40% contribution)
+                      // Platform bonus based on event type and class
                       let basePlatformBonus : Nat = switch (event.eventType, template.raceClass) {
-                        case (#DailySprint, #Scrap) { 110_000_000 };
-                        case (#DailySprint, #Junker) { 160_000_000 };
-                        case (#DailySprint, #Raider) { 210_000_000 };
-                        case (#DailySprint, #Elite) { 270_000_000 };
-                        case (#DailySprint, #SilentKlan) { 320_000_000 };
                         case (#WeeklyLeague, #Scrap) { 80_000_000 };
                         case (#WeeklyLeague, #Junker) { 160_000_000 };
                         case (#WeeklyLeague, #Raider) { 240_000_000 };
@@ -1404,10 +1490,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   };
 
                 } else {
-                  // Split into heats of max 8 players
+                  // Split into heats of max 12 players
                   let heats = eventCalendar.splitIntoHeats(
                     classRegistrations,
-                    8,
+                    12,
                     heatStrategy,
                     getElo,
                   );
@@ -1514,13 +1600,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                     };
                     let adjustedEntryFee = Int.abs(Float.toInt(Float.fromInt(event.metadata.entryFee) * classFeeMultiplier));
 
-                    // Platform bonus (40% contribution)
+                    // Platform bonus based on event type and class
                     let platformBonus : Nat = switch (event.eventType, raceClass) {
-                      case (#DailySprint, #Scrap) { 110_000_000 };
-                      case (#DailySprint, #Junker) { 160_000_000 };
-                      case (#DailySprint, #Raider) { 210_000_000 };
-                      case (#DailySprint, #Elite) { 270_000_000 };
-                      case (#DailySprint, #SilentKlan) { 320_000_000 };
                       case (#WeeklyLeague, #Scrap) { 80_000_000 };
                       case (#WeeklyLeague, #Junker) { 160_000_000 };
                       case (#WeeklyLeague, #Raider) { 240_000_000 };
@@ -1698,6 +1779,17 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     // Use longer lookhead for special events that might be scheduled far in advance
     let allUpcomingEvents = eventCalendar.getUpcomingEvents(now, 60); // Next 60 days for special events
 
+    // Get ALL events (including cancelled) for duplicate time checks
+    // This prevents creating new events at the same time as recently cancelled events
+    let allEventsForTimeCheck = Array.filter<RaceCalendar.ScheduledEvent>(
+      eventCalendar.getAllEvents(),
+      func(e) {
+        // Include events within the next 60 days regardless of status
+        let NANOS_PER_DAY : Int = 86400_000_000_000;
+        e.scheduledTime >= now - NANOS_PER_DAY and e.scheduledTime <= now + (60 * NANOS_PER_DAY);
+      },
+    );
+
     // Check for Weekly League races in next 2 weeks
     let weeklyLeagues = Array.filter<RaceCalendar.ScheduledEvent>(
       upcomingEvents,
@@ -1785,8 +1877,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         let nextSprint = RaceCalendar.getNextDailySprintTime(scheduleTime);
 
         // Check if event already exists at this time (within 5-minute window)
+        // FIX: Use allEventsForTimeCheck (includes cancelled events) to prevent duplicates
+        // after an event is cancelled for lack of participation
         let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-          upcomingEvents,
+          allEventsForTimeCheck,
           func(e) {
             switch (e.eventType) {
               case (#DailySprint) {
@@ -1859,8 +1953,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         let nextFreeSprint = RaceCalendar.getNextFreeSprintTime(scheduleTime);
 
         // Check if Free Sprint already exists at this time (within 5-minute window)
+        // FIX: Use allEventsForTimeCheck (includes cancelled events) to prevent duplicates
+        // after an event is cancelled for lack of participation
         let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-          upcomingEvents,
+          allEventsForTimeCheck,
           func(e) {
             switch (e.eventType) {
               case (#SpecialEvent(name)) {
@@ -1926,9 +2022,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     // Schedule Monthly Cup (first Saturday of month at 8pm UTC)
     if (monthlyCups.size() == 0) {
       let nextFirstSaturday = RaceCalendar.getNextMonthlyOccurrence(6, 1, 20, 0, now); // Saturday=6, first=1, 8pm
-      // Check if event already exists at this time
+      // Check if event already exists at this time (including cancelled events to prevent duplicates)
       let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-        allUpcomingEvents,
+        allEventsForTimeCheck,
         func(e) {
           let timeDiff = Int.abs(e.scheduledTime - nextFirstSaturday);
           timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
@@ -1955,9 +2051,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       var scheduleTime = now;
       for (i in Iter.range(0, 1 - weekendWarriors.size())) {
         let nextFriday = RaceCalendar.getNextWeeklyOccurrence(5, 22, 0, scheduleTime); // Friday=5, 10pm (after rush hour)
-        // Check if event already exists at this time
+        // Check if event already exists at this time (including cancelled events to prevent duplicates)
         let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-          allUpcomingEvents,
+          allEventsForTimeCheck,
           func(e) {
             let timeDiff = Int.abs(e.scheduledTime - nextFriday);
             timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
@@ -1989,9 +2085,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       let weekNum = (now / (7 * 86400 * 1_000_000_000)) % 3; // Rotate every week
       let terrain = terrains[Int.abs(weekNum) % 3];
       let nextSaturday = RaceCalendar.getNextWeeklyOccurrence(6, 14, 0, now); // Saturday=6, 2pm
-      // Check if event already exists at this time
+      // Check if event already exists at this time (including cancelled events to prevent duplicates)
       let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-        allUpcomingEvents,
+        allEventsForTimeCheck,
         func(e) {
           let timeDiff = Int.abs(e.scheduledTime - nextSaturday);
           timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
@@ -2018,9 +2114,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       var scheduleTime = now;
       for (i in Iter.range(0, 1 - eliteShowcases.size())) {
         let nextSunday = RaceCalendar.getNextWeeklyOccurrence(0, 17, 0, scheduleTime); // Sunday=0, 5pm (moved from 6pm to give gap before Weekly League)
-        // Check if event already exists at this time
+        // Check if event already exists at this time (including cancelled events to prevent duplicates)
         let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-          allUpcomingEvents,
+          allEventsForTimeCheck,
           func(e) {
             let timeDiff = Int.abs(e.scheduledTime - nextSunday);
             timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
@@ -2049,9 +2145,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       var scheduleTime = now;
       for (i in Iter.range(0, 1 - beginnerBootcamps.size())) {
         let nextSaturday = RaceCalendar.getNextWeeklyOccurrence(6, 10, 0, scheduleTime); // Saturday=6, 10am
-        // Check if event already exists at this time
+        // Check if event already exists at this time (including cancelled events to prevent duplicates)
         let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-          allUpcomingEvents,
+          allEventsForTimeCheck,
           func(e) {
             let timeDiff = Int.abs(e.scheduledTime - nextSaturday);
             timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
@@ -2078,9 +2174,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     if (factionWars.size() == 0) {
       let nextSecondSunday = RaceCalendar.getNextMonthlyOccurrence(0, 2, 16, 0, now); // Sunday=0, second=2, 4pm
-      // Check if event already exists at this time
+      // Check if event already exists at this time (including cancelled events to prevent duplicates)
       let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-        allUpcomingEvents,
+        allEventsForTimeCheck,
         func(e) {
           let timeDiff = Int.abs(e.scheduledTime - nextSecondSunday);
           timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
@@ -2105,9 +2201,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     if (distanceChallenges.size() == 0) {
       let nextThirdSaturday = RaceCalendar.getNextMonthlyOccurrence(6, 3, 11, 0, now); // Saturday=6, third=3, 11am (moved from noon to avoid Daily Sprint conflict)
-      // Check if event already exists at this time
+      // Check if event already exists at this time (including cancelled events to prevent duplicates)
       let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-        allUpcomingEvents,
+        allEventsForTimeCheck,
         func(e) {
           let timeDiff = Int.abs(e.scheduledTime - nextThirdSaturday);
           timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
@@ -2133,10 +2229,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     if (rushHours.size() < 2) {
       var scheduleTime = now;
       for (i in Iter.range(0, 1 - rushHours.size())) {
-        let nextFriday = RaceCalendar.getNextWeeklyOccurrence(5, 17, 0, scheduleTime); // Friday=5, 5pm (moved from 7pm to avoid Weekend Warrior conflict)
-        // Check if event already exists at this time
+        let nextFriday = RaceCalendar.getNextWeeklyOccurrence(6, 3, 0, scheduleTime); // Saturday=6, 3am UTC = Friday 8pm MST
+        // Check if event already exists at this time (including cancelled events to prevent duplicates)
         let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-          allUpcomingEvents,
+          allEventsForTimeCheck,
           func(e) {
             let timeDiff = Int.abs(e.scheduledTime - nextFriday);
             timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
@@ -2163,9 +2259,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     if (ultraMarathons.size() == 0) {
       let nextSecondSaturday = RaceCalendar.getNextMonthlyOccurrence(6, 2, 11, 0, now); // Saturday=6, second=2, 11am (moved from noon to avoid Daily Sprint conflict)
-      // Check if event already exists at this time
+      // Check if event already exists at this time (including cancelled events to prevent duplicates)
       let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-        allUpcomingEvents,
+        allEventsForTimeCheck,
         func(e) {
           let timeDiff = Int.abs(e.scheduledTime - nextSecondSaturday);
           timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
@@ -2192,9 +2288,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       var scheduleTime = now;
       for (i in Iter.range(0, 1 - midnightMadnesses.size())) {
         let nextSaturday = RaceCalendar.getNextWeeklyOccurrence(6, 24, 0, scheduleTime); // Saturday=6 -> Sunday=0, midnight
-        // Check if event already exists at this time
+        // Check if event already exists at this time (including cancelled events to prevent duplicates)
         let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-          allUpcomingEvents,
+          allEventsForTimeCheck,
           func(e) {
             let timeDiff = Int.abs(e.scheduledTime - nextSaturday);
             timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
@@ -2221,9 +2317,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     if (championsCups.size() == 0) {
       let nextLastSunday = RaceCalendar.getNextMonthlyOccurrence(0, -1, 22, 0, now); // Sunday=0, last=-1, 10pm (moved from 8pm to avoid Weekly League conflict)
-      // Check if event already exists at this time
+      // Check if event already exists at this time (including cancelled events to prevent duplicates)
       let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-        allUpcomingEvents,
+        allEventsForTimeCheck,
         func(e) {
           let timeDiff = Int.abs(e.scheduledTime - nextLastSunday);
           timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
@@ -3717,6 +3813,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     getUserScavengerBots = func(principal : Principal) : [Nat] {
       Option.get(Map.get(stable_user_scavenger_bots, Map.phash, principal), []);
     };
+    trackMethodCall = trackMethodCall;
   };
 
   // Import tool configurations from separate modules
@@ -3901,6 +3998,174 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     return #ok(clearedCount);
   };
 
+  // --- METHOD CALL TRACKING ENDPOINTS ---
+
+  /// Get method call statistics grouped by method and caller
+  public query func get_method_call_stats() : async {
+    trackingStartTime : Int;
+    totalUniqueCallers : Nat;
+    totalMethods : Nat;
+    entries : [{
+      method : Text;
+      caller : Principal;
+      count : Nat;
+      lastCallTimestamp : Int;
+    }];
+    byMethod : [{
+      method : Text;
+      totalCalls : Nat;
+      uniqueCallers : Nat;
+    }];
+    byCaller : [{
+      caller : Principal;
+      totalCalls : Nat;
+      methodCount : Nat;
+    }];
+  } {
+    let allEntries = Buffer.Buffer<{ method : Text; caller : Principal; count : Nat; lastCallTimestamp : Int }>(Map.size(stable_method_call_tracking));
+
+    // Method aggregations
+    let methodCounts = Map.new<Text, { totalCalls : Nat; callers : [Principal] }>();
+    // Caller aggregations
+    let callerCounts = Map.new<Principal, { totalCalls : Nat; methods : [Text] }>();
+    let uniqueCallers = Map.new<Principal, Bool>();
+
+    for ((key, entry) in Map.entries(stable_method_call_tracking)) {
+      allEntries.add({
+        method = entry.method;
+        caller = entry.caller;
+        count = entry.count;
+        lastCallTimestamp = entry.lastCallTimestamp;
+      });
+      Map.set(uniqueCallers, Map.phash, entry.caller, true);
+
+      // Aggregate by method
+      switch (Map.get(methodCounts, Map.thash, entry.method)) {
+        case (?existing) {
+          Map.set(
+            methodCounts,
+            Map.thash,
+            entry.method,
+            {
+              totalCalls = existing.totalCalls + entry.count;
+              callers = Array.append(existing.callers, [entry.caller]);
+            },
+          );
+        };
+        case (null) {
+          Map.set(
+            methodCounts,
+            Map.thash,
+            entry.method,
+            {
+              totalCalls = entry.count;
+              callers = [entry.caller];
+            },
+          );
+        };
+      };
+
+      // Aggregate by caller
+      switch (Map.get(callerCounts, Map.phash, entry.caller)) {
+        case (?existing) {
+          Map.set(
+            callerCounts,
+            Map.phash,
+            entry.caller,
+            {
+              totalCalls = existing.totalCalls + entry.count;
+              methods = Array.append(existing.methods, [entry.method]);
+            },
+          );
+        };
+        case (null) {
+          Map.set(
+            callerCounts,
+            Map.phash,
+            entry.caller,
+            {
+              totalCalls = entry.count;
+              methods = [entry.method];
+            },
+          );
+        };
+      };
+    };
+
+    let byMethodArr = Buffer.Buffer<{ method : Text; totalCalls : Nat; uniqueCallers : Nat }>(Map.size(methodCounts));
+    for ((method, stats) in Map.entries(methodCounts)) {
+      byMethodArr.add({
+        method = method;
+        totalCalls = stats.totalCalls;
+        uniqueCallers = stats.callers.size();
+      });
+    };
+
+    let byCallerArr = Buffer.Buffer<{ caller : Principal; totalCalls : Nat; methodCount : Nat }>(Map.size(callerCounts));
+    for ((caller, stats) in Map.entries(callerCounts)) {
+      byCallerArr.add({
+        caller = caller;
+        totalCalls = stats.totalCalls;
+        methodCount = stats.methods.size();
+      });
+    };
+
+    return {
+      trackingStartTime = stable_method_tracking_start_time;
+      totalUniqueCallers = Map.size(uniqueCallers);
+      totalMethods = Map.size(methodCounts);
+      entries = Buffer.toArray(allEntries);
+      byMethod = Buffer.toArray(byMethodArr);
+      byCaller = Buffer.toArray(byCallerArr);
+    };
+  };
+
+  /// Clear method call tracking stats (owner only)
+  public shared ({ caller }) func clear_method_call_stats() : async Result.Result<Nat, Text> {
+    if (caller != owner) {
+      return #err("Only the owner can clear method call stats");
+    };
+    let clearedCount = Map.size(stable_method_call_tracking);
+    Map.clear(stable_method_call_tracking);
+    stable_method_tracking_start_time := Time.now();
+    return #ok(clearedCount);
+  };
+
+  /// Get HTTP request update tracking stats (tracks ALL update calls including untracked MCP protocol calls)
+  public query func get_http_update_stats() : async {
+    trackingStartTime : Int;
+    totalUpdateCalls : Nat;
+    unparseableRequests : Nat;
+    byMethod : [{
+      method : Text;
+      count : Nat;
+    }];
+  } {
+    let methodEntries = Buffer.Buffer<{ method : Text; count : Nat }>(Map.size(stable_http_update_by_method));
+    for ((method, count) in Map.entries(stable_http_update_by_method)) {
+      methodEntries.add({ method = method; count = count });
+    };
+    return {
+      trackingStartTime = stable_http_update_tracking_start;
+      totalUpdateCalls = stable_http_update_total_count;
+      unparseableRequests = stable_http_update_unparseable;
+      byMethod = Buffer.toArray(methodEntries);
+    };
+  };
+
+  /// Clear HTTP update tracking stats (owner only)
+  public shared ({ caller }) func clear_http_update_stats() : async Result.Result<Nat, Text> {
+    if (caller != owner) {
+      return #err("Only the owner can clear HTTP update stats");
+    };
+    let clearedCount = stable_http_update_total_count;
+    stable_http_update_total_count := 0;
+    stable_http_update_unparseable := 0;
+    Map.clear(stable_http_update_by_method);
+    stable_http_update_tracking_start := Time.now();
+    return #ok(clearedCount);
+  };
+
   /// Get detailed timer state for race_create debugging
   public query func get_race_create_timer_state() : async {
     raceCreateTimers : [{ id : Nat; time : Nat; actionType : Text }];
@@ -4040,6 +4305,18 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   /// Handle incoming HTTP requests that modify state (e.g., POST).
   public shared func http_request_update(req : SrvTypes.HttpRequest) : async SrvTypes.HttpResponse {
+    // --- Track ALL http_request_update calls ---
+    stable_http_update_total_count += 1;
+    switch (extractJsonRpcMethod(req.body)) {
+      case (?method) {
+        let current = Option.get(Map.get(stable_http_update_by_method, Map.thash, method), 0);
+        Map.set(stable_http_update_by_method, Map.thash, method, current + 1);
+      };
+      case null {
+        stable_http_update_unparseable += 1;
+      };
+    };
+
     let ctx : HttpHandler.Context = _create_http_context();
 
     // Ask the SDK to handle the request
@@ -5703,7 +5980,15 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     totalWins : Nat;
     totalEarnings : Nat;
   } {
-    leaderboardManager.getPlatformStats();
+    let leaderboardStats = leaderboardManager.getPlatformStats();
+    // Use initialized bot count for totalRacers instead of leaderboard entries
+    // This includes all registered racers, not just those with paid race entries
+    {
+      totalRacers = garageManager.getInitializedBotCount();
+      totalRaces = leaderboardStats.totalRaces;
+      totalWins = leaderboardStats.totalWins;
+      totalEarnings = leaderboardStats.totalEarnings;
+    };
   };
 
   // Get leaderboard by type with pagination
@@ -8371,6 +8656,37 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
   };
 
+  // Admin function to reschedule an event to a new time
+  // All times are in nanoseconds (UTC timestamp)
+  public shared ({ caller }) func admin_reschedule_event(
+    eventId : Nat,
+    newScheduledTime : Int,
+    newRegistrationOpens : Int,
+    newRegistrationCloses : Int,
+  ) : async Text {
+    if (caller != owner) {
+      Debug.trap("Only owner can reschedule events");
+    };
+
+    let now = Time.now();
+
+    switch (eventCalendar.rescheduleEvent(eventId, newScheduledTime, newRegistrationOpens, newRegistrationCloses, now)) {
+      case (#ok(updated)) {
+        let scheduledTimeMs = updated.scheduledTime / 1_000_000;
+        let regOpensMs = updated.registrationOpens / 1_000_000;
+        let regClosesMs = updated.registrationCloses / 1_000_000;
+        "Rescheduled event " # Nat.toText(eventId) # " (" # updated.metadata.name # ")\n" #
+        "  New scheduled time: " # Int.toText(scheduledTimeMs) # "ms (Unix)\n" #
+        "  Registration opens: " # Int.toText(regOpensMs) # "ms (Unix)\n" #
+        "  Registration closes: " # Int.toText(regClosesMs) # "ms (Unix)\n" #
+        "  Status: " # debug_show (updated.status);
+      };
+      case (#err(e)) {
+        "Error rescheduling event " # Nat.toText(eventId) # ": " # e;
+      };
+    };
+  };
+
   // Admin function to cancel an event and refund all registrations
   public shared ({ caller }) func admin_cancel_event_and_refund(eventId : Nat) : async Text {
     if (caller != owner) {
@@ -8895,6 +9211,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       minutesUntilCooldown : ?Nat;
     };
   }] {
+    // Track this method call
+    trackMethodCall("web_list_my_bots", caller);
+
     let walletAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
     let tokensResult = await ExtIntegration.getOwnedTokens(extCanister, walletAccountId);
 
@@ -9408,7 +9727,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       } {
         let lifetime = PokedBotsGarage.getSMRLifetimeKwh(smr.model);
         let percent = if (lifetime > 0) {
-          (smr.totalMwhGenerated / Float.fromInt(lifetime)) * 100.0; // totalMwhGenerated actually stores kWh
+          Float.min(100.0, (smr.totalMwhGenerated / Float.fromInt(lifetime)) * 100.0); // Cap at 100%
         } else { 0.0 };
         {
           model = PokedBotsGarage.getSMRModelName(smr.model);
@@ -9431,6 +9750,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_purchase_smr(
     modelId : Text
   ) : async Result.Result<{ message : Text; model : Text; powerOutput : Nat; newTotalCapacity : Nat; cost : Nat }, Text> {
+    // Track this method call
+    trackMethodCall("web_purchase_smr", caller);
+
     // Parse model from string
     let model : PokedBotsGarage.SMRModel = switch (modelId) {
       case ("WR250") { #WR250 };
@@ -9517,6 +9839,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_purchase_parts(
     amount : Nat // Number of Universal Parts to buy (must be multiple of 500)
   ) : async Result.Result<{ message : Text; partsReceived : Nat; cost : Nat; newTotal : Nat }, Text> {
+    // Track this method call
+    trackMethodCall("web_purchase_parts", caller);
+
     // Validate amount (must be at least 500 and a multiple of 500)
     if (amount < 500) {
       return #err("Minimum purchase is 500 Universal Parts (1 ICP)");
@@ -9538,6 +9863,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
     };
 
+    // Use current time for transaction deduplication
+    // If the same caller submits the same transfer within the ledger's dedup window (~24h),
+    // it will be rejected as a duplicate
+    let now = Time.now();
+
     let transferResult = try {
       await icpLedger.icrc2_transfer_from({
         from = { owner = caller; subaccount = null };
@@ -9545,7 +9875,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         amount = icpCost;
         fee = null;
         memo = null;
-        created_at_time = null;
+        created_at_time = ?Nat64.fromNat(Int.abs(now));
         spender_subaccount = null;
       });
     } catch (e) {
@@ -9560,6 +9890,15 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           };
           case (#InsufficientFunds({ balance })) {
             "Insufficient ICP balance. Current: " # Nat.toText(balance / 100_000_000) # " ICP. Required: " # Nat.toText(icpCost / 100_000_000) # " ICP.";
+          };
+          case (#Duplicate({ duplicate_of })) {
+            "This purchase was already processed (duplicate transaction). Please refresh and check your inventory.";
+          };
+          case (#CreatedInFuture({ ledger_time })) {
+            "Transaction timestamp error. Please try again.";
+          };
+          case (#TooOld) {
+            "Transaction expired. Please try again.";
           };
           case (_) {
             "Payment failed. Please check your ICRC-2 approval and ICP balance.";
@@ -9737,6 +10076,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   /// Purchase a new repair bay slot
   /// Uses ICRC-2 transfer_from to pull ICP and deducts parts from inventory
   public shared ({ caller }) func web_purchase_repair_bay_slot() : async Result.Result<{ message : Text; bayId : Nat; totalBays : Nat }, Text> {
+    // Track this method call
+    trackMethodCall("web_purchase_repair_bay_slot", caller);
+
     let storage = garageManager.getUserRepairBayStorage(caller);
     let nextSlot = storage.bays.size() + 1;
 
@@ -9859,6 +10201,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_upgrade_repair_bay(
     bayId : Nat
   ) : async Result.Result<{ message : Text; bayId : Nat; newTier : Nat; newTierName : Text; completionTime : Int }, Text> {
+    // Track this method call
+    trackMethodCall("web_upgrade_repair_bay", caller);
+
     let storage = garageManager.getUserRepairBayStorage(caller);
 
     // Find the bay
@@ -10006,6 +10351,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_complete_repair_bay_upgrade(
     bayId : Nat
   ) : async Result.Result<{ message : Text; bayId : Nat; newTier : Nat; newTierName : Text; newRepairRate : Nat }, Text> {
+    // Track this method call
+    trackMethodCall("web_complete_repair_bay_upgrade", caller);
+
     let now = Time.now();
 
     switch (garageManager.completeRepairBayUpgrade(caller, bayId, now)) {
@@ -10119,6 +10467,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     tokenIndex : Nat,
     name : ?Text,
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_initialize_bot", caller);
+
     // Validate name if provided
     switch (name) {
       case (?n) {
@@ -10292,6 +10643,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_get_bot_details(
     tokenIndex : Nat
   ) : async Result.Result<{ stats : ?PokedBotsGarage.PokedBotRacingStats; baseStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; isOwner : Bool; isInitialized : Bool; currentCondition : ?Nat; currentBattery : ?Nat; activeUpgrade : ?PokedBotsGarage.UpgradeSession; upgradeCosts : ?{ Velocity : { parts : Nat; icp : Nat }; PowerCore : { parts : Nat; icp : Nat }; Thruster : { parts : Nat; icp : Nat }; Gyro : { parts : Nat; icp : Nat } } }, Text> {
+    // Track this method call
+    trackMethodCall("web_get_bot_details", caller);
+
     let baseStats = garageManager.getBaseStats(tokenIndex);
 
     // Check if bot is initialized
@@ -10439,6 +10793,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_deregister_bot(
     tokenIndex : Nat
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_deregister_bot", caller);
+
     // Get bot stats to verify current registration
     let stats = switch (garageManager.getStats(tokenIndex)) {
       case (null) {
@@ -10478,6 +10835,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_recharge_bot(
     tokenIndex : Nat
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_recharge_bot", caller);
+
     // Get stats and verify registration
     let stats = switch (garageManager.getStats(tokenIndex)) {
       case (null) {
@@ -10655,6 +11015,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_repair_bot(
     tokenIndex : Nat
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_repair_bot", caller);
+
     // Get stats and verify registration
     let stats = switch (garageManager.getStats(tokenIndex)) {
       case (null) {
@@ -10797,6 +11160,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_set_starred_bots(
     starredBots : [Nat]
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_set_starred_bots", caller);
+
     // Validate bot indices (optional - could add ownership check)
     if (starredBots.size() > 100) {
       return #err("Cannot star more than 100 bots");
@@ -10815,6 +11181,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_set_racer_bots(
     racerBots : [Nat]
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_set_racer_bots", caller);
+
     if (racerBots.size() > 100) {
       return #err("Cannot tag more than 100 bots as racers");
     };
@@ -10831,6 +11200,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_set_scavenger_bots(
     scavengerBots : [Nat]
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_set_scavenger_bots", caller);
+
     if (scavengerBots.size() > 100) {
       return #err("Cannot tag more than 100 bots as scavengers");
     };
@@ -10842,6 +11214,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_full_maintenance(
     tokenIndex : Nat
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_full_maintenance", caller);
+
     // Get stats and verify registration
     let stats = switch (garageManager.getStats(tokenIndex)) {
       case (null) {
@@ -11036,6 +11411,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     upgradeType : PokedBotsGarage.UpgradeType,
     paymentMethod : { #icp; #parts },
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_upgrade_bot", caller);
+
     // Get current stats and verify registration
     let stats = switch (garageManager.getStats(tokenIndex)) {
       case (null) {
@@ -11292,6 +11670,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_cancel_upgrade(
     tokenIndex : Nat
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_cancel_upgrade", caller);
+
     // Check if there's an active upgrade to settle
     switch (garageManager.getActiveUpgrade(tokenIndex)) {
       case (null) {
@@ -11480,6 +11861,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     tokenIndex : Nat,
     statsToStrip : [Text],
   ) : async Result.Result<{ speedPartsRefunded : Nat; powerCorePartsRefunded : Nat; accelerationPartsRefunded : Nat; stabilityPartsRefunded : Nat; totalRefunded : Nat; respecCost : Nat }, Text> {
+    // Track this method call
+    trackMethodCall("web_respec_bot", caller);
+
     // Get current stats and verify registration
     let stats = switch (garageManager.getStats(tokenIndex)) {
       case (null) {
@@ -11520,6 +11904,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     raceId : Nat,
     tokenIndex : Nat,
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_enter_race", caller);
+
     // Get bot stats and verify registration (done below)
     // Registration check happens after we get race and bot stats
 
@@ -12015,6 +12402,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     zone : Text,
     durationMinutes : ?Nat,
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_start_scavenging", caller);
+
     // Get stats and verify registration
     let stats = switch (garageManager.getStats(tokenIndex)) {
       case (null) {
@@ -12064,6 +12454,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_complete_scavenging(
     tokenIndex : Nat
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_complete_scavenging", caller);
+
     // Get stats and verify registration
     let stats = switch (garageManager.getStats(tokenIndex)) {
       case (null) {
@@ -12118,6 +12511,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_batch_complete_scavenging(
     tokenIndices : [Nat]
   ) : async [{ tokenIndex : Nat; result : Result.Result<Text, Text> }] {
+    // Track this method call
+    trackMethodCall("web_batch_complete_scavenging", caller);
+
     let now = Time.now();
     let results = Buffer.Buffer<{ tokenIndex : Nat; result : Result.Result<Text, Text> }>(tokenIndices.size());
 
@@ -12153,6 +12549,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     zone : Text,
     durationMinutes : ?Nat,
   ) : async [{ tokenIndex : Nat; result : Result.Result<Text, Text> }] {
+    // Track this method call
+    trackMethodCall("web_batch_start_scavenging", caller);
+
     let now = Time.now();
     let results = Buffer.Buffer<{ tokenIndex : Nat; result : Result.Result<Text, Text> }>(tokenIndices.size());
 
@@ -12200,6 +12599,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_batch_recharge_bots(
     tokenIndices : [Nat]
   ) : async [{ tokenIndex : Nat; result : Result.Result<Text, Text> }] {
+    // Track this method call
+    trackMethodCall("web_batch_recharge_bots", caller);
+
     let now = Time.now();
     let results = Buffer.Buffer<{ tokenIndex : Nat; result : Result.Result<Text, Text> }>(tokenIndices.size());
     let RECHARGE_COST : Nat = 10_000_000; // 0.1 ICP
@@ -12389,6 +12791,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_batch_repair_bots(
     tokenIndices : [Nat]
   ) : async [{ tokenIndex : Nat; result : Result.Result<Text, Text> }] {
+    // Track this method call
+    trackMethodCall("web_batch_repair_bots", caller);
+
     let now = Time.now();
     let results = Buffer.Buffer<{ tokenIndex : Nat; result : Result.Result<Text, Text> }>(tokenIndices.size());
     let BASE_REPAIR_COST : Nat = 5_000_000; // 0.05 ICP
@@ -12551,6 +12956,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     toType : Text,
     amount : Nat,
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_convert_parts", caller);
+
     // Parse part types
     let fromPartType = switch (fromType) {
       case ("SpeedChip") { #SpeedChip };
@@ -12584,6 +12992,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_combine_parts_to_universal(
     amount : Nat
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_combine_parts_to_universal", caller);
+
     switch (garageManager.combinePartsToUniversal(caller, amount)) {
       case (#err(e)) { #err(e) };
       case (#ok()) {
@@ -12900,6 +13311,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     betType : BettingTypes.BetType,
     amountE8s : Nat,
   ) : async Result.Result<{ betId : Nat; currentOdds : Float; potentialPayout : Nat }, Text> {
+    // Track this method call
+    trackMethodCall("web_betting_place_bet", caller);
+
     // Validate amount
     if (amountE8s < 1_000_000) {
       return #err("Minimum bet is 0.01 ICP");
@@ -13185,6 +13599,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     batteryId : Nat,
     tokenIndex : Nat,
   ) : async Result.Result<{ energyDelivered : Float; energyConsumed : Float; newBotBattery : Nat; newBatteryCharge : Float; newBatteryHealth : Nat; newHeatStacks : Nat; overheated : Bool; message : Text }, Text> {
+    // Track this method call
+    trackMethodCall("web_jolt_bot", caller);
+
     let now = Time.now();
 
     switch (garageManager.joltBot(caller, batteryId, tokenIndex, now)) {
@@ -13208,6 +13625,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_repair_battery(
     batteryId : Nat
   ) : async Result.Result<{ healthGained : Nat; newHealth : Nat; cyclesPercent : Float; partsCost : Nat }, Text> {
+    // Track this method call
+    trackMethodCall("web_repair_battery", caller);
+
     switch (garageManager.repairBattery(caller, batteryId)) {
       case (#ok(result)) {
         #ok({
@@ -13226,6 +13646,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     batteryId : Nat,
     useIcp : Bool,
   ) : async Result.Result<Text, Text> {
+    // Track this method call
+    trackMethodCall("web_rebuild_battery", caller);
+
     if (useIcp) {
       // ICP payment via ICRC-2
       let battery = switch (garageManager.getBattery(caller, batteryId)) {
@@ -13292,6 +13715,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_salvage_battery(
     batteryId : Nat
   ) : async Result.Result<{ partsReturned : Nat; batteryType : Text }, Text> {
+    // Track this method call
+    trackMethodCall("web_salvage_battery", caller);
+
     switch (garageManager.salvageBattery(caller, batteryId)) {
       case (#ok(result)) {
         let typeText = switch (result.batteryType) {
@@ -13313,6 +13739,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   public shared ({ caller }) func web_toggle_battery(
     batteryId : Nat
   ) : async Result.Result<{ isEnabled : Bool; message : Text }, Text> {
+    // Track this method call
+    trackMethodCall("web_toggle_battery", caller);
+
     let now = Time.now();
     // First accumulate any pending charge before toggling
     garageManager.accumulateBatteryCharge(caller, now);

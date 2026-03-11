@@ -30,12 +30,12 @@ You CAN register to race while scavenging. When race starts:
 ### Before Racing
 - Keep battery 80%+ (recharge if below)
 - Keep condition 90%+ (repair if needed)
-- **Cost:** 0.1 ICP recharge + 0.05 ICP repair = 0.15 ICP maintenance
+- **Cost:** 0.1 ICP recharge (2hr cooldown) + 0.05 ICP repair (1hr cooldown) = 0.15 ICP maintenance
 
 ### After Racing
-- Battery drains 10-20 per race
-- Condition wears 3-7 per race
-- Can usually do 3-4 races before needing maintenance
+- Battery drains based on distance: ~16 per 4km, ~40 per 10km, ~80 per 20km (before modifiers)
+- Condition wears based on distance: ~10 per 4km, ~25 per 10km (before modifiers)
+- Short races (5-7km) allow multiple races before maintenance; long races (20km+) may need maintenance after each
 
 ## OPTIMAL ROTATION (5 bots example)
 
@@ -65,12 +65,12 @@ You CAN register to race while scavenging. When race starts:
 ## COST OPTIMIZATION
 
 ### Expensive Approach (0.15 ICP per maintenance cycle)
-- Pay 0.1 ICP recharge + 0.05 ICP repair every 3-4 races
+- Pay 0.1 ICP recharge (2hr cooldown) + 0.05 ICP repair (1hr cooldown)
 - Fast recovery, can race immediately
 - Best for active players racing frequently
 
-### Free Approach (0 ICP, ~10-15h recovery)
-- Use ChargingStation (~10-15h for full charge from 0%) + RepairBay (5h for 60+ condition)
+### Free Approach (0 ICP, slower recovery)
+- Use ChargingStation (speed varies by grid efficiency and battery level) + RepairBay (rate depends on bay tier, 12-240 condition/hr)
 - No ICP cost, no condition penalty on charging
 - Best for casual players or low-priority bots
 

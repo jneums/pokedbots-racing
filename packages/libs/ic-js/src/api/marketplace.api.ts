@@ -546,10 +546,14 @@ export async function purchaseMarketplaceBot(
   // Convert principal to account identifier (EXT format)
   const buyerAccountId = principalToAccountIdentifier(buyerPrincipal);
   
+  // Convert price to e8s (smallest unit) - use Math.round to avoid floating-point precision errors
+  // e.g., 9.8 * 100_000_000 can produce 980000000.0000001 which can't be converted to BigInt
+  const priceE8s = BigInt(Math.round(priceICP * 100_000_000));
+
   // Step 1: Lock the NFT
   const lockResult = await nftActor.lock(
     tokenId,
-    BigInt(priceICP * 100_000_000),
+    priceE8s,
     buyerAccountId, // buyer's account identifier
     []  // subaccount
   );
@@ -571,7 +575,7 @@ export async function purchaseMarketplaceBot(
     memo: BigInt(0),
     from_subaccount: [],
     created_at_time: [],
-    amount: { e8s: BigInt(priceICP * 100_000_000) },
+    amount: { e8s: priceE8s },
   });
 
   if ('Err' in transferResult) {

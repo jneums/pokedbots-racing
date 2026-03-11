@@ -6,6 +6,7 @@ import Array "mo:base/Array";
 import Float "mo:base/Float";
 import Nat "mo:base/Nat";
 import Int "mo:base/Int";
+import Principal "mo:base/Principal";
 
 import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
@@ -33,6 +34,16 @@ module {
     cb : (Result.Result<McpTypes.CallToolResult, McpTypes.HandlerError>) -> (),
   ) -> async () {
     func(_args : McpTypes.JsonValue, _auth : ?AuthTypes.AuthInfo, cb : (Result.Result<McpTypes.CallToolResult, McpTypes.HandlerError>) -> ()) : async () {
+      // Track this method call (allow anonymous browsing but track if authenticated)
+      switch (_auth) {
+        case (?auth) {
+          context.trackMethodCall("browse_pokedbots", auth.principal);
+        };
+        case (null) {
+          context.trackMethodCall("browse_pokedbots", Principal.fromText("2vxsx-fae"));
+        }; // anonymous principal
+      };
+
       // Check if requesting specific token
       let specificTokenIndex = switch (Result.toOption(Json.getAsNat(_args, "tokenIndex"))) {
         case (?idx) { ?Nat32.fromNat(idx) };

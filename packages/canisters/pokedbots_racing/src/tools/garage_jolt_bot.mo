@@ -35,6 +35,9 @@ module {
         case (?auth) { auth.principal };
       };
 
+      // Track this method call
+      ctx.trackMethodCall("garage_jolt_bot", user);
+
       // Parse battery ID
       let batteryId = switch (Result.toOption(Json.getAsNat(_args, "battery_id"))) {
         case (null) {
@@ -66,14 +69,6 @@ module {
 
       if (racingStats.ownerPrincipal != user) {
         return ToolContext.makeError("You are not the registered owner of this PokedBot.", cb);
-      };
-
-      // Check if bot is scavenging
-      switch (racingStats.activeMission) {
-        case (?_) {
-          return ToolContext.makeError("Cannot jolt a bot while it's on a scavenging mission. Complete the mission first.", cb);
-        };
-        case (null) {};
       };
 
       let now = Time.now();

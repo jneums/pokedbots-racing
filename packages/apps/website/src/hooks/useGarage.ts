@@ -701,7 +701,7 @@ export function useUserSMRs() {
           lifetimeKwh: smr.lifetimeKwh,
           usedKwh: smr.usedKwh,
           lifetimePercent: smr.lifetimePercent,
-          remainingLife: (100 - smr.lifetimePercent).toFixed(2) + '%'
+          remainingLife: smr.lifetimePercent >= 100 ? 'DEAD' : (100 - smr.lifetimePercent).toFixed(2) + '%'
         });
       });
       console.log('=== END SMR DEBUG ===');

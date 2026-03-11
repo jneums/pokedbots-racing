@@ -701,6 +701,62 @@ module {
       };
     };
 
+    // Reschedule an event to a new time (admin only)
+    // Updates scheduledTime, registrationOpens, registrationCloses, and cancellation deadlines
+    public func rescheduleEvent(
+      eventId : Nat,
+      newScheduledTime : Int,
+      newRegistrationOpens : Int,
+      newRegistrationCloses : Int,
+      now : Int,
+    ) : Result.Result<ScheduledEvent, Text> {
+      switch (getEvent(eventId)) {
+        case (null) { #err("Event not found") };
+        case (?event) {
+          // Don't allow rescheduling events that have already started
+          if (event.status == #InProgress or event.status == #Completed) {
+            return #err("Cannot reschedule event that is in progress or completed");
+          };
+
+          // Don't allow rescheduling to a past time
+          if (newScheduledTime <= now) {
+            return #err("Cannot reschedule to a time in the past");
+          };
+
+          // Calculate new cancellation deadlines based on the time shift
+          // We'll use the same relative offsets as the original event
+          let timeShift = newScheduledTime - event.scheduledTime;
+
+          let newCancellationDeadlines = {
+            fullRefund = event.cancellationDeadlines.fullRefund + timeShift;
+            halfRefund = event.cancellationDeadlines.halfRefund + timeShift;
+            quarterRefund = event.cancellationDeadlines.quarterRefund + timeShift;
+          };
+
+          // Determine new status based on current time
+          let newStatus = if (now < newRegistrationOpens) {
+            #Announced;
+          } else if (now < newRegistrationCloses) {
+            #RegistrationOpen;
+          } else {
+            #RegistrationClosed;
+          };
+
+          let updated : ScheduledEvent = {
+            event with
+            scheduledTime = newScheduledTime;
+            registrationOpens = newRegistrationOpens;
+            registrationCloses = newRegistrationCloses;
+            cancellationDeadlines = newCancellationDeadlines;
+            status = newStatus;
+          };
+
+          ignore Map.put(events, nhash, eventId, updated);
+          #ok(updated);
+        };
+      };
+    };
+
     // Create Weekly League event
     public func createWeeklyLeagueEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
@@ -723,20 +779,19 @@ module {
         heatAllocation = #SnakeDraft;
       });
 
-      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Friday
-      let regCloses = scheduledTime - (30 * 60 * 1_000_000_000); // 30min before
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // 15min before
 
       scheduleEvent(
         #WeeklyLeague,
         scheduledTime,
-        regOpens,
+        now, // Opens immediately when created
         regCloses,
         metadata,
         raceMode,
         {
-          fullRefund = regOpens + (2 * 3600 * 1_000_000_000); // Friday + 2h
-          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // Saturday 8pm
-          quarterRefund = scheduledTime - (12 * 3600 * 1_000_000_000); // Sunday 8am
+          fullRefund = scheduledTime - (48 * 3600 * 1_000_000_000); // 48h before
+          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // 24h before
+          quarterRefund = scheduledTime - (12 * 3600 * 1_000_000_000); // 12h before
         },
         now,
       );
@@ -750,7 +805,7 @@ module {
         entryFee = 20_000_000; // 0.2 ICP base (Junker)
         maxEntries = 100; // No practical cap - heats handle overflow
         minEntries = 2;
-        prizePoolBonus = 50_000_000; // Platform adds 0.5 ICP (Junker base)
+        prizePoolBonus = 0; // No platform contribution for daily sprints
         pointsMultiplier = 1.0; // Standard points
         divisions = [#Scrap, #Junker, #Raider, #Elite]; // Scrap through Elite (no Silent Klan)
         scoringMode = #Individual;
@@ -844,7 +899,7 @@ module {
         heatAllocation = #TopBottom;
       });
 
-      let regCloses = scheduledTime - (10 * 60 * 1_000_000_000); // 10min before (shorter since free)
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // 15min before
 
       scheduleEvent(
         #SpecialEvent("Free Sprint"),
@@ -884,20 +939,19 @@ module {
         heatAllocation = #SkillTiered;
       });
 
-      let regOpens = scheduledTime - (7 * 86400 * 1_000_000_000); // 1 week before
-      let regCloses = scheduledTime - (24 * 3600 * 1_000_000_000); // 24h before
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // 15min before
 
       scheduleEvent(
         #MonthlyCup,
         scheduledTime,
-        regOpens,
+        now, // Opens immediately when created
         regCloses,
         metadata,
         raceMode,
         {
-          fullRefund = regOpens + (72 * 3600 * 1_000_000_000); // 3 days after opens
-          halfRefund = scheduledTime - (48 * 3600 * 1_000_000_000); // 2 days before
-          quarterRefund = regCloses; // At close
+          fullRefund = scheduledTime - (72 * 3600 * 1_000_000_000); // 72h before
+          halfRefund = scheduledTime - (48 * 3600 * 1_000_000_000); // 48h before
+          quarterRefund = regCloses; // At close (24h before)
         },
         now,
       );
@@ -912,7 +966,7 @@ module {
       now : Int,
     ) : ScheduledEvent {
       let regOpens = scheduledTime - (72 * 3600 * 1_000_000_000); // Opens 72h before
-      let regCloses = scheduledTime - (1 * 3600 * 1_000_000_000); // Closes 1h before
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
 
       scheduleEvent(
         #SpecialEvent(theme),
@@ -1058,20 +1112,19 @@ module {
         heatAllocation = #SnakeDraft;
       });
 
-      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Opens Wednesday
-      let regCloses = scheduledTime - (2 * 3600 * 1_000_000_000); // Closes 2h before Friday race
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
 
       scheduleEvent(
         #SpecialEvent("Weekend Warrior"),
         scheduledTime,
-        regOpens,
+        now, // Opens immediately when created
         regCloses,
         metadata,
         raceMode,
         {
-          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Thursday noon
-          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // Thursday 8pm
-          quarterRefund = regCloses; // At close
+          fullRefund = scheduledTime - (48 * 3600 * 1_000_000_000); // 48h before
+          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // 24h before
+          quarterRefund = regCloses; // At close (2h before)
         },
         now,
       );
@@ -1208,20 +1261,19 @@ module {
         heatAllocation = #SnakeDraft;
       });
 
-      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Opens Tuesday
-      let regCloses = scheduledTime - (2 * 3600 * 1_000_000_000); // Closes 2h before Thursday race
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
 
       scheduleEvent(
         #SpecialEvent(terrain # " Master"),
         scheduledTime,
-        regOpens,
+        now, // Opens immediately when created
         regCloses,
         metadata,
         raceMode,
         {
-          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Wednesday
-          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // Wednesday evening
-          quarterRefund = regCloses; // At close
+          fullRefund = scheduledTime - (48 * 3600 * 1_000_000_000); // 48h before
+          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // 24h before
+          quarterRefund = regCloses; // At close (2h before)
         },
         now,
       );
@@ -1249,8 +1301,7 @@ module {
         heatAllocation = #SkillTiered;
       });
 
-      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Opens Friday
-      let regCloses = scheduledTime - (1 * 3600 * 1_000_000_000); // Closes 1h before
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
 
       // Elite Showcase requires 1500+ ELO to enter
       let visibility : EventVisibility = #Restricted({
@@ -1265,14 +1316,14 @@ module {
       scheduleRestrictedEvent(
         #SpecialEvent("Elite Showcase"),
         scheduledTime,
-        regOpens,
+        now, // Opens immediately when created
         regCloses,
         metadata,
         raceMode,
         {
-          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Saturday 6pm
-          halfRefund = scheduledTime - (12 * 3600 * 1_000_000_000); // Sunday 6am
-          quarterRefund = regCloses; // At close
+          fullRefund = scheduledTime - (48 * 3600 * 1_000_000_000); // 48h before
+          halfRefund = scheduledTime - (12 * 3600 * 1_000_000_000); // 12h before
+          quarterRefund = regCloses; // At close (1h before)
         },
         visibility,
         now,
@@ -1301,20 +1352,19 @@ module {
         heatAllocation = #TopBottom; // Separate skill levels
       });
 
-      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Opens Thursday
-      let regCloses = scheduledTime - (1 * 3600 * 1_000_000_000); // Closes 1h before
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
 
       scheduleEvent(
         #SpecialEvent("Beginner Bootcamp"),
         scheduledTime,
-        regOpens,
+        now, // Opens immediately when created
         regCloses,
         metadata,
         raceMode,
         {
-          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Friday 10am
-          halfRefund = scheduledTime - (12 * 3600 * 1_000_000_000); // Friday 10pm
-          quarterRefund = regCloses; // At close
+          fullRefund = scheduledTime - (48 * 3600 * 1_000_000_000); // 48h before
+          halfRefund = scheduledTime - (12 * 3600 * 1_000_000_000); // 12h before
+          quarterRefund = regCloses; // At close (1h before)
         },
         now,
       );
@@ -1418,20 +1468,19 @@ module {
         heatAllocation = #Random; // Mixed faction matchups
       });
 
-      let regOpens = scheduledTime - (72 * 3600 * 1_000_000_000); // Opens Thursday
-      let regCloses = scheduledTime - (1 * 3600 * 1_000_000_000); // Closes 1h before
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
 
       scheduleEvent(
         #SpecialEvent("Faction Wars"),
         scheduledTime,
-        regOpens,
+        now, // Opens immediately when created
         regCloses,
         metadata,
         raceMode,
         {
-          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Friday 4pm
-          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // Saturday 4pm
-          quarterRefund = regCloses; // At close
+          fullRefund = scheduledTime - (72 * 3600 * 1_000_000_000); // 72h before
+          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // 24h before
+          quarterRefund = regCloses; // At close (1h before)
         },
         now,
       );
@@ -1510,20 +1559,19 @@ module {
         heatAllocation = #SnakeDraft;
       });
 
-      let regOpens = scheduledTime - (48 * 3600 * 1_000_000_000); // Opens Thursday
-      let regCloses = scheduledTime - (1 * 3600 * 1_000_000_000); // Closes 1h before
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
 
       scheduleEvent(
         #SpecialEvent("Distance Challenge"),
         scheduledTime,
-        regOpens,
+        now, // Opens immediately when created
         regCloses,
         metadata,
         raceMode,
         {
-          fullRefund = regOpens + (24 * 3600 * 1_000_000_000); // Friday noon
-          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // Friday noon
-          quarterRefund = regCloses; // At close
+          fullRefund = scheduledTime - (48 * 3600 * 1_000_000_000); // 48h before
+          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // 24h before
+          quarterRefund = regCloses; // At close (1h before)
         },
         now,
       );
@@ -1676,20 +1724,19 @@ module {
         heatAllocation = #Random; // Maximum chaos!
       });
 
-      let regOpens = scheduledTime - (7 * 3600 * 1_000_000_000); // Opens at noon same day
       let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
 
       scheduleEvent(
         #SpecialEvent("Rush Hour"),
         scheduledTime,
-        regOpens,
+        now, // Opens immediately when created
         regCloses,
         metadata,
         raceMode,
         {
-          fullRefund = regOpens + (3 * 3600 * 1_000_000_000); // 3pm same day
-          halfRefund = scheduledTime - (2 * 3600 * 1_000_000_000); // 5pm
-          quarterRefund = regCloses; // At close
+          fullRefund = scheduledTime - (48 * 3600 * 1_000_000_000); // 48h before
+          halfRefund = scheduledTime - (24 * 3600 * 1_000_000_000); // 24h before
+          quarterRefund = regCloses; // At close (2h before)
         },
         now,
       );
@@ -1718,7 +1765,7 @@ module {
       });
 
       let regOpens = scheduledTime - (120 * 3600 * 1_000_000_000); // Opens Monday (5 days)
-      let regCloses = scheduledTime - (2 * 3600 * 1_000_000_000); // Closes 2h before
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
 
       scheduleEvent(
         #SpecialEvent("Ultra Marathon"),
@@ -1758,20 +1805,19 @@ module {
         heatAllocation = #Random; // Chaos!
       });
 
-      let regOpens = scheduledTime - (6 * 3600 * 1_000_000_000); // Opens 6pm same day
-      let regCloses = scheduledTime - (30 * 60 * 1_000_000_000); // Closes 30min before
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
 
       scheduleEvent(
         #SpecialEvent("Midnight Madness"),
         scheduledTime,
-        regOpens,
+        now, // Opens immediately when created
         regCloses,
         metadata,
         raceMode,
         {
-          fullRefund = regOpens + (2 * 3600 * 1_000_000_000); // 8pm
-          halfRefund = scheduledTime - (2 * 3600 * 1_000_000_000); // 10pm
-          quarterRefund = regCloses; // At close
+          fullRefund = scheduledTime - (6 * 3600 * 1_000_000_000); // 6h before
+          halfRefund = scheduledTime - (2 * 3600 * 1_000_000_000); // 2h before
+          quarterRefund = regCloses; // At close (30min before)
         },
         now,
       );
@@ -1799,20 +1845,19 @@ module {
         heatAllocation = #SkillTiered; // Best vs best
       });
 
-      let regOpens = scheduledTime - (7 * 86400 * 1_000_000_000); // Opens 1 week before
-      let regCloses = scheduledTime - (24 * 3600 * 1_000_000_000); // Closes 1 day before
+      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
 
       scheduleEvent(
         #SpecialEvent("Champions Cup"),
         scheduledTime,
-        regOpens,
+        now, // Opens immediately when created
         regCloses,
         metadata,
         raceMode,
         {
-          fullRefund = regOpens + (72 * 3600 * 1_000_000_000); // 3 days after opens
-          halfRefund = scheduledTime - (72 * 3600 * 1_000_000_000); // 3 days before
-          quarterRefund = regCloses; // At close
+          fullRefund = scheduledTime - (72 * 3600 * 1_000_000_000); // 72h before
+          halfRefund = scheduledTime - (48 * 3600 * 1_000_000_000); // 48h before
+          quarterRefund = regCloses; // At close (24h before)
         },
         now,
       );

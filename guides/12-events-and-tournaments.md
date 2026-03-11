@@ -14,9 +14,10 @@ Your complete guide to wasteland racing events. Find your perfect competition!
 
 ### Weekly League Championship
 **When:** Every Sunday at 8:00 PM UTC  
-**Entry Fee:** 0.8 ICP (varies by division)  
+**Entry Fee:** Base fee × class multiplier (e.g., Junker = 1.5× base)  
+**Distances:** 15, 20, 25, or 30km  
 **Divisions:** All (Scrap, Junker, Raider, Elite, Silent Klan)  
-**Prize Pool Bonus:** +2 ICP platform contribution  
+**Prize Pool Bonus:** 0.80-4.80 ICP (scales by class)  
 **Duration:** ~2 hours
 
 The premier weekly event for all racers! Register anytime between Friday evening and 30 minutes before start time. Once registration closes, we'll split racers into balanced heats based on who signed up. Winners get double championship points!
@@ -32,12 +33,13 @@ The premier weekly event for all racers! Register anytime between Friday evening
 
 ### Daily Sprint Challenge
 **When:** Every 6 hours (Midnight, 6 AM, Noon, 6 PM UTC)  
-**Entry Fee:** 0.2 ICP  
+**Entry Fee:** Base fee × class multiplier  
+**Distances:** 5, 7, or 10km  
 **Divisions:** All  
-**Prize Pool Bonus:** +0.5 ICP  
+**Prize Pool Bonus:** 1.10-3.20 ICP (scales by class)  
 **Duration:** ~30 minutes
 
-Quick races throughout the day! Perfect for when you've got 30 minutes and want some action. Short distances (5-10km) and fast payouts. Heat assignments are random for maximum variety.
+Quick races throughout the day! Perfect for when you've got 30 minutes and want some action. Short distances and fast payouts. Heat assignments are random for maximum variety.
 
 **Perfect for:** Quick sessions, casual racing, testing new builds
 
@@ -48,11 +50,25 @@ Quick races throughout the day! Perfect for when you've got 30 minutes and want 
 
 ---
 
+### Free Sprint Challenge
+**When:** Every 6 hours (offset from Daily Sprints)  
+**Entry Fee:** FREE (0 ICP)  
+**Distances:** 5, 7, or 10km  
+**Divisions:** All  
+**Prize Pool Bonus:** None  
+
+Free races for practice! No entry fee, no prizes, no ELO changes, and no parts awarded. Great for testing builds and learning mechanics risk-free.
+
+**Perfect for:** New racers, build testing, zero-risk fun
+
+---
+
 ### Monthly Championship Cup
 **When:** First Saturday of each month, 8:00 PM UTC  
-**Entry Fee:** 2.0 ICP  
+**Entry Fee:** Base fee × class multiplier  
+**Distances:** 25, 30, 35, or 40km  
 **Divisions:** Elite and Silent Klan only  
-**Prize Pool Bonus:** +5 ICP  
+**Prize Pool Bonus:** 8.00-12.00 ICP (scales by class)  
 **Duration:** ~3 hours
 
 The most prestigious event in the wasteland! This is a multi-stage tournament where you'll race three times:
@@ -279,7 +295,20 @@ Can your Junker bot beat Raider bots? Find out! This is your chance to punch abo
 
 ---
 
-## 💡 EVENT SELECTION GUIDE
+## � RACE LOGISTICS
+
+### Heat Size
+All races have a **maximum of 12 bots per heat**. Larger events split racers into multiple heats.
+
+### Refund Policy
+- **2+ hours before race:** Full refund
+- **1-2 hours before:** Half refund
+- **30 min - 1 hour before:** Quarter refund
+- **Less than 30 min:** No refund
+
+---
+
+## �💡 EVENT SELECTION GUIDE
 
 ### New to Racing?
 Start with **Beginner Bootcamp** or **Daily Sprints**. Low stakes, welcoming atmosphere.

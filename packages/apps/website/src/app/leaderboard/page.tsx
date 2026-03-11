@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -184,6 +184,19 @@ function LeaderboardTable({ entries, type, botProfiles }: { entries: Leaderboard
 export default function LeaderboardPage() {
   const [selectedBracket, setSelectedBracket] = useState<BracketType>('All');
   
+  // Remember the last selected tab
+  const [selectedTab, setSelectedTab] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('leaderboard-tab') || 'month';
+    }
+    return 'month';
+  });
+  
+  // Persist tab selection to localStorage
+  useEffect(() => {
+    localStorage.setItem('leaderboard-tab', selectedTab);
+  }, [selectedTab]);
+  
   const bracket = bracketToRaceClass(selectedBracket);
   
   const { 
@@ -318,19 +331,13 @@ export default function LeaderboardPage() {
           </div>
 
           {/* Leaderboard Tabs */}
-          <Tabs defaultValue="points" className="w-full">
+          <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-8 h-auto sm:h-14 bg-muted p-1.5 rounded-xl gap-1.5 sm:gap-0">
               <TabsTrigger 
-                value="points" 
+                value="month"
                 className="text-sm sm:text-base font-semibold py-3 sm:py-0 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-lg"
               >
-                🏆 Points
-              </TabsTrigger>
-              <TabsTrigger 
-                value="wins"
-                className="text-sm sm:text-base font-semibold py-3 sm:py-0 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-lg"
-              >
-                🥇 Wins
+                📆 Month
               </TabsTrigger>
               <TabsTrigger 
                 value="season"
@@ -339,10 +346,16 @@ export default function LeaderboardPage() {
                 📅 Season
               </TabsTrigger>
               <TabsTrigger 
-                value="month"
+                value="points" 
                 className="text-sm sm:text-base font-semibold py-3 sm:py-0 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-lg"
               >
-                📆 Month
+                🏆 All-Time
+              </TabsTrigger>
+              <TabsTrigger 
+                value="wins"
+                className="text-sm sm:text-base font-semibold py-3 sm:py-0 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-lg"
+              >
+                🥇 Wins
               </TabsTrigger>
             </TabsList>
 

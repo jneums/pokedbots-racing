@@ -1802,6 +1802,11 @@ module {
       Iter.toArray(Map.keys(stats));
     };
 
+    /// Get count of initialized bots (for platform stats)
+    public func getInitializedBotCount() : Nat {
+      Map.size(stats);
+    };
+
     /// Get all bots for owner
     public func getBotsForOwner(owner : Principal) : [PokedBotRacingStats] {
       let allStats = Map.vals(stats);
@@ -1917,10 +1922,24 @@ module {
 
     // ===== SMR (Small Modular Reactor) FUNCTIONS =====
 
-    /// Get user's total SMR power output (in watts)
+    /// Check if an SMR reactor is still alive (has remaining lifetime)
+    public func isSMRAlive(smr : InstalledSMR) : Bool {
+      let lifetimeKwh = Float.fromInt(getSMRLifetimeKwh(smr.model));
+      smr.totalMwhGenerated < lifetimeKwh; // totalMwhGenerated actually stores kWh
+    };
+
+    /// Get user's total SMR power output (in watts) - only counts alive reactors
     public func getUserSMRPower(owner : Principal) : Nat {
       switch (Map.get(userSMRs, phash, owner)) {
-        case (?storage) { storage.totalPowerOutput };
+        case (?storage) {
+          var alivePower : Nat = 0;
+          for (smr in storage.installedSMRs.vals()) {
+            if (isSMRAlive(smr)) {
+              alivePower += smr.powerOutput;
+            };
+          };
+          alivePower;
+        };
         case (null) { 0 };
       };
     };
@@ -1973,18 +1992,35 @@ module {
           // Using 10,000 divisor = 100x faster depletion than old MWh rate
           let energyKwh = energyWh / 10_000.0;
 
-          // Distribute energy proportionally across all SMRs based on their power output
-          let totalPower = Float.fromInt(storage.totalPowerOutput);
+          // Only distribute energy among alive SMRs (skip dead ones)
+          var alivePower : Float = 0.0;
+          for (smr in storage.installedSMRs.vals()) {
+            if (isSMRAlive(smr)) {
+              alivePower += Float.fromInt(smr.powerOutput);
+            };
+          };
+
+          // If no alive SMRs, nothing to accumulate
+          if (alivePower <= 0.0) { return };
+
+          // Distribute energy proportionally across alive SMRs only
           let updatedSMRs = Array.map<InstalledSMR, InstalledSMR>(
             storage.installedSMRs,
             func(smr : InstalledSMR) : InstalledSMR {
-              let powerRatio = Float.fromInt(smr.powerOutput) / totalPower;
+              // Skip dead reactors - don't accumulate any more usage
+              if (not isSMRAlive(smr)) {
+                return smr;
+              };
+              let powerRatio = Float.fromInt(smr.powerOutput) / alivePower;
               let smrEnergyShare = energyKwh * powerRatio;
+              // Cap at lifetime maximum - don't let usage exceed 100%
+              let lifetimeKwh = Float.fromInt(getSMRLifetimeKwh(smr.model));
+              let newUsage = Float.min(smr.totalMwhGenerated + smrEnergyShare, lifetimeKwh);
               {
                 model = smr.model;
                 installedAt = smr.installedAt;
                 powerOutput = smr.powerOutput;
-                totalMwhGenerated = smr.totalMwhGenerated + smrEnergyShare; // Actually kWh
+                totalMwhGenerated = newUsage; // Capped at lifetime max
                 lastUpdateTime = now;
               };
             },
@@ -4254,122 +4290,15 @@ module {
     };
 
     /// Get stat bonuses for a faction based on count
+    /// DISABLED: Stat-based auras temporarily disabled while system is being reworked
     private func getFactionStatBonus(faction : FactionType, count : Nat) : {
       speed : Nat;
       powerCore : Nat;
       acceleration : Nat;
       stability : Nat;
     } {
-      switch (faction) {
-        // Common factions (no stat bonuses, only cost bonuses)
-        case (#Game or #Industrial) {
-          { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
-        };
-        case (#Animal) {
-          if (count >= 16) {
-            { speed = 3; powerCore = 3; acceleration = 3; stability = 3 };
-          } else if (count >= 8) {
-            { speed = 2; powerCore = 2; acceleration = 2; stability = 2 };
-          } else if (count >= 4) {
-            { speed = 1; powerCore = 1; acceleration = 1; stability = 1 };
-          } else {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
-          };
-        };
-
-        // Rare factions - stat bonuses at 2/4/6 (shifted up so 6+ can reach +5)
-        case (#Bee) {
-          if (count >= 6) {
-            { speed = 5; powerCore = 0; acceleration = 0; stability = 0 }; // Max +5 Speed
-          } else if (count >= 4) {
-            { speed = 4; powerCore = 0; acceleration = 0; stability = 0 };
-          } else if (count >= 2) {
-            { speed = 3; powerCore = 0; acceleration = 0; stability = 0 };
-          } else {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
-          };
-        };
-        case (#Food) {
-          { speed = 0; powerCore = 0; acceleration = 0; stability = 0 }; // Cooldown bonus only
-        };
-        case (#Box) {
-          if (count >= 6) {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 5 }; // Max +5 Stability
-          } else if (count >= 4) {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 4 };
-          } else if (count >= 2) {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 3 };
-          } else {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
-          };
-        };
-        case (#Murder) {
-          if (count >= 6) {
-            { speed = 0; powerCore = 0; acceleration = 5; stability = 0 }; // Max +5 Accel
-          } else if (count >= 4) {
-            { speed = 0; powerCore = 0; acceleration = 4; stability = 0 };
-          } else if (count >= 2) {
-            { speed = 0; powerCore = 0; acceleration = 3; stability = 0 };
-          } else {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
-          };
-        };
-
-        // Super-Rare factions - stat bonuses at 2/4/6 (shifted up)
-        case (#Blackhole) {
-          if (count >= 6) {
-            { speed = 0; powerCore = 5; acceleration = 0; stability = 0 }; // Max +5 Power
-          } else if (count >= 4) {
-            { speed = 0; powerCore = 4; acceleration = 0; stability = 0 };
-          } else if (count >= 2) {
-            { speed = 0; powerCore = 3; acceleration = 0; stability = 0 };
-          } else {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
-          };
-        };
-        case (#Dead) {
-          { speed = 0; powerCore = 0; acceleration = 0; stability = 0 }; // Parts bonus only
-        };
-        case (#Master) {
-          if (count >= 6) {
-            { speed = 4; powerCore = 4; acceleration = 4; stability = 4 }; // +4 all (competitive but not matching specialists)
-          } else if (count >= 4) {
-            { speed = 3; powerCore = 3; acceleration = 3; stability = 3 };
-          } else if (count >= 2) {
-            { speed = 2; powerCore = 2; acceleration = 2; stability = 2 };
-          } else {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
-          };
-        };
-
-        // Ultra-Rare factions - powerful bonuses at 2/3 or just 1 (shifted up)
-        case (#Ultimate) {
-          if (count >= 3) {
-            { speed = 5; powerCore = 0; acceleration = 5; stability = 0 }; // Max +5 Speed/Accel
-          } else if (count >= 2) {
-            { speed = 3; powerCore = 0; acceleration = 3; stability = 0 };
-          } else {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
-          };
-        };
-        case (#Golden) {
-          { speed = 0; powerCore = 0; acceleration = 0; stability = 0 }; // Prize bonus only
-        };
-        case (#Wild) {
-          if (count >= 2) {
-            { speed = 4; powerCore = 4; acceleration = 4; stability = 4 }; // Stays at +4 (2nd strongest all-around)
-          } else {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
-          };
-        };
-        case (#UltimateMaster) {
-          if (count >= 1) {
-            { speed = 5; powerCore = 5; acceleration = 5; stability = 5 }; // Max bonus stays at 5
-          } else {
-            { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
-          };
-        };
-      };
+      // All stat bonuses disabled - system being reworked
+      { speed = 0; powerCore = 0; acceleration = 0; stability = 0 };
     };
 
     /// Get cost/yield multipliers for a faction based on count

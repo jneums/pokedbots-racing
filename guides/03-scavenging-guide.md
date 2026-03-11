@@ -31,45 +31,46 @@ Send your bots into the wasteland to gather upgrade parts. **No ICP cost** - onl
 **ScrapHeaps - Safe & Balanced**
 - 1.0x parts, 1.0x battery drain, 1.0x condition wear
 - **40% Universal Parts**, 60% specialized (15% each type)
-- ~10 parts/hour, ~30 battery/hour, ~12 condition/hour
+- ~15 parts/hour, ~30 battery/hour, ~12 condition/hour
 - Best for: New bots, low-risk farming, safest option
 
 **AbandonedSettlements - Moderate Risk/Reward**
 - 1.6x parts, 2.0x battery drain, 2.0x condition wear
 - **40% Universal Parts**, 60% specialized (15% each type)
-- ~16 parts/hour, ~60 battery/hour, ~24 condition/hour
+- ~24 parts/hour, ~60 battery/hour, ~24 condition/hour
 - Best for: More parts than ScrapHeaps, manageable costs
 
 **DeadMachineFields - High Risk/Reward**
 - 2.5x parts, 3.5x battery drain, 3.5x condition wear
 - **40% Universal Parts**, 60% specialized (15% each type)
-- ~25 parts/hour, ~105 battery/hour, ~42 condition/hour
+- ~37.5 parts/hour, ~105 battery/hour, ~42 condition/hour
 - Best for: High stats bots, maximum parts (but highest costs)
 
 ### Maintenance Zones (Free Repairs - No Parts)
 
 **RepairBay - Free Condition Restore**
-- 0x parts, **NO battery drain**, **RESTORES +24-36 condition/hour**
-- Bypasses 12h repair cooldown and 0.05 ICP cost
-- 0 battery/hour, +24-36 condition/hour (with stat bonuses)
-- **Completely FREE** - no battery cost, just like ChargingStation!
+- 0x parts, **NO battery drain**, **RESTORES condition** based on your Repair Bay tier
+- Base rate: 12 condition/hour (Tier 1 "Salvage Arm"), upgradeable to 240/hr (Tier 16 "Foundry Core")
+- Rate modified by power grid efficiency
+- Bypasses repair cooldown and 0.05 ICP cost
+- **Completely FREE** - no battery cost!
 - Best for: Free repairs, damaged bots under 50% condition, any bot needing condition
 
 **ChargingStation - Free Battery Restore**
 - 0x parts, **RESTORES battery** (stepped charging curve - slower at low battery)
 - **NO condition penalty** - completely free!
-- Bypasses 6h recharge cooldown and 0.1 ICP cost
-- **Charging speeds:** 1x at <25% → 2x at <50% → 3x at <75% → 4x at 75-100%
-- ~5/hour at 0%, ~10/hour at 30%, ~15/hour at 60%, ~20/hour at 80%
-- **0% to 100% takes ~10-15 hours** (punishes low battery, rewards keeping it topped up)
-- **✅ NEW: No battery depletion penalty!** Safe zone for reviving dead bots
+- Bypasses recharge cooldown and 0.1 ICP cost
+- **Charging speeds (at 100% grid efficiency):** 1x at <25% → 2x at <50% → 3x at <75% → 4x at 75-100%
+- Base rate: ~3 battery/hr before tier multiplier, up to ~12/hr at fastest tier
+- Rate scales with power grid efficiency (more bots charging = less power per bot)
+- **✅ Safe zone for reviving dead bots!** No battery depletion penalty
 - Best for: Patient players, saving ICP, low-priority bots, dead bots
 
 **💡 Pro Tip: Overcharge Strategy**
 - Use **scavenging zones** (ScrapHeaps/AbandonedSettlements) to spend battery while farming parts
-- Overcharge formula: (100 - battery) × 0.4 × efficiency (capped at 60%)
+- Overcharge formula: (100 - battery) × 0.4 × efficiency (capped at 40%)
 - Lower battery at recharge = bigger overcharge potential (10% battery → ~36% overcharge avg)
-- Efficiency varies by condition + RNG: 100% condition = 0.55-1.35× (highly random!)
+- Efficiency varies by condition + RNG: ~0.4 + condition/200 + randomVariance(±0.25)
 - Overcharge bonus: +0.25% Speed/Accel per 1% overcharge (max +10% at 40%)
 - Strategy: Drop battery low scavenging, then recharge for big one-time race boost!
 
@@ -97,33 +98,41 @@ Send your bots into the wasteland to gather upgrade parts. **No ICP cost** - onl
 
 ## Faction Bonuses (Specialization System)
 
-Each faction excels at finding specific parts:
+Each faction has unique scavenging modifiers:
 
-**Speed Specialists:** +30% Speed Chips
-- Bee, Wild
+**Faction Scavenging Bonuses:**
+- **UltimateMaster:** 1.20× parts, 0.70× battery drain
+- **Dead:** 1.40× parts in DeadMachineFields (1.10× elsewhere), 0.50× condition loss
+- **Master:** 1.12× parts, 0.75× battery drain
+- **Food:** 1.12× parts in ScrapHeaps/Settlements, 0.80× battery drain
+- **Ultimate:** 1.15× parts
+- **Wild:** 0.60× condition loss
+- **Murder:** 1.15× parts in DeadMachineFields, 1.20× condition damage
+- **Blackhole:** 1.10× parts, 1.10× condition damage
+- **Bee:** 1.08× parts in AbandonedSettlements
+- **Industrial:** 1.05× parts, 0.90× battery drain
+- **Box:** 1.05× parts
 
-**Power Specialists:** +30% Power Core Fragments
-- Blackhole, Golden
-
-**Acceleration Specialists:** +30% Thruster Kits
-- Game, Animal
-
-**Stability Specialists:** +30% Gyro Modules
-- Industrial, Box
-
-**Balanced Factions:** +15% Universal Parts
-- Dead, Master, Murder, Food, UltimateMaster, Ultimate
-
-**Strategy:** Specialize in your faction's parts, trade with others for parts you need!
+**Completion Bonuses (RNG-based):**
+- **Golden:** 15% chance to **double** all parts on mission completion
+- **Box:** 5% chance to **triple** all parts on mission completion
+- **Master:** Every 10th mission **doubles** parts
+- **Game:** Every 5th mission grants **+10 universal parts**
 
 ## World Buffs (Bonus Stats)
 
 **How It Works:**
-- ~8% chance per hour spent scavenging
+- ~8% chance per hour spent scavenging (scales with time in mission)
 - Up to ~12.8% per hour with 100 Acceleration stat (+60% boost)
-- Grants 2-4 bonus stat points for your next race
+- Chance capped at 90% maximum
+- Grants bonus stat points for your next race (consumed after one race)
 - Expires in 48 hours if unused
-- **Blackhole faction:** Gets +3 Speed/Accel BONUS on top of regular buff
+
+**Buff Strength (scales with total mission hours):**
+- 0-3 hours: +2 Speed
+- 4-8 hours: +3 Speed, +2 Acceleration
+- 9+ hours: +4 Speed, +3 Acceleration, +2 Power Core
+- **Blackhole faction bonus:** +3 to Speed and Acceleration on top of regular buff
 
 **Important:**
 - ONLY available in scavenging zones (ScrapHeaps, AbandonedSettlements, DeadMachineFields)
@@ -154,5 +163,7 @@ If your bot reaches **0 battery OR 0 condition** during scavenging:
 - Mission ends immediately
 - **ALL pending parts are LOST**
 - Bot returns with 0 rewards
+
+**Battery Depletion Penalty:** If battery hits 0 in a non-maintenance zone, your bot takes **10 condition damage per hour** on top of normal condition loss. Maintenance zones (RepairBay/ChargingStation) are exempt.
 
 **Always leave a safety buffer!** Don't push your bot to the limit.

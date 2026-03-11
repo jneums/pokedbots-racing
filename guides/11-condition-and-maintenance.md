@@ -47,9 +47,9 @@ Stability uses logarithmic scaling (same formula as Power Core efficiency):
 ## REPAIR MECHANICS
 
 ### Paid Repair
-- **Cost:** 0.05 ICP + transfer fee
-- **Restoration:** 30 condition
-- **Cooldown:** 3 hours
+- **Cost:** 0.05 ICP + transfer fee (reduced by Industrial faction synergy, min 0.01 ICP)
+- **Restoration:** 30 condition (capped at 100)
+- **Cooldown:** 1 hour base (reduced by Dedication tier: T2=0.90×, T3=0.80×, T4=0.70×, T5=0.60×)
 
 ### The Deficit Math
 - 10km race costs: ~18-25 condition (depending on stability/terrain)
@@ -60,11 +60,15 @@ Stability uses logarithmic scaling (same formula as Power Core efficiency):
 
 ## CONDITION PERFORMANCE PENALTIES
 
-Low condition reduces your bot's effectiveness:
+Low condition reduces your bot's **Power Core & Stability** effectiveness:
 
-- **100% condition:** Full stats
-- **50% condition:** -25% stats (0.75× multiplier)
-- **0% condition:** -90% stats (0.10× multiplier) - CRITICAL
+| Condition | Multiplier | Stat Reduction |
+|-----------|------------|----------------|
+| 90-100% | 1.0× | Full stats |
+| 70-89% | 0.80-1.0× | Up to -20% |
+| 50-69% | 0.60-0.80× | Up to -40% |
+| 25-49% | 0.30-0.60× | Up to -70% |
+| 0-24% | 0.10-0.30× | Up to -90% (CRITICAL) |
 
 **Also increases battery drain:**
 - 100 condition: No penalty
@@ -74,14 +78,14 @@ Low condition reduces your bot's effectiveness:
 ## STRATEGIC REST PERIODS
 
 ### When to Skip Races
-1. **Condition below 70%** - Stats penalties hurt competitiveness
-2. **Back-to-back 17km Elite races** - Too much damage even with repair
+1. **Condition below 70%** - Penalties start at 70%, getting worse rapidly below 50%
+2. **Back-to-back long races** - Too much damage even with repair
 3. **Low-value races** - Not worth the condition wear if prize is small
 
 ### Recovery Options
-1. **ScrapHeaps** - Slow free repair while earning parts
-2. **RepairBay** - Faster free repair but no parts (best for urgent recovery)
-3. **Paid repair** - Instant but only restores 30, use strategically
+1. **RepairBay** - Free repair, rate depends on your bay tier (12-240 condition/hr)
+2. **Paid repair** - Instant 30 condition but only restores a fixed amount, use strategically
+3. **ScrapHeaps** - Slow scavenging earns parts but condition still drains
 
 ## SCAVENGING CONDITION DAMAGE
 
@@ -90,8 +94,8 @@ Low condition reduces your bot's effectiveness:
 
 ### Zone Modifiers
 - **ScrapHeaps:** 1.0× (base 12/hr)
-- **Moderate zones:** 1.3-1.5× (16-18/hr)
-- **Dangerous zones:** 2.0-3.0× (24-36/hr)
+- **AbandonedSettlements:** 2.0× (24/hr)
+- **DeadMachineFields:** 3.5× (42/hr)
 
 ### Duration Bonus
 Longer missions have better efficiency:
@@ -129,10 +133,10 @@ Both resources drain, but **battery drains faster**:
 
 | Resource | Racing Drain | Scavenging Drain | Free Recovery | Paid Recovery |
 |----------|--------------|------------------|---------------|---------------|
-| **Battery** | 16-80/race | 30-105/hr | ChargingStation (slow) | 0.1 ICP (50-90 restore) |
-| **Condition** | 10-50/race | 12-42/hr | RepairBay (fast, ~30/hr) | 0.05 ICP (30 restore) |
+| **Battery** | 16-80/race | 30-105/hr | ChargingStation (rate varies by grid efficiency) | 0.1 ICP (50-90 restore, 2hr cooldown) |
+| **Condition** | 10-50/race | 12-42/hr | RepairBay (12-240/hr based on bay tier) | 0.05 ICP (30 restore, 1hr cooldown) |
 
-**Battery** is the immediate constraint (races require 50+ battery, drains faster).  
+**Battery** is the immediate constraint (races require sufficient battery, drains faster).  
 **Condition** is the long-term durability constraint (drains slower, easier to maintain).
 **RepairBay** is now FREE and FAST - no battery drain, ~24-36 condition restored per hour!
 
@@ -142,8 +146,9 @@ Repair while overcharged AND within your bot's resonance window to achieve Perfe
 
 - **Bonus:** Keep overcharge Speed/Accel boost WITHOUT the Stability/PowerCore penalties!
 - **Requirements:** Have active overcharge AND repair within resonance zone
-- **Peak Resonance (±3% of optimal):** 100% of penalties removed
-- **Good Resonance (±10% of optimal):** 70% of penalties removed
+- **Peak Resonance (±2% of optimal condition):** 100% of penalties removed
+- **Good Resonance (±12% of optimal):** 70% of penalties removed
+- **Weak Resonance (fallback at ~70% condition):** 30% of penalties removed
 - **Outside Resonance:** Overcharge preserved but penalties still apply in next race
 
 **Strategy:** Each bot has unique resonance points that drift over time - experiment to find your bot's sweet spots!

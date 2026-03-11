@@ -1472,12 +1472,13 @@ export default function GaragePage() {
                         <span className="text-[10px] text-amber-300/60">+{smr.powerOutput}W</span>
                       </div>
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                        smr.lifetimePercent >= 90 ? 'bg-red-500/20 text-red-400' 
+                        smr.lifetimePercent >= 100 ? 'bg-red-500/30 text-red-400'
+                        : smr.lifetimePercent >= 90 ? 'bg-red-500/20 text-red-400' 
                         : smr.lifetimePercent >= 70 ? 'bg-orange-500/20 text-orange-400'
                         : smr.lifetimePercent >= 50 ? 'bg-yellow-500/20 text-yellow-400'
                         : 'bg-green-500/20 text-green-400'
                       }`}>
-                        {(100 - smr.lifetimePercent).toFixed(0)}% life
+                        {smr.lifetimePercent >= 100 ? '☠️ DEAD' : `${Math.max(0, 100 - smr.lifetimePercent).toFixed(0)}% life`}
                       </span>
                     </div>
                   </div>
@@ -2921,12 +2922,13 @@ export default function GaragePage() {
                                   <span className="text-[9px] text-amber-300/60">+{smr.powerOutput}W</span>
                                 </div>
                                 <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${
-                                  smr.lifetimePercent >= 90 ? 'bg-red-500/20 text-red-400' 
+                                  smr.lifetimePercent >= 100 ? 'bg-red-500/30 text-red-400'
+                                  : smr.lifetimePercent >= 90 ? 'bg-red-500/20 text-red-400' 
                                   : smr.lifetimePercent >= 70 ? 'bg-orange-500/20 text-orange-400'
                                   : smr.lifetimePercent >= 50 ? 'bg-yellow-500/20 text-yellow-400'
                                   : 'bg-green-500/20 text-green-400'
                                 }`}>
-                                  {(100 - smr.lifetimePercent).toFixed(0)}% life
+                                  {smr.lifetimePercent >= 100 ? '☠️ DEAD' : `${Math.max(0, 100 - smr.lifetimePercent).toFixed(0)}% life`}
                                 </span>
                               </div>
                             </div>

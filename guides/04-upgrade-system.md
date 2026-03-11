@@ -18,6 +18,17 @@ Currency for upgrading your bot's stats permanently. You gather them through sca
 - **Gyro Modules** → Upgrade Stability (Gyro)
 - **Universal Parts** → Can substitute for ANY type (most valuable!)
 
+## UPGRADE TYPES
+
+- **Velocity** → +1 Speed
+- **PowerCore** → +1 Power Core
+- **Thruster** → +1 Acceleration
+- **Gyro** → +1 Stability (+10 XP, +3 faction rep instead of standard +5 XP, +2 rep)
+
+## RESPEC (Free!)
+
+You can respec your bot for **0 ICP** at any time. All parts invested at each upgrade level are refunded based on what they would have cost. This lets you completely redistribute your stat points without financial penalty.
+
 ## UPGRADE SYSTEM V2 (Gacha-Style)
 
 ### Payment Options

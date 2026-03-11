@@ -96,9 +96,9 @@ Every bot has 4 stats that determine racing performance:
   - High Accel = Quick recovery
 
 **Distance Scaling:**
-- Short sprints (<10km): CRITICAL - 0.75x to 1.25x scaling based on Accel
-  - Low Accel = 75% performance on sprints
-  - High Accel = 125% performance on sprints
+- Short sprints (<10km): CRITICAL - 0.67x to 1.33x scaling based on Accel
+  - Low Accel = 67% performance on sprints
+  - High Accel = 133% performance on sprints
 - Long treks: Neutral
 
 **Scavenging Bonus:** +60% world buff chance at 100 Acceleration
@@ -146,7 +146,7 @@ Every bot has 4 stats that determine racing performance:
 ## DISTANCE CATEGORIES
 
 ### Short Sprints (<10km)
-- **Acceleration** gets 0.75x to 1.25x scaling (CRITICAL)
+- **Acceleration** gets 0.67x to 1.33x scaling (CRITICAL)
 - **Speed** gets slight penalty (matters less)
 - Fast, explosive races
 - Best for: High-Accel builds
@@ -183,8 +183,9 @@ Every bot has 4 stats that determine racing performance:
 - At combined 50: 0.8875x effectiveness (11.25% penalty)
 - **Key insight:** Endurance needs consistency to be fully effective
 
-- **Per-Segment RNG:** ±10% time variation per segment
-- **Per-Segment Conditions:** ±6% performance variation (driver errors, debris, wind)
+- **Per-Segment RNG:** ±20% time variation per segment
+- **Per-Segment Conditions:** Stability-dependent variation (±25% at low Stability, ±5% at max Stability)
+- **Luck Influence:** Shifts performance center point (Luck 10 = 1.03x slower average, Luck 50 = neutral)
 - Races are deterministic (same seed = same result) but feel dynamic
 
 ## 6 EXAMPLE BOT BUILDS
@@ -209,7 +210,7 @@ Every bot has 4 stats that determine racing performance:
 **Stats:** Speed 70 | Power 40 | Accel 100 | Stability 50  
 **Rating:** 65  
 **Best For:** Short sprints (<10km) on any terrain  
-**Why:** 100 Accel = 125% performance on sprints, quick recovery from corners  
+**Why:** 100 Accel = 133% performance on sprints, quick recovery from corners  
 **Weaknesses:** Can't sustain long races, average on technical tracks  
 **Upgrade Path:** Accel → 100 first, then Speed (synergy boost)
 
@@ -280,7 +281,7 @@ Every bot has 4 stats that determine racing performance:
 **WastelandSand → Power Core**  
 **ScrapHeaps → Stability**  
 
-**Short Sprints (<10km) → Accel (125% scaling)**  
+**Short Sprints (<10km) → Accel (133% scaling)**  
 **Medium Races (10-20km) → Balanced**  
 **Long Treks (>20km) → Power + Stability (105% scaling each)**
 
