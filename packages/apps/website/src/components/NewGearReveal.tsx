@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -235,15 +235,19 @@ export function NewGearReveal({ gear, open, onOpenChange, onComplete }: NewGearR
   const [revealedSet, setRevealedSet] = useState<Set<number>>(new Set());
 
   // Snapshot gear when the dialog opens so background refetches can't
-  // cause the card list to flicker or re-sort mid-reveal
+  // cause the card list to flicker or re-sort mid-reveal.
+  // We use a ref + wasOpen tracking to capture synchronously on the
+  // render where open transitions to true (no useEffect delay).
   const snapshotRef = useRef<GearPieceView[]>([]);
-  useEffect(() => {
-    if (open && gear.length > 0) {
-      snapshotRef.current = [...gear].sort(
-        (a, b) => getRarityOrder(a.rarity) - getRarityOrder(b.rarity)
-      );
-    }
-  }, [open]); // intentionally only depends on open — captures gear at open time
+  const wasOpenRef = useRef(false);
+
+  if (open && !wasOpenRef.current && gear.length > 0) {
+    // open just became true — snapshot now (synchronous, before render)
+    snapshotRef.current = [...gear].sort(
+      (a, b) => getRarityOrder(a.rarity) - getRarityOrder(b.rarity)
+    );
+  }
+  wasOpenRef.current = open;
 
   const sortedGear = snapshotRef.current;
 

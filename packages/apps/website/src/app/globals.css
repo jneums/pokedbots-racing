@@ -301,9 +301,9 @@
   }
 
   @keyframes gearRevealPulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.02); }
-    100% { transform: scale(1); }
+    0% { transform: rotateY(180deg) scale(1); }
+    50% { transform: rotateY(180deg) scale(1.02); }
+    100% { transform: rotateY(180deg) scale(1); }
   }
 
   .gear-card-flipped .gear-card-front {
