@@ -1,8 +1,10 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { X, ChevronRight, Sparkles } from 'lucide-react';
+import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { useGetBotProfilesBatch } from '../hooks/useRacing';
 import type { GearPieceView } from '../hooks/useGarage';
 
 // ============================================================================
@@ -230,6 +232,19 @@ interface NewGearRevealProps {
   onComplete?: () => void;
 }
 
+/** A single card in the reveal sequence, annotated with its bot. */
+interface RevealCard {
+  gear: GearPieceView;
+  botIndex: number;
+  /** True if this is the first card for a new bot group. */
+  isGroupStart: boolean;
+}
+
+function getBotImageUrl(tokenIndex: number): string {
+  const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', tokenIndex);
+  return generateExtThumbnailLink(tokenId);
+}
+
 export function NewGearReveal({ gear, open, onOpenChange, onComplete }: NewGearRevealProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [revealedSet, setRevealedSet] = useState<Set<number>>(new Set());
@@ -238,22 +253,49 @@ export function NewGearReveal({ gear, open, onOpenChange, onComplete }: NewGearR
   // cause the card list to flicker or re-sort mid-reveal.
   // We use a ref + wasOpen tracking to capture synchronously on the
   // render where open transitions to true (no useEffect delay).
-  const snapshotRef = useRef<GearPieceView[]>([]);
+  const snapshotRef = useRef<RevealCard[]>([]);
   const wasOpenRef = useRef(false);
 
   if (open && !wasOpenRef.current && gear.length > 0) {
-    // open just became true — snapshot now (synchronous, before render)
-    snapshotRef.current = [...gear].sort(
-      (a, b) => getRarityOrder(a.rarity) - getRarityOrder(b.rarity)
-    );
+    // Group by bot, then sort each group by rarity (ascending)
+    const byBot = new Map<number, GearPieceView[]>();
+    for (const g of gear) {
+      const bot = g.boundToBot || 0;
+      if (!byBot.has(bot)) byBot.set(bot, []);
+      byBot.get(bot)!.push(g);
+    }
+    const cards: RevealCard[] = [];
+    for (const [botIndex, pieces] of byBot) {
+      pieces.sort((a, b) => getRarityOrder(a.rarity) - getRarityOrder(b.rarity));
+      pieces.forEach((g, i) => {
+        cards.push({ gear: g, botIndex, isGroupStart: i === 0 });
+      });
+    }
+    snapshotRef.current = cards;
   }
   wasOpenRef.current = open;
 
-  const sortedGear = snapshotRef.current;
+  const cards = snapshotRef.current;
+
+  // Batch-fetch bot profiles for all bots in the reveal
+  const botIndices = useMemo(() => {
+    const indices = new Set<number>();
+    for (const c of cards) indices.add(c.botIndex);
+    return Array.from(indices);
+  }, [cards]);
+  const { data: botProfiles = [] } = useGetBotProfilesBatch(botIndices);
+
+  const getBotName = useCallback((tokenIndex: number) => {
+    const profile = botProfiles.find((p: any) => Number(p.tokenIndex) === tokenIndex);
+    if (profile?.name && profile.name.length > 0 && profile.name[0]) {
+      return profile.name[0];
+    }
+    return `Bot #${tokenIndex}`;
+  }, [botProfiles]);
 
   const isCurrentRevealed = revealedSet.has(currentIndex);
-  const allRevealed = revealedSet.size === sortedGear.length;
-  const isLastCard = currentIndex === sortedGear.length - 1;
+  const allRevealed = revealedSet.size === cards.length;
+  const isLastCard = currentIndex === cards.length - 1;
 
   const handleReveal = useCallback(() => {
     if (!isCurrentRevealed) {
@@ -280,9 +322,10 @@ export function NewGearReveal({ gear, open, onOpenChange, onComplete }: NewGearR
     }, 300);
   }, [onOpenChange, onComplete]);
 
-  if (sortedGear.length === 0) return null;
+  if (cards.length === 0) return null;
 
-  const currentGear = sortedGear[currentIndex];
+  const currentCard = cards[currentIndex];
+  const currentGear = currentCard?.gear;
   const currentConfig = RARITY_CONFIG[currentGear?.rarity] || RARITY_CONFIG.Common;
 
   return (
@@ -297,15 +340,27 @@ export function NewGearReveal({ gear, open, onOpenChange, onComplete }: NewGearR
             <X className="h-4 w-4" />
           </button>
 
-          {/* Header */}
-          <div className="text-center space-y-1">
+          {/* Header — bot avatar + name + counter */}
+          <div className="text-center space-y-2">
+            {currentCard && (
+              <div className="flex items-center justify-center gap-2">
+                <img
+                  src={getBotImageUrl(currentCard.botIndex)}
+                  alt=""
+                  className="h-8 w-8 rounded-full border border-border/50"
+                />
+                <span className="text-sm font-semibold text-foreground">
+                  {getBotName(currentCard.botIndex)}
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-center gap-2">
               <Sparkles className="h-5 w-5 text-amber-400" />
               <h2 className="text-lg font-bold text-foreground">New Gear!</h2>
               <Sparkles className="h-5 w-5 text-amber-400" />
             </div>
             <p className="text-sm text-muted-foreground">
-              {currentIndex + 1} / {sortedGear.length}
+              {currentIndex + 1} / {cards.length}
             </p>
           </div>
 
@@ -348,16 +403,18 @@ export function NewGearReveal({ gear, open, onOpenChange, onComplete }: NewGearR
           </div>
 
           {/* Pip indicators */}
-          {sortedGear.length > 1 && (
-            <div className="flex gap-1.5">
-              {sortedGear.map((g, idx) => {
-                const pipConfig = RARITY_CONFIG[g.rarity] || RARITY_CONFIG.Common;
+          {cards.length > 1 && (
+            <div className="flex gap-1.5 flex-wrap justify-center max-w-[320px]">
+              {cards.map((c, idx) => {
+                const pipConfig = RARITY_CONFIG[c.gear.rarity] || RARITY_CONFIG.Common;
                 const isActive = idx === currentIndex;
                 const isRevealed = revealedSet.has(idx);
                 return (
                   <div
                     key={idx}
                     className={`h-2 rounded-full transition-all duration-300 ${
+                      c.isGroupStart && idx > 0 ? 'ml-2' : ''
+                    } ${
                       isActive
                         ? `w-6 ${isRevealed ? pipConfig.particle : 'bg-muted-foreground'}`
                         : `w-2 ${isRevealed ? pipConfig.particle + ' opacity-60' : 'bg-muted-foreground/30'}`

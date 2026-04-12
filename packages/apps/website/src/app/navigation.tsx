@@ -3,7 +3,9 @@ import { useState, useEffect } from "react";
 import { useAuth } from '../hooks/useAuth';
 import WalletButton from '../components/WalletButton';
 import EventsHub from '../components/EventsHub';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Sparkles } from 'lucide-react';
+import { useRecentGear } from '../hooks/useGarage';
+import { NewGearReveal } from '../components/NewGearReveal';
 
 export default function Navigation() {
   const location = useLocation();
@@ -12,6 +14,9 @@ export default function Navigation() {
   const [raceMenuOpen, setRaceMenuOpen] = useState(false);
   const [myBotsMenuOpen, setMyBotsMenuOpen] = useState(false);
   const { isAuthenticated, logout } = useAuth();
+  const [gearRevealOpen, setGearRevealOpen] = useState(false);
+  const { recentGear } = useRecentGear();
+  const newGearCount = isAuthenticated ? recentGear.length : 0;
   
   const isActive = (path: string) => {
     if (path === '/') return pathname === '/';
@@ -131,6 +136,19 @@ export default function Navigation() {
             <Link to="/news" className={linkClass('/news')}>
               News
             </Link>
+            {newGearCount > 0 && (
+              <button
+                onClick={() => setGearRevealOpen(true)}
+                className="relative flex items-center gap-1.5 text-sm font-medium text-amber-400 hover:text-amber-300 transition-all animate-pulse"
+                title={`${newGearCount} new gear pieces`}
+              >
+                <Sparkles className="h-4 w-4" />
+                New Gear
+                <span className="absolute -top-1.5 -right-3 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-black px-1">
+                  {newGearCount}
+                </span>
+              </button>
+            )}
             <WalletButton />
           </nav>
           
@@ -218,6 +236,24 @@ export default function Navigation() {
                     <div className="font-medium">Marketplace</div>
                     <div className="text-xs text-muted-foreground">Buy & sell bots</div>
                   </Link>
+                  {newGearCount > 0 && (
+                    <button
+                      onClick={() => {
+                        setGearRevealOpen(true);
+                        setIsOpen(false);
+                      }}
+                      className="w-full block px-4 py-3 text-base font-medium text-amber-400 hover:bg-amber-400/10 transition-all border-l-4 border-amber-400 text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        New Gear
+                        <span className="min-w-[20px] h-[20px] flex items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-black px-1">
+                          {newGearCount}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">Reveal your latest drops</div>
+                    </button>
+                  )}
 
                   <div className="h-px bg-border my-2" />
 
@@ -268,6 +304,13 @@ export default function Navigation() {
           )}
         </div>
       </div>
+
+      {/* New Gear Reveal Dialog — accessible from anywhere */}
+      <NewGearReveal
+        gear={recentGear}
+        open={gearRevealOpen}
+        onOpenChange={setGearRevealOpen}
+      />
     </header>
   );
 }
