@@ -13,7 +13,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_rebuild_battery";
     title = ?"Rebuild Battery Core";
-    description = ?"Rebuild a battery's core to reset cycles, restoring full capacity. This is the only way to restore a degraded battery.\n\n**BATTERY DEGRADATION (realistic curve):**\n• 0-100 cycles: 100% → 90% capacity (barely noticeable)\n• 100-150 cycles: 90% → 70% capacity (starting to notice)\n• 150-200 cycles: 70% → 30% capacity (rapid decline 'knee')\n• 200-250 cycles: 30% → 0% capacity (battery dying)\n• 250+ cycles: DEAD (0% capacity, cannot jolt)\n\n**REBUILD COSTS (choose parts OR ICP):**\n• ScrapCell: 300 parts OR 2 ICP\n• SalvagePack: 900 parts OR 5 ICP\n• IndustrialBank: 2400 parts OR 12 ICP\n• PlasmaVault: 6000 parts OR 25 ICP\n\n**WHAT REBUILD DOES:**\n• Resets cycles to 0 (restores 100% capacity)\n• Battery is EMPTY after rebuild (needs recharge)\n\n**WHEN TO REBUILD:**\n• Capacity drops below acceptable level\n• Battery reaches 250+ cycles (dead)";
+    description = ?"Reset a battery's cycle count to restore full capacity. Pay with parts or ICP. Battery is empty after rebuild. Use help_get_compendium for degradation curve and rebuild costs.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

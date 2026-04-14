@@ -9,7 +9,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "help_get_compendium";
     title = ?"PokedBots Racing Compendium";
-    description = ?"Get comprehensive reference information about factions, mechanics, and systems. Call this once at the start of conversations to understand game mechanics.";
+    description = ?"Get comprehensive reference for game mechanics: factions, stats, zones, resonance, overcharge, upgrade curves, battery degradation, and race class brackets. Call once per conversation for context.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

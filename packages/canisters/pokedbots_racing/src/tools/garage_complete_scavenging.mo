@@ -18,7 +18,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_complete_scavenging";
     title = ?"Complete Scavenging Mission";
-    description = ?"Retrieve your PokedBot from scavenging and collect accumulated rewards. Can be called anytime.\n\n**Rewards:**\n• Parts distributed across multiple types (Speed Chips, Power Core Fragments, Thruster Kits, Gyro Modules, Universal Parts)\n• All zones have same 40% Universal / 60% Specialized split (harder zones give MORE total parts)\n• All pending parts awarded to inventory\n• World buff chance: ~8% per hour, strength scales with time\n• Faction-specific bonuses and specials applied\n\n**RETRIEVE ON DEMAND:**\n• Retrieve anytime - no waiting required\n• Rewards accumulate continuously based on time elapsed\n• Ends mission and stops accumulation\n• Returns total hours elapsed and parts collected";
+    description = ?"Retrieve a bot from its current activity and collect accumulated rewards. Can be called anytime — rewards accumulate based on time elapsed.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

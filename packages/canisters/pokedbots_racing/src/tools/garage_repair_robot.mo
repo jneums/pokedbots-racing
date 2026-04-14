@@ -26,7 +26,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_repair_robot";
     title = ?"Repair Robot Condition";
-    description = ?"Repair a robot to restore condition. Costs 0.05 ICP + 0.0001 ICP transfer fee. Restores 30 Condition. Cooldown: 1 hour.\n\n**RESONANCE SYSTEM (NEW!):**\n• Each bot has a unique 'resonance field' that determines optimal repair points\n• Resonance drifts slowly over time (~weekly cycle with daily micro-shifts)\n• Peak Zone (±3% of optimal): Full Perfect Tune-Up - ALL overcharge penalties removed!\n• Good Zone (±10% of optimal): Partial Tune-Up - 70% of overcharge penalties removed\n• Outside Resonance: Standard repair - overcharge is RESET to prevent exploit loops\n• Use garage_get_robot_details to check your bot's current resonance\n\n**PERFECT TUNE-UP:**\n• Achieved by repairing within your bot's resonance window while having overcharge\n• Removes the Stability/PowerCore penalties from overcharge, keeping the Speed/Accel boost!\n• Strategic depth: Each bot's optimal point is different and changes over time";
+    description = ?"Repair bot condition (0.05 ICP). Restores 30 condition. 1hr cooldown. Repairing within resonance window grants Perfect Tune-Up (preserves overcharge boosts). Outside resonance, overcharge resets. Requires ICRC-2 approval. Use help_get_compendium for resonance mechanics.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

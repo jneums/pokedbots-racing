@@ -13,7 +13,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_convert_parts";
     title = ?"Convert Parts";
-    description = ?"Convert parts from one specialized type to another.\n\n**Conversion Rules:**\n• Cannot convert FROM Universal Parts (they already work for any upgrade)\n• Cannot convert TO Universal Parts (use garage_combine_parts instead)\n• Cannot convert to the same type\n• Converting between specialized types: 25% cost (receive 75% of input)\n\n**Part Types:**\n• SpeedChip → For Speed upgrades\n• PowerCoreFragment → For Power Core upgrades\n• ThrusterKit → For Acceleration upgrades\n• GyroModule → For Stability upgrades\n\n**To create Universal Parts:**\nUse the garage_combine_parts tool instead. It takes 1 of each part type (SPD + PWR + ACC + STB) to create 1 Universal Part.\n\n**Strategy:**\n• Use conversion when you have excess parts of one type and need another\n• Use combine to create Universal parts when you have balanced part inventory";
+    description = ?"Convert specialized parts between types (e.g., SpeedChip to GyroModule). 25% conversion cost. Cannot convert from/to Universal Parts.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

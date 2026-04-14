@@ -19,7 +19,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_get_robot_details";
     title = ?"Get Robot Details";
-    description = ?"Get comprehensive details for a specific PokedBot including stats, condition, career, and upgrade status. The bot must be initialized for racing first.\n\n**TIMESTAMPS:** All timestamps (world_buff_expires_at_utc, last_recharged_utc, last_repaired_utc, start_time_utc, last_accumulation_utc) are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z'). Cooldowns: recharge 6hr, repair 3hr.\n\n**OWNERSHIP:** If you own the bot, shows full details (condition, battery, upgrade costs). If not, shows public profile only (stats, career, rating, ELO).\n\nFor detailed mechanics (battery penalties, overcharge, terrain bonuses), use help_get_compendium tool.";
+    description = ?"Get full details for a specific PokedBot: stats, condition, battery, career, upgrade costs, and resonance. Shows public profile only for bots you don't own. All timestamps are UTC ISO 8601. Use help_get_compendium for mechanic details.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

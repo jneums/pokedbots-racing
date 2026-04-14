@@ -20,7 +20,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_get_race_details";
     title = ?"Get Race Details";
-    description = ?"Get detailed information about a specific race including all entries, participants, current status, results (if completed), and race commentary events.\n\n**RACE COMMENTARY:** Completed races include a `commentary` array with timestamp and description for key race moments (lead changes, performance highlights, lap completions, podium finishes).\n\n**TIMESTAMP FORMAT:** All timestamps (start_time_utc, entry_deadline_utc, created_at_utc, entered_at_utc) are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z'). Times are already in UTC timezone. Current date: December 17, 2025.";
+    description = ?"Get details for a specific race: entries, status, results, and race commentary events. Timestamps are UTC ISO 8601.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

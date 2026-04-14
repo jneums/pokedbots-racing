@@ -24,7 +24,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_upgrade_robot";
     title = ?"Upgrade Robot";
-    description = ?"Instantly upgrade your PokedBot with RNG mechanics. Types: Velocity (+Speed), PowerCore (+Power Core), Thruster (+Acceleration), Gyro (+Stability).\n\n**V2 MECHANICS:**\n• Dynamic ICP costs: 0.5 + (stat/40)² × tier premium (0.7-3.5×)\n• Success rates PER STAT: 85% (first upgrade) smoothly decreasing to 1% (at 15 upgrades), then stays at 1%\n• Each stat tracked independently: Speed, Power Core, Acceleration, and Stability each get their own success rate curve\n• Pity system: +5% per consecutive fail (max +25%), persists across deploys\n• Double lottery: 15% → 2% chance for +2 points (disabled after +15 successful upgrades per stat)\n• 50% refund on failure (ICP or parts returned based on payment method)\n• Pay with ICP or parts (100 parts = 1 ICP)\n\nUse garage_get_robot_details to see exact costs/rates. For full V2 mechanics, use help_get_compendium tool.";
+    description = ?"Upgrade a bot stat: Velocity (Speed), PowerCore, Thruster (Accel), Gyro (Stability). Dynamic ICP cost scales with current stat level. RNG success rate decreases per upgrade. Pity system: +5% per consecutive fail. Pay with ICP or parts. 50% refund on failure. Use garage_get_robot_details for exact costs/rates.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

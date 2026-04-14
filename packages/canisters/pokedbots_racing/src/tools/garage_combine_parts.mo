@@ -13,7 +13,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_combine_parts";
     title = ?"Combine Parts to Universal";
-    description = ?"Combine 1 of each specialized part type to create Universal Parts.\n\n**Combination Formula:**\n1 SPD + 1 PWR + 1 ACC + 1 STB = 1 Universal Part\n\n**Requirements:**\nYou need equal amounts of all 4 specialized part types:\n• Speed Chips (SPD)\n• Power Core Fragments (PWR)\n• Thruster Kits (ACC)\n• Gyro Modules (STB)\n\n**Example:**\nIf you have 100 SPD, 80 PWR, 120 ACC, 90 STB:\n• Maximum you can combine: 80 (limited by PWR)\n• Result: 80 Universal Parts\n• Remaining: 20 SPD, 0 PWR, 40 ACC, 10 STB\n\n**Why Universal Parts?**\nUniversal Parts can be used for ANY upgrade type without conversion penalties!";
+    description = ?"Combine 1 of each specialized part type (SPD+PWR+ACC+STB) into 1 Universal Part. Limited by your lowest part count.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

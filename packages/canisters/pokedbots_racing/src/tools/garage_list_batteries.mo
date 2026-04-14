@@ -15,7 +15,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_list_batteries";
     title = ?"List Garage Batteries";
-    description = ?"View all batteries stored in your garage. Batteries are found while scavenging and can be used to instantly charge bots with the jolt command.\n\n**BATTERY TYPES:**\n• ScrapCell (50 kWh) - Common, found in Scrap Heaps\n• SalvagePack (150 kWh) - Uncommon, found in Abandoned Settlements\n• IndustrialBank (400 kWh) - Rare, found anywhere\n• PlasmaVault (1000 kWh) - Legendary, very rare find\n\n**HEALTH:**\n• 100%: Operational - can deliver jolts\n• <100%: Damaged - must repair before use\n• Jolts damage health, cycling wears the core\n\n**USAGE:** Use garage_jolt_bot to discharge a battery into your bot for instant charging.";
+    description = ?"List all batteries in your garage. Shows type, capacity (kWh), cycles, and health. Types: ScrapCell (50), SalvagePack (150), IndustrialBank (400), PlasmaVault (1000).";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

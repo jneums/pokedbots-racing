@@ -20,7 +20,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_unregister_from_event";
     title = ?"Unregister from Event";
-    description = ?"Cancel your event registration and receive a refund based on how early you cancel.\n\n**CANCELLATION POLICY:**\n• Full refund (100%): Cancel before early cancellation deadline\n• Half refund (50%): Cancel before regular cancellation deadline\n• Quarter refund (25%): Cancel before final cancellation deadline\n• No refund (0%): After final cancellation deadline or after registration closes\n\n**REFUND PROCESS:**\n• Refunds are sent back to your bot's garage subaccount\n• Transfer fee (0.0001 ICP) is deducted from refund\n• Cancellation after registration closes is not allowed";
+    description = ?"Cancel event registration and receive a partial refund based on timing. Earlier cancellation = higher refund (100%/50%/25%/0%). Not allowed after registration closes.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

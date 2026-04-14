@@ -12,7 +12,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_deregister_pokedbot";
     title = ?"De-register PokedBot";
-    description = ?"De-register a PokedBot from your racing account. Use this BEFORE transferring a bot to another wallet, or after purchasing a bot to prevent the previous owner from controlling it. This removes your ability to race, upgrade, or manage this bot until you re-register it. All stats and upgrades are preserved - only control is removed.";
+    description = ?"Remove your control of a PokedBot. Use before transferring to another wallet. Stats and upgrades are preserved — only control is removed.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

@@ -24,7 +24,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_register_for_event";
     title = ?"Register for Event";
-    description = ?"Register your PokedBot for an upcoming racing event. Entry fee is paid upfront via ICRC-2. After registration closes, races will be created automatically with registered participants split into heats.\n\n**EVENT REGISTRATION SYSTEM:**\n• Register for the EVENT, not individual races\n• After registration closes, system creates races from registered bots\n• Bots are split into heats of max 8 players using configured allocation strategy\n• Races are pre-populated with entries - no separate race registration needed\n\n**CANCELLATION POLICY:**\n• Full refund (100%): Cancel before early cancellation deadline\n• Half refund (50%): Cancel before regular cancellation deadline\n• Quarter refund (25%): Cancel before final cancellation deadline\n• No refund (0%): After final cancellation deadline\n\n**ENTRY FEES:**\n• Paid at registration time via ICRC-2 approval\n• Class-based multipliers: Scrap 0.5×, Junker 1×, Raider 1.5×, Elite 2×, SilentKlan 2.5×\n• Refunded if event is cancelled by platform\n\n**BLIND REGISTRATION:**\n• Some events hide participant lists until registration closes\n• Creates more strategic/fair competition";
+    description = ?"Register a bot for a racing event. Entry fee paid via ICRC-2, scaled by race class. After registration closes, races are created automatically from registered bots. Returns ALREADY_REGISTERED structured error with full context if bot is already registered. Use help_get_compendium for class multipliers and cancellation policy.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

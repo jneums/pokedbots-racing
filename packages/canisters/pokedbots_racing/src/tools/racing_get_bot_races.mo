@@ -19,7 +19,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_get_bot_races";
     title = ?"Get Bot's Race Entries";
-    description = ?"Show races that a specific bot is entered in. Returns 5 races per page. Filter by status category and use cursor-based pagination.\n\n**TIMESTAMP FORMAT:** All timestamps (start_time_utc, entry_deadline_utc, created_at_utc) are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z'). Times are already in UTC timezone.";
+    description = ?"List races a specific bot is entered in, 5 per page. Filter by status. Timestamps are UTC ISO 8601.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

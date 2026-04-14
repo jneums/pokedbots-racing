@@ -11,7 +11,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_jolt_bot";
     title = ?"Jolt Bot with Battery";
-    description = ?"Instantly charge a bot by discharging a battery. Uses 20 kWh per jolt, delivering 25-45% battery boost (reduced by heat).\n\n**JOLT MECHANICS:**\n• Costs 20 kWh per jolt\n• Base boost: 25-45% battery (random)\n• Heat reduces effectiveness: -15% per stack\n• Battery must be at 100% health to operate\n\n**HEAT SYSTEM:**\n• Each jolt: +1 heat stack (decays 1/hour)\n• 4 stacks: Bot overheats, 1-hour lockout\n• Heat is tracked per bot, not per battery\n\n**BATTERY WEAR:**\n• Each jolt damages battery health (varies by type)\n• Each jolt adds to cycle wear (kWh/capacity)\n• Repair restores health, rebuild resets cycles";
+    description = ?"Discharge a battery into a bot for instant charging. Costs 20 kWh per jolt, delivers 25-45% battery boost (reduced by heat). 4 heat stacks = 1hr lockout.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

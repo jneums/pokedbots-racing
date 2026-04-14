@@ -9,7 +9,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_cancel_upgrade";
     title = ?"Cancel Upgrade (Deprecated)";
-    description = ?"This tool is deprecated. Upgrades now complete instantly, so there is nothing to cancel. Simply use garage_upgrade_robot to upgrade your PokedBot and get immediate results.";
+    description = ?"Deprecated — upgrades now complete instantly. Use garage_upgrade_robot instead.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

@@ -19,7 +19,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_sponsor_race";
     title = ?"Sponsor Race";
-    description = ?"Sponsor a wasteland race by adding ICP to its prize pool. Your sponsorship will be publicly displayed on the race, and winners will know who supported the event. Only Upcoming races can be sponsored.";
+    description = ?"Add ICP to a race's prize pool. Only upcoming races can be sponsored.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

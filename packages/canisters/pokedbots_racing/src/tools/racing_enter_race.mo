@@ -9,7 +9,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_enter_race";
     title = ?"Enter Race (DEPRECATED)";
-    description = ?"⚠️ DEPRECATED: This tool has been replaced by the new Event Registration System. Please use `racing_list_events` to find upcoming events and `racing_register_for_event` to register your bot for an event. The event system automatically creates races from registered participants.";
+    description = ?"Deprecated — use racing_register_for_event instead. The event system creates races automatically.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

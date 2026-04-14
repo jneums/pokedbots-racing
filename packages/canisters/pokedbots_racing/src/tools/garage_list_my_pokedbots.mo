@@ -24,7 +24,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_list_my_pokedbots";
     title = ?"List My PokedBots";
-    description = ?"List all PokedBots in your wallet with detailed stats, full power stats, racing status, scavenging status, and overall ratings. Filter by user tags (starred, racers, scavengers) or activity status.";
+    description = ?"List all your PokedBots with stats, racing status, and activity status. Filter by user tags (starred, racers, scavengers), activity, or race readiness thresholds.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

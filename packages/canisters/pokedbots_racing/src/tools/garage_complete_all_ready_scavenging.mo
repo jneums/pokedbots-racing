@@ -28,7 +28,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_complete_all_ready_scavenging";
     title = ?"Complete All Ready Scavenging Missions";
-    description = ?"Batch-complete scavenging missions for ALL your bots that have active missions. Iterates every bot you own, completes each active mission, and returns aggregate results.\n\n**Behavior:**\n• Processes up to 20 completions per call\n• Retrieves all bots, completes each active mission\n• Returns parts collected per bot and totals\n• Skips bots with no active mission\n• Reports any still-active missions that couldn't be completed\n\n**Use when:**\n• You want to collect all pending scavenging rewards at once\n• Bulk retrieval after sending many bots out";
+    description = ?"Batch-complete active missions for all your bots. Processes up to 20 completions per call. Returns parts collected per bot and aggregate totals.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

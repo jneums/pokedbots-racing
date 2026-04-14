@@ -18,7 +18,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_get_my_registrations";
     title = ?"Get My Event Registrations";
-    description = ?"Get all your event registrations across all your bots. Shows which bots are registered for which upcoming events, with event details and timing information.\n\n**⚠️ AUTOMATION NOTE:** Use `only_actionable: true` for scripts/automation — it filters out stale entries stuck in open status from long-past events. Without filters, raw results may include historical noise.\n\n**RETURNS:**\n• List of your registered bots per event\n• Event start times and status\n• Race IDs (if races have been created)\n• Time until event starts";
+    description = ?"List your event registrations across all bots. Use only_actionable=true for automation to filter out stale/completed entries. Supports status, time, and staleness filters.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

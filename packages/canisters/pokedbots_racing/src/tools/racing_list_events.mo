@@ -19,7 +19,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_list_events";
     title = ?"List Racing Events";
-    description = ?"View racing events. Returns 5 events per page. Filter by event type, status, class eligibility, or bot-specific filters. Use after_event_id for pagination.\n\n**TIMESTAMP FORMAT:** All timestamps are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z').\n\n**STATUS OPTIONS:** announced (scheduled, not open), registration_open (accepting entries), registration_closed (closed but not started), in_progress (currently running), completed (finished), cancelled\n\n**BOT FILTERS:** Use only_eligible_for_token to show only events a specific bot can enter based on its race class. Use only_not_registered_for_token to hide events a bot is already registered for.";
+    description = ?"List racing events, 5 per page. Filter by type, status, class eligibility, or bot-specific filters. Status: announced, registration_open, registration_closed, in_progress, completed, cancelled.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

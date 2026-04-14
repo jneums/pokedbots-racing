@@ -21,7 +21,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_get_event_results";
     title = ?"Get Event Results";
-    description = ?"Get comprehensive results for a multi-stage event including cumulative standings, individual race results, and prize distribution.\n\n**MULTI-STAGE EVENTS:** Events with Cumulative or TeamAggregate scoring pool all entry fees and distribute prizes at event completion based on overall standings.\n\n**SCORING MODES:**\n• **Cumulative**: Points accumulated across all races (10/6/4/2/1 for positions 1-5). Final prizes: 45%/28%/18%/9% for top 4.\n• **TeamAggregate**: Faction war - all members of the winning faction split the entire prize pool.\n• **Individual**: Standard per-race prizes (not pooled).\n\n**PRIZE DISTRIBUTION:** Multi-stage events apply 5% platform tax, then distribute remaining pool based on final standings.";
+    description = ?"Get event results: cumulative standings, individual race results, and prize distribution. Supports Cumulative, TeamAggregate, and Individual scoring modes.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

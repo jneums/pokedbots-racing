@@ -12,7 +12,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_transfer_parts";
     title = ?"Transfer Parts to Another User";
-    description = ?"Transfer parts from your inventory to another user's garage inventory. Useful for gifting parts or helping other players.";
+    description = ?"Transfer parts from your inventory to another user.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

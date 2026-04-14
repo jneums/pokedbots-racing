@@ -11,7 +11,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_salvage_battery";
     title = ?"Salvage Battery for Parts";
-    description = ?"Destroy a battery to recover parts. Use this when a battery is too degraded to be worth repairing or when you need parts.\n\n**SALVAGE RETURNS:**\n• ScrapCell: 50 parts\n• SalvagePack: 150 parts\n• IndustrialBank: 400 parts\n• PlasmaVault: 1000 parts\n\n**NOTE:** Returns are fixed regardless of battery condition or cycles. A Pristine battery salvages for the same amount as a Degraded one.\n\n**WHEN TO SALVAGE:**\n• Battery has very high cycles and isn't worth rebuilding\n• You need parts more than battery storage capacity\n• You have too many low-tier batteries";
+    description = ?"Destroy a battery to recover parts. Fixed returns regardless of condition: ScrapCell 50, SalvagePack 150, IndustrialBank 400, PlasmaVault 1000.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

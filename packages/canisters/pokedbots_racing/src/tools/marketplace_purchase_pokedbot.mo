@@ -25,7 +25,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "purchase_pokedbot";
     title = ?"Purchase PokedBot";
-    description = ?"Purchase a PokedBot NFT from the marketplace. The bot will be sent directly to your wallet for racing.";
+    description = ?"Purchase a PokedBot NFT from the marketplace. Requires ICRC-2 approval.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

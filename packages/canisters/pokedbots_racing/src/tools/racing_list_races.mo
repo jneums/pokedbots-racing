@@ -18,7 +18,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_list_races";
     title = ?"List Available Races";
-    description = ?"View wasteland races. Returns 5 races per page. Filter by class, terrain, status, distance, or bot eligibility. Use after_race_id for pagination.\n\n**TIMESTAMP FORMAT:** All timestamps (start_time_utc, entry_deadline_utc) are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z').\n\n**STATUS OPTIONS:** open (accepting entries), full (max entries reached), closed (past deadline but not started), in_progress (currently racing), completed (finished races)";
+    description = ?"List races, 5 per page. Filter by class, terrain, status, distance, or bot eligibility. Status: open, full, closed, in_progress, completed. Timestamps are UTC ISO 8601.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

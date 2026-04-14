@@ -17,7 +17,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "betting_get_pool_info";
     title = ?"Get Pool Details & Live Odds";
-    description = ?"Get detailed information about a specific betting pool including live odds for all entrants. Use this before placing bets to see current payout multipliers.\n\n**INFORMATION PROVIDED:**\n• Pool status and race details\n• Live odds for each bot (Win/Place/Show)\n• Current pool sizes by bet type\n• Total bets and unique bettors\n• Betting window timing\n• Entrant list with current odds\n\n**ODDS EXPLANATION:**\n• Odds show potential payout multiplier (e.g., 3.2x means 3.2 ICP per 1 ICP bet)\n• Odds change as more bets are placed\n• Higher odds = less money bet on that bot = higher risk/reward\n• Pari-mutuel system: you're betting against other bettors, not the house";
+    description = ?"Get live odds and details for a specific betting pool. Shows payout multipliers per bot, pool sizes by bet type, and betting window.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

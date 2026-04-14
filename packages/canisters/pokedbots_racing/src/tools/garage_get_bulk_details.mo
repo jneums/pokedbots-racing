@@ -17,7 +17,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_get_bulk_details";
     title = ?"Get Bulk Bot Details";
-    description = ?"Get details for up to 20 PokedBots at once. Returns battery, condition, overcharge, activity status, recommended action, race readiness, rating, and race class for each owned bot.\n\n**USE CASE:** Fleet management dashboard - check all your bots in one call instead of querying each individually.\n\n**OWNERSHIP:** Only returns details for bots you own. Non-owned bots are skipped and listed in the errors array.\n\n**FIELD FILTER:** Optionally pass a 'fields' array to limit output (e.g. [\"condition\", \"activity\", \"recommendation\"]). Available fields: condition, activity, recommendation, stats, career, rating.\n\nFor full details on a single bot (upgrade costs, terrain bonuses, etc.), use garage_get_robot_details.";
+    description = ?"Get details for up to 20 bots at once: battery, condition, activity, recommended action, race readiness. Only returns bots you own. Pass 'fields' array to limit output.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

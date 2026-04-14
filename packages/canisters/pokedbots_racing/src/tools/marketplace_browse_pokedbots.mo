@@ -19,7 +19,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "browse_pokedbots";
     title = ?"Browse PokedBots Marketplace";
-    description = ?"Browse available PokedBots NFTs for sale with detailed stats. Filter by faction, min/max rating, or proven winners. Sort by price, rating, or win rate. Returns 5 listings per page.";
+    description = ?"Browse PokedBots NFTs for sale. Filter by faction, rating, or proven winners. Sort by price, rating, or win rate. Returns 5 per page.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

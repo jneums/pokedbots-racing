@@ -9,7 +9,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_start_activity";
     title = ?"Send Bot to Zone";
-    description = ?"Send your PokedBot to a zone for an activity. This is the universal \"dispatch\" tool covering scavenging zones (ScrapHeaps, AbandonedSettlements, DeadMachineFields), maintenance (RepairBay), and power (ChargingStation).\n\nThis is the preferred name for garage_start_scavenging (which remains as a backwards-compatible alias).\n\nSee garage_start_scavenging for full zone details and accumulation rates.";
+    description = ?"Send a PokedBot to a zone. Scavenging zones (ScrapHeaps, AbandonedSettlements, DeadMachineFields) earn parts but drain battery/condition. RepairBay restores condition for free. ChargingStation restores battery for free. Continuous mode accumulates rewards every 15 min. Timed mode auto-returns. Bot dies at 0 battery or 0 condition and loses pending rewards. Use help_get_compendium for zone rates, faction bonuses, and world buff mechanics.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

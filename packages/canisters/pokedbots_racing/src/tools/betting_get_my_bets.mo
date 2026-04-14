@@ -17,7 +17,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "betting_get_my_bets";
     title = ?"Get My Betting History";
-    description = ?"View your betting history including active bets, settled bets, and performance stats.\n\n**INFORMATION PROVIDED:**\n• All your bets (active and settled)\n• Bet status (Pending, Won, Lost, Refunded)\n• Actual payouts for won bets\n• Return on investment (ROI) for each bet\n• Total performance metrics\n\n**BET STATUSES:**\n• Pending: Race hasn't started yet, bet is active\n• Active: Race in progress\n• Won: Bot finished in winning position, payout issued\n• Lost: Bot didn't finish in winning position\n• Refunded: Race cancelled or special circumstances\n\n**USE CASES:**\n• Track active bets\n• Review past performance\n• Calculate total profit/loss\n• See which bet types work best for you";
+    description = ?"View your betting history: active bets, settled results, payouts, and ROI. Status: Pending, Active, Won, Lost, Refunded.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

@@ -21,7 +21,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "betting_place_bet";
     title = ?"Place Bet on Race";
-    description = ?"Place a bet on a PokedBot in an upcoming race. Bets are paid via ICRC-2 approval (same approval as race entry fees). You can bet on Win (1st place), Place (top 3), or Show (top 5).\n\n**BET TYPES:**\n• Win: Bot finishes 1st place (higher payout, higher risk)\n• Place: Bot finishes in top 3 (medium payout, medium risk)\n• Show: Bot finishes in top 5 (lower payout, lower risk)\n\n**BETTING LIMITS:**\n• Minimum bet: 0.1 ICP per bet\n• Maximum bet: 100 ICP per bet\n• Maximum total: 100 ICP per race (across all bet types)\n\n**BETTING WINDOW:**\n• Opens when race registration closes (1 hour before race)\n• Closes when race starts\n• Check pool status before betting\n\n**PAYOUT SYSTEM:**\n• Pari-mutuel: Pool-based betting with proportional payouts\n• 10% rake: 8% added to race prize pool, 2% to platform\n• Automatic payouts: Winners receive ICP automatically after race settlement\n• Live odds: View current odds with betting_get_pool_info\n\n**REQUIREMENTS:**\n• Must approve racing canister for ICP transfers (ICRC-2)\n• Same approval covers both racing entry fees and betting\n• Bot must be entered in the race\n• Pool must be open for betting";
+    description = ?"Bet on a bot in an upcoming race via ICRC-2. Types: Win (1st), Place (top 3), Show (top 5). Min 0.1 ICP, max 100 ICP per bet. Pari-mutuel payouts with 10% rake. Betting opens after registration closes and ends at race start.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

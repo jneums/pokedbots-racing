@@ -15,7 +15,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_get_bot_names";
     title = ?"Get Bot Names";
-    description = ?"Lookup bot names for multiple token indices. Returns the custom name (if set) or a formatted display name for each bot. Perfect for enriching race results, leaderboards, or news articles with recognizable bot identities instead of raw token numbers.\n\n**NO AUTHENTICATION REQUIRED** - Bot names are public information.\n\n**INPUT:** Array of token indices (max 50 per request)\n\n**OUTPUT:** Array of bot identity objects with:\n- `token_index`: The bot's token ID\n- `name`: Custom name if set, otherwise 'Bot #XXXX'\n- `display_name`: Always formatted as 'Name (Bot #XXXX)' for clarity\n- `faction`: Bot's faction if initialized\n- `faction_icon`: Emoji icon for the faction\n\n**USAGE TIPS:**\n- Use this before writing race recaps to replace token numbers with names\n- Batch multiple lookups into a single request for efficiency\n- Display names include both custom name and token ID for context";
+    description = ?"Look up display names and factions for multiple bots by token index (max 50). No authentication required. Returns custom name or 'Bot #XXXX' format.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

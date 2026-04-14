@@ -17,7 +17,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "betting_list_pools";
     title = ?"List Betting Pools";
-    description = ?"List betting pools for races. Filter by pool status (Open, Closed, Settled) or race class. Shows current pool sizes, entrants, and betting deadlines.\n\n**POOL STATUSES:**\n• Open: Currently accepting bets (between registration close and race start)\n• Closed: Race in progress, no more bets accepted\n• Settled: Race completed, payouts distributed\n• Pending: Pool created but betting not yet open\n\n**USE CASES:**\n• Find races to bet on (status=Open)\n• Check completed races for results (status=Settled)\n• Monitor pool sizes and participation\n• View betting opportunities by race class";
+    description = ?"List betting pools. Filter by status (Open, Closed, Settled, Pending) or race class. Shows pool sizes and betting deadlines.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

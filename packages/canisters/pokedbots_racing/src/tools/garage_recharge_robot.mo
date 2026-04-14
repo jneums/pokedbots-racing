@@ -26,7 +26,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_recharge_robot";
     title = ?"Recharge Robot Battery";
-    description = ?"Recharge robot battery. Costs 0.1 ICP + 0.0001 fee. Restores 50-90 battery (RNG-based). Does NOT restore condition (use garage_repair_robot). 2hr cooldown. Requires ICRC-2 approval.\n\n**BATTERY RECHARGE:**\n• Base recharge: 70 battery\n• RNG variance: ±20 battery (50-90 range)\n• Cannot predict exact amount - waiting for 0% is risky!\n\n**RESONANCE SYSTEM:**\n• Each bot has a hidden 'resonance field' that determines optimal recharge points\n• Resonance drifts slowly over time (~weekly cycle)\n• Peak Zone: Maximum overcharge bonus!\n• Good Zone: 80% of max overcharge\n• Outside Resonance: 60% of max overcharge (baseline)\n• Optimal points are unique per bot and hidden - experiment to discover patterns!\n\n**OVERCHARGE MECHANIC:**\n• Base overcharge: (100 - battery) × 0.4, modified by resonance\n• MCP cap: 25% max (UI gets up to 40%)\n• Condition + RNG affect efficiency\n• Overcharge consumed in next race for stat boost:\n  - Speed: +0.25% per 1% overcharge\n  - Acceleration: +0.25% per 1% overcharge\n  - Stability: -0.133% per 1% overcharge (negated by Perfect Tune-Up)\n  - Power Core: -0.133% per 1% overcharge (negated by Perfect Tune-Up)\n• ⚠️ REPAIR RESETS OVERCHARGE unless you achieve Perfect Tune-Up";
+    description = ?"Recharge bot battery (0.1 ICP). Restores 50-90 battery (RNG). 2hr cooldown. Does NOT restore condition. Generates overcharge based on resonance field. Requires ICRC-2 approval. Use help_get_compendium for resonance/overcharge mechanics.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

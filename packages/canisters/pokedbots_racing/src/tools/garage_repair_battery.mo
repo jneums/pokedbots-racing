@@ -13,7 +13,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_repair_battery";
     title = ?"Repair Battery (Deprecated)";
-    description = ?"**DEPRECATED**: Health-based repair has been removed. Batteries now degrade based on cycles only.\n\n**NEW SYSTEM:**\n• Cycles increase with each jolt\n• Capacity decreases as cycles increase (realistic degradation curve)\n• At 250+ cycles, capacity reaches 0% and battery is dead\n• Use **garage_rebuild_battery** to reset cycles and restore full capacity\n\nThis tool will return an error directing you to use rebuild instead.";
+    description = ?"Deprecated — health-based battery repair removed. Batteries degrade by cycles only. Use garage_rebuild_battery to reset cycles.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),

@@ -13,7 +13,7 @@ module {
   public func config() : McpTypes.Tool = {
     name = "garage_get_station_status";
     title = ?"Garage Station Status";
-    description = ?"View the full power grid, charging station, and repair bay status of your garage.\n\n**POWER GRID:**\nShows total capacity (base + SMR reactors), current draw, surplus, and efficiency.\n\n**CHARGING STATION:**\nShows how many bots are currently charging and the effective watts per bot.\nMore bots charging = lower efficiency (shared power).\n\n**REPAIR BAYS:**\nShows all repair bay slots (up to 5), their tier, current occupant, and power draw.\nHigher tier bays repair faster but draw more power.\n\n**BATTERIES:**\nShows surplus watts available for passive battery charging.";
+    description = ?"View your garage power grid, charging station, and repair bay status. Shows capacity, current draw, efficiency, and slot occupancy.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
