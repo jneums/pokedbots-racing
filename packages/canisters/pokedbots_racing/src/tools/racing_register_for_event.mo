@@ -28,7 +28,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("event_id", Json.obj([("type", Json.str("number")), ("description", Json.str("The event ID to register for"))])), ("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Your PokedBot's token index"))])), ("skip_if_registered", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: If true, returns success with registration details when bot is already registered instead of an error. Useful for automation fire-and-forget patterns."))]))])),
+      ("properties", Json.obj([("event_id", Json.obj([("type", Json.str("number")), ("description", Json.str("The event ID to register for"))])), ("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Your PokedBot's token index"))]))])),
       ("required", Json.arr([Json.str("event_id"), Json.str("token_index")])),
     ]);
     outputSchema = null;
@@ -65,11 +65,6 @@ module {
         case (?idx) { idx };
       };
 
-      let skipIfRegistered = switch (Result.toOption(Json.getAsBool(_args, "skip_if_registered"))) {
-        case (?b) { b };
-        case (null) { false };
-      };
-
       // Get event
       let event = switch (ctx.eventCalendar.getEvent(eventId)) {
         case (null) {
@@ -80,38 +75,39 @@ module {
 
       let now = Time.now();
 
-      // Idempotent registration check - if skip_if_registered is true,
-      // return success with existing registration details instead of erroring
-      if (skipIfRegistered) {
-        let existingReg = Array.find<RaceCalendar.EventRegistration>(
-          event.registrations,
-          func(reg : RaceCalendar.EventRegistration) : Bool {
-            reg.tokenIndex == tokenIndex and Principal.equal(reg.owner, user);
-          },
-        );
-        switch (existingReg) {
-          case (?reg) {
-            let classText = switch (reg.raceClass) {
-              case (#Scrap) { "Scrap" };
-              case (#Junker) { "Junker" };
-              case (#Raider) { "Raider" };
-              case (#Elite) { "Elite" };
-              case (#SilentKlan) { "Silent Klan" };
-            };
-            let response = Json.obj([
-              ("already_registered", Json.bool(true)),
-              ("message", Json.str("✅ Bot #" # Nat.toText(tokenIndex) # " is already registered for event #" # Nat.toText(eventId))),
+      // Check for duplicate event registration — always return structured error
+      // with full registration context so automation can inspect existing registration
+      let existingReg = Array.find<RaceCalendar.EventRegistration>(
+        event.registrations,
+        func(reg : RaceCalendar.EventRegistration) : Bool {
+          reg.tokenIndex == tokenIndex and Principal.equal(reg.owner, user);
+        },
+      );
+      switch (existingReg) {
+        case (?reg) {
+          let classText = switch (reg.raceClass) {
+            case (#Scrap) { "Scrap" };
+            case (#Junker) { "Junker" };
+            case (#Raider) { "Raider" };
+            case (#Elite) { "Elite" };
+            case (#SilentKlan) { "Silent Klan" };
+          };
+          return ToolContext.makeStructuredError(
+            "ALREADY_REGISTERED",
+            "Bot #" # Nat.toText(tokenIndex) # " is already registered for event #" # Nat.toText(eventId),
+            false,
+            [
               ("event_id", Json.int(eventId)),
               ("event_name", Json.str(event.metadata.name)),
               ("token_index", Json.int(tokenIndex)),
               ("race_class", Json.str(classText)),
               ("registered_at", Json.int(reg.registeredAt)),
               ("entry_fee_paid_e8s", Json.int(reg.entryFeePaid)),
-            ]);
-            return ToolContext.makeSuccess(response, cb);
-          };
-          case (null) {}; // Not registered, continue with normal flow
+            ],
+            cb,
+          );
         };
+        case (null) {}; // Not registered, continue with normal flow
       };
 
       // Get bot stats and verify ownership

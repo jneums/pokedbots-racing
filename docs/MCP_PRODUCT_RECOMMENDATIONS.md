@@ -43,23 +43,36 @@ idempotent registration with clearer status.
 
 ## 1. Easy Wins
 
-### 1a. Idempotent Event Registration
+### 1a. Consistent Duplicate Registration Errors
 
 **Tool:** `racing_register_for_event`  
 **Current behavior:** Returns error text like "already registered" if bot is in event.  
-**Proposed:** Add `skip_if_registered: bool` (default false for backward compat).
+**Implemented:** Duplicate registration ALWAYS returns a structured error:
 
-When true and bot already registered:
-- Return success with `already_registered: true`, `registration_id`, `event_id`,
-  `token_index`, `registered_at`
-- No payment attempted, no error thrown
-- Automation can fire-and-forget without try/catch
+```
+{
+  "isError": true,
+  "error_code": "ALREADY_REGISTERED",
+  "message": "Bot #42 is already registered for event #7",
+  "event_id": 7,
+  "event_name": "Friday Night Rumble",
+  "token_index": 42,
+  "race_class": "Junker",
+  "registered_at": 1713052800000000000,
+  "entry_fee_paid_e8s": 150000
+}
+```
 
-**Where to change:** `racing_register_for_event.mo` — add param parsing, add an
-early check against `ctx.calendar.getRegistrations(eventId)` before payment flow.
+- `isError: true` always — no ambiguous success-shaped duplicates
+- Full registration context always included — automation can inspect without a second call
+- No `skip_if_registered` parameter needed — the structured error IS the idempotent response
+- No payment attempted on duplicate — early exit before ICRC-2 flow
+
+**Where changed:** `racing_register_for_event.mo` — early check against
+`event.registrations` before ownership/payment flow. Uses `makeStructuredError`.
 
 **Effort:** ~30 lines. No new canister methods needed — registration lookup already
-exists in the handler's duplicate check.
+exists in the event object.
 
 ---
 
@@ -451,7 +464,6 @@ Accept common aliases without breaking existing consumers:
 |--------------------------|---------------|--------------------|
 | garage_start_scavenging  | zone          | location_type      |
 | garage_start_scavenging  | zone          | location           |
-| racing_register_for_event| (n/a)         | skip_if_registered |
 
 Implementation: In input parsing, check alias first, fall back to canonical.
 One-line change per alias.
