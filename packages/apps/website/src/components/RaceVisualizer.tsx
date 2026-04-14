@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause, RotateCcw, FastForward, SkipForward, Radio, PlayCircle, Zap, Trophy, TrendingUp, TrendingDown, Users, AlertTriangle, Sparkles } from 'lucide-react';
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
-import {  useGetBotProfilesBatch } from '@/hooks/useRacing';
+import {  useGetBotProfilesBatch, useGetRaceSegments } from '@/hooks/useRacing';
+import type { BotSegmentTimes } from '@/hooks/useRacing';
 
 
 // Component to fetch all bot names at once using batch endpoint
@@ -1524,6 +1525,9 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
   
   // Memoize bot IDs for name fetching
   const botIds = useMemo(() => results.map(r => r.nftId), [results]);
+
+  // Fetch backend segment data for deterministic replay (completed races only)
+  const { data: backendSegments } = useGetRaceSegments(raceId ?? null);
   
   // Pre-calculate segment times for all bots WITH SLIPSTREAM (memoized)
   // Must simulate segment-by-segment for all bots simultaneously to match backend
@@ -1532,6 +1536,32 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     
     // Get track info
     const track = TRACK_TEMPLATES[trackId] || { segments: [], laps: 1 };
+
+    // Use backend segment data when available (deterministic replay)
+    if (backendSegments && backendSegments.length > 0 && track.segments.length > 0) {
+      const totalSegments = track.segments.length * track.laps;
+      for (const bot of backendSegments) {
+        const segments: SegmentTime[] = [];
+        let cumulativeDistance = 0;
+        for (let i = 0; i < bot.segmentTimes.length && i < totalSegments; i++) {
+          const segIdx = i % track.segments.length;
+          const segLength = track.segments[segIdx].length;
+          cumulativeDistance += segLength;
+          const cumulativeTime = bot.segmentTimes[i];
+          const prevTime = i > 0 ? bot.segmentTimes[i - 1] : 0;
+          segments.push({
+            segmentIndex: i,
+            time: cumulativeTime - prevTime,
+            cumulativeTime,
+            distance: segLength,
+            cumulativeDistance,
+          });
+        }
+        map.set(bot.nftId, segments);
+      }
+      return map;
+    }
+
     if (track.segments.length === 0) {
       // No track data, fall back to simple calculation
       results.forEach((result) => {
@@ -1804,7 +1834,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
     });
     
     return map;
-  }, [results, trackId, trackSeed, bonusesAlreadyApplied, botOrder, terrain, distance, raceCreatedAt, overridePhenomenon]);
+  }, [results, trackId, trackSeed, bonusesAlreadyApplied, botOrder, terrain, distance, raceCreatedAt, overridePhenomenon, backendSegments]);
   
   // Find the slowest NON-DNF finisher
   // CRITICAL: Use BACKEND times (results[x].finalTime) when available, as these determine

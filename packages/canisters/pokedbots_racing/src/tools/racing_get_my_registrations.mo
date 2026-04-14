@@ -18,11 +18,20 @@ module {
   public func config() : McpTypes.Tool = {
     name = "racing_get_my_registrations";
     title = ?"Get My Event Registrations";
-    description = ?"Get all your event registrations across all your bots. Shows which bots are registered for which upcoming events, with event details and timing information. Useful for maintenance scripts to know when to prepare bots for racing.\n\n**RETURNS:**\n• List of your registered bots per event\n• Event start times and status\n• Race IDs (if races have been created)\n• Time until event starts";
+    description = ?"Get all your event registrations across all your bots. Shows which bots are registered for which upcoming events, with event details and timing information.\n\n**⚠️ AUTOMATION NOTE:** Use `only_actionable: true` for scripts/automation — it filters out stale entries stuck in open status from long-past events. Without filters, raw results may include historical noise.\n\n**RETURNS:**\n• List of your registered bots per event\n• Event start times and status\n• Race IDs (if races have been created)\n• Time until event starts";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Filter to registrations for a specific bot"))])), ("event_id", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Filter to a specific event"))])), ("include_completed", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Include completed events (default: false)"))]))])),
+      ("properties", Json.obj([
+        ("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Filter to registrations for a specific bot"))])),
+        ("event_id", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Filter to a specific event"))])),
+        ("include_completed", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Include completed events (default: false)"))])),
+        ("only_upcoming", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show events that are genuinely upcoming — status is Announced/RegistrationOpen/InProgress AND scheduledTime is not more than 24h in the past. Filters out stale events stuck in open status. (default: false)"))])),
+        ("only_actionable", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Best filter for automation. Only events where action is still possible: upcoming events not yet started, or currently in progress. Excludes completed, cancelled, and any event whose scheduledTime is more than 24h in the past regardless of status. (default: false)"))])),
+        ("status", Json.obj([("type", Json.str("string")), ("description", Json.str("Optional: Filter by exact event status. One of: Announced, RegistrationOpen, RegistrationClosed, InProgress, Completed, Cancelled"))])),
+        ("exclude_stale", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Exclude events that are stale — completed/cancelled older than 7 days, OR any status but scheduledTime more than 7 days in the past. Catches events stuck in open status from long-past dates. (default: false)"))])),
+        ("event_start_after", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Only include events with scheduledTime >= this nanosecond timestamp"))])),
+      ])),
     ]);
     outputSchema = null;
   };
@@ -47,6 +56,23 @@ module {
         case (?b) { b };
         case (null) { false };
       };
+      let onlyUpcoming = switch (Result.toOption(Json.getAsBool(_args, "only_upcoming"))) {
+        case (?b) { b };
+        case (null) { false };
+      };
+      let onlyActionable = switch (Result.toOption(Json.getAsBool(_args, "only_actionable"))) {
+        case (?b) { b };
+        case (null) { false };
+      };
+      let statusFilter = Result.toOption(Json.getAsText(_args, "status"));
+      let excludeStale = switch (Result.toOption(Json.getAsBool(_args, "exclude_stale"))) {
+        case (?b) { b };
+        case (null) { false };
+      };
+      let eventStartAfter = Result.toOption(Json.getAsNat(_args, "event_start_after"));
+
+      let sevenDaysNanos : Int = 7 * 24 * 3_600_000_000_000;
+      let oneDayNanos : Int = 24 * 3_600_000_000_000;
 
       // Get all events
       let allEvents = ctx.eventCalendar.getAllEvents();
@@ -67,9 +93,58 @@ module {
       var registrations : [RegistrationInfo] = [];
 
       for (event in allEvents.vals()) {
+        let eventAge : Int = now - event.scheduledTime; // positive = past
+
         // Skip completed events unless requested
         if (not includeCompleted and (event.status == #Completed or event.status == #Cancelled)) {
           // Skip
+        }
+        // only_actionable: strictest automation filter — only events where user can still act
+        // Excludes: completed, cancelled, and anything whose scheduledTime is >24h in the past
+        else if (onlyActionable and (
+          event.status == #Completed or event.status == #Cancelled or eventAge > oneDayNanos
+        )) {
+          // Skip non-actionable
+        }
+        // only_upcoming: status-based + time check — filters stale open-status events
+        else if (onlyUpcoming and not (
+          (event.status == #Announced or event.status == #RegistrationOpen or event.status == #InProgress) and eventAge < oneDayNanos
+        )) {
+          // Skip non-upcoming (wrong status OR scheduled time >24h in past)
+        }
+        // status: exact status match
+        else if (
+          switch (statusFilter) {
+            case (?s) {
+              let eventStatusText = switch (event.status) {
+                case (#Announced) { "Announced" };
+                case (#RegistrationOpen) { "RegistrationOpen" };
+                case (#RegistrationClosed) { "RegistrationClosed" };
+                case (#InProgress) { "InProgress" };
+                case (#Completed) { "Completed" };
+                case (#Cancelled) { "Cancelled" };
+              };
+              eventStatusText != s;
+            };
+            case (null) { false };
+          }
+        ) {
+          // Skip status mismatch
+        }
+        // exclude_stale: drop events that are clearly stale
+        // - completed/cancelled older than 7 days
+        // - ANY status with scheduledTime more than 7 days in the past (catches stuck-open events)
+        else if (excludeStale and eventAge > sevenDaysNanos) {
+          // Skip stale
+        }
+        // event_start_after: nanosecond timestamp floor
+        else if (
+          switch (eventStartAfter) {
+            case (?ts) { event.scheduledTime < ts }; // Nat auto-coerces to Int in comparison
+            case (null) { false };
+          }
+        ) {
+          // Skip events before timestamp floor
         } else {
           // Apply event filter if specified
           let eventMatches = switch (eventIdFilter) {

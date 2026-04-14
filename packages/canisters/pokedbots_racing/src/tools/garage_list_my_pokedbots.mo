@@ -14,7 +14,9 @@ import Json "mo:json";
 import ToolContext "./ToolContext";
 import ExtIntegration "../ExtIntegration";
 import RacingSimulator "../RacingSimulator";
+import RaceCalendar "../RaceCalendar";
 import RaceClassUtils "../RaceClassUtils";
+import Principal "mo:base/Principal";
 
 module {
   let RECHARGE_COOLDOWN : Int = 21600000000000; // 6 hours in nanoseconds
@@ -26,7 +28,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("only_starred", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots you've marked as favorites"))])), ("only_racers", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots you've tagged as racers"))])), ("only_scavengers", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots you've tagged as scavengers"))])), ("only_scavenging", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots currently on scavenging missions"))])), ("only_in_races", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots currently entered in races"))])), ("only_ready", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots ready to race (battery ≥ 30%, condition ≥ 50%, not in active missions)"))]))])),
+      ("properties", Json.obj([("only_starred", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots you've marked as favorites"))])), ("only_racers", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots you've tagged as racers"))])), ("only_scavengers", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots you've tagged as scavengers"))])), ("only_scavenging", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots currently on scavenging missions"))])), ("only_in_races", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots currently entered in races"))])), ("only_ready", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots ready to race (battery ≥ 30%, condition ≥ 50%, not in active missions)"))])), ("min_battery", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Minimum battery percentage (0-100). Only show bots with battery >= this value."))])), ("min_condition", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Minimum condition percentage (0-100). Only show bots with condition >= this value."))])), ("only_idle", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots that are idle (not scavenging, not in race, not upgrading)"))])), ("only_not_registered", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Only show bots not registered for any upcoming event"))]))])),
     ]);
     outputSchema = null;
   };
@@ -54,6 +56,10 @@ module {
       let onlyScavenging = Result.toOption(Json.getAsBool(_args, "only_scavenging"));
       let onlyInRaces = Result.toOption(Json.getAsBool(_args, "only_in_races"));
       let onlyReady = Result.toOption(Json.getAsBool(_args, "only_ready"));
+      let minBattery = Result.toOption(Json.getAsNat(_args, "min_battery"));
+      let minCondition = Result.toOption(Json.getAsNat(_args, "min_condition"));
+      let onlyIdle = Result.toOption(Json.getAsBool(_args, "only_idle"));
+      let onlyNotRegistered = Result.toOption(Json.getAsBool(_args, "only_not_registered"));
 
       // Get user's preference lists
       let starredBots = ctx.getUserStarredBots(userPrincipal);
@@ -242,6 +248,84 @@ module {
           );
         };
 
+        // Filter by minimum battery
+        switch (minBattery) {
+          case (?threshold) {
+            filteredBots := Array.filter(
+              filteredBots,
+              func(bot : { tokenIndex : Nat }) : Bool {
+                switch (ctx.garageManager.getStats(bot.tokenIndex)) {
+                  case (?stats) { stats.battery >= threshold };
+                  case (null) { false };
+                };
+              },
+            );
+          };
+          case (null) {};
+        };
+
+        // Filter by minimum condition
+        switch (minCondition) {
+          case (?threshold) {
+            filteredBots := Array.filter(
+              filteredBots,
+              func(bot : { tokenIndex : Nat }) : Bool {
+                switch (ctx.garageManager.getStats(bot.tokenIndex)) {
+                  case (?stats) { stats.condition >= threshold };
+                  case (null) { false };
+                };
+              },
+            );
+          };
+          case (null) {};
+        };
+
+        // Filter by idle status (not scavenging, not in race, not upgrading)
+        if (Option.get(onlyIdle, false)) {
+          filteredBots := Array.filter(
+            filteredBots,
+            func(bot : { tokenIndex : Nat }) : Bool {
+              switch (ctx.garageManager.getStats(bot.tokenIndex)) {
+                case (?stats) {
+                  let notScavenging = Option.isNull(stats.activeMission);
+                  let notInRace = not ctx.isInActiveRace(bot.tokenIndex);
+                  let notUpgrading = Option.isNull(ctx.garageManager.getActiveUpgrade(bot.tokenIndex));
+                  notScavenging and notInRace and notUpgrading;
+                };
+                case (null) { false };
+              };
+            },
+          );
+        };
+
+        // Filter by not registered for any upcoming event
+        if (Option.get(onlyNotRegistered, false)) {
+          let allEvents = ctx.eventCalendar.getAllEvents();
+          let now = Time.now();
+          filteredBots := Array.filter(
+            filteredBots,
+            func(bot : { tokenIndex : Nat }) : Bool {
+              // Check if bot is registered for any upcoming/open event
+              for (event in allEvents.vals()) {
+                switch (event.status) {
+                  case (#Completed) {};
+                  case (#Cancelled) {};
+                  case _ {
+                    if (event.scheduledTime > now) {
+                      for (reg in event.registrations.vals()) {
+                        if (reg.tokenIndex == bot.tokenIndex) {
+                          return false; // Bot is registered for an upcoming event
+                        };
+                      };
+                    };
+                  };
+                };
+              };
+              true; // Not registered for any upcoming event
+            },
+          );
+        };
+
         msg #= "Found " # Nat.toText(filteredBots.size()) # " PokedBot(s)";
         if (filteredBots.size() != ownerBots.size()) {
           msg #= " (filtered from " # Nat.toText(ownerBots.size()) # " total)";
@@ -338,10 +422,69 @@ module {
 
               // Show condition
               msg #= "   🔋 Battery: " # Nat32.toText(Nat32.fromNat(stats.battery)) # "%";
-              msg #= " | 🔧 Condition: " # Nat32.toText(Nat32.fromNat(stats.condition)) # "%\n";
+              msg #= " | 🔧 Condition: " # Nat32.toText(Nat32.fromNat(stats.condition)) # "%";
+              // Annotate with meets_thresholds if custom min_battery/min_condition were requested
+              switch (minBattery, minCondition) {
+                case (?mb, ?mc) {
+                  msg #= " ✅ (meets min_battery=" # Nat.toText(mb) # ", min_condition=" # Nat.toText(mc) # ")";
+                };
+                case (?mb, null) {
+                  msg #= " ✅ (meets min_battery=" # Nat.toText(mb) # ")";
+                };
+                case (null, ?mc) {
+                  msg #= " ✅ (meets min_condition=" # Nat.toText(mc) # ")";
+                };
+                case (null, null) {};
+              };
+              msg #= "\n";
+
+              // Maintenance recommendation
+              let now = Time.now();
+              let repairReady = switch (stats.lastRepaired) {
+                case (?lastTime) { now - lastTime >= REPAIR_COOLDOWN };
+                case (null) { true };
+              };
+              let recommendedAction = if (stats.condition < 50 and repairReady) {
+                "RepairBay";
+              } else if (stats.battery < 30) {
+                "ChargingStation";
+              } else if (stats.condition < 80 and repairReady) {
+                "RepairBay";
+              } else if (stats.battery < 80) {
+                "ChargingStation";
+              } else if (stats.overcharge == 0) {
+                "Jolt";
+              } else {
+                "None";
+              };
+              if (recommendedAction != "None") {
+                msg #= "   💡 Recommended: " # recommendedAction # "\n";
+              };
+
+              // Activity status summary
+              let activityType = switch (stats.activeMission) {
+                case (?mission) {
+                  switch (mission.zone) {
+                    case (#ChargingStation) { "charging ⚡" };
+                    case (#RepairBay) { "repairing 🔧" };
+                    case (#ScrapHeaps) { "scavenging (ScrapHeaps) 🔍" };
+                    case (#AbandonedSettlements) { "scavenging (AbandonedSettlements) 🔍" };
+                    case (#DeadMachineFields) { "scavenging (DeadMachineFields) 🔍" };
+                  };
+                };
+                case (null) {
+                  if (ctx.isInActiveRace(bot.tokenIndex)) { "racing 🏁" }
+                  else {
+                    switch (ctx.garageManager.getActiveUpgrade(bot.tokenIndex)) {
+                      case (?_) { "upgrading ⬆️" };
+                      case (null) { "idle 💤" };
+                    };
+                  };
+                };
+              };
+              msg #= "   📋 Activity: " # activityType # "\n";
 
               // Show scavenging status
-              let now = Time.now();
               switch (stats.activeMission) {
                 case (?mission) {
                   let hoursElapsed = (now - mission.startTime) / (3600 * 1_000_000_000);
@@ -359,7 +502,7 @@ module {
                 case (null) {};
               };
 
-              // Show next race if bot is entered
+              // Show next race/event if bot is entered
               let nftId = Nat.toText(bot.tokenIndex);
               let allRaces = ctx.raceManager.getAllRaces();
               var nextRace : ?RacingSimulator.Race = null;
@@ -420,8 +563,112 @@ module {
                   };
                 };
                 case (null) {
-                  msg #= "   🏁 NEXT RACE: None registered\n";
+                  // No race found in raceManager — check event calendar for registrations
+                  var nextEvent : ?RaceCalendar.ScheduledEvent = null;
+                  let allEvents = ctx.eventCalendar.getAllEvents();
+                  // Grace period: include events that started up to 1 hour ago (may still be active)
+                  let gracePeriod : Int = 3600 * 1_000_000_000;
+
+                  for (event in allEvents.vals()) {
+                    // Skip completed/cancelled events
+                    switch (event.status) {
+                      case (#Completed) {};
+                      case (#Cancelled) {};
+                      case _ {
+                        // Only consider future events, in-progress events, or very recently started ones
+                        let isFutureOrActive = event.scheduledTime > now or
+                          event.status == #InProgress or
+                          (now - event.scheduledTime) < gracePeriod;
+
+                        if (isFutureOrActive) {
+                          // Check if this bot is registered
+                          let isRegistered = Array.find<RaceCalendar.EventRegistration>(
+                            event.registrations,
+                            func(reg) { reg.tokenIndex == bot.tokenIndex and Principal.equal(reg.owner, userPrincipal) },
+                          );
+                          switch (isRegistered) {
+                            case (?_) {
+                              // Found — pick the nearest upcoming event
+                              switch (nextEvent) {
+                                case (null) { nextEvent := ?event };
+                                case (?current) {
+                                  if (event.scheduledTime < current.scheduledTime) {
+                                    nextEvent := ?event;
+                                  };
+                                };
+                              };
+                            };
+                            case (null) {};
+                          };
+                        };
+                      };
+                    };
+                  };
+
+                  switch (nextEvent) {
+                    case (?event) {
+                      let eventStatusText = switch (event.status) {
+                        case (#Announced) { "📢 Announced" };
+                        case (#RegistrationOpen) { "✅ Reg Open" };
+                        case (#RegistrationClosed) { "🔒 Reg Closed" };
+                        case (#InProgress) { "🏎️ In Progress" };
+                        case _ { "" };
+                      };
+                      let timeUntil = event.scheduledTime - now;
+                      let hoursUntil = timeUntil / (3600 * 1_000_000_000);
+                      let minsUntil = (timeUntil % (3600 * 1_000_000_000)) / (60 * 1_000_000_000);
+
+                      if (hoursUntil > 24) {
+                        let daysUntil = hoursUntil / 24;
+                        let remainingHours = hoursUntil % 24;
+                        msg #= "   🏁 NEXT EVENT: " # eventStatusText # " in " # Nat.toText(Int.abs(daysUntil)) # "d " # Nat.toText(Int.abs(remainingHours)) # "h - Event #" # Nat.toText(event.eventId) # " (" # event.metadata.name # ")\n";
+                      } else if (hoursUntil > 0) {
+                        msg #= "   🏁 NEXT EVENT: " # eventStatusText # " in " # Nat.toText(Int.abs(hoursUntil)) # "h " # Nat.toText(Int.abs(minsUntil)) # "m - Event #" # Nat.toText(event.eventId) # " (" # event.metadata.name # ")\n";
+                      } else if (minsUntil > 0) {
+                        msg #= "   🏁 NEXT EVENT: " # eventStatusText # " in " # Nat.toText(Int.abs(minsUntil)) # "m - Event #" # Nat.toText(event.eventId) # " (" # event.metadata.name # ")\n";
+                      } else {
+                        msg #= "   🏁 NEXT EVENT: " # eventStatusText # " - Event #" # Nat.toText(event.eventId) # " (" # event.metadata.name # ")\n";
+                      };
+                    };
+                    case (null) {
+                      msg #= "   🏁 NEXT RACE: None registered\n";
+                    };
+                  };
                 };
+              };
+
+              // Show ALL upcoming event registrations for this bot
+              let allEventsForReg = ctx.eventCalendar.getAllEvents();
+              var registeredEventIds : [Nat] = [];
+              for (evt in allEventsForReg.vals()) {
+                switch (evt.status) {
+                  case (#Completed) {};
+                  case (#Cancelled) {};
+                  case _ {
+                    if (evt.scheduledTime > now or evt.status == #InProgress) {
+                      let isReg = Array.find<RaceCalendar.EventRegistration>(
+                        evt.registrations,
+                        func(reg) { reg.tokenIndex == bot.tokenIndex and Principal.equal(reg.owner, userPrincipal) },
+                      );
+                      switch (isReg) {
+                        case (?_) {
+                          registeredEventIds := Array.append(registeredEventIds, [evt.eventId]);
+                        };
+                        case (null) {};
+                      };
+                    };
+                  };
+                };
+              };
+              if (registeredEventIds.size() > 0) {
+                msg #= "   📅 Registered for: ";
+                var first = true;
+                for (eid in registeredEventIds.vals()) {
+                  if (not first) { msg #= ", " };
+                  msg #= "Event #" # Nat.toText(eid);
+                  first := false;
+                };
+                msg #= "\n";
               };
 
               // Show service cooldowns (using Food faction synergy adjusted cooldown)

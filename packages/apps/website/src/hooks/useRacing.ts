@@ -8,6 +8,7 @@ import {
   getEventWithRaces,
   getEventResults,
   getRaceById,
+  getRaceSegments,
   getBotProfile,
   getBotProfilesBatch,
   getBotRaceHistory,
@@ -15,12 +16,19 @@ import {
   queryRaces,
   registerForEvent,
   unregisterFromEvent,
+  createUserEvent,
+  cancelUserEvent,
+  getMyEvents,
   type ScheduledEvent,
   type Race,
+  type BotSegmentTimes,
+  type UserEventConfig,
+  type EventVisibility,
+  type CreateUserEventParams,
 } from '@pokedbots-racing/ic-js';
 import { useAuth } from './useAuth';
 
-export type { ScheduledEvent, Race };
+export type { ScheduledEvent, Race, BotSegmentTimes, UserEventConfig, EventVisibility, CreateUserEventParams };
 
 /**
  * React Query hook to fetch upcoming race events.
@@ -143,6 +151,19 @@ export const useGetRaceById = (raceId: number | null, isActiveOrImminent: boolea
     },
     enabled: raceId !== null,
     refetchInterval: isActiveOrImminent ? 5000 : 30000, // 5s when race starting/running, 30s otherwise
+  });
+};
+
+/**
+ * React Query hook to fetch per-bot segment times via deterministic replay.
+ * Only fetches for completed races (when raceId is provided).
+ */
+export const useGetRaceSegments = (raceId: number | null) => {
+  return useQuery<BotSegmentTimes[]>({
+    queryKey: ['raceSegments', raceId],
+    queryFn: () => getRaceSegments(raceId!),
+    enabled: raceId !== null,
+    staleTime: Infinity, // Segment data never changes for completed races
   });
 };
 
@@ -312,6 +333,34 @@ export const useRegisterForEvent = () => {
 };
 
 /**
+ * Mutation hook to create a user-created event
+ */
+export const useCreateUserEvent = () => {
+  const queryClient = useQueryClient();
+  const { getAgent } = useAuth();
+  
+  return useMutation({
+    mutationFn: async (config: CreateUserEventParams) => {
+      const agent = getAgent();
+      if (!agent) {
+        throw new Error('Not authenticated');
+      }
+      const result = await createUserEvent(config, agent);
+      if ('err' in result) {
+        throw new Error(result.err);
+      }
+      return result.ok;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['upcomingEvents'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingEventsWithRaces'] });
+      queryClient.invalidateQueries({ queryKey: ['allScheduledEvents'] });
+      queryClient.invalidateQueries({ queryKey: ['myEvents'] });
+    },
+  });
+};
+
+/**
  * Mutation hook to unregister a bot from an event
  */
 export const useUnregisterFromEvent = () => {
@@ -337,5 +386,53 @@ export const useUnregisterFromEvent = () => {
       queryClient.invalidateQueries({ queryKey: ['upcomingEvents'] });
       queryClient.invalidateQueries({ queryKey: ['upcomingEventsWithRaces'] });
     },
+  });
+};
+
+/**
+ * Mutation hook to cancel a user-created event
+ */
+export const useCancelUserEvent = () => {
+  const queryClient = useQueryClient();
+  const { getAgent } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ eventId }: { eventId: number }) => {
+      const agent = getAgent();
+      if (!agent) {
+        throw new Error('Not authenticated');
+      }
+      const result = await cancelUserEvent(eventId, agent);
+      if ('err' in result) {
+        throw new Error(result.err);
+      }
+      return result.ok;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['upcomingEvents'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingEventsWithRaces'] });
+      queryClient.invalidateQueries({ queryKey: ['allScheduledEvents'] });
+      queryClient.invalidateQueries({ queryKey: ['myEvents'] });
+      queryClient.invalidateQueries({ queryKey: ['eventDetails'] });
+    },
+  });
+};
+
+/**
+ * Query hook to fetch events created by the current user
+ */
+export const useGetMyEvents = () => {
+  const { getAgent, isAuthenticated } = useAuth();
+
+  return useQuery<ScheduledEvent[]>({
+    queryKey: ['myEvents'],
+    queryFn: async () => {
+      const agent = getAgent();
+      if (!agent) {
+        throw new Error('Not authenticated');
+      }
+      return getMyEvents(agent);
+    },
+    enabled: isAuthenticated,
   });
 };

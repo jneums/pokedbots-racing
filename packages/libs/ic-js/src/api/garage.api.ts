@@ -2052,3 +2052,288 @@ export const getRepairBayTiers = async (
     buildTimeSeconds: t.buildTimeSeconds,
   }));
 };
+
+// ============= Gear System APIs =============
+
+export interface GearPieceView {
+  gearId: bigint;
+  name: string;
+  description: string;
+  slot: string;
+  rarity: string;
+  category: string;
+  ilvl: number;
+  season: number;
+  terrainTag: string;
+  speedBonus: number;
+  accelerationBonus: number;
+  powerCoreBonus: number;
+  stabilityBonus: number;
+  luckBonus: number;
+  passive: any | null;
+  craftedFrom: bigint[] | null;
+  sourceRaceId: number | null;
+  sourceEventType: string | null;
+  createdAt: bigint;
+  boundToBot: number;
+}
+
+export interface BotLoadoutView {
+  tokenIndex: number;
+  legs: GearPieceView | null;
+  thruster: GearPieceView | null;
+  chassis: GearPieceView | null;
+  gyro: GearPieceView | null;
+  core: GearPieceView | null;
+  module: GearPieceView | null;
+  consumable1: any | null;
+  consumable2: any | null;
+}
+
+export interface GearBonuses {
+  speed: number;
+  acceleration: number;
+  powerCore: number;
+  stability: number;
+  luck: number;
+}
+
+// Helper to extract variant key from Candid variant type
+function variantKey(v: Record<string, null>): string {
+  return Object.keys(v)[0];
+}
+
+// Helper to map raw GearPiece to frontend view
+function mapGearPiece(g: any): GearPieceView {
+  return {
+    gearId: g.gearId,
+    name: g.name,
+    description: g.description,
+    slot: variantKey(g.slot),
+    rarity: variantKey(g.rarity),
+    category: variantKey(g.category),
+    ilvl: Number(g.ilvl),
+    season: Number(g.season),
+    terrainTag: variantKey(g.terrainTag),
+    speedBonus: Number(g.speedBonus),
+    accelerationBonus: Number(g.accelerationBonus),
+    powerCoreBonus: Number(g.powerCoreBonus),
+    stabilityBonus: Number(g.stabilityBonus),
+    luckBonus: Number(g.luckBonus),
+    passive: g.passive.length > 0 ? g.passive[0] : null,
+    craftedFrom: g.craftedFrom.length > 0 ? g.craftedFrom[0] : null,
+    sourceRaceId: g.sourceRaceId.length > 0 ? Number(g.sourceRaceId[0]) : null,
+    sourceEventType: g.sourceEventType.length > 0 ? g.sourceEventType[0] : null,
+    createdAt: g.createdAt,
+    boundToBot: Number(g.boundToBot),
+  };
+}
+
+/**
+ * Get the gear loadout for a specific bot (resolved with full gear pieces)
+ */
+export const getBotGearLoadout = async (
+  tokenIndex: number,
+  identityOrAgent?: IdentityOrAgent
+): Promise<BotLoadoutView> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_get_bot_loadout(BigInt(tokenIndex));
+  return {
+    tokenIndex,
+    legs: result.legs.length > 0 ? mapGearPiece(result.legs[0]) : null,
+    thruster: result.thruster.length > 0 ? mapGearPiece(result.thruster[0]) : null,
+    chassis: result.chassis.length > 0 ? mapGearPiece(result.chassis[0]) : null,
+    gyro: result.gyro.length > 0 ? mapGearPiece(result.gyro[0]) : null,
+    core: result.core.length > 0 ? mapGearPiece(result.core[0]) : null,
+    module: result.module.length > 0 ? mapGearPiece(result.module[0]) : null,
+    consumable1: result.consumable1.length > 0 ? result.consumable1[0] : null,
+    consumable2: result.consumable2.length > 0 ? result.consumable2[0] : null,
+  };
+};
+
+/**
+ * Get all gear pieces owned by the caller
+ */
+export const getPlayerGear = async (
+  identityOrAgent: IdentityOrAgent
+): Promise<GearPieceView[]> => {
+  const actor = await getActor(identityOrAgent);
+  // We need the caller's principal - get it from the identity
+  let principal: Principal;
+  if (isPlugAgent(identityOrAgent)) {
+    principal = await identityOrAgent.getPrincipal();
+  } else {
+    principal = (identityOrAgent as Identity).getPrincipal();
+  }
+  const result = await actor.web_get_player_gear(principal);
+  return result.map(mapGearPiece);
+};
+
+/**
+ * Get a map of gearId → tokenIndex for all equipped gear across all bots
+ */
+export const getGearEquipMap = async (
+  identityOrAgent: IdentityOrAgent
+): Promise<Map<bigint, number>> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_get_gear_equip_map();
+  const map = new Map<bigint, number>();
+  for (const [gearId, botId] of result) {
+    map.set(gearId, Number(botId));
+  }
+  return map;
+};
+
+/**
+ * Get the stat bonuses from gear for a bot
+ */
+export const getGearBonuses = async (
+  tokenIndex: number,
+  identityOrAgent?: IdentityOrAgent
+): Promise<GearBonuses> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_get_gear_bonuses(BigInt(tokenIndex));
+  return {
+    speed: Number(result.speed),
+    acceleration: Number(result.acceleration),
+    powerCore: Number(result.powerCore),
+    stability: Number(result.stability),
+    luck: Number(result.luck),
+  };
+};
+
+/**
+ * Equip a gear piece to a bot
+ */
+export const equipGear = async (
+  tokenIndex: number,
+  gearId: bigint,
+  identityOrAgent: IdentityOrAgent
+): Promise<BotLoadoutView> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_equip_gear(BigInt(tokenIndex), gearId);
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  // Re-fetch loadout to get resolved gear pieces
+  return getBotGearLoadout(tokenIndex, identityOrAgent);
+};
+
+/**
+ * Unequip a gear slot from a bot
+ */
+export const unequipGear = async (
+  tokenIndex: number,
+  slot: string,
+  identityOrAgent: IdentityOrAgent
+): Promise<BotLoadoutView> => {
+  const actor = await getActor(identityOrAgent);
+  const slotVariant = { [slot]: null } as any;
+  const result = await actor.web_unequip_gear(BigInt(tokenIndex), slotVariant);
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  return getBotGearLoadout(tokenIndex, identityOrAgent);
+};
+
+/**
+ * Craft 3 gear pieces into a new one
+ */
+export const craftGear = async (
+  tokenIndex: number,
+  gearIds: bigint[],
+  identityOrAgent: IdentityOrAgent
+): Promise<GearPieceView> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_craft_gear(BigInt(tokenIndex), gearIds);
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  return mapGearPiece(result.ok);
+};
+
+// ============= Consumable APIs =============
+
+export interface ConsumableView {
+  instanceId: bigint;
+  name: string;
+  description: string;
+  consumableId: string;
+  rarity: string;
+  ilvl: number;
+  triggerType: string;
+  effect: any;
+  createdAt: bigint;
+}
+
+function mapConsumable(inst: any): ConsumableView {
+  const ct = inst.consumableType;
+  return {
+    instanceId: inst.instanceId,
+    name: ct.name,
+    description: ct.description,
+    consumableId: ct.consumableId,
+    rarity: variantKey(ct.rarity),
+    ilvl: Number(ct.ilvl),
+    triggerType: variantKey(ct.trigger),
+    effect: ct.effect,
+    createdAt: inst.createdAt,
+  };
+}
+
+/**
+ * Get all consumables owned by the caller
+ */
+export const getPlayerConsumables = async (
+  identityOrAgent: IdentityOrAgent
+): Promise<ConsumableView[]> => {
+  const actor = await getActor(identityOrAgent);
+  let principal: Principal;
+  if (isPlugAgent(identityOrAgent)) {
+    principal = await identityOrAgent.getPrincipal();
+  } else {
+    principal = (identityOrAgent as Identity).getPrincipal();
+  }
+  const result = await actor.web_get_player_consumables(principal);
+  return result.map(mapConsumable);
+};
+
+/**
+ * Equip a consumable to a bot (slot 1 or 2)
+ */
+export const equipConsumable = async (
+  tokenIndex: number,
+  instanceId: bigint,
+  slot: number,
+  identityOrAgent: IdentityOrAgent
+): Promise<BotLoadoutView> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_equip_consumable(
+    BigInt(tokenIndex),
+    instanceId,
+    BigInt(slot),
+  );
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  return getBotGearLoadout(tokenIndex, identityOrAgent);
+};
+
+/**
+ * Unequip a consumable from a bot (slot 1 or 2)
+ */
+export const unequipConsumable = async (
+  tokenIndex: number,
+  slot: number,
+  identityOrAgent: IdentityOrAgent
+): Promise<BotLoadoutView> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await actor.web_unequip_consumable(
+    BigInt(tokenIndex),
+    BigInt(slot),
+  );
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  return getBotGearLoadout(tokenIndex, identityOrAgent);
+};

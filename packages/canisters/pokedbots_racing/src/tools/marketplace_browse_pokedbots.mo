@@ -110,8 +110,8 @@ module {
               // Build response with stats
               let response : McpTypes.JsonValue = switch (racingStats) {
                 case (?stats) {
-                  // Bot has racing history
-                  let rating = context.garageManager.calculateOverallRating(stats);
+                  // Bot has racing history - use rating at 100% (no gear/buffs/penalties)
+                  let rating = context.garageManager.calculateRatingAt100(stats);
                   let winRate = if (stats.racesEntered > 0) {
                     Float.fromInt(stats.wins) / Float.fromInt(stats.racesEntered) * 100.0;
                   } else { 0.0 };
@@ -207,7 +207,7 @@ module {
         let statsInfo = switch (racingStats) {
           case (?stats) {
             // Bot has racing history
-            let rating = context.garageManager.calculateOverallRating(stats);
+            let rating = context.garageManager.calculateRatingAt100(stats);
             let winRate = if (stats.racesEntered > 0) {
               Float.fromInt(stats.wins) / Float.fromInt(stats.racesEntered) * 100.0;
             } else { 0.0 };

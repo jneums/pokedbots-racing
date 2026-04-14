@@ -8,6 +8,7 @@ import MarketplacePage from './app/marketplace/page';
 import GaragePage from './app/garage/page';
 import SchedulePage from './app/schedule/page';
 import EventDetailsPage from './app/schedule/[eventId]/page';
+import CreateEventPage from './app/schedule/create/page';
 import LeaderboardPage from './app/leaderboard/page';
 import BettingPage from './app/betting/page';
 import SimulatorPage from './app/simulator/page';
@@ -146,6 +147,7 @@ export default function App() {
           <Route path="/marketplace" element={<MarketplacePage />} />
           <Route path="/garage" element={<GaragePage />} />
           <Route path="/schedule" element={<SchedulePage />} />
+          <Route path="/schedule/create" element={<CreateEventPage />} />
           <Route path="/schedule/:eventId" element={<EventDetailsPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/betting" element={<BettingPage />} />

@@ -99,7 +99,9 @@ module {
 
       // Get current stats for cost calculation (V2)
       let currentStats = ctx.garageManager.getCurrentStats(racingStats);
-      let overallRating = ctx.garageManager.calculateOverallRating(racingStats);
+      // Use rating at 100% (base + upgrades only, no gear/buffs/penalties) for cost calculation
+      // This matches main.mo which uses max stats (base + bonus) for upgrade pricing
+      let overallRating = ctx.garageManager.calculateRatingAt100(racingStats);
 
       // Get base stat and current stat value for this upgrade type
       let (baseStat, currentStatValue) = switch (upgradeType) {

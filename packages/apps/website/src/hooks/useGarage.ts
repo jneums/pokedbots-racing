@@ -52,6 +52,18 @@ import {
   upgradeRepairBay,
   completeRepairBayUpgrade,
   getRepairBayTiers,
+  // Gear APIs
+  getBotGearLoadout,
+  getPlayerGear,
+  getGearBonuses,
+  getGearEquipMap,
+  equipGear,
+  unequipGear,
+  craftGear,
+  // Consumable APIs
+  getPlayerConsumables,
+  equipConsumable,
+  unequipConsumable,
   type UpgradeType,
   type PaymentMethod,
   type SMRModelId,
@@ -1228,3 +1240,246 @@ export function useCompleteRepairBayUpgrade() {
 
 // Re-export types for convenience
 export type { BatteryInfo, BatteryStorageSummary, BotHeatStatus, BatteryTypeInfo, RepairBatteryResult, RebuildBatteryResult, ToggleBatteryResult };
+
+// ============= Gear System Hooks =============
+
+import type { GearPieceView, BotLoadoutView, GearBonuses, ConsumableView } from '@pokedbots-racing/ic-js';
+
+/**
+ * Hook to fetch a bot's gear loadout (resolved gear pieces)
+ */
+export function useBotGearLoadout(tokenIndex: number | null) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['bot-gear-loadout', tokenIndex, user?.principal],
+    queryFn: async () => {
+      if (!user?.agent || tokenIndex === null) {
+        throw new Error('Not authenticated or invalid token');
+      }
+      return getBotGearLoadout(tokenIndex, user.agent);
+    },
+    enabled: !!user?.agent && tokenIndex !== null,
+    staleTime: 10 * 1000,
+  });
+}
+
+/**
+ * Hook to fetch all gear owned by the current player
+ */
+export function usePlayerGear() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['player-gear', user?.principal],
+    queryFn: async () => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return getPlayerGear(user.agent);
+    },
+    enabled: !!user?.agent,
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Hook to fetch the gear equip map (gearId → tokenIndex) for all bots
+ */
+export function useGearEquipMap() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['gear-equip-map', user?.principal],
+    queryFn: async () => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return getGearEquipMap(user.agent);
+    },
+    enabled: !!user?.agent,
+    staleTime: 10 * 1000,
+  });
+}
+
+/**
+ * Hook to fetch gear stat bonuses for a bot
+ */
+export function useGearBonuses(tokenIndex: number | null) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['gear-bonuses', tokenIndex, user?.principal],
+    queryFn: async () => {
+      if (!user?.agent || tokenIndex === null) {
+        throw new Error('Not authenticated or invalid token');
+      }
+      return getGearBonuses(tokenIndex, user.agent);
+    },
+    enabled: !!user?.agent && tokenIndex !== null,
+    staleTime: 10 * 1000,
+  });
+}
+
+/**
+ * Hook to equip gear on a bot
+ */
+export function useEquipGear() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ tokenIndex, gearId }: { tokenIndex: number; gearId: bigint }) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return equipGear(tokenIndex, gearId, user.agent);
+    },
+    onSuccess: (_, { tokenIndex }) => {
+      queryClient.invalidateQueries({ queryKey: ['bot-gear-loadout', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['gear-bonuses', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['player-gear'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex], refetchType: 'all' });
+    },
+  });
+}
+
+/**
+ * Hook to unequip a gear slot from a bot
+ */
+export function useUnequipGear() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ tokenIndex, slot }: { tokenIndex: number; slot: string }) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return unequipGear(tokenIndex, slot, user.agent);
+    },
+    onSuccess: (_, { tokenIndex }) => {
+      queryClient.invalidateQueries({ queryKey: ['bot-gear-loadout', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['gear-bonuses', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['player-gear'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['bot-details', tokenIndex], refetchType: 'all' });
+    },
+  });
+}
+
+/**
+ * Hook to craft 3 gear pieces into a new one
+ */
+export function useCraftGear() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ tokenIndex, gearIds }: { tokenIndex: number; gearIds: bigint[] }) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return craftGear(tokenIndex, gearIds, user.agent);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['player-gear'], refetchType: 'all' });
+    },
+  });
+}
+
+// ============= Consumable Hooks =============
+
+/**
+ * Hook to get all consumables owned by the player
+ */
+export function usePlayerConsumables() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['player-consumables'],
+    queryFn: () => getPlayerConsumables(user!.agent),
+    enabled: !!user?.agent,
+  });
+}
+
+/**
+ * Hook to equip a consumable to a bot slot
+ */
+export function useEquipConsumable() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ tokenIndex, instanceId, slot }: { tokenIndex: number; instanceId: bigint; slot: number }) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return equipConsumable(tokenIndex, instanceId, slot, user.agent);
+    },
+    onSuccess: (_, { tokenIndex }) => {
+      queryClient.invalidateQueries({ queryKey: ['bot-gear-loadout', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['player-consumables'], refetchType: 'all' });
+    },
+  });
+}
+
+/**
+ * Hook to unequip a consumable from a bot slot
+ */
+export function useUnequipConsumable() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ tokenIndex, slot }: { tokenIndex: number; slot: number }) => {
+      if (!user?.agent) {
+        throw new Error('Not authenticated');
+      }
+      return unequipConsumable(tokenIndex, slot, user.agent);
+    },
+    onSuccess: (_, { tokenIndex }) => {
+      queryClient.invalidateQueries({ queryKey: ['bot-gear-loadout', tokenIndex], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['player-consumables'], refetchType: 'all' });
+    },
+  });
+}
+
+// ============= New Gear Detection Hooks =============
+
+import { useMemo } from 'react';
+
+/**
+ * Hook to get gear pieces that dropped from a specific race.
+ * Uses the sourceRaceId field on GearPieceView.
+ */
+export function useNewGearFromRace(raceId: number | null) {
+  const playerGear = usePlayerGear();
+
+  return useMemo(() => {
+    if (!playerGear.data || raceId === null) return [];
+    return playerGear.data.filter(
+      (g: GearPieceView) => g.sourceRaceId === raceId
+    );
+  }, [playerGear.data, raceId]);
+}
+
+/**
+ * Hook to get gear pieces earned recently (within a time window).
+ * Useful for the garage page "NEW" badges.
+ * @param withinMs - time window in milliseconds (default: 24 hours)
+ */
+export function useRecentGear(withinMs: number = 24 * 60 * 60 * 1000) {
+  const playerGear = usePlayerGear();
+
+  return useMemo(() => {
+    if (!playerGear.data) return { recentGear: [], recentGearIds: new Set<string>() };
+    const cutoff = BigInt(Date.now() - withinMs) * 1_000_000n; // nanoseconds
+    const recentGear = playerGear.data.filter(
+      (g: GearPieceView) => g.createdAt > cutoff
+    );
+    const recentGearIds = new Set(recentGear.map((g: GearPieceView) => g.gearId.toString()));
+    return { recentGear, recentGearIds };
+  }, [playerGear.data, withinMs]);
+}
+
+export type { GearPieceView, BotLoadoutView, GearBonuses, ConsumableView };

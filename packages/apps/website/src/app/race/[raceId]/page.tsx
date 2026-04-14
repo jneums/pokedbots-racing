@@ -1,9 +1,13 @@
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useGetRaceById, useGetBotProfilesBatch } from "@/hooks/useRacing";
+import { useAuth } from '@/hooks/useAuth';
+import { useNewGearFromRace } from '@/hooks/useGarage';
 import { RaceVisualizer } from '@/components/RaceVisualizer';
+import { NewGearReveal } from '@/components/NewGearReveal';
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
 
 // ============================================================================
@@ -213,11 +217,16 @@ function RaceVisualizerWithStats({ results, trackSeed, trackId, distance, terrai
 export default function RaceDetailsPage() {
   const { raceId } = useParams<{ raceId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [showGearReveal, setShowGearReveal] = useState(false);
   
   const { data: race, isLoading, error } = useGetRaceById(
     raceId ? Number(raceId) : null, 
     true // Enable frequent polling for active races
   );
+
+  // Fetch gear dropped from this race (only when logged in + completed)
+  const newGear = useNewGearFromRace(raceId ? Number(raceId) : null);
   
   // Collect all bot indices for profile fetching
   const entryIndices = race?.entries?.map((e: any) => Number(e.nftId)) || [];
@@ -534,6 +543,42 @@ export default function RaceDetailsPage() {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* New Gear Loot Drops Banner */}
+          {isCompleted && user && newGear.length > 0 && (
+            <>
+              <Card className="border-2 border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-amber-500/10 mb-6 overflow-hidden">
+                <CardContent className="py-6">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="text-4xl">🎁</div>
+                      <div>
+                        <h3 className="text-lg font-bold text-amber-300">
+                          New Gear Dropped!
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          You earned {newGear.length} gear piece{newGear.length !== 1 ? 's' : ''} from this race
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => setShowGearReveal(true)}
+                      size="lg"
+                      className="bg-gradient-to-r from-amber-600 to-purple-600 hover:from-amber-500 hover:to-purple-500 text-white font-bold shadow-lg"
+                    >
+                      🎴 Open Loot Drops
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <NewGearReveal
+                gear={newGear}
+                open={showGearReveal}
+                onOpenChange={setShowGearReveal}
+              />
+            </>
           )}
 
           {/* Sponsors Section - only if race has sponsors */}

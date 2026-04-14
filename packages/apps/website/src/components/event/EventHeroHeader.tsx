@@ -88,6 +88,27 @@ export function EventHeroHeader({
               {getStatusBadge()}
             </div>
             <p className="text-muted-foreground mb-4 max-w-2xl">{event.metadata.description}</p>
+
+            {/* Creator & Visibility info */}
+            {(event.creatorName?.[0] || (event.visibility && !('Public' in event.visibility))) && (
+              <div className="flex flex-wrap items-center gap-3 mb-3 text-sm">
+                {event.creatorName?.[0] && (
+                  <span className="text-muted-foreground">
+                    👤 Hosted by <span className="text-foreground font-medium">{event.creatorName[0]}</span>
+                  </span>
+                )}
+                {event.visibility && 'Private' in event.visibility && (
+                  <Badge variant="outline" className="text-xs bg-purple-500/10 border-purple-500/30 text-purple-400">
+                    🔒 Invite Only
+                  </Badge>
+                )}
+                {event.visibility && 'Restricted' in event.visibility && (
+                  <Badge variant="outline" className="text-xs bg-amber-500/10 border-amber-500/30 text-amber-400">
+                    🛡️ Restricted Entry
+                  </Badge>
+                )}
+              </div>
+            )}
             
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">

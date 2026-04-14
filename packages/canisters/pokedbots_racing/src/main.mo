@@ -62,6 +62,10 @@ import GarageJoltBot "tools/garage_jolt_bot";
 import GarageRepairBattery "tools/garage_repair_battery";
 import GarageRebuildBattery "tools/garage_rebuild_battery";
 import GarageSalvageBattery "tools/garage_salvage_battery";
+import GarageGetStationStatus "tools/garage_get_station_status";
+import GarageStartActivity "tools/garage_start_activity";
+import GarageGetBulkDetails "tools/garage_get_bulk_details";
+import GarageCompleteAllReadyScavenging "tools/garage_complete_all_ready_scavenging";
 import RacingListRaces "tools/racing_list_races";
 import RacingListEvents "tools/racing_list_events";
 import RacingGetMyRegistrations "tools/racing_get_my_registrations";
@@ -95,6 +99,7 @@ import BettingManager "BettingManager";
 import BettingTypes "BettingTypes";
 import RaceClassUtils "RaceClassUtils";
 import BotDedication "BotDedication";
+import GearSystem "GearSystem";
 import ResonanceSystem "ResonanceSystem";
 import TT "mo:timer-tool";
 import Star "mo:star/star";
@@ -445,6 +450,150 @@ import Star "mo:star/star";
 //   }
 // )
 
+// Migration: Add #ConsumableProc variant to RaceEventType in stored events
+// (Already deployed — commenting out post-migration)
+// (
+//   with migration = func(
+//     old : {
+//       stable_races : Map.Map<Nat, {
+//         raceId : Nat; name : Text; distance : Nat; terrain : RacingSimulator.Terrain;
+//         trackId : Nat; trackSeed : Nat; raceClass : RacingSimulator.RaceClass;
+//         entryFee : Nat; maxEntries : Nat; minEntries : Nat; startTime : Int;
+//         duration : Nat; entryDeadline : Int; createdAt : Int;
+//         entries : [RacingSimulator.RaceEntry]; status : RacingSimulator.RaceStatus;
+//         results : ?[RacingSimulator.RaceResult];
+//         events : [{
+//           eventType : {
+//             #Overtake : { overtaker : Text; overtaken : Text };
+//             #LeadChange : { newLeader : Text; previousLeader : Text };
+//             #LargeGap : { leader : Text; gapSeconds : Float };
+//             #CloseRacing : { bots : [Text]; gapSeconds : Float };
+//             #ExceptionalPerformance : { bot : Text; performancePct : Float };
+//             #PoorPerformance : { bot : Text; performancePct : Float };
+//             #SegmentComplete : { segmentIndex : Nat; leader : Text };
+//             #LuckProc : { bot : Text; procType : Text; boost : Float };
+//             #BadLuck : { bot : Text; incidentType : Text; penalty : Float };
+//           };
+//           timestamp : Float;
+//           segmentIndex : Nat;
+//           description : Text;
+//         }];
+//         prizePool : Nat; platformTax : Nat; platformBonus : Nat;
+//         sponsors : [RacingSimulator.Sponsor];
+//       }>;
+//     }
+//   ) : {
+//     stable_races : Map.Map<Nat, RacingSimulator.Race>;
+//   } {
+//     Debug.print("Migration: Adding #ConsumableProc to RaceEventType");
+//
+//     let migratedRaces = Map.new<Nat, RacingSimulator.Race>();
+//     var raceCount = 0;
+//
+//     for ((raceId, oldRace) in Map.entries(old.stable_races)) {
+//       let newEvents = Array.map(oldRace.events, func(e : { eventType : { #Overtake : { overtaker : Text; overtaken : Text }; #LeadChange : { newLeader : Text; previousLeader : Text }; #LargeGap : { leader : Text; gapSeconds : Float }; #CloseRacing : { bots : [Text]; gapSeconds : Float }; #ExceptionalPerformance : { bot : Text; performancePct : Float }; #PoorPerformance : { bot : Text; performancePct : Float }; #SegmentComplete : { segmentIndex : Nat; leader : Text }; #LuckProc : { bot : Text; procType : Text; boost : Float }; #BadLuck : { bot : Text; incidentType : Text; penalty : Float } }; timestamp : Float; segmentIndex : Nat; description : Text }) : RacingSimulator.RaceEvent {
+//         let newEventType : RacingSimulator.RaceEventType = switch (e.eventType) {
+//           case (#Overtake(v)) { #Overtake(v) };
+//           case (#LeadChange(v)) { #LeadChange(v) };
+//           case (#LargeGap(v)) { #LargeGap(v) };
+//           case (#CloseRacing(v)) { #CloseRacing(v) };
+//           case (#ExceptionalPerformance(v)) { #ExceptionalPerformance(v) };
+//           case (#PoorPerformance(v)) { #PoorPerformance(v) };
+//           case (#SegmentComplete(v)) { #SegmentComplete(v) };
+//           case (#LuckProc(v)) { #LuckProc(v) };
+//           case (#BadLuck(v)) { #BadLuck(v) };
+//         };
+//         { eventType = newEventType; timestamp = e.timestamp; segmentIndex = e.segmentIndex; description = e.description };
+//       });
+//
+//       ignore Map.put(migratedRaces, Map.nhash, raceId, {
+//         raceId = oldRace.raceId; name = oldRace.name; distance = oldRace.distance;
+//         terrain = oldRace.terrain; trackId = oldRace.trackId; trackSeed = oldRace.trackSeed;
+//         raceClass = oldRace.raceClass; entryFee = oldRace.entryFee;
+//         maxEntries = oldRace.maxEntries; minEntries = oldRace.minEntries;
+//         startTime = oldRace.startTime; duration = oldRace.duration;
+//         entryDeadline = oldRace.entryDeadline; createdAt = oldRace.createdAt;
+//         entries = oldRace.entries; status = oldRace.status;
+//         results = oldRace.results; events = newEvents;
+//         prizePool = oldRace.prizePool; platformTax = oldRace.platformTax;
+//         platformBonus = oldRace.platformBonus; sponsors = oldRace.sponsors;
+//       });
+//       raceCount += 1;
+//     };
+//
+//     Debug.print("Migrated events for " # Nat.toText(raceCount) # " races");
+//     { stable_races = migratedRaces };
+//   }
+// )
+
+// Migration: Add boundToBot field to GearPiece for soulbound gear system
+// (Already deployed — commenting out post-migration)
+// (
+//   with migration = func(
+//     old : {
+//       stable_gear_pieces : Map.Map<Nat, {
+//         gearId : Nat;
+//         name : Text;
+//         description : Text;
+//         slot : GearSystem.GearSlot;
+//         rarity : GearSystem.GearRarity;
+//         category : GearSystem.GearCategory;
+//         terrainTag : GearSystem.TerrainTag;
+//         ilvl : Nat;
+//         season : Nat;
+//         speedBonus : Nat;
+//         powerCoreBonus : Nat;
+//         accelerationBonus : Nat;
+//         stabilityBonus : Nat;
+//         luckBonus : Nat;
+//         passive : ?GearSystem.PassiveEffect;
+//         // NOTE: boundToBot field is missing in old data
+//         sourceRaceId : ?Nat;
+//         sourceEventType : ?Text;
+//         craftedFrom : ?[Nat];
+//         createdAt : Int;
+//       }>;
+//     }
+//   ) : {
+//     stable_gear_pieces : Map.Map<Nat, GearSystem.GearPiece>;
+//   } {
+//     Debug.print("Migration: Adding boundToBot field to GearPiece (soulbound gear)");
+//
+//     let migratedGear = Map.new<Nat, GearSystem.GearPiece>();
+//     var count = 0;
+//
+//     for ((gearId, oldGear) in Map.entries(old.stable_gear_pieces)) {
+//       let newGear : GearSystem.GearPiece = {
+//         gearId = oldGear.gearId;
+//         name = oldGear.name;
+//         description = oldGear.description;
+//         slot = oldGear.slot;
+//         rarity = oldGear.rarity;
+//         category = oldGear.category;
+//         terrainTag = oldGear.terrainTag;
+//         ilvl = oldGear.ilvl;
+//         season = oldGear.season;
+//         speedBonus = oldGear.speedBonus;
+//         powerCoreBonus = oldGear.powerCoreBonus;
+//         accelerationBonus = oldGear.accelerationBonus;
+//         stabilityBonus = oldGear.stabilityBonus;
+//         luckBonus = oldGear.luckBonus;
+//         passive = oldGear.passive;
+//         boundToBot = 0; // Placeholder — admin_migrate_gear_soulbound() will wipe and regenerate
+//         sourceRaceId = oldGear.sourceRaceId;
+//         sourceEventType = oldGear.sourceEventType;
+//         craftedFrom = oldGear.craftedFrom;
+//         createdAt = oldGear.createdAt;
+//       };
+//       ignore Map.put(migratedGear, Map.nhash, gearId, newGear);
+//       count += 1;
+//     };
+//
+//     Debug.print("Gear migrated with boundToBot placeholder: " # Nat.toText(count) # " pieces");
+//     { stable_gear_pieces = migratedGear };
+//   }
+// )
+
 shared ({ caller = deployer }) persistent actor class McpServer(
   args : ?{
     owner : ?Principal;
@@ -507,6 +656,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   // Stable state for bot dedication system (per-bot investment and activity tracking)
   let stable_bot_dedication = Map.new<Nat, BotDedication.BotDedicationProfile>(); // tokenIndex -> profile
+
+  // Stable state for gear system
+  let stable_gear_pieces = Map.new<Nat, GearSystem.GearPiece>(); // gearId -> GearPiece
+  let stable_bot_loadouts = Map.new<Nat, GearSystem.BotLoadout>(); // tokenIndex -> BotLoadout
+  let stable_player_gear_inventories = Map.new<Principal, GearSystem.PlayerGearInventory>(); // owner -> inventory
+  let stable_consumable_instances = Map.new<Nat, GearSystem.ConsumableInstance>(); // instanceId -> ConsumableInstance
+  var stable_next_gear_id : Nat = 1;
+  var stable_next_consumable_id : Nat = 1;
 
   // Stable state for battery storage system
   let stable_garage_batteries = Map.new<Principal, PokedBotsGarage.GarageBatteryStorage>(); // owner -> battery storage
@@ -747,6 +904,22 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   // NOTE: Must be instantiated before garageManager since garageManager uses getTierBenefits callback
   transient let dedicationManager = BotDedication.DedicationManager(stable_bot_dedication);
 
+  // Gear System Manager (gear/loot/crafting/consumables)
+  transient let gearManager = GearSystem.GearManager(
+    stable_gear_pieces,
+    stable_bot_loadouts,
+    stable_player_gear_inventories,
+    stable_consumable_instances,
+    {
+      get = func() : Nat { stable_next_gear_id };
+      set = func(id : Nat) { stable_next_gear_id := id };
+    },
+    {
+      get = func() : Nat { stable_next_consumable_id };
+      set = func(id : Nat) { stable_next_consumable_id := id };
+    },
+  );
+
   transient let garageManager = PokedBotsGarage.PokedBotsGarageManager(
     stable_racing_stats,
     stable_active_upgrades,
@@ -778,6 +951,15 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       };
       getBenefitsForBot = func(tokenIndex : Nat) : BotDedication.TierBenefits {
         dedicationManager.getBenefitsForBot(tokenIndex);
+      };
+      getGearBonuses = func(tokenIndex : Nat) : {
+        speed : Nat;
+        powerCore : Nat;
+        acceleration : Nat;
+        stability : Nat;
+        luck : Nat;
+      } {
+        gearManager.getGearStatBonuses(tokenIndex);
       };
     },
   );
@@ -1779,14 +1961,13 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     // Use longer lookhead for special events that might be scheduled far in advance
     let allUpcomingEvents = eventCalendar.getUpcomingEvents(now, 60); // Next 60 days for special events
 
-    // Get ALL events (including cancelled) for duplicate time checks
-    // This prevents creating new events at the same time as recently cancelled events
+    // Get non-cancelled events for duplicate time checks
+    // (Admin-cancelled events should not block rescheduled slots)
     let allEventsForTimeCheck = Array.filter<RaceCalendar.ScheduledEvent>(
       eventCalendar.getAllEvents(),
       func(e) {
-        // Include events within the next 60 days regardless of status
         let NANOS_PER_DAY : Int = 86400_000_000_000;
-        e.scheduledTime >= now - NANOS_PER_DAY and e.scheduledTime <= now + (60 * NANOS_PER_DAY);
+        e.scheduledTime >= now - NANOS_PER_DAY and e.scheduledTime <= now + (60 * NANOS_PER_DAY) and e.status != #Cancelled;
       },
     );
 
@@ -1861,16 +2042,16 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       },
     );
 
-    // Schedule Daily Sprints to ensure at least 8 in next 48 hours (one every 6 hours)
-    if (sprintsIn48h.size() < 8) {
+    // Schedule Daily Sprints to ensure at least 2 in next 48 hours (one per day at 18:00 UTC)
+    if (sprintsIn48h.size() < 2) {
       // Always start from now to fill gaps in the 48-hour window
       var scheduleTime = now;
       var createdCount : Nat = 0;
-      let targetCount : Nat = 8 - sprintsIn48h.size();
+      let targetCount : Nat = 2 - sprintsIn48h.size();
 
-      // Limit iterations to prevent infinite loops (48h = 8 slots max)
+      // Limit iterations to prevent infinite loops (48h = 2 slots max)
       var iterations : Nat = 0;
-      let maxIterations : Nat = 16; // Safety limit: check up to 16 slots
+      let maxIterations : Nat = 4; // Safety limit: check up to 4 slots
 
       label scheduling while (createdCount < targetCount and iterations < maxIterations) {
         iterations += 1;
@@ -1939,14 +2120,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       },
     );
 
-    // Schedule Free Sprints to ensure at least 8 in next 48 hours (one every 6 hours, offset from Daily Sprints)
-    if (freeSprintsIn48h.size() < 8) {
+    // Schedule Free Sprints to ensure at least 4 in next 48 hours (every 12 hours at 09:00 & 21:00 UTC)
+    if (freeSprintsIn48h.size() < 4) {
       var scheduleTime = now;
       var createdCount : Nat = 0;
-      let targetCount : Nat = 8 - freeSprintsIn48h.size();
+      let targetCount : Nat = 4 - freeSprintsIn48h.size();
 
       var iterations : Nat = 0;
-      let maxIterations : Nat = 16;
+      let maxIterations : Nat = 8;
 
       label freeScheduling while (createdCount < targetCount and iterations < maxIterations) {
         iterations += 1;
@@ -1970,34 +2151,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           },
         );
 
-        // Check if a special event is scheduled within 2 hours (skip free sprint to avoid conflict)
-        let specialEventNearby = Array.filter<RaceCalendar.ScheduledEvent>(
-          allUpcomingEvents,
-          func(e) {
-            switch (e.eventType) {
-              case (#DailySprint) { false }; // Ignore daily sprints
-              case (#SpecialEvent(name)) {
-                if (name == "Free Sprint") { false } // Ignore other free sprints
-                else {
-                  let timeDiff = Int.abs(e.scheduledTime - nextFreeSprint);
-                  timeDiff < (2 * 60 * 60 * 1_000_000_000); // Within 2 hours
-                };
-              };
-              case (_) {
-                // Weekly League, Monthly Cup, etc.
-                let timeDiff = Int.abs(e.scheduledTime - nextFreeSprint);
-                timeDiff < (2 * 60 * 60 * 1_000_000_000); // Within 2 hours
-              };
-            };
-          },
-        );
-
-        if (existingAtTime.size() == 0 and specialEventNearby.size() == 0) {
+        if (existingAtTime.size() == 0) {
           ignore eventCalendar.createFreeSprintEvent(nextFreeSprint, now);
           Debug.print("Auto-scheduled Free Sprint for timestamp: " # debug_show (nextFreeSprint));
           createdCount += 1;
-        } else if (specialEventNearby.size() > 0) {
-          Debug.print("SKIP: Free Sprint skipped due to nearby special event at timestamp: " # debug_show (nextFreeSprint));
         } else {
           Debug.print("SKIP: Free Sprint already exists at timestamp: " # debug_show (nextFreeSprint));
         };
@@ -2036,186 +2193,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       };
     };
 
-    // Check for Weekend Warrior (every Friday 8pm)
-    let weekendWarriors = Array.filter<RaceCalendar.ScheduledEvent>(
-      allUpcomingEvents,
-      func(e) {
-        switch (e.eventType) {
-          case (#SpecialEvent(name)) { name == "Weekend Warrior" };
-          case (_) { false };
-        };
-      },
-    );
-
-    if (weekendWarriors.size() < 2) {
-      var scheduleTime = now;
-      for (i in Iter.range(0, 1 - weekendWarriors.size())) {
-        let nextFriday = RaceCalendar.getNextWeeklyOccurrence(5, 22, 0, scheduleTime); // Friday=5, 10pm (after rush hour)
-        // Check if event already exists at this time (including cancelled events to prevent duplicates)
-        let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-          allEventsForTimeCheck,
-          func(e) {
-            let timeDiff = Int.abs(e.scheduledTime - nextFriday);
-            timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
-          },
-        );
-        if (existingAtTime.size() == 0) {
-          ignore eventCalendar.createWeekendWarriorEvent(nextFriday, now);
-          Debug.print("Auto-scheduled Weekend Warrior for timestamp: " # debug_show (nextFriday));
-        };
-        scheduleTime := nextFriday + (7 * 86400 * 1_000_000_000); // Next week
-      };
-    };
-
-    // Terrain Master Series (rotating: Sand Saturday, Metal next Saturday, Scrap next)
-    let terrainMasters = Array.filter<RaceCalendar.ScheduledEvent>(
-      allUpcomingEvents,
-      func(e) {
-        switch (e.eventType) {
-          case (#SpecialEvent(name)) {
-            name == "Sand Master" or name == "Metal Master" or name == "Scrap Master";
-          };
-          case (_) { false };
-        };
-      },
-    );
-
-    if (terrainMasters.size() < 2) {
-      let terrains = ["Sand", "Metal", "Scrap"];
-      let weekNum = (now / (7 * 86400 * 1_000_000_000)) % 3; // Rotate every week
-      let terrain = terrains[Int.abs(weekNum) % 3];
-      let nextSaturday = RaceCalendar.getNextWeeklyOccurrence(6, 14, 0, now); // Saturday=6, 2pm
-      // Check if event already exists at this time (including cancelled events to prevent duplicates)
-      let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-        allEventsForTimeCheck,
-        func(e) {
-          let timeDiff = Int.abs(e.scheduledTime - nextSaturday);
-          timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
-        },
-      );
-      if (existingAtTime.size() == 0) {
-        ignore eventCalendar.createTerrainMasterEvent(terrain, nextSaturday, now);
-        Debug.print("Auto-scheduled " # terrain # " Master for timestamp: " # debug_show (nextSaturday));
-      };
-    };
-
-    // Elite Showcase (every Sunday 6pm - 2 hours before Weekly League)
-    let eliteShowcases = Array.filter<RaceCalendar.ScheduledEvent>(
-      allUpcomingEvents,
-      func(e) {
-        switch (e.eventType) {
-          case (#SpecialEvent(name)) { name == "Elite Showcase" };
-          case (_) { false };
-        };
-      },
-    );
-
-    if (eliteShowcases.size() < 2) {
-      var scheduleTime = now;
-      for (i in Iter.range(0, 1 - eliteShowcases.size())) {
-        let nextSunday = RaceCalendar.getNextWeeklyOccurrence(0, 17, 0, scheduleTime); // Sunday=0, 5pm (moved from 6pm to give gap before Weekly League)
-        // Check if event already exists at this time (including cancelled events to prevent duplicates)
-        let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-          allEventsForTimeCheck,
-          func(e) {
-            let timeDiff = Int.abs(e.scheduledTime - nextSunday);
-            timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
-          },
-        );
-        if (existingAtTime.size() == 0) {
-          ignore eventCalendar.createEliteShowcaseEvent(nextSunday, now);
-          Debug.print("Auto-scheduled Elite Showcase for timestamp: " # debug_show (nextSunday));
-        };
-        scheduleTime := nextSunday + (7 * 86400 * 1_000_000_000); // Next week
-      };
-    };
-
-    // Beginner Bootcamp (every Saturday 10am)
-    let beginnerBootcamps = Array.filter<RaceCalendar.ScheduledEvent>(
-      allUpcomingEvents,
-      func(e) {
-        switch (e.eventType) {
-          case (#SpecialEvent(name)) { name == "Beginner Bootcamp" };
-          case (_) { false };
-        };
-      },
-    );
-
-    if (beginnerBootcamps.size() < 2) {
-      var scheduleTime = now;
-      for (i in Iter.range(0, 1 - beginnerBootcamps.size())) {
-        let nextSaturday = RaceCalendar.getNextWeeklyOccurrence(6, 10, 0, scheduleTime); // Saturday=6, 10am
-        // Check if event already exists at this time (including cancelled events to prevent duplicates)
-        let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-          allEventsForTimeCheck,
-          func(e) {
-            let timeDiff = Int.abs(e.scheduledTime - nextSaturday);
-            timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
-          },
-        );
-        if (existingAtTime.size() == 0) {
-          ignore eventCalendar.createBeginnerBootcampEvent(nextSaturday, now);
-          Debug.print("Auto-scheduled Beginner Bootcamp for timestamp: " # debug_show (nextSaturday));
-        };
-        scheduleTime := nextSaturday + (7 * 86400 * 1_000_000_000); // Next week
-      };
-    };
-
-    // Faction Wars (second Sunday of each month at 4pm)
-    let factionWars = Array.filter<RaceCalendar.ScheduledEvent>(
-      allUpcomingEvents,
-      func(e) {
-        switch (e.eventType) {
-          case (#SpecialEvent(name)) { name == "Faction Wars" };
-          case (_) { false };
-        };
-      },
-    );
-
-    if (factionWars.size() == 0) {
-      let nextSecondSunday = RaceCalendar.getNextMonthlyOccurrence(0, 2, 16, 0, now); // Sunday=0, second=2, 4pm
-      // Check if event already exists at this time (including cancelled events to prevent duplicates)
-      let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-        allEventsForTimeCheck,
-        func(e) {
-          let timeDiff = Int.abs(e.scheduledTime - nextSecondSunday);
-          timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
-        },
-      );
-      if (existingAtTime.size() == 0) {
-        ignore eventCalendar.createFactionWarsEvent(nextSecondSunday, now);
-        Debug.print("Auto-scheduled Faction Wars for timestamp: " # debug_show (nextSecondSunday));
-      };
-    };
-
-    // Distance Challenge (third Saturday of each month at noon)
-    let distanceChallenges = Array.filter<RaceCalendar.ScheduledEvent>(
-      allUpcomingEvents,
-      func(e) {
-        switch (e.eventType) {
-          case (#SpecialEvent(name)) { name == "Distance Challenge" };
-          case (_) { false };
-        };
-      },
-    );
-
-    if (distanceChallenges.size() == 0) {
-      let nextThirdSaturday = RaceCalendar.getNextMonthlyOccurrence(6, 3, 11, 0, now); // Saturday=6, third=3, 11am (moved from noon to avoid Daily Sprint conflict)
-      // Check if event already exists at this time (including cancelled events to prevent duplicates)
-      let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-        allEventsForTimeCheck,
-        func(e) {
-          let timeDiff = Int.abs(e.scheduledTime - nextThirdSaturday);
-          timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
-        },
-      );
-      if (existingAtTime.size() == 0) {
-        ignore eventCalendar.createDistanceChallengeEvent(nextThirdSaturday, now);
-        Debug.print("Auto-scheduled Distance Challenge for timestamp: " # debug_show (nextThirdSaturday));
-      };
-    };
-
-    // Rush Hour Rumble (every Friday 7pm)
+    // Rush Hour Rumble (every Friday 8pm MST = Saturday 3am UTC) - "Raid Night"
     let rushHours = Array.filter<RaceCalendar.ScheduledEvent>(
       allUpcomingEvents,
       func(e) {
@@ -2246,65 +2224,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       };
     };
 
-    // Ultra Marathon (second Saturday of each month at noon)
-    let ultraMarathons = Array.filter<RaceCalendar.ScheduledEvent>(
-      allUpcomingEvents,
-      func(e) {
-        switch (e.eventType) {
-          case (#SpecialEvent(name)) { name == "Ultra Marathon" };
-          case (_) { false };
-        };
-      },
-    );
-
-    if (ultraMarathons.size() == 0) {
-      let nextSecondSaturday = RaceCalendar.getNextMonthlyOccurrence(6, 2, 11, 0, now); // Saturday=6, second=2, 11am (moved from noon to avoid Daily Sprint conflict)
-      // Check if event already exists at this time (including cancelled events to prevent duplicates)
-      let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-        allEventsForTimeCheck,
-        func(e) {
-          let timeDiff = Int.abs(e.scheduledTime - nextSecondSaturday);
-          timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
-        },
-      );
-      if (existingAtTime.size() == 0) {
-        ignore eventCalendar.createUltraMarathonEvent(nextSecondSaturday, now);
-        Debug.print("Auto-scheduled Ultra Marathon for timestamp: " # debug_show (nextSecondSaturday));
-      };
-    };
-
-    // Midnight Madness (every Saturday midnight)
-    let midnightMadnesses = Array.filter<RaceCalendar.ScheduledEvent>(
-      allUpcomingEvents,
-      func(e) {
-        switch (e.eventType) {
-          case (#SpecialEvent(name)) { name == "Midnight Madness" };
-          case (_) { false };
-        };
-      },
-    );
-
-    if (midnightMadnesses.size() < 2) {
-      var scheduleTime = now;
-      for (i in Iter.range(0, 1 - midnightMadnesses.size())) {
-        let nextSaturday = RaceCalendar.getNextWeeklyOccurrence(6, 24, 0, scheduleTime); // Saturday=6 -> Sunday=0, midnight
-        // Check if event already exists at this time (including cancelled events to prevent duplicates)
-        let existingAtTime = Array.filter<RaceCalendar.ScheduledEvent>(
-          allEventsForTimeCheck,
-          func(e) {
-            let timeDiff = Int.abs(e.scheduledTime - nextSaturday);
-            timeDiff < (60 * 60 * 1_000_000_000); // Within 1 hour
-          },
-        );
-        if (existingAtTime.size() == 0) {
-          ignore eventCalendar.createMidnightMadnessEvent(nextSaturday, now);
-          Debug.print("Auto-scheduled Midnight Madness for timestamp: " # debug_show (nextSaturday));
-        };
-        scheduleTime := nextSaturday + (7 * 86400 * 1_000_000_000); // Next week
-      };
-    };
-
-    // Champions Cup (last Sunday of each month at 8pm)
+    // Champions Cup (last Sunday of each month at 10pm UTC)
     let championsCups = Array.filter<RaceCalendar.ScheduledEvent>(
       allUpcomingEvents,
       func(e) {
@@ -2783,6 +2703,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                     tokenIndex = tokenIdx;
                     faction = faction;
                     baseAvgRating = baseAvgRating;
+                    passives = gearManager.getEquippedPassives(tokenIdx);
+                    consumables = gearManager.consumeLoadoutConsumables(tokenIdx);
                   };
                   participants := Array.append(participants, [participant]);
                 };
@@ -2801,7 +2723,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
             // Simulate race and store results
             switch (raceSimulator.simulateRaceSegmented(updatedRace, participants)) {
-              case (?(results, events)) {
+              case (?(results, events, segmentBreakdown)) {
                 Debug.print("Race simulated at start, " # debug_show (results.size()) # " racers, " # debug_show (events.size()) # " events");
 
                 // === TIME CAP SYSTEM ===
@@ -2847,7 +2769,15 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
                 // Zero out partsEarned for free races (entry fee = 0) to prevent misleading UI display
                 // Free races are for practice only - no parts rewards
-                let isFreeRace = race.entryFee == 0;
+                // For multi-stage events (Rush Hour), per-race entryFee is 0 but event is paid
+                let isFreeRace = if (race.entryFee == 0) {
+                  switch (eventCalendar.getEventByRaceId(raceId)) {
+                    case (?parentEvent) { parentEvent.metadata.entryFee == 0 };
+                    case (null) { true };
+                  };
+                } else {
+                  false;
+                };
                 let finalResults = if (isFreeRace) {
                   Debug.print("Free race detected - zeroing out partsEarned in results");
                   Array.map<RacingSimulator.RaceResult, RacingSimulator.RaceResult>(
@@ -2994,7 +2924,15 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                 Debug.print("[RF-6] Scheduled bet_settlement action " # debug_show (settlementActionId) # " for race " # debug_show (raceId));
 
                 // Skip ELO changes for free races (entry fee = 0) to prevent sandbagging
-                let isFreeRaceForElo = race.entryFee == 0;
+                // For multi-stage events (Rush Hour), per-race entryFee is 0 but event is paid
+                let isFreeRaceForElo = if (race.entryFee == 0) {
+                  switch (eventCalendar.getEventByRaceId(raceId)) {
+                    case (?parentEvent) { parentEvent.metadata.entryFee == 0 };
+                    case (null) { true };
+                  };
+                } else {
+                  false;
+                };
 
                 // Apply ELO rating changes first (only for paid races)
                 if (not isFreeRaceForElo) {
@@ -3043,23 +2981,20 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   // - ScrapHeaps: PowerCells (power to push through debris)
                   // - WastelandSand: ThrusterKits/GyroModules alternating (accel/stability in sand)
 
-                  // Check if this race is part of a multi-stage event (Cumulative or TeamAggregate)
-                  // If so, skip per-race parts - they'll be awarded at event completion
-                  let isMultiStageRace = switch (eventCalendar.getEventByRaceId(raceId)) {
-                    case (?parentEvent) {
-                      switch (parentEvent.metadata.scoringMode) {
-                        case (#Cumulative) { true };
-                        case (#TeamAggregate) { true };
-                        case (_) { false };
-                      };
+                  // Skip parts for free races (entry fee = 0) to prevent exploitation
+                  // Multi-stage events (Rush Hour etc.) DO award loot per race — each race is a "boss drop"
+                  // For multi-stage Cumulative events, per-race entryFee is 0 but the EVENT has a fee
+                  let isFreeRace = if (race.entryFee == 0) {
+                    // Check if this race belongs to a paid event (multi-stage with aggregate prizes)
+                    switch (eventCalendar.getEventByRaceId(raceId)) {
+                      case (?parentEvent) { parentEvent.metadata.entryFee == 0 };
+                      case (null) { true }; // Standalone race with 0 entry fee = free
                     };
-                    case (null) { false };
+                  } else {
+                    false;
                   };
 
-                  // Skip parts for free races (entry fee = 0) to prevent exploitation
-                  let isFreeRace = race.entryFee == 0;
-
-                  if (not isMultiStageRace and not isFreeRace) {
+                  if (not isFreeRace) {
                     let partType : PokedBotsGarage.PartType = switch (race.terrain) {
                       case (#MetalRoads) { #SpeedChip };
                       case (#ScrapHeaps) { #PowerCoreFragment };
@@ -3102,10 +3037,64 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                       case (#UniversalPart) { "UniversalParts" };
                     };
                     Debug.print("Awarded " # debug_show (partsEarned) # " " # partName # " to " # Principal.toText(result.owner));
-                  } else if (isFreeRace) {
-                    Debug.print("Skipping parts for free race (practice mode) - no rewards");
                   } else {
-                    Debug.print("Skipping per-race parts for multi-stage event - will award at event completion");
+                    Debug.print("Skipping parts for free race (practice mode) - no part rewards");
+                  };
+
+                  // === GEAR LOOT DROP ===
+                  // All races drop gear — free races drop Common/Standard (grey) gear via #Free tier
+                  // Determine event tier from parent event (or default to Daily for standalone races)
+                  let gearEventTier : GearSystem.EventTier = if (isFreeRace) {
+                    #Free; // Free races always drop Common/Standard gear
+                  } else {
+                    switch (eventCalendar.getEventByRaceId(raceId)) {
+                      case (?parentEvent) {
+                        switch (parentEvent.eventType) {
+                          case (#DailySprint) { #Daily };
+                          case (#WeeklyLeague) { #Weekly };
+                          case (#MonthlyCup) { #Monthly };
+                          case (#SpecialEvent(_)) { #Special };
+                        };
+                      };
+                      case (null) { #Daily }; // Standalone races use Daily tier
+                    };
+                  };
+
+                  // Map race terrain to gear terrain tag
+                  let gearTerrain : GearSystem.TerrainTag = switch (race.terrain) {
+                    case (#MetalRoads) { #MetalRoads };
+                    case (#ScrapHeaps) { #ScrapHeaps };
+                    case (#WastelandSand) { #WastelandSand };
+                  };
+
+                  // Deterministic seed: raceId * 10000 + position * 137 + tokenIndex
+                  let tokenIdx2 = switch (Nat.fromText(result.nftId)) {
+                    case (?t) { t };
+                    case (null) { 0 };
+                  };
+                  let lootSeed = raceId * 10000 + result.position * 137 + tokenIdx2;
+
+                  // Current season and ilvl (derived from season — ilvl increases each season)
+                  let currentSeason : Nat = Leaderboard.getSeasonIdFromTime(Time.now());
+                  let currentIlvl : Nat = GearSystem.ilvlFromSeason(currentSeason);
+
+                  let droppedGear = gearManager.generateLootDrop(
+                    result.owner,
+                    tokenIdx2,
+                    lootSeed,
+                    gearTerrain,
+                    gearEventTier,
+                    currentSeason,
+                    currentIlvl,
+                    ?raceId,
+                  );
+                  switch (droppedGear) {
+                    case (?gear) {
+                      Debug.print("Gear drop: " # gear.name # " (" # gearManager.rarityToText(gear.rarity) # ") to " # Principal.toText(result.owner));
+                    };
+                    case (null) {
+                      Debug.print("No gear drop (miss) for " # Principal.toText(result.owner));
+                    };
                   };
 
                   // Apply race costs (battery drain and condition wear based on race)
@@ -3840,6 +3829,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     GarageRepairBattery.config(),
     GarageRebuildBattery.config(),
     GarageSalvageBattery.config(),
+    // Station status tool
+    GarageGetStationStatus.config(),
+    // Activity alias for scavenging
+    GarageStartActivity.config(),
+    // Bulk bot details
+    GarageGetBulkDetails.config(),
+    // Complete all ready scavenging
+    GarageCompleteAllReadyScavenging.config(),
     RacingListRaces.config(),
     RacingListEvents.config(),
     RacingGetMyRegistrations.config(),
@@ -3894,6 +3891,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       ("garage_repair_battery", GarageRepairBattery.handle(toolContext)),
       ("garage_rebuild_battery", GarageRebuildBattery.handle(toolContext)),
       ("garage_salvage_battery", GarageSalvageBattery.handle(toolContext)),
+      // Station status tool
+      ("garage_get_station_status", GarageGetStationStatus.handle(toolContext)),
+      // Activity alias for scavenging
+      ("garage_start_activity", GarageStartActivity.handle(toolContext)),
+      // Bulk bot details
+      ("garage_get_bulk_details", GarageGetBulkDetails.handle(toolContext)),
+      // Complete all ready scavenging
+      ("garage_complete_all_ready_scavenging", GarageCompleteAllReadyScavenging.handle(toolContext)),
       ("racing_list_races", RacingListRaces.handle(toolContext)),
       ("racing_list_events", RacingListEvents.handle(toolContext)),
       ("racing_get_my_registrations", RacingGetMyRegistrations.handle(toolContext)),
@@ -4909,6 +4914,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
               tokenIndex = tokenIndex;
               faction = faction;
               baseAvgRating = baseAvgRating;
+              passives = [];
+              consumables = [];
             };
           };
           case null { null };
@@ -4966,7 +4973,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     // Simulate the race
     Debug.print("MAIN_BEFORE_SIMULATE trackId=" # Nat.toText(trackId) # " participants=" # Nat.toText(participants.size()));
     switch (raceSimulator.simulateRaceSegmented(testRace, participants)) {
-      case (?(results, events)) {
+      case (?(results, events, _segmentBreakdown)) {
         let formattedResults = Array.map<RacingSimulator.RaceResult, { tokenIndex : Nat; finalTime : Float; stats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat; luck : Nat } }>(
           results,
           func(result : RacingSimulator.RaceResult) : {
@@ -5142,6 +5149,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         tokenIndex = tokenIdx;
         faction = faction;
         baseAvgRating = baseAvgRating;
+        passives = [];
+        consumables = [];
       };
       participants := Array.append(participants, [participant]);
     };
@@ -5151,7 +5160,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     // Re-simulate the race with the EXACT same parameters
     switch (raceSimulator.simulateRaceSegmented(race, participants)) {
-      case (?(newResults, events)) {
+      case (?(newResults, events, _segmentBreakdown)) {
         Debug.print("=== RESIMULATION RESULTS ===");
 
         let formattedOriginal = Array.map<RacingSimulator.RaceResult, { nftId : Text; position : Nat; finalTime : Float; stats : ?RacingSimulator.RacingStats }>(
@@ -5366,6 +5375,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             tokenIndex = tokenIndex;
             faction = faction;
             baseAvgRating = baseAvgRating;
+            passives = [];
+            consumables = [];
           };
 
           participants := Array.append(participants, [participant]);
@@ -5416,7 +5427,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     // Simulate the race
     let simulator = RacingSimulator.RaceSimulator();
     switch (simulator.simulateRaceSegmented(mockRace, participants)) {
-      case (?(results, raceEvents)) {
+      case (?(results, raceEvents, _segmentBreakdown)) {
         // Calculate analysis
         var totalTime : Float = 0.0;
         var fastestTime : Float = 999999.0;
@@ -6180,6 +6191,184 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     eventCalendar.getEvent(eventId);
   };
 
+  // ===== USER-CREATED EVENTS =====
+
+  /// Create a user-created event with custom config and optional bot whitelist
+  /// Payment: creation fee (0.5 ICP non-refundable) + prize contribution (escrowed, refundable on cancel)
+  /// Requires ICRC-2 approval for total amount (creation fee + prize contribution)
+  public shared ({ caller }) func create_user_event(
+    config : RaceCalendar.UserEventConfig,
+  ) : async Result.Result<{ eventId : Nat; message : Text }, Text> {
+    trackMethodCall("create_user_event", caller);
+
+    let now = Time.now();
+
+    // Validate the event config via RaceCalendar
+    let event = switch (eventCalendar.scheduleUserEvent(config, caller, now)) {
+      case (#err(e)) { return #err(e) };
+      case (#ok(e)) { e };
+    };
+
+    // Calculate total payment: creation fee + prize contribution
+    let totalPayment = RaceCalendar.USER_EVENT_CREATION_FEE + config.prizeContribution;
+
+    // Process ICRC-2 payment
+    let ledgerId = switch (icpLedgerCanisterId) {
+      case (?id) { id };
+      case (null) { return #err("ICP Ledger not configured") };
+    };
+
+    let icpLedger = actor (Principal.toText(ledgerId)) : actor {
+      icrc2_transfer_from : shared IcpLedger.TransferFromArgs -> async IcpLedger.Result_3;
+    };
+
+    let transferResult = try {
+      await icpLedger.icrc2_transfer_from({
+        from = { owner = caller; subaccount = null };
+        to = { owner = thisPrincipal; subaccount = null };
+        amount = totalPayment;
+        fee = null;
+        memo = null;
+        created_at_time = null;
+        spender_subaccount = null;
+      });
+    } catch (e) {
+      // Rollback: cancel the event we just created since payment failed
+      ignore eventCalendar.cancelUserEvent(event.eventId, caller, now);
+      return #err("Payment transfer failed: " # Error.message(e));
+    };
+
+    switch (transferResult) {
+      case (#Err(e)) {
+        // Rollback: cancel the event since payment failed
+        ignore eventCalendar.cancelUserEvent(event.eventId, caller, now);
+        let errorMsg = switch (e) {
+          case (#InsufficientAllowance({ allowance })) {
+            "Insufficient spending allowance. Current: " # Nat.toText(allowance / 100_000_000) # " ICP. Required: " # Nat.toText(totalPayment / 100_000_000) # " ICP. Please approve more ICP first.";
+          };
+          case (#InsufficientFunds({ balance })) {
+            "Insufficient ICP balance. Current: " # Nat.toText(balance / 100_000_000) # " ICP. Required: " # Nat.toText(totalPayment / 100_000_000) # " ICP.";
+          };
+          case (_) {
+            "Payment failed. Please check your ICRC-2 approval and ICP balance.";
+          };
+        };
+        return #err(errorMsg);
+      };
+      case (#Ok(_blockIndex)) {
+        // Payment successful — event is already created
+        let visStr = switch (config.visibility) {
+          case (#Public) { "Public" };
+          case (#Private) { "Private (invite-only)" };
+          case (#Restricted(_)) { "Restricted (whitelist)" };
+        };
+
+        #ok({
+          eventId = event.eventId;
+          message = "🏁 Event \"" # config.name # "\" created! Visibility: " # visStr #
+          ". Creation fee: " # Nat.toText(RaceCalendar.USER_EVENT_CREATION_FEE / 100_000_000) # " ICP" #
+          ". Prize pool contribution: " # Nat.toText(config.prizeContribution / 100_000_000) # " ICP (escrowed).";
+        });
+      };
+    };
+  };
+
+  /// Cancel a user-created event. Only the creator can cancel, and only before registration closes.
+  /// Refunds: entry fees to all registrants + prize contribution to creator (creation fee is NOT refunded)
+  public shared ({ caller }) func cancel_user_event(
+    eventId : Nat,
+  ) : async Result.Result<{ message : Text; refundedRegistrants : Nat; prizeRefunded : Nat }, Text> {
+    trackMethodCall("cancel_user_event", caller);
+
+    let now = Time.now();
+
+    // Cancel the event via RaceCalendar (validates ownership, status, etc.)
+    let cancelledEvent = switch (eventCalendar.cancelUserEvent(eventId, caller, now)) {
+      case (#err(e)) { return #err(e) };
+      case (#ok(e)) { e };
+    };
+
+    // Process refunds
+    var refundedCount : Nat = 0;
+
+    // Refund entry fees to all registrants
+    if (cancelledEvent.registrations.size() > 0) {
+      let ledgerId = switch (icpLedgerCanisterId) {
+        case (?id) { id };
+        case (null) { return #err("ICP Ledger not configured — cannot process refunds") };
+      };
+
+      let icpLedger = actor (Principal.toText(ledgerId)) : actor {
+        icrc1_transfer : shared IcpLedger.TransferArg -> async IcpLedger.Result;
+      };
+
+      for (reg in cancelledEvent.registrations.vals()) {
+        try {
+          let refundResult = await icpLedger.icrc1_transfer({
+            to = { owner = reg.owner; subaccount = null };
+            amount = reg.entryFeePaid;
+            fee = null;
+            memo = null;
+            created_at_time = null;
+            from_subaccount = null;
+          });
+          switch (refundResult) {
+            case (#Ok(_)) { refundedCount += 1 };
+            case (#Err(_)) {};
+          };
+        } catch (_) {
+          // Log but continue — don't fail the whole cancellation for one refund
+        };
+      };
+    };
+
+    // Refund prize contribution to creator
+    var prizeRefunded : Nat = 0;
+    if (cancelledEvent.metadata.prizePoolBonus > 0) {
+      let ledgerId = switch (icpLedgerCanisterId) {
+        case (?id) { id };
+        case (null) { return #err("Refunds processed but prize return failed: no ledger") };
+      };
+
+      let icpLedger = actor (Principal.toText(ledgerId)) : actor {
+        icrc1_transfer : shared IcpLedger.TransferArg -> async IcpLedger.Result;
+      };
+
+      try {
+        let prizeRefundResult = await icpLedger.icrc1_transfer({
+          to = { owner = caller; subaccount = null };
+          amount = cancelledEvent.metadata.prizePoolBonus;
+          fee = null;
+          memo = null;
+          created_at_time = null;
+          from_subaccount = null;
+        });
+        switch (prizeRefundResult) {
+          case (#Ok(_)) { prizeRefunded := cancelledEvent.metadata.prizePoolBonus };
+          case (#Err(_)) {};
+        };
+      } catch (_) {};
+    };
+
+    #ok({
+      message = "🚫 Event \"" # cancelledEvent.metadata.name # "\" cancelled." #
+      (if (refundedCount > 0) {
+        " Refunded " # Nat.toText(refundedCount) # " registrant(s)."
+      } else { "" }) #
+      (if (prizeRefunded > 0) {
+        " Prize contribution of " # Nat.toText(prizeRefunded / 100_000_000) # " ICP returned."
+      } else { "" }) #
+      " Note: creation fee is non-refundable.";
+      refundedRegistrants = refundedCount;
+      prizeRefunded = prizeRefunded;
+    });
+  };
+
+  /// Get events created by the calling user
+  public query ({ caller }) func get_my_events() : async [RaceCalendar.ScheduledEvent] {
+    eventCalendar.getUserEvents(caller);
+  };
+
   // Get event with aggregated race details
   public query func get_event_with_races(eventId : Nat) : async ?{
     event : RaceCalendar.ScheduledEvent;
@@ -6607,6 +6796,59 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     raceManager.getRace(raceId);
   };
 
+  // Deterministic replay: re-simulate a completed race and return per-bot segment times
+  public query func get_race_segments(raceId : Nat) : async Result.Result<[RacingSimulator.BotSegmentTimes], Text> {
+    let ?race = Map.get(stable_races, Map.nhash, raceId) else {
+      return #err("Race not found");
+    };
+
+    let ?results = race.results else {
+      return #err("Race has no results");
+    };
+
+    // Rebuild participants from entries (preserving original order for deterministic seeds)
+    // The simulation seed uses participant index, so order must match the original simulation
+    let participants = Array.map<RacingSimulator.RaceEntry, RacingSimulator.RacingParticipant>(
+      race.entries,
+      func(entry) : RacingSimulator.RacingParticipant {
+        let tokenIdx = switch (Nat.fromText(entry.nftId)) {
+          case (?idx) { idx };
+          case (null) { 0 };
+        };
+        // Look up stored result for this entry to get gear data (faction/passives/consumables)
+        let matchingResult = Array.find<RacingSimulator.RaceResult>(results, func(r) { r.nftId == entry.nftId });
+        let (faction, passives, consumables) = switch (matchingResult) {
+          case (?r) { (r.faction, r.passives, r.consumables) };
+          case (null) {
+            (#Wild, ([] : [GearSystem.PassiveEffect]), ([] : [GearSystem.ConsumableInstance]));
+          };
+        };
+        {
+          nftId = entry.nftId;
+          owner = entry.owner;
+          stats = Option.get(entry.stats, { speed = 50; powerCore = 50; acceleration = 50; stability = 50; luck = 10; overcharge = 0; perfectTuneUp = false; tuneupQuality = 0.0; baseAvgRating = null });
+          tokenIndex = tokenIdx;
+          faction = faction;
+          baseAvgRating = switch (entry.stats) {
+            case (?s) { s.baseAvgRating };
+            case (null) { null };
+          };
+          passives = passives;
+          consumables = consumables;
+        };
+      },
+    );
+
+    switch (raceSimulator.simulateRaceSegmented(race, participants)) {
+      case (?(_, _, segmentBreakdown)) {
+        #ok(segmentBreakdown);
+      };
+      case (null) {
+        #err("Simulation failed");
+      };
+    };
+  };
+
   // Debug: Regenerate commentary for a completed race
   public shared ({ caller }) func debug_regenerate_race_commentary(raceId : Nat) : async Result.Result<Text, Text> {
     if (caller != owner) {
@@ -6656,12 +6898,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           tokenIndex = tokenIdx;
           faction = faction;
           baseAvgRating = baseAvgRating;
+          passives = [];
+          consumables = [];
         };
       },
     );
 
     // Call simulator with existing race data to regenerate events
-    let ?(_, newEvents) = raceSimulator.simulateRaceSegmented(race, participants) else {
+    let ?(_, newEvents, _) = raceSimulator.simulateRaceSegmented(race, participants) else {
       return #err("Failed to regenerate commentary");
     };
 
@@ -6694,6 +6938,94 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     ignore Map.put(stable_races, Map.nhash, raceId, updatedRace);
 
     #ok("Successfully regenerated commentary for race " # Nat.toText(raceId) # " with " # Nat.toText(newEvents.size()) # " events (was " # Nat.toText(race.events.size()) # ")");
+  };
+
+  // Admin: Wipe all gear and regenerate from race history with soulbound bindings.
+  // This replays every completed paid race's loot drops, binding each gear piece to the bot that earned it.
+  // Run once after deploying soulbound gear changes.
+  public shared ({ caller }) func admin_migrate_gear_soulbound() : async Result.Result<Text, Text> {
+    if (caller != owner) {
+      return #err("Unauthorized: Only owner can run gear migration");
+    };
+
+    // Build the race descriptor array for wipeAndRegenerateGear
+    let allRaces = raceManager.getAllRaces();
+    let raceBuf = Buffer.Buffer<{ raceId : Nat; terrain : GearSystem.TerrainTag; entryFee : Nat; results : ?[{ nftId : Text; owner : Principal; position : Nat }]; startTime : Int; eventTier : ?GearSystem.EventTier; isPartOfPaidEvent : Bool }>(allRaces.size());
+
+    for (race in allRaces.vals()) {
+      // Only process completed races
+      switch (race.status) {
+        case (#Completed) {
+          let gearTerrain : GearSystem.TerrainTag = switch (race.terrain) {
+            case (#MetalRoads) { #MetalRoads };
+            case (#ScrapHeaps) { #ScrapHeaps };
+            case (#WastelandSand) { #WastelandSand };
+          };
+
+          // Determine event tier from parent event
+          let eventTier : ?GearSystem.EventTier = switch (eventCalendar.getEventByRaceId(race.raceId)) {
+            case (?parentEvent) {
+              let tier : GearSystem.EventTier = switch (parentEvent.eventType) {
+                case (#DailySprint) { #Daily };
+                case (#WeeklyLeague) { #Weekly };
+                case (#MonthlyCup) { #Monthly };
+                case (#SpecialEvent(_)) { #Special };
+              };
+              ?tier;
+            };
+            case (null) { ?#Daily };
+          };
+
+          // Check if race is part of a paid event (for free-race filtering)
+          let isPartOfPaidEvent = if (race.entryFee == 0) {
+            switch (eventCalendar.getEventByRaceId(race.raceId)) {
+              case (?parentEvent) { parentEvent.metadata.entryFee > 0 };
+              case (null) { false };
+            };
+          } else { false };
+
+          // Map results to minimal shape
+          let results : ?[{ nftId : Text; owner : Principal; position : Nat }] = switch (race.results) {
+            case (?rs) {
+              let buf = Buffer.Buffer<{ nftId : Text; owner : Principal; position : Nat }>(rs.size());
+              for (r in rs.vals()) {
+                buf.add({
+                  nftId = r.nftId;
+                  owner = r.owner;
+                  position = r.position;
+                });
+              };
+              ?Buffer.toArray(buf);
+            };
+            case (null) { null };
+          };
+
+          raceBuf.add({
+            raceId = race.raceId;
+            terrain = gearTerrain;
+            entryFee = race.entryFee;
+            results = results;
+            startTime = race.startTime;
+            eventTier = eventTier;
+            isPartOfPaidEvent = isPartOfPaidEvent;
+          });
+        };
+        case (_) {}; // Skip non-completed races
+      };
+    };
+
+    let raceData = Buffer.toArray(raceBuf);
+    // March 12, 2026 00:00:00 UTC in nanoseconds — gear system deploy date
+    let gearSystemDeployTime : Int = 1_773_273_600_000_000_000;
+    let (gearsGenerated, racesProcessed) = gearManager.wipeAndRegenerateGear(
+      raceData,
+      Leaderboard.getSeasonIdFromTime,
+      gearSystemDeployTime,
+    );
+
+    let msg = "Gear migration complete: " # Nat.toText(gearsGenerated) # " gear pieces generated from " # Nat.toText(racesProcessed) # " races (all soulbound)";
+    Debug.print(msg);
+    #ok(msg);
   };
 
   // Admin: Re-simulate a completed race and update results
@@ -6746,12 +7078,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           tokenIndex = tokenIdx;
           faction = faction;
           baseAvgRating = baseAvgRating;
+          passives = [];
+          consumables = [];
         };
       },
     );
 
     // Re-run simulation with existing trackSeed
-    let ?(newResults, newEvents) = raceSimulator.simulateRaceSegmented(race, participants) else {
+    let ?(newResults, newEvents, _) = raceSimulator.simulateRaceSegmented(race, participants) else {
       return #err("Failed to resimulate race");
     };
 
@@ -6775,6 +7109,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           partsEarned = newResult.partsEarned;
           partType = newResult.partType;
           dnf = newResult.dnf;
+          faction = newResult.faction;
+          passives = newResult.passives;
+          consumables = newResult.consumables;
         };
       },
     );
@@ -7005,6 +7342,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                     partsEarned = result.partsEarned;
                     partType = result.partType;
                     dnf = result.dnf;
+                    faction = result.faction;
+                    passives = result.passives;
+                    consumables = result.consumables;
                   };
                 },
               );
@@ -8649,6 +8989,139 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     switch (eventCalendar.updateEventStatus(eventId, newStatus)) {
       case (?updated) {
         "Updated event " # Nat.toText(eventId) # " (" # updated.metadata.name # ") to status: " # status;
+      };
+      case (null) {
+        "Error: Event " # Nat.toText(eventId) # " not found";
+      };
+    };
+  };
+
+  // Admin function to force-trigger the calendar scheduler
+  public shared ({ caller }) func admin_trigger_scheduler() : async Text {
+    if (caller != owner) {
+      Debug.trap("Only owner can trigger scheduler");
+    };
+    let now = Time.now();
+    ensureCalendarScheduled<system>(now);
+    "Scheduler triggered at " # Int.toText(now);
+  };
+
+  // Admin function to add Scrap race stages to a Rush Hour event's Manual templates
+  public shared ({ caller }) func admin_add_scrap_to_rush_hour(eventId : Nat) : async Text {
+    if (caller != owner) {
+      Debug.trap("Only owner can modify events");
+    };
+
+    let scrapTemplates : [RaceCalendar.RaceTemplate] = [
+      {
+        stageName = ?"Race 1";
+        raceClass = #Scrap;
+        terrain = #MetalRoads;
+        distance = 5;
+        trackId = null;
+        startOffset = 0;
+      },
+      {
+        stageName = ?"Race 2";
+        raceClass = #Scrap;
+        terrain = #ScrapHeaps;
+        distance = 4;
+        trackId = null;
+        startOffset = 1_200_000_000_000;
+      },
+      {
+        stageName = ?"Race 3";
+        raceClass = #Scrap;
+        terrain = #WastelandSand;
+        distance = 6;
+        trackId = null;
+        startOffset = 2_400_000_000_000;
+      },
+      {
+        stageName = ?"Race 4";
+        raceClass = #Scrap;
+        terrain = #MetalRoads;
+        distance = 8;
+        trackId = null;
+        startOffset = 3_600_000_000_000;
+      },
+      {
+        stageName = ?"Race 5 Finals";
+        raceClass = #Scrap;
+        terrain = #ScrapHeaps;
+        distance = 10;
+        trackId = null;
+        startOffset = 5_400_000_000_000;
+      },
+    ];
+
+    switch (eventCalendar.getEvent(eventId)) {
+      case (?event) {
+        switch (event.raceCreationMode) {
+          case (#Manual(config)) {
+            let newTemplates = Array.append(scrapTemplates, config.raceTemplates);
+            let newMode : RaceCalendar.RaceCreationMode = #Manual({
+              raceTemplates = newTemplates;
+              heatAllocation = config.heatAllocation;
+            });
+            switch (eventCalendar.updateEventRaceCreationMode(eventId, newMode)) {
+              case (?updated) {
+                "Added 5 Scrap race stages to event " # Nat.toText(eventId) # " (" # updated.metadata.name # "). Now has " # Nat.toText(newTemplates.size()) # " total race templates.";
+              };
+              case (null) {
+                "Error: Failed to update event " # Nat.toText(eventId);
+              };
+            };
+          };
+          case (#Automatic(_)) {
+            "Error: Event " # Nat.toText(eventId) # " uses Automatic mode, not Manual. Scrap will work automatically via divisions.";
+          };
+        };
+      };
+      case (null) { "Error: Event " # Nat.toText(eventId) # " not found" };
+    };
+  };
+
+  // Admin function to update event metadata (divisions, minEntries, etc.)
+  public shared ({ caller }) func admin_update_event_metadata(
+    eventId : Nat,
+    divisions : [Text],
+    minEntries : Nat,
+  ) : async Text {
+    if (caller != owner) {
+      Debug.trap("Only owner can update event metadata");
+    };
+
+    // Parse division texts to RaceClass variants
+    let parsedDivisions = Buffer.Buffer<RaceCalendar.RaceClass>(divisions.size());
+    for (div in divisions.vals()) {
+      switch (div) {
+        case ("Scrap") { parsedDivisions.add(#Scrap) };
+        case ("Junker") { parsedDivisions.add(#Junker) };
+        case ("Raider") { parsedDivisions.add(#Raider) };
+        case ("Elite") { parsedDivisions.add(#Elite) };
+        case ("SilentKlan") { parsedDivisions.add(#SilentKlan) };
+        case (other) {
+          return "Error: Unknown division '" # other # "'. Valid: Scrap, Junker, Raider, Elite, SilentKlan";
+        };
+      };
+    };
+
+    switch (eventCalendar.getEvent(eventId)) {
+      case (?event) {
+        let updatedMetadata : RaceCalendar.EventMetadata = {
+          event.metadata with
+          divisions = Buffer.toArray(parsedDivisions);
+          minEntries = minEntries;
+        };
+        switch (eventCalendar.updateEventMetadata(eventId, updatedMetadata)) {
+          case (?updated) {
+            "Updated event " # Nat.toText(eventId) # " (" # updated.metadata.name # "): divisions=" # debug_show (Buffer.toArray(parsedDivisions)) # ", minEntries=" # Nat.toText(minEntries);
+          };
+          case (null) {
+            "Error: Event " # Nat.toText(eventId) # " not found";
+          };
+        };
       };
       case (null) {
         "Error: Event " # Nat.toText(eventId) # " not found";
@@ -13810,5 +14283,202 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         },
       ];
     };
+  };
+
+  // ==========================================
+  // GEAR SYSTEM ENDPOINTS
+  // ==========================================
+
+  /// Get a bot's equipped loadout with full gear details
+  public query func web_get_bot_loadout(
+    tokenIndex : Nat
+  ) : async {
+    tokenIndex : Nat;
+    legs : ?GearSystem.GearPiece;
+    thruster : ?GearSystem.GearPiece;
+    chassis : ?GearSystem.GearPiece;
+    gyro : ?GearSystem.GearPiece;
+    core : ?GearSystem.GearPiece;
+    module_ : ?GearSystem.GearPiece;
+    consumable1 : ?GearSystem.ConsumableInstance;
+    consumable2 : ?GearSystem.ConsumableInstance;
+  } {
+    gearManager.getResolvedLoadout(tokenIndex);
+  };
+
+  /// Get total gear stat bonuses for a bot
+  public query func web_get_gear_bonuses(
+    tokenIndex : Nat
+  ) : async {
+    speed : Nat;
+    powerCore : Nat;
+    acceleration : Nat;
+    stability : Nat;
+    luck : Nat;
+  } {
+    gearManager.getGearStatBonuses(tokenIndex);
+  };
+
+  /// Get all gear owned by a player (full details)
+  public query func web_get_player_gear(
+    owner : Principal
+  ) : async [GearSystem.GearPiece] {
+    gearManager.getPlayerGear(owner);
+  };
+
+  /// Get which bot each gear piece is equipped on (gearId → tokenIndex)
+  public query func web_get_gear_equip_map() : async [(Nat, Nat)] {
+    gearManager.getGearEquipMap();
+  };
+
+  /// Get a single gear piece by ID
+  public query func web_get_gear_piece(
+    gearId : Nat
+  ) : async ?GearSystem.GearPiece {
+    gearManager.getGearPiece(gearId);
+  };
+
+  /// Get total gear count (admin/stats)
+  public query func web_get_total_gear_count() : async Nat {
+    gearManager.getTotalGearCount();
+  };
+
+  /// Equip a gear piece to a bot
+  public shared ({ caller }) func web_equip_gear(
+    tokenIndex : Nat,
+    gearId : Nat,
+  ) : async Result.Result<GearSystem.BotLoadout, Text> {
+    trackMethodCall("web_equip_gear", caller);
+
+    // Verify caller owns the bot
+    switch (garageManager.getStats(tokenIndex)) {
+      case (null) { return #err("Bot not registered") };
+      case (?stats) {
+        if (not Principal.equal(stats.ownerPrincipal, caller)) {
+          return #err("You are not the owner of this bot");
+        };
+      };
+    };
+
+    gearManager.equipGear(caller, tokenIndex, gearId);
+  };
+
+  /// Unequip a gear slot on a bot
+  public shared ({ caller }) func web_unequip_gear(
+    tokenIndex : Nat,
+    slot : GearSystem.GearSlot,
+  ) : async Result.Result<GearSystem.BotLoadout, Text> {
+    trackMethodCall("web_unequip_gear", caller);
+
+    // Verify caller owns the bot
+    switch (garageManager.getStats(tokenIndex)) {
+      case (null) { return #err("Bot not registered") };
+      case (?stats) {
+        if (not Principal.equal(stats.ownerPrincipal, caller)) {
+          return #err("You are not the owner of this bot");
+        };
+      };
+    };
+
+    gearManager.unequipSlot(caller, tokenIndex, slot);
+  };
+
+  /// Craft 5 gear pieces of the same slot and rarity into a higher rarity piece
+  /// All pieces must be soulbound to the same bot (tokenIndex).
+  public shared ({ caller }) func web_craft_gear(
+    tokenIndex : Nat,
+    gearIds : [Nat],
+  ) : async Result.Result<GearSystem.GearPiece, Text> {
+    trackMethodCall("web_craft_gear", caller);
+
+    if (gearIds.size() != 3) {
+      return #err("Exactly 3 gear pieces required");
+    };
+
+    // Verify caller owns the bot
+    switch (garageManager.getStats(tokenIndex)) {
+      case (null) { return #err("Bot not registered") };
+      case (?stats) {
+        if (not Principal.equal(stats.ownerPrincipal, caller)) {
+          return #err("You are not the owner of this bot");
+        };
+      };
+    };
+
+    let currentSeason = Leaderboard.getSeasonIdFromTime(Time.now());
+    let currentIlvl = GearSystem.ilvlFromSeason(currentSeason);
+    // Deterministic seed from gear IDs
+    var seed : Nat = 0;
+    for (id in gearIds.vals()) {
+      seed := seed * 31 + id;
+    };
+
+    gearManager.craftGear(caller, tokenIndex, gearIds, currentSeason, currentIlvl, seed);
+  };
+
+  // ===== CONSUMABLE ENDPOINTS =====
+
+  /// Get all consumables owned by a player
+  public query func web_get_player_consumables(owner : Principal) : async [GearSystem.ConsumableInstance] {
+    let inv = gearManager.getPlayerInventory(owner);
+    let buf = Buffer.Buffer<GearSystem.ConsumableInstance>(inv.consumables.size());
+    for (id in inv.consumables.vals()) {
+      switch (gearManager.getConsumableInstance(id)) {
+        case (?inst) { buf.add(inst) };
+        case (null) {};
+      };
+    };
+    Buffer.toArray(buf);
+  };
+
+  /// Equip a consumable to a bot's loadout (slot 1 or 2)
+  public shared ({ caller }) func web_equip_consumable(
+    tokenIndex : Nat,
+    instanceId : Nat,
+    slot : Nat,
+  ) : async Result.Result<GearSystem.BotLoadout, Text> {
+    trackMethodCall("web_equip_consumable", caller);
+
+    // Verify bot ownership
+    switch (garageManager.getStats(tokenIndex)) {
+      case (?stats) {
+        if (not Principal.equal(stats.ownerPrincipal, caller)) {
+          return #err("Not your bot");
+        };
+      };
+      case (null) { return #err("Bot not found") };
+    };
+
+    gearManager.equipConsumable(caller, tokenIndex, instanceId, slot);
+  };
+
+  /// Unequip a consumable from a bot's loadout (slot 1 or 2)
+  public shared ({ caller }) func web_unequip_consumable(
+    tokenIndex : Nat,
+    slot : Nat,
+  ) : async Result.Result<GearSystem.BotLoadout, Text> {
+    trackMethodCall("web_unequip_consumable", caller);
+
+    // Verify bot ownership
+    switch (garageManager.getStats(tokenIndex)) {
+      case (?stats) {
+        if (not Principal.equal(stats.ownerPrincipal, caller)) {
+          return #err("Not your bot");
+        };
+      };
+      case (null) { return #err("Bot not found") };
+    };
+
+    var loadout = gearManager.getLoadout(tokenIndex);
+    if (slot == 1) {
+      loadout := { loadout with consumable1 = null; lastModified = Time.now() };
+    } else if (slot == 2) {
+      loadout := { loadout with consumable2 = null; lastModified = Time.now() };
+    } else {
+      return #err("Consumable slot must be 1 or 2");
+    };
+
+    gearManager.setLoadout(tokenIndex, loadout);
+    #ok(loadout);
   };
 };

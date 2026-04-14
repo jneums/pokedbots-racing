@@ -217,6 +217,18 @@ function RegistrationPanel({ event }: { event: any }) {
               {event.visibility.Restricted.requiredFaction?.[0] && (
                 <p>Required Faction: <span className="font-bold text-amber-400">{event.visibility.Restricted.requiredFaction[0]}</span></p>
               )}
+              {event.visibility.Restricted.allowedBots?.[0] && event.visibility.Restricted.allowedBots[0].length > 0 && (
+                <div>
+                  <p className="mb-1">Whitelisted Bots:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {event.visibility.Restricted.allowedBots[0].map((botId: bigint, idx: number) => (
+                      <Badge key={idx} variant="outline" className="text-xs bg-primary/10 border-primary/30">
+                        #{Number(botId)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -752,7 +764,7 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
             {/* Live Tab */}
             <TabsContent value="live" ref={liveTabRef}>
               <LiveRacesPanel 
-                races={[...liveRaces, ...imminentRaces]} 
+                races={races} 
                 event={event}
                 botProfiles={botProfilesMap}
               />

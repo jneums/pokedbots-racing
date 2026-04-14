@@ -110,12 +110,13 @@ module {
           // Check ownership via registration - if bot is registered, the ownerPrincipal is the owner
           let isOwner = racingStats.ownerPrincipal == user;
 
-          // Calculate overall rating
-          let overallRating = ctx.garageManager.calculateOverallRating(racingStats);
+          // Calculate overall rating at 100% (base + upgrades only, no gear/buffs/penalties)
+          // This is the "true" rating used for race class and display
+          let overallRating = ctx.garageManager.calculateRatingAt100(racingStats);
           let status = ctx.garageManager.getBotStatus(racingStats);
           let canRace = ctx.garageManager.canRace(Nat.toText(tokenIndex));
 
-          // Determine race class bracket (rating-based)
+          // Determine race class bracket (rating-based, uses at-100 rating)
           let raceClassVariant = RaceClassUtils.getRaceClassFromRating(overallRating);
           let raceClass = RaceClassUtils.getClassDescription(raceClassVariant);
 
@@ -260,6 +261,26 @@ module {
           // Get dedication tier info for this bot
           let dedicationSummary = ctx.dedicationManager.getDedicationSummary(tokenIndex);
 
+          // Maintenance recommendation
+          let REPAIR_COOLDOWN : Int = 43200000000000; // 12 hours in nanoseconds
+          let repairReady = switch (racingStats.lastRepaired) {
+            case (?lastTime) { now - lastTime >= REPAIR_COOLDOWN };
+            case (null) { true };
+          };
+          let recommendedAction = if (racingStats.condition < 50 and repairReady) {
+            "RepairBay";
+          } else if (racingStats.battery < 30) {
+            "ChargingStation";
+          } else if (racingStats.condition < 80 and repairReady) {
+            "RepairBay";
+          } else if (racingStats.battery < 80) {
+            "ChargingStation";
+          } else if (racingStats.overcharge == 0) {
+            "Jolt";
+          } else {
+            "None";
+          };
+
           // Build JSON response - different fields based on ownership
           let response = if (isOwner) {
             // Full details for owned bots
@@ -283,6 +304,7 @@ module {
                   ("perfect_tuneup_active", Json.bool(racingStats.perfectTuneUp)),
                   ("status", Json.str(status)),
                   ("status_message", Json.str(statusFlavor)),
+                  ("recommended_action", Json.str(recommendedAction)),
                   ("last_recharged_utc", switch (racingStats.lastRecharged) { case (?t) { Json.str(TimeUtils.nanosToUtcString(t)) }; case (null) { Json.nullable() } }),
                   ("last_repaired_utc", switch (racingStats.lastRepaired) { case (?t) { Json.str(TimeUtils.nanosToUtcString(t)) }; case (null) { Json.nullable() } }),
                   (
@@ -374,6 +396,46 @@ module {
                   case (?info) { info };
                 },
               ),
+              // Explicit activity status model
+              (
+                "activity",
+                do {
+                  let (actType, actZone, actStarted, actCanCollect) : (Text, ?Text, ?Int, ?Bool) = switch (racingStats.activeMission) {
+                    case (?mission) {
+                      let zone = switch (mission.zone) {
+                        case (#ScrapHeaps) { "ScrapHeaps" };
+                        case (#AbandonedSettlements) { "AbandonedSettlements" };
+                        case (#DeadMachineFields) { "DeadMachineFields" };
+                        case (#RepairBay) { "RepairBay" };
+                        case (#ChargingStation) { "ChargingStation" };
+                      };
+                      let aType = switch (mission.zone) {
+                        case (#ChargingStation) { "charging" };
+                        case (#RepairBay) { "repairing" };
+                        case _ { "scavenging" };
+                      };
+                      (aType, ?zone, ?mission.startTime, ?true);
+                    };
+                    case (null) {
+                      if (ctx.isInActiveRace(tokenIndex)) {
+                        ("racing", null, null, null);
+                      } else {
+                        switch (ctx.garageManager.getActiveUpgrade(tokenIndex)) {
+                          case (?_upgrade) { ("upgrading", null, null, null) };
+                          case (null) { ("idle", null, null, null) };
+                        };
+                      };
+                    };
+                  };
+                  Json.obj([
+                    ("type", Json.str(actType)),
+                    ("zone", switch (actZone) { case (?z) { Json.str(z) }; case (null) { Json.nullable() } }),
+                    ("started_at", switch (actStarted) { case (?t) { Json.str(TimeUtils.nanosToUtcString(t)) }; case (null) { Json.nullable() } }),
+                    ("started_at_nanos", switch (actStarted) { case (?t) { Json.int(Int.abs(t)) }; case (null) { Json.nullable() } }),
+                    ("can_collect_now", switch (actCanCollect) { case (?b) { Json.bool(b) }; case (null) { Json.nullable() } }),
+                  ]);
+                },
+              ),
             ]);
           } else {
             // Public details only for bots not owned by caller - show only statsAt100 (no battery/condition penalties)
@@ -403,6 +465,33 @@ module {
               ("preferred_terrain", Json.str(terrainText)),
               ("thumbnail", Json.str(thumbnailUrl)),
               ("image", Json.str(fullImageUrl)),
+              // Explicit activity status model (public view - limited info)
+              (
+                "activity",
+                do {
+                  let actType : Text = switch (racingStats.activeMission) {
+                    case (?mission) {
+                      switch (mission.zone) {
+                        case (#ChargingStation) { "charging" };
+                        case (#RepairBay) { "repairing" };
+                        case _ { "scavenging" };
+                      };
+                    };
+                    case (null) {
+                      if (ctx.isInActiveRace(tokenIndex)) { "racing" }
+                      else {
+                        switch (ctx.garageManager.getActiveUpgrade(tokenIndex)) {
+                          case (?_) { "upgrading" };
+                          case (null) { "idle" };
+                        };
+                      };
+                    };
+                  };
+                  Json.obj([
+                    ("type", Json.str(actType)),
+                  ]);
+                },
+              ),
             ]);
           };
 

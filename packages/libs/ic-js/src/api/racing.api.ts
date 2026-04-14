@@ -8,6 +8,9 @@ import { getCanisterId, getHost } from '../config.js';
 export type ScheduledEvent = PokedBotsRacing.ScheduledEvent;
 export type EventStatus = PokedBotsRacing.EventStatus;
 export type Race = PokedBotsRacing.Race;
+export type BotSegmentTimes = PokedBotsRacing.BotSegmentTimes;
+export type UserEventConfig = PokedBotsRacing.UserEventConfig;
+export type EventVisibility = PokedBotsRacing.EventVisibility;
 
 // Accept either Identity or Plug agent (which has call/getPrincipal methods)
 type IdentityOrAgent = Identity | any;
@@ -109,6 +112,24 @@ export const getRaceById = async (
   const racingActor = await getActor(identity);
   const result = await racingActor.get_race_by_id(BigInt(raceId));
   return result.length > 0 ? (result[0] ?? null) : null;
+};
+
+/**
+ * Fetches per-bot segment times via deterministic replay of a completed race.
+ * @param raceId The ID of the race to replay
+ * @param identity Optional identity to use for the actor
+ * @returns Array of BotSegmentTimes (nftId + cumulative segment times)
+ */
+export const getRaceSegments = async (
+  raceId: number,
+  identity?: Identity
+): Promise<BotSegmentTimes[]> => {
+  const racingActor = await getActor(identity);
+  const result = await racingActor.get_race_segments(BigInt(raceId));
+  if ('ok' in result) {
+    return result.ok;
+  }
+  throw new Error(result.err);
 };
 
 /**
@@ -412,5 +433,87 @@ export const unregisterFromEvent = async (
 ): Promise<{ ok: { refundAmount: bigint; penalty: bigint } } | { err: string }> => {
   const racingActor = await getActor(identity);
   const result = await racingActor.unregister_from_event(BigInt(eventId), BigInt(tokenIndex));
+  return result;
+};
+
+/**
+ * JS-friendly params for creating a user event.
+ * All bigint fields from the backend UserEventConfig accept number here and are converted internally.
+ */
+export interface CreateUserEventParams {
+  prizeContribution: number;
+  raceCreationMode: PokedBotsRacing.RaceCreationMode;
+  scheduledTime: number;
+  minEntries: number;
+  registrationWindowHours: number;
+  name: string;
+  description: string;
+  creatorName?: string;
+  invitedParticipants?: Array<import('@icp-sdk/core/principal').Principal>;
+  divisions: Array<PokedBotsRacing.RaceClass>;
+  maxRegistrationsPerClass: number;
+  entryFee: number;
+  visibility: PokedBotsRacing.EventVisibility;
+}
+
+/**
+ * Create a user-created event with custom config.
+ * Requires ICRC-2 approval for creation fee + prize contribution before calling.
+ * @param config JS-friendly event configuration
+ * @param identity Identity to use for the call (authenticated)
+ * @returns The created event ID and message, or an error
+ */
+export const createUserEvent = async (
+  config: CreateUserEventParams,
+  identity: IdentityOrAgent
+): Promise<{ ok: { eventId: bigint; message: string } } | { err: string }> => {
+  const racingActor = await getActor(identity);
+
+  const backendConfig: PokedBotsRacing.UserEventConfig = {
+    prizeContribution: BigInt(config.prizeContribution),
+    raceCreationMode: config.raceCreationMode,
+    scheduledTime: BigInt(config.scheduledTime),
+    minEntries: BigInt(config.minEntries),
+    registrationWindowHours: BigInt(config.registrationWindowHours),
+    name: config.name,
+    description: config.description,
+    creatorName: config.creatorName !== undefined ? [config.creatorName] : [],
+    invitedParticipants: config.invitedParticipants !== undefined ? [config.invitedParticipants] : [],
+    divisions: config.divisions,
+    maxRegistrationsPerClass: BigInt(config.maxRegistrationsPerClass),
+    entryFee: BigInt(config.entryFee),
+    visibility: config.visibility,
+  };
+
+  const result = await racingActor.create_user_event(backendConfig);
+  return result;
+};
+
+/**
+ * Cancel a user-created event. Only the creator can cancel, and only before registration closes.
+ * Refunds entry fees to registrants and prize contribution to creator (creation fee is NOT refunded).
+ * @param eventId The ID of the event to cancel
+ * @param identity Identity to use for the call (authenticated)
+ * @returns Refund info or error
+ */
+export const cancelUserEvent = async (
+  eventId: number,
+  identity: IdentityOrAgent
+): Promise<{ ok: { refundedRegistrants: bigint; message: string; prizeRefunded: bigint } } | { err: string }> => {
+  const racingActor = await getActor(identity);
+  const result = await racingActor.cancel_user_event(BigInt(eventId));
+  return result;
+};
+
+/**
+ * Get events created by the calling user.
+ * @param identity Identity to use for the call (authenticated)
+ * @returns Array of ScheduledEvent objects created by the caller
+ */
+export const getMyEvents = async (
+  identity: IdentityOrAgent
+): Promise<ScheduledEvent[]> => {
+  const racingActor = await getActor(identity);
+  const result = await racingActor.get_my_events();
   return result;
 };

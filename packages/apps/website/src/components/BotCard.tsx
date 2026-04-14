@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { BotListItem, generatetokenIdentifier } from '@pokedbots-racing/ic-js';
 import { useAuth } from '../hooks/useAuth';
-import { calculateDailyAffinity } from './DailyPhenomenonBanner';
 import { 
   useInitializeBot,
   useRechargeBot,
@@ -18,6 +17,7 @@ import {
   useRespecBot,
   useEnterRace,
   useDedicationInfo,
+  useGearBonuses,
 } from '../hooks/useGarage';
 import { useGetUpcomingEventsWithRaces, useRegisterForEvent, useUnregisterFromEvent } from '../hooks/useRacing';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -33,6 +33,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Checkbox } from './ui/checkbox';
 import { Slider } from './ui/slider';
 import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionBonus, getFactionSpecialTerrain } from '../lib/utils';
+import { GearLoadoutPanel } from './GearLoadoutPanel';
 
 interface BotCardProps {
   bot: BotListItem;
@@ -85,6 +86,8 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   
   // Fetch dedication info for badge display
   const { data: dedicationInfo } = useDedicationInfo(Number(bot.tokenIndex));
+  const gearBonuses = useGearBonuses(Number(bot.tokenIndex));
+  const gearLuck = gearBonuses.data?.luck ?? 0;
   
   // Fetch upcoming events for event registration
   const { data: upcomingEvents } = useGetUpcomingEventsWithRaces(7); // Next 7 days
@@ -871,26 +874,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           const maxStability = Number(bot.maxStats.stability);
           
           // Calculate luck from stats (not affected by battery/condition)
-          const luck = bot.stats ? Number(bot.stats.luckBase || 0n) + Number(bot.stats.luckBonus || 0n) : Math.floor((Number(bot.tokenIndex) % 100) / 2) + 10;
-          
-          // Get faction from stats (Candid enum format)
-          let factionName = 'Unknown';
-          if (bot.stats?.faction) {
-            const factionKeys = Object.keys(bot.stats.faction);
-            if (factionKeys.length > 0) {
-              factionName = factionKeys[0];
-            }
-          }
-          
-          // Calculate daily affinity (needed for effective luck)
-          const affinity = calculateDailyAffinity(
-            Number(bot.tokenIndex),
-            { speed: maxSpeed, powerCore: maxPower, acceleration: maxAccel, stability: maxStability, luck },
-            factionName
-          );
-          
-          // Effective luck tier = (luck + affinity) / 2, as used in simulator
-          const effectiveLuck = Math.floor((luck + affinity) / 2);
+          const baseLuck = bot.stats ? Number(bot.stats.luckBase || 0n) + Number(bot.stats.luckBonus || 0n) : Math.floor((Number(bot.tokenIndex) % 100) / 2) + 10;
           
           // Penalty detection based on battery/condition thresholds (not stat comparisons)
           // Battery < 80 = speed/acceleration penalties
@@ -937,29 +921,17 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 </div>
               </div>
 
-              {/* Luck Section (separate - not part of rating) */}
-              <div className="p-2 rounded-lg border border-green-500/30 bg-gradient-to-r from-green-500/5 to-emerald-500/10">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🍀</span>
-                    <div>
-                      <span className="text-xs font-medium text-green-400">Luck</span>
-                      <span className="text-[10px] text-muted-foreground ml-1">(not in rating)</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <span className="text-xs text-muted-foreground">Base: </span>
-                      <span className="font-bold">{luck}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs text-muted-foreground">Effective: </span>
-                      <span className={`font-bold ${effectiveLuck > luck ? 'text-green-400' : effectiveLuck < luck ? 'text-orange-400' : ''}`}>
-                        {effectiveLuck}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+              {/* Luck (separate - not part of rating) */}
+              <div className="flex items-center justify-center gap-2 p-2 bg-card/80 border border-green-500/30 rounded-lg">
+                <span className="text-lg">🍀</span>
+                <span className="text-xs text-muted-foreground">Luck</span>
+                <span className={`text-base font-bold ${gearLuck > 0 ? 'text-green-400' : ''}`}>
+                  {baseLuck + gearLuck}
+                </span>
+                {gearLuck > 0 && (
+                  <span className="text-xs text-green-400">/{baseLuck}</span>
+                )}
+                <span className="text-[10px] text-muted-foreground">(not in rating)</span>
               </div>
               
               {isPenalized && (
@@ -970,6 +942,8 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
             </div>
           );
         })()}
+
+        <GearLoadoutPanel tokenIndex={Number(bot.tokenIndex)} />
 
         {/* Battery & Condition */}
         <div className={`p-3 rounded-lg border space-y-3 ${

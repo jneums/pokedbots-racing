@@ -960,6 +960,14 @@ module {
       // Bot Dedication tier benefits callback
       getTierBenefits : (Nat) -> BotDedication.TierBenefits;
       getBenefitsForBot : (Nat) -> BotDedication.TierBenefits;
+      // Gear system stat bonuses callback
+      getGearBonuses : (Nat) -> {
+        speed : Nat;
+        powerCore : Nat;
+        acceleration : Nat;
+        stability : Nat;
+        luck : Nat;
+      };
     },
   ) {
     private let stats = initStats;
@@ -1172,12 +1180,15 @@ module {
               let baseStats = getBaseStats(idx);
               let baseAvg = (baseStats.speed + baseStats.powerCore + baseStats.acceleration + baseStats.stability) / 4;
 
+              // Include gear luck bonuses in luck stat
+              let gearBonuses = statsProvider.getGearBonuses(botStats.tokenIndex);
+
               ?{
                 speed = finalStats.speed;
                 powerCore = finalStats.powerCore;
                 acceleration = finalStats.acceleration;
                 stability = finalStats.stability;
-                luck = botStats.luckBase + botStats.luckBonus;
+                luck = botStats.luckBase + botStats.luckBonus + gearBonuses.luck;
                 overcharge = botStats.overcharge;
                 perfectTuneUp = botStats.perfectTuneUp;
                 tuneupQuality = botStats.tuneupQuality;
@@ -1199,13 +1210,14 @@ module {
         case (?idx) {
           switch (Map.get(stats, nhash, idx)) {
             case (?botStats) {
-              // Get base stats + bonuses (no battery/condition penalties)
+              // Get base stats + bonuses + gear (no battery/condition penalties)
               let baseStats = getBaseStats(idx);
+              let gearBonuses = statsProvider.getGearBonuses(idx);
               let statsAt100 = {
-                speed = baseStats.speed + botStats.speedBonus;
-                powerCore = baseStats.powerCore + botStats.powerCoreBonus;
-                acceleration = baseStats.acceleration + botStats.accelerationBonus;
-                stability = baseStats.stability + botStats.stabilityBonus;
+                speed = baseStats.speed + botStats.speedBonus + gearBonuses.speed;
+                powerCore = baseStats.powerCore + botStats.powerCoreBonus + gearBonuses.powerCore;
+                acceleration = baseStats.acceleration + botStats.accelerationBonus + gearBonuses.acceleration;
+                stability = baseStats.stability + botStats.stabilityBonus + gearBonuses.stability;
               };
 
               // Apply faction terrain bonuses (condition=100 for Golden faction bonus)
@@ -1231,7 +1243,7 @@ module {
                 powerCore = finalStats.powerCore;
                 acceleration = finalStats.acceleration;
                 stability = finalStats.stability;
-                luck = botStats.luckBase + botStats.luckBonus;
+                luck = botStats.luckBase + botStats.luckBonus + gearBonuses.luck;
                 overcharge = 0; // At 100% stats, no overcharge active
                 perfectTuneUp = false;
                 tuneupQuality = 0.0;
@@ -2684,11 +2696,13 @@ module {
       };
 
       // Apply penalties to appropriate stats, then add synergy bonuses and world buffs
+      // Gear bonuses are added to base+upgrade before penalties (so battery/condition still gate performance)
+      let gearBonuses = statsProvider.getGearBonuses(botStats.tokenIndex);
       // Use roundFloat instead of Float.toInt to avoid truncation (e.g., 17.9 -> 17 instead of 18)
-      let speedWithPenalty = roundFloat(Float.fromInt(base.speed + botStats.speedBonus) * batteryPenalty * speedOvercharge) + speedBuff + synergySpeed;
-      let accelerationWithPenalty = roundFloat(Float.fromInt(base.acceleration + botStats.accelerationBonus) * batteryPenalty * accelOvercharge) + accelerationBuff + synergyAcceleration;
-      let powerCoreWithPenalty = roundFloat(Float.fromInt(base.powerCore + botStats.powerCoreBonus) * conditionPenalty * powerCoreOvercharge) + powerCoreBuff + synergyPowerCore;
-      let stabilityWithPenalty = roundFloat(Float.fromInt(base.stability + botStats.stabilityBonus) * conditionPenalty * stabilityOvercharge) + stabilityBuff + synergyStability;
+      let speedWithPenalty = roundFloat(Float.fromInt(base.speed + botStats.speedBonus + gearBonuses.speed) * batteryPenalty * speedOvercharge) + speedBuff + synergySpeed;
+      let accelerationWithPenalty = roundFloat(Float.fromInt(base.acceleration + botStats.accelerationBonus + gearBonuses.acceleration) * batteryPenalty * accelOvercharge) + accelerationBuff + synergyAcceleration;
+      let powerCoreWithPenalty = roundFloat(Float.fromInt(base.powerCore + botStats.powerCoreBonus + gearBonuses.powerCore) * conditionPenalty * powerCoreOvercharge) + powerCoreBuff + synergyPowerCore;
+      let stabilityWithPenalty = roundFloat(Float.fromInt(base.stability + botStats.stabilityBonus + gearBonuses.stability) * conditionPenalty * stabilityOvercharge) + stabilityBuff + synergyStability;
 
       // Apply Bot Dedication tier bonuses (flat stat bonuses that stack)
       let tierBenefits = statsProvider.getBenefitsForBot(botStats.tokenIndex);
@@ -2710,6 +2724,7 @@ module {
       speed : {
         base : Nat;
         upgrades : Nat;
+        gear : Nat;
         batteryPenalty : Float;
         batteryEffect : Int;
         overcharge : Float;
@@ -2722,6 +2737,7 @@ module {
       powerCore : {
         base : Nat;
         upgrades : Nat;
+        gear : Nat;
         conditionPenalty : Float;
         conditionEffect : Int;
         overcharge : Float;
@@ -2734,6 +2750,7 @@ module {
       acceleration : {
         base : Nat;
         upgrades : Nat;
+        gear : Nat;
         batteryPenalty : Float;
         batteryEffect : Int;
         overcharge : Float;
@@ -2746,6 +2763,7 @@ module {
       stability : {
         base : Nat;
         upgrades : Nat;
+        gear : Nat;
         conditionPenalty : Float;
         conditionEffect : Int;
         overcharge : Float;
@@ -2841,28 +2859,31 @@ module {
       let dedicationAcceleration = tierBenefits.accelerationBonus;
       let dedicationStability = tierBenefits.stabilityBonus;
 
+      // Gear bonuses
+      let gearBonuses = statsProvider.getGearBonuses(botStats.tokenIndex);
+
       // Helper function to round floats properly (Float.toInt truncates, we want rounding)
       func roundFloat(f : Float) : Int {
         Float.toInt(f + 0.5);
       };
 
       // Calculate intermediate values (using roundFloat for proper rounding)
-      let speedBeforePenalty = base.speed + botStats.speedBonus;
+      let speedBeforePenalty = base.speed + botStats.speedBonus + gearBonuses.speed;
       let speedAfterBattery = roundFloat(Float.fromInt(speedBeforePenalty) * batteryPenalty * speedOvercharge);
       let speedBatteryEffect = speedAfterBattery - speedBeforePenalty;
       let speedFinal = Nat.min(100, Int.abs(speedAfterBattery) + speedBuff + synergySpeed + dedicationSpeed);
 
-      let accelBeforePenalty = base.acceleration + botStats.accelerationBonus;
+      let accelBeforePenalty = base.acceleration + botStats.accelerationBonus + gearBonuses.acceleration;
       let accelAfterBattery = roundFloat(Float.fromInt(accelBeforePenalty) * batteryPenalty * accelOvercharge);
       let accelBatteryEffect = accelAfterBattery - accelBeforePenalty;
       let accelFinal = Nat.min(100, Int.abs(accelAfterBattery) + accelerationBuff + synergyAcceleration + dedicationAcceleration);
 
-      let powerCoreBeforePenalty = base.powerCore + botStats.powerCoreBonus;
+      let powerCoreBeforePenalty = base.powerCore + botStats.powerCoreBonus + gearBonuses.powerCore;
       let powerCoreAfterCondition = roundFloat(Float.fromInt(powerCoreBeforePenalty) * conditionPenalty * powerCoreOvercharge);
       let powerCoreConditionEffect = powerCoreAfterCondition - powerCoreBeforePenalty;
       let powerCoreFinal = Nat.min(100, Int.abs(powerCoreAfterCondition) + powerCoreBuff + synergyPowerCore + dedicationPowerCore);
 
-      let stabilityBeforePenalty = base.stability + botStats.stabilityBonus;
+      let stabilityBeforePenalty = base.stability + botStats.stabilityBonus + gearBonuses.stability;
       let stabilityAfterCondition = roundFloat(Float.fromInt(stabilityBeforePenalty) * conditionPenalty * stabilityOvercharge);
       let stabilityConditionEffect = stabilityAfterCondition - stabilityBeforePenalty;
       let stabilityFinal = Nat.min(100, Int.abs(stabilityAfterCondition) + stabilityBuff + synergyStability + dedicationStability);
@@ -2871,6 +2892,7 @@ module {
         speed = {
           base = base.speed;
           upgrades = botStats.speedBonus;
+          gear = gearBonuses.speed;
           batteryPenalty = batteryPenalty;
           batteryEffect = speedBatteryEffect;
           overcharge = speedOvercharge;
@@ -2883,6 +2905,7 @@ module {
         powerCore = {
           base = base.powerCore;
           upgrades = botStats.powerCoreBonus;
+          gear = gearBonuses.powerCore;
           conditionPenalty = conditionPenalty;
           conditionEffect = powerCoreConditionEffect;
           overcharge = powerCoreOvercharge;
@@ -2895,6 +2918,7 @@ module {
         acceleration = {
           base = base.acceleration;
           upgrades = botStats.accelerationBonus;
+          gear = gearBonuses.acceleration;
           batteryPenalty = batteryPenalty;
           batteryEffect = accelBatteryEffect;
           overcharge = accelOvercharge;
@@ -2907,6 +2931,7 @@ module {
         stability = {
           base = base.stability;
           upgrades = botStats.stabilityBonus;
+          gear = gearBonuses.stability;
           conditionPenalty = conditionPenalty;
           conditionEffect = stabilityConditionEffect;
           overcharge = stabilityOvercharge;

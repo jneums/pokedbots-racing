@@ -373,16 +373,64 @@ function CompactRaceCard({ race, isSelected, onClick, botProfiles }: {
   );
 }
 
+// Compact row for the post-live completed races list
+function CompletedRaceRow({ race, botProfiles }: { race: any; botProfiles: any[] }) {
+  const entryCount = race.entries?.length || 0;
+  const estimatedPrizePool = (Number(race.entryFee) * entryCount) + Number(race.platformBonus || 0);
+  
+  // Get winner info
+  const winner = race.results?.[0]?.[0];
+  const winnerProfile = winner ? botProfiles.find((p: any) => p && Number(p.tokenIndex) === Number(winner.nftId)) : null;
+  const winnerName = winnerProfile?.name?.[0] || (winner ? `Bot #${winner.nftId}` : null);
+  
+  return (
+    <Link
+      to={`/race/${race.raceId}`}
+      className="flex items-center gap-3 p-3 rounded-lg border border-border/40 bg-card/30 hover:bg-card/60 hover:border-primary/50 transition-all"
+    >
+      {/* Status */}
+      <div className="w-10 shrink-0 text-center">
+        <span className="text-green-500 text-sm">✓</span>
+      </div>
+      
+      {/* Race Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-medium truncate">{getTerrainIcon(race.terrain)} {race.name}</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+          <span>{race.distance?.toString()}km</span>
+          <span>•</span>
+          <span>{entryCount} racers</span>
+          {winnerName && (
+            <>
+              <span>•</span>
+              <span className="text-amber-400">🏆 {winnerName}</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Division Badge */}
+      <Badge variant="outline" className="text-xs shrink-0">
+        {getRaceClassName(race.raceClass)}
+      </Badge>
+
+      {/* Prize */}
+      <div className="text-right shrink-0">
+        <span className="text-sm font-medium text-amber-400">{formatICP(BigInt(estimatedPrizePool))}</span>
+      </div>
+    </Link>
+  );
+}
+
 export function LiveRacesPanel({ races, event, botProfiles }: LiveRacesPanelProps) {
-  // Buffer constants - must match RaceVisualizer
-  const LIVE_START_BUFFER_SECONDS = 45;
-  const maxRaceDuration = 10 * 60 * 1_000_000_000; // 10 minutes - generous for long races
   const now = Date.now() * 1_000_000;
   
-  // Separate live, recently completed (still watchable), and imminent races
+  // Categorize all races
   const liveRaces = races.filter(r => 'InProgress' in r.status);
   
-  // Include recently completed races that are still within a reasonable viewing window
+  // Recently completed races that are still watchable (animation may still be running)
   const recentlyCompletedRaces = races.filter(r => {
     if (!('Completed' in r.status)) return false;
     const raceStartNs = Number(r.startTime);
@@ -394,23 +442,35 @@ export function LiveRacesPanel({ races, event, botProfiles }: LiveRacesPanelProp
     'Upcoming' in r.status && 
     Number(r.startTime) < now + 15 * 60 * 1_000_000_000
   ).sort((a, b) => Number(a.startTime) - Number(b.startTime));
+
+  // All completed races (for post-live list)
+  const completedRaces = races.filter(r => 'Completed' in r.status)
+    .sort((a, b) => Number(b.startTime) - Number(a.startTime)); // newest first
   
-  // Combine: live first, then recently completed, then imminent
-  const filteredRaces = [...liveRaces, ...recentlyCompletedRaces, ...imminentRaces];
+  // "Active" races = ones that should show in the live viewer (live + still-watchable + imminent)
+  const activeRaces = [...liveRaces, ...recentlyCompletedRaces, ...imminentRaces];
+  // Deduplicate (a recently completed race could appear in both lists)
+  const activeRaceIds = new Set<string>();
+  const deduplicatedActiveRaces = activeRaces.filter(r => {
+    const id = r.raceId?.toString();
+    if (activeRaceIds.has(id)) return false;
+    activeRaceIds.add(id);
+    return true;
+  });
+  
+  const isLivePeriod = liveRaces.length > 0 || imminentRaces.length > 0 || recentlyCompletedRaces.length > 0;
   
   // Track which race is currently selected for viewing
   const [selectedRaceId, setSelectedRaceId] = useState<string | null>(
-    filteredRaces[0]?.raceId?.toString() || null
+    deduplicatedActiveRaces[0]?.raceId?.toString() || null
   );
   
   // CRITICAL: Store the currently viewed race in a ref so it persists even when
-  // the race status changes and it gets filtered out of the list
+  // the race status changes and it gets filtered out of the active list
   const currentlyViewingRaceRef = useRef<any>(null);
   
-  // Find the selected race from the filtered list
-  let selectedRaceFromList = filteredRaces.find(r => r.raceId?.toString() === selectedRaceId);
-  
-  // Also check the full races array (not filtered) in case it was filtered out
+  // Find the selected race - check active races first, then ALL races as fallback
+  let selectedRaceFromList = deduplicatedActiveRaces.find(r => r.raceId?.toString() === selectedRaceId);
   if (!selectedRaceFromList && selectedRaceId) {
     selectedRaceFromList = races.find(r => r.raceId?.toString() === selectedRaceId);
   }
@@ -420,24 +480,58 @@ export function LiveRacesPanel({ races, event, botProfiles }: LiveRacesPanelProp
     currentlyViewingRaceRef.current = selectedRaceFromList;
   }
   
-  // Use the ref as fallback - this prevents the race from disappearing mid-animation
-  const selectedRace = selectedRaceFromList || currentlyViewingRaceRef.current || filteredRaces[0];
+  // Use the ref as fallback - prevents the race from disappearing mid-animation
+  const selectedRace = selectedRaceFromList || currentlyViewingRaceRef.current || deduplicatedActiveRaces[0];
   
-  // Build the display list: include the currently selected race even if it's not in filteredRaces
-  const allRaces = [...filteredRaces];
-  if (selectedRace && !filteredRaces.some(r => r.raceId?.toString() === selectedRace.raceId?.toString())) {
-    // Add the currently viewed race to the list so it stays visible
-    allRaces.unshift(selectedRace);
+  // Build the display list: include the currently selected race even if it aged out of activeRaces
+  const displayRaces = [...deduplicatedActiveRaces];
+  if (selectedRace && !deduplicatedActiveRaces.some(r => r.raceId?.toString() === selectedRace.raceId?.toString())) {
+    displayRaces.unshift(selectedRace);
   }
   
-  // Get all bot indices for batch profile fetch
-  const allBotIndices = [...new Set(allRaces.flatMap(race => [
+  // Get all bot indices for batch profile fetch (from display races + completed races for the list)
+  const racesForProfiles = isLivePeriod ? displayRaces : completedRaces;
+  const allBotIndices = [...new Set(racesForProfiles.flatMap(race => [
     ...race.entries.map((e: any) => Number(e.nftId)),
     ...(race.results?.[0]?.map((r: any) => Number(r.nftId)) || [])
   ]))];
   const { data: profiles = [] } = useGetBotProfilesBatch(allBotIndices);
 
-  if (allRaces.length === 0 && !selectedRace) {
+  // ── Post-live state: all races completed, none imminent ──
+  if (!isLivePeriod && completedRaces.length > 0) {
+    return (
+      <div className="space-y-4">
+        <Card className="border-2 border-primary/20 bg-card/50">
+          <CardContent className="py-8 text-center">
+            <div className="text-5xl mb-3">🏁</div>
+            <h3 className="text-xl font-semibold mb-1">Racing Complete</h3>
+            <p className="text-muted-foreground text-sm">
+              All races have finished. Click any race to watch the replay.
+            </p>
+          </CardContent>
+        </Card>
+        
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <span>Race Replays</span>
+            <Badge variant="outline" className="text-xs">{completedRaces.length} races</Badge>
+          </h3>
+          <div className="space-y-2">
+            {completedRaces.map(race => (
+              <CompletedRaceRow 
+                key={race.raceId.toString()} 
+                race={race}
+                botProfiles={profiles}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── No races at all ──
+  if (displayRaces.length === 0 && !selectedRace && completedRaces.length === 0) {
     return (
       <Card className="border-2 border-primary/20 bg-card/50">
         <CardContent className="py-12 text-center">
@@ -449,17 +543,18 @@ export function LiveRacesPanel({ races, event, botProfiles }: LiveRacesPanelProp
     );
   }
 
+  // ── Live period: show race selector + visualizer ──
   return (
     <div className="space-y-4">
       {/* Race selector - show all races as clickable cards when multiple */}
-      {allRaces.length > 1 && (
+      {displayRaces.length > 1 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
             <span>Select Race to Watch</span>
-            <Badge variant="outline" className="text-xs">{allRaces.length} races</Badge>
+            <Badge variant="outline" className="text-xs">{displayRaces.length} races</Badge>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {allRaces.map(race => (
+            {displayRaces.map(race => (
               <CompactRaceCard 
                 key={race.raceId.toString()} 
                 race={race}

@@ -76,6 +76,25 @@ module ToolContext {
     cb(#ok({ content = [#text({ text = "❌ Error: " # message })]; isError = true; structuredContent = null }));
   };
 
+  /// Helper function to create a structured error response with machine-parseable fields
+  /// Used for automation-friendly error handling (error_code, retryable, context)
+  public func makeStructuredError(
+    code : Text,
+    message : Text,
+    retryable : Bool,
+    context : [(Text, Json.Json)],
+    cb : (Result.Result<McpTypes.CallToolResult, McpTypes.HandlerError>) -> (),
+  ) {
+    let structured = Json.obj([
+      ("error", Json.bool(true)),
+      ("error_code", Json.str(code)),
+      ("error_message", Json.str(message)),
+      ("retryable", Json.bool(retryable)),
+      ("context", Json.obj(context)),
+    ]);
+    cb(#ok({ content = [#text({ text = "❌ Error: " # message })]; isError = true; structuredContent = ?structured }));
+  };
+
   /// Helper function to create a success response with structured JSON and invoke callback
   public func makeSuccess(structured : Json.Json, cb : (Result.Result<McpTypes.CallToolResult, McpTypes.HandlerError>) -> ()) {
     cb(#ok({ content = [#text({ text = Json.stringify(structured, null) })]; isError = false; structuredContent = ?structured }));

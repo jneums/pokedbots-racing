@@ -28,7 +28,7 @@ module {
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("event_id", Json.obj([("type", Json.str("number")), ("description", Json.str("The event ID to register for"))])), ("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Your PokedBot's token index"))]))])),
+      ("properties", Json.obj([("event_id", Json.obj([("type", Json.str("number")), ("description", Json.str("The event ID to register for"))])), ("token_index", Json.obj([("type", Json.str("number")), ("description", Json.str("Your PokedBot's token index"))])), ("skip_if_registered", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: If true, returns success with registration details when bot is already registered instead of an error. Useful for automation fire-and-forget patterns."))]))])),
       ("required", Json.arr([Json.str("event_id"), Json.str("token_index")])),
     ]);
     outputSchema = null;
@@ -65,24 +65,63 @@ module {
         case (?idx) { idx };
       };
 
+      let skipIfRegistered = switch (Result.toOption(Json.getAsBool(_args, "skip_if_registered"))) {
+        case (?b) { b };
+        case (null) { false };
+      };
+
       // Get event
       let event = switch (ctx.eventCalendar.getEvent(eventId)) {
         case (null) {
-          return ToolContext.makeError("Event not found", cb);
+          return ToolContext.makeStructuredError("EVENT_NOT_FOUND", "Event not found", false, [("event_id", Json.int(eventId))], cb);
         };
         case (?e) { e };
       };
 
       let now = Time.now();
 
+      // Idempotent registration check - if skip_if_registered is true,
+      // return success with existing registration details instead of erroring
+      if (skipIfRegistered) {
+        let existingReg = Array.find<RaceCalendar.EventRegistration>(
+          event.registrations,
+          func(reg : RaceCalendar.EventRegistration) : Bool {
+            reg.tokenIndex == tokenIndex and Principal.equal(reg.owner, user);
+          },
+        );
+        switch (existingReg) {
+          case (?reg) {
+            let classText = switch (reg.raceClass) {
+              case (#Scrap) { "Scrap" };
+              case (#Junker) { "Junker" };
+              case (#Raider) { "Raider" };
+              case (#Elite) { "Elite" };
+              case (#SilentKlan) { "Silent Klan" };
+            };
+            let response = Json.obj([
+              ("already_registered", Json.bool(true)),
+              ("message", Json.str("✅ Bot #" # Nat.toText(tokenIndex) # " is already registered for event #" # Nat.toText(eventId))),
+              ("event_id", Json.int(eventId)),
+              ("event_name", Json.str(event.metadata.name)),
+              ("token_index", Json.int(tokenIndex)),
+              ("race_class", Json.str(classText)),
+              ("registered_at", Json.int(reg.registeredAt)),
+              ("entry_fee_paid_e8s", Json.int(reg.entryFeePaid)),
+            ]);
+            return ToolContext.makeSuccess(response, cb);
+          };
+          case (null) {}; // Not registered, continue with normal flow
+        };
+      };
+
       // Get bot stats and verify ownership
       let botStats = switch (ctx.garageManager.getStats(tokenIndex)) {
         case (null) {
-          return ToolContext.makeError("This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first.", cb);
+          return ToolContext.makeStructuredError("NOT_INITIALIZED", "This PokedBot is not initialized for racing. Use garage_initialize_pokedbot first.", false, [("token_index", Json.int(tokenIndex))], cb);
         };
         case (?stats) {
           if (not Principal.equal(stats.ownerPrincipal, user)) {
-            return ToolContext.makeError("This PokedBot is registered to a different owner.", cb);
+            return ToolContext.makeStructuredError("NOT_OWNER", "This PokedBot is registered to a different owner.", false, [("token_index", Json.int(tokenIndex))], cb);
           };
           stats;
         };
@@ -131,7 +170,7 @@ module {
             );
             switch (isAlreadyEntered) {
               case (?_) {
-                return ToolContext.makeError("This bot is already entered in another race in this event (Race #" # Nat.toText(eventRaceId) # ")", cb);
+                return ToolContext.makeStructuredError("ALREADY_REGISTERED", "This bot is already entered in another race in this event (Race #" # Nat.toText(eventRaceId) # ")", false, [("event_id", Json.int(eventId)), ("race_id", Json.int(eventRaceId)), ("token_index", Json.int(tokenIndex))], cb);
               };
               case (null) {};
             };
@@ -144,7 +183,7 @@ module {
       switch (ctx.eventCalendar.getConflictingEventForBot(eventId, tokenIndex, event.scheduledTime, event.raceCreationMode)) {
         case (?conflictingEvent) {
           let conflictName = conflictingEvent.metadata.name;
-          return ToolContext.makeError("This bot is already registered for \"" # conflictName # "\" which has a race at a conflicting time", cb);
+          return ToolContext.makeStructuredError("EVENT_CONFLICT", "This bot is already registered for \"" # conflictName # "\" which has a race at a conflicting time", false, [("event_id", Json.int(eventId)), ("token_index", Json.int(tokenIndex))], cb);
         };
         case (null) {}; // No conflict
       };

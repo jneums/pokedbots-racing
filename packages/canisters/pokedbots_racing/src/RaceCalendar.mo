@@ -5,6 +5,7 @@ import Iter "mo:base/Iter";
 import Text "mo:base/Text";
 import Result "mo:base/Result";
 import Buffer "mo:base/Buffer";
+import Principal "mo:base/Principal";
 import Map "mo:map/Map";
 import { nhash } "mo:map/Map";
 import RacingSimulator "./RacingSimulator";
@@ -117,6 +118,36 @@ module {
     };
   };
 
+  // ===== USER-CREATED EVENT CONFIG =====
+
+  public type UserEventConfig = {
+    name : Text;
+    description : Text;
+    scheduledTime : Int; // UTC nanoseconds
+    registrationWindowHours : Nat; // How many hours before start to open registration
+    entryFee : Nat; // ICP e8s per bot (base fee, scaled by class)
+    maxRegistrationsPerClass : Nat;
+    minEntries : Nat;
+    prizeContribution : Nat; // ICP e8s from creator (escrowed)
+    divisions : [RaceClass];
+    visibility : EventVisibility;
+    invitedParticipants : ?[Principal]; // For #Private events
+    raceCreationMode : RaceCreationMode;
+    creatorName : ?Text;
+  };
+
+  // User event limits
+  public let MAX_USER_EVENTS : Nat = 3;
+  public let USER_EVENT_CREATION_FEE : Nat = 50_000_000; // 0.5 ICP
+  public let MIN_USER_PRIZE_POOL : Nat = 100_000_000; // 1.0 ICP
+  public let MIN_USER_ENTRY_FEE : Nat = 10_000_000; // 0.1 ICP
+  public let MAX_USER_ENTRY_FEE : Nat = 500_000_000; // 5.0 ICP
+  public let MIN_ADVANCE_TIME_NS : Int = 86_400_000_000_000; // 24 hours
+  public let MAX_ADVANCE_TIME_NS : Int = 2_592_000_000_000_000; // 30 days
+  public let MIN_REGISTRATION_WINDOW_HOURS : Nat = 12;
+  public let MAX_EVENT_NAME_LENGTH : Nat = 50;
+  public let MAX_EVENT_DESCRIPTION_LENGTH : Nat = 200;
+
   // Sponsorship tracking
   public type Sponsorship = {
     sponsor : Principal;
@@ -201,54 +232,57 @@ module {
     targetTime * NANOS_PER_SECOND;
   };
 
-  // Calculate next 6-hour interval (00:00, 06:00, 12:00, 18:00 UTC)
+  // Calculate next daily sprint time (18:00 UTC, once per day)
   public func getNextDailySprintTime(fromTime : Int) : Int {
     let NANOS_PER_SECOND : Int = 1_000_000_000;
     let SECONDS_PER_HOUR : Int = 3600;
-    let SPRINT_INTERVAL : Int = 6 * SECONDS_PER_HOUR; // 6 hours (21600 seconds)
+    let SECONDS_PER_DAY : Int = 86400;
+    let TARGET_HOUR : Int = 0; // 00:00 UTC = 18:00 MST
 
     let currentSeconds = fromTime / NANOS_PER_SECOND;
 
-    // Find the next 6-hour boundary after fromTime
-    // Daily sprints happen at: 00:00, 06:00, 12:00, 18:00 UTC
-    // We need to find which boundary comes next
+    // Find the next 00:00 UTC (18:00 MST) after fromTime
+    let secondsIntoDay = Int.abs(currentSeconds % SECONDS_PER_DAY);
+    let targetSecondsOfDay = TARGET_HOUR * SECONDS_PER_HOUR;
 
-    // Calculate how many seconds into the current 6-hour interval we are
-    let secondsIntoInterval = Int.abs(currentSeconds % SPRINT_INTERVAL);
-
-    // Calculate seconds until the next 6-hour boundary
-    // If we're exactly at a boundary (secondsIntoInterval == 0), move to the next one
-    let secondsUntilNext = if (secondsIntoInterval == 0) {
-      SPRINT_INTERVAL;
+    let secondsUntilNext = if (secondsIntoDay < targetSecondsOfDay) {
+      // Today's 18:00 hasn't passed yet
+      targetSecondsOfDay - secondsIntoDay;
     } else {
-      SPRINT_INTERVAL - secondsIntoInterval;
+      // Today's 18:00 already passed, schedule for tomorrow
+      SECONDS_PER_DAY - secondsIntoDay + targetSecondsOfDay;
     };
 
-    // Return the next sprint time
     (currentSeconds + secondsUntilNext) * NANOS_PER_SECOND;
   };
 
-  // Calculate next Free Sprint time (03:00, 09:00, 15:00, 21:00 UTC - offset 3h from Daily Sprint)
+  // Calculate next Free Sprint time (every 12 hours at 09:00 UTC and 21:00 UTC)
   public func getNextFreeSprintTime(fromTime : Int) : Int {
     let NANOS_PER_SECOND : Int = 1_000_000_000;
     let SECONDS_PER_HOUR : Int = 3600;
-    let SPRINT_INTERVAL : Int = 6 * SECONDS_PER_HOUR; // 6 hours
-    let FREE_SPRINT_OFFSET : Int = 3 * SECONDS_PER_HOUR; // 3 hours offset from daily sprint
+    let SECONDS_PER_DAY : Int = 86400;
+    let SLOT_A : Int = 9;  // 09:00 UTC = 03:00 MST
+    let SLOT_B : Int = 21; // 21:00 UTC = 15:00 MST
 
     let currentSeconds = fromTime / NANOS_PER_SECOND;
+    let secondsIntoDay = Int.abs(currentSeconds % SECONDS_PER_DAY);
 
-    // Free sprints happen at: 03:00, 09:00, 15:00, 21:00 UTC (3h after daily sprints)
-    // Adjust by subtracting the offset, find next 6h boundary, then add offset back
-    let adjustedSeconds = currentSeconds - FREE_SPRINT_OFFSET;
-    let secondsIntoInterval = Int.abs(adjustedSeconds % SPRINT_INTERVAL);
+    let slotASeconds = SLOT_A * SECONDS_PER_HOUR;
+    let slotBSeconds = SLOT_B * SECONDS_PER_HOUR;
 
-    let secondsUntilNext = if (secondsIntoInterval == 0) {
-      SPRINT_INTERVAL;
+    // Pick the nearest upcoming slot (09:00 or 21:00 UTC)
+    let secondsUntilNext = if (secondsIntoDay < slotASeconds) {
+      // Before 09:00 — next slot is 09:00 today
+      slotASeconds - secondsIntoDay;
+    } else if (secondsIntoDay < slotBSeconds) {
+      // Between 09:00 and 21:00 — next slot is 21:00 today
+      slotBSeconds - secondsIntoDay;
     } else {
-      SPRINT_INTERVAL - secondsIntoInterval;
+      // After 21:00 — next slot is 09:00 tomorrow
+      SECONDS_PER_DAY - secondsIntoDay + slotASeconds;
     };
 
-    (adjustedSeconds + secondsUntilNext + FREE_SPRINT_OFFSET) * NANOS_PER_SECOND;
+    (currentSeconds + secondsUntilNext) * NANOS_PER_SECOND;
   };
 
   // Calculate first Saturday of month
@@ -460,6 +494,238 @@ module {
 
       ignore Map.put(events, nhash, eventId, event);
       event;
+    };
+
+    // Create a user-created event with full config
+    public func scheduleUserEvent(
+      config : UserEventConfig,
+      creator : Principal,
+      now : Int,
+    ) : Result.Result<ScheduledEvent, Text> {
+      // Validate name length
+      if (config.name.size() > MAX_EVENT_NAME_LENGTH) {
+        return #err("Event name too long (max " # Nat.toText(MAX_EVENT_NAME_LENGTH) # " chars)");
+      };
+      if (config.name.size() == 0) {
+        return #err("Event name cannot be empty");
+      };
+
+      // Validate description length
+      if (config.description.size() > MAX_EVENT_DESCRIPTION_LENGTH) {
+        return #err("Description too long (max " # Nat.toText(MAX_EVENT_DESCRIPTION_LENGTH) # " chars)");
+      };
+
+      // Validate timing
+      if (config.scheduledTime < now + MIN_ADVANCE_TIME_NS) {
+        return #err("Event must be scheduled at least 24 hours in advance");
+      };
+      if (config.scheduledTime > now + MAX_ADVANCE_TIME_NS) {
+        return #err("Event cannot be scheduled more than 30 days ahead");
+      };
+
+      // Validate registration window
+      if (config.registrationWindowHours < MIN_REGISTRATION_WINDOW_HOURS) {
+        return #err("Registration window must be at least " # Nat.toText(MIN_REGISTRATION_WINDOW_HOURS) # " hours");
+      };
+
+      // Validate entry fee
+      if (config.entryFee < MIN_USER_ENTRY_FEE) {
+        return #err("Entry fee must be at least 0.1 ICP");
+      };
+      if (config.entryFee > MAX_USER_ENTRY_FEE) {
+        return #err("Entry fee cannot exceed 5.0 ICP");
+      };
+
+      // Validate prize contribution
+      if (config.prizeContribution < MIN_USER_PRIZE_POOL) {
+        return #err("Prize contribution must be at least 1.0 ICP");
+      };
+
+      // Validate entries
+      if (config.minEntries < 2) {
+        return #err("Minimum entries must be at least 2");
+      };
+      if (config.maxRegistrationsPerClass == 0) {
+        return #err("Max registrations per class must be at least 1");
+      };
+      if (config.maxRegistrationsPerClass > 100) {
+        return #err("Max registrations per class cannot exceed 100");
+      };
+
+      // Validate divisions
+      if (config.divisions.size() == 0) {
+        return #err("Must select at least one division");
+      };
+
+      // Check user event limit
+      let activeCount = getUserActiveEventCount(creator);
+      if (activeCount >= MAX_USER_EVENTS) {
+        return #err("You already have " # Nat.toText(MAX_USER_EVENTS) # " active events (maximum reached)");
+      };
+
+      // Validate private events have invited participants
+      switch (config.visibility) {
+        case (#Private) {
+          switch (config.invitedParticipants) {
+            case (null) { return #err("Private events require an invited participants list") };
+            case (?invited) {
+              if (invited.size() == 0) {
+                return #err("Private events require at least one invited participant");
+              };
+            };
+          };
+        };
+        case (#Restricted(rules)) {
+          // Validate restricted rules have at least one restriction
+          let hasRestriction = rules.minElo != null or rules.maxElo != null
+            or rules.requiredFaction != null or rules.requiredAchievement != null
+            or rules.allowedBots != null or rules.allowedPlayers != null;
+          if (not hasRestriction) {
+            return #err("Restricted events must have at least one restriction (ELO, faction, bot whitelist, or player list)");
+          };
+        };
+        case (#Public) {};
+      };
+
+      let NANOS_PER_HOUR : Int = 3_600_000_000_000;
+      let registrationOpens = config.scheduledTime - (config.registrationWindowHours * NANOS_PER_HOUR);
+      let registrationCloses = config.scheduledTime - NANOS_PER_HOUR; // 1 hour before start
+
+      // Build cancellation deadlines
+      let cancellationDeadlines = {
+        fullRefund = registrationCloses - (48 * NANOS_PER_HOUR);
+        halfRefund = registrationCloses - (24 * NANOS_PER_HOUR);
+        quarterRefund = registrationCloses;
+      };
+
+      let eventId = nextEventId;
+      nextEventId += 1;
+
+      let event : ScheduledEvent = {
+        eventId = eventId;
+        eventType = #SpecialEvent(config.name);
+        scheduledTime = config.scheduledTime;
+        registrationOpens = registrationOpens;
+        registrationCloses = registrationCloses;
+        status = if (now < registrationOpens) { #Announced } else {
+          #RegistrationOpen;
+        };
+        metadata = {
+          name = config.name;
+          description = config.description;
+          entryFee = config.entryFee;
+          maxEntries = config.maxRegistrationsPerClass;
+          minEntries = config.minEntries;
+          prizePoolBonus = config.prizeContribution;
+          pointsMultiplier = 1.0; // User events get standard points
+          divisions = config.divisions;
+          scoringMode = #Individual;
+          eventBonusPrize = 0; // No platform bonus for user events
+        };
+        raceIds = [];
+        createdAt = now;
+        registrations = [];
+        registrationCounts = {
+          total = 0;
+          byClass = [];
+        };
+        maxRegistrationsPerClass = config.maxRegistrationsPerClass;
+        cancellationDeadlines = cancellationDeadlines;
+        raceCreationMode = config.raceCreationMode;
+        creator = ?creator;
+        creatorName = config.creatorName;
+        creationFee = USER_EVENT_CREATION_FEE;
+        visibility = config.visibility;
+        invitedParticipants = config.invitedParticipants;
+        sponsorships = [];
+      };
+
+      ignore Map.put(events, nhash, eventId, event);
+      #ok(event);
+    };
+
+    // Count active (non-completed, non-cancelled) events created by a principal
+    public func getUserActiveEventCount(creator : Principal) : Nat {
+      var count : Nat = 0;
+      for (event in Map.vals(events)) {
+        switch (event.creator) {
+          case (?eventCreator) {
+            if (Principal.equal(eventCreator, creator)) {
+              switch (event.status) {
+                case (#Completed) {};
+                case (#Cancelled) {};
+                case (_) { count += 1 };
+              };
+            };
+          };
+          case (null) {}; // Platform events
+        };
+      };
+      count;
+    };
+
+    // Cancel a user-created event (returns the event for refund processing)
+    public func cancelUserEvent(eventId : Nat, caller : Principal, now : Int) : Result.Result<ScheduledEvent, Text> {
+      let event = switch (Map.get(events, nhash, eventId)) {
+        case (null) { return #err("Event not found") };
+        case (?e) { e };
+      };
+
+      // Verify ownership
+      switch (event.creator) {
+        case (null) { return #err("Cannot cancel platform events") };
+        case (?creator) {
+          if (not Principal.equal(creator, caller)) {
+            return #err("Only the event creator can cancel this event");
+          };
+        };
+      };
+
+      // Can only cancel before registration closes
+      if (now > event.registrationCloses) {
+        return #err("Cannot cancel after registration has closed");
+      };
+
+      // Mark as cancelled
+      let updated : ScheduledEvent = {
+        eventId = event.eventId;
+        eventType = event.eventType;
+        scheduledTime = event.scheduledTime;
+        registrationOpens = event.registrationOpens;
+        registrationCloses = event.registrationCloses;
+        status = #Cancelled;
+        metadata = event.metadata;
+        raceIds = event.raceIds;
+        createdAt = event.createdAt;
+        registrations = event.registrations;
+        registrationCounts = event.registrationCounts;
+        maxRegistrationsPerClass = event.maxRegistrationsPerClass;
+        cancellationDeadlines = event.cancellationDeadlines;
+        raceCreationMode = event.raceCreationMode;
+        creator = event.creator;
+        creatorName = event.creatorName;
+        creationFee = event.creationFee;
+        visibility = event.visibility;
+        invitedParticipants = event.invitedParticipants;
+        sponsorships = event.sponsorships;
+      };
+
+      ignore Map.put(events, nhash, eventId, updated);
+      #ok(event); // Return original event (with registrations for refund processing)
+    };
+
+    // Get events created by a specific user
+    public func getUserEvents(creator : Principal) : [ScheduledEvent] {
+      let allEvents = getAllEvents();
+      Array.filter<ScheduledEvent>(
+        allEvents,
+        func(e) {
+          switch (e.creator) {
+            case (?c) { Principal.equal(c, creator) };
+            case (null) { false };
+          };
+        },
+      );
     };
 
     // Get event by ID
@@ -701,6 +967,36 @@ module {
       };
     };
 
+    // Update event metadata (divisions, minEntries, etc.)
+    public func updateEventMetadata(eventId : Nat, newMetadata : EventMetadata) : ?ScheduledEvent {
+      switch (getEvent(eventId)) {
+        case (?event) {
+          let updated = {
+            event with
+            metadata = newMetadata;
+          };
+          ignore Map.put(events, nhash, eventId, updated);
+          ?updated;
+        };
+        case (null) { null };
+      };
+    };
+
+    // Update event race creation mode (templates, heat allocation, etc.)
+    public func updateEventRaceCreationMode(eventId : Nat, newMode : RaceCreationMode) : ?ScheduledEvent {
+      switch (getEvent(eventId)) {
+        case (?event) {
+          let updated = {
+            event with
+            raceCreationMode = newMode;
+          };
+          ignore Map.put(events, nhash, eventId, updated);
+          ?updated;
+        };
+        case (null) { null };
+      };
+    };
+
     // Reschedule an event to a new time (admin only)
     // Updates scheduledTime, registrationOpens, registrationCloses, and cancellation deadlines
     public func rescheduleEvent(
@@ -767,7 +1063,7 @@ module {
         minEntries = 4;
         prizePoolBonus = 200_000_000; // Platform adds 2 ICP
         pointsMultiplier = 2.0; // Double points
-        divisions = [#Junker, #Raider, #Elite, #SilentKlan]; // No Scrap - longer races
+        divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan];
         scoringMode = #Individual;
         eventBonusPrize = 0;
       };
@@ -862,13 +1158,13 @@ module {
     public func createFreeSprintEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Free Sprint";
-        description = "Free racing for all! No entry fee, just pure wasteland fun. Perfect for practice, trying new strategies, or casual competition. No prizes - just the thrill of the race!";
+        description = "Free racing for all! No entry fee, just pure wasteland fun. Runs twice daily. Winners earn common gear!";
         entryFee = 0; // FREE!
         maxEntries = 100; // No practical cap - heats handle overflow
         minEntries = 2;
         prizePoolBonus = 0; // No prize pool - free races are for practice only
         pointsMultiplier = 0.5; // Half points (encourages paid events for serious competition)
-        divisions = [#Scrap, #Junker, #Raider]; // Casual classes only (no Elite)
+        divisions = [#Scrap, #Junker, #Raider, #Elite];
         scoringMode = #Individual;
         eventBonusPrize = 0;
       };
@@ -924,10 +1220,10 @@ module {
         description = "The wasteland's most prestigious tournament - only the strongest survive. Raider class and above compete for glory and massive prize pools in this monthly showdown.";
         entryFee = 200_000_000; // 2.0 ICP base (Elite)
         maxEntries = 64; // Top 64 qualify
-        minEntries = 8; // At least 8 for bracket
+        minEntries = 4;
         prizePoolBonus = 500_000_000; // Platform adds 5 ICP
         pointsMultiplier = 3.0; // Triple points
-        divisions = [#Raider, #Elite, #SilentKlan]; // Top tiers only - long elite races
+        divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan];
         scoringMode = #Individual;
         eventBonusPrize = 0;
       };
@@ -1584,10 +1880,10 @@ module {
         description = "5 quick races in 2 hours. Maximum chaos!";
         entryFee = 30_000_000; // 0.3 ICP
         maxEntries = 50;
-        minEntries = 8;
+        minEntries = 4;
         prizePoolBonus = 100_000_000; // 1 ICP bonus
         pointsMultiplier = 1.2;
-        divisions = [#Junker, #Raider, #Elite];
+        divisions = [#Scrap, #Junker, #Raider, #Elite];
         scoringMode = #Cumulative; // Sum points across all 5 races
         eventBonusPrize = 50_000_000; // 0.5 ICP bonus for cumulative winner
       };
@@ -1595,6 +1891,48 @@ module {
       // Multi-stage configuration: 5 races in 90 minutes for each division
       let raceMode : RaceCreationMode = #Manual({
         raceTemplates = [
+          // Scrap Division - 5 races
+          {
+            stageName = ?"Race 1";
+            raceClass = #Scrap;
+            terrain = #MetalRoads;
+            distance = 5;
+            trackId = null;
+            startOffset = 0;
+          },
+          {
+            stageName = ?"Race 2";
+            raceClass = #Scrap;
+            terrain = #ScrapHeaps;
+            distance = 4;
+            trackId = null;
+            startOffset = 1_200_000_000_000;
+          }, // +20min
+          {
+            stageName = ?"Race 3";
+            raceClass = #Scrap;
+            terrain = #WastelandSand;
+            distance = 6;
+            trackId = null;
+            startOffset = 2_400_000_000_000;
+          }, // +40min
+          {
+            stageName = ?"Race 4";
+            raceClass = #Scrap;
+            terrain = #MetalRoads;
+            distance = 8;
+            trackId = null;
+            startOffset = 3_600_000_000_000;
+          }, // +60min
+          {
+            stageName = ?"Race 5 Finals";
+            raceClass = #Scrap;
+            terrain = #ScrapHeaps;
+            distance = 10;
+            trackId = null;
+            startOffset = 5_400_000_000_000;
+          }, // +90min
+
           // Junker Division - 5 races
           {
             stageName = ?"Race 1";

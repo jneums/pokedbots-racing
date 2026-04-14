@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetUpcomingEventsWithRaces, useGetPastEvents, type ScheduledEvent } from "@/hooks/useRacing";
+import { useAuth } from "@/hooks/useAuth";
 
 // Type for event with race summary from the backend
 type EventWithRaceSummary = {
@@ -140,6 +141,18 @@ function getEventTypeName(eventType: ScheduledEvent['eventType']): string {
   return 'Race Event';
 }
 
+function getLootTier(eventType: ScheduledEvent['eventType']): { label: string; color: string } {
+  if ('DailySprint' in eventType) return { label: 'Rare Loot', color: 'text-blue-400' };
+  if ('WeeklyLeague' in eventType) return { label: 'Epic Loot', color: 'text-purple-400' };
+  if ('MonthlyCup' in eventType) return { label: 'Legendary Loot', color: 'text-amber-400' };
+  if ('SpecialEvent' in eventType) {
+    const name = eventType.SpecialEvent;
+    if (name === 'Free Sprint') return { label: 'Common Loot', color: 'text-gray-400' };
+    return { label: 'Epic Loot', color: 'text-purple-400' };
+  }
+  return { label: 'Common Loot', color: 'text-gray-400' };
+}
+
 function getStatusBadge(status: ScheduledEvent['status'], registrationCloses: bigint) {
   const now = Date.now() * 1_000_000; // Convert to nanoseconds
   const registrationClosed = Number(registrationCloses) < now;
@@ -226,13 +239,14 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
     <Link to={`/schedule/${event.eventId}`} className="block">
       <Card className={`border-2 ${hasStarted && !isPastEvent ? 'border-orange-500/40 bg-orange-950/10' : 'border-primary/20 bg-card/50'} hover:border-primary/50 transition-all cursor-pointer`}>
         <div className="p-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             {/* Event Icon */}
-            <div className="text-2xl flex-shrink-0">{getEventTypeIcon(event.eventType)}</div>
+            <div className="text-2xl flex-shrink-0 hidden sm:block">{getEventTypeIcon(event.eventType)}</div>
             
             {/* Main Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-lg sm:hidden">{getEventTypeIcon(event.eventType)}</span>
                 <h3 className="font-semibold text-base truncate">{event.metadata.name}</h3>
                 <Badge variant="outline" className="text-xs font-mono px-1.5 py-0">
                   {formatDate(event.scheduledTime)}
@@ -247,7 +261,7 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
               </div>
               
               {/* Meta line */}
-              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+              <div className="flex items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-1 flex-wrap">
                 <span>{getEventTypeName(event.eventType)}</span>
                 <span>•</span>
                 <span>{event.raceIds.length || '—'} races</span>
@@ -255,6 +269,17 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
                 <span>👥 {Number(event.registrationCounts.total)} registered</span>
                 <span>•</span>
                 <span className="text-muted-foreground">min {Number(event.metadata.minEntries)}/class</span>
+                {(() => {
+                  const loot = getLootTier(event.eventType);
+                  return (
+                    <>
+                      <span>•</span>
+                      <span className={loot.color}>
+                        🎁 {loot.label}
+                      </span>
+                    </>
+                  );
+                })()}
               </div>
               
               {/* Status line */}
@@ -299,7 +324,7 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
             
             {/* Prize Pool */}
             {totalEventPrizePool > 0n && (
-              <div className="text-right flex-shrink-0 min-w-[80px]">
+              <div className="text-left sm:text-right flex-shrink-0 sm:min-w-[80px]">
                 <div className="text-xs text-muted-foreground">Prize</div>
                 <div className="font-bold text-amber-500">{formatICP(totalEventPrizePool)}</div>
               </div>
@@ -313,6 +338,7 @@ function EventCard({ event, raceSummary, isPastEvent = false }: {
 
 export default function SchedulePage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isAuthenticated } = useAuth();
   const { data: upcomingEventsData, isLoading: upcomingLoading } = useGetUpcomingEventsWithRaces(14); // Next 2 weeks
   
   const [pastPage, setPastPage] = useState(0);
@@ -356,6 +382,15 @@ export default function SchedulePage() {
             <p className="text-xl text-muted-foreground">
               Upcoming wasteland racing events and championships
             </p>
+            {isAuthenticated && (
+              <div className="mt-4">
+                <Link to="/schedule/create">
+                  <Button variant="outline" size="lg">
+                    ➕ Create Event
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Tabs for Upcoming vs Past */}

@@ -3,6 +3,10 @@ import { PokedBotsRacing } from '@pokedbots-racing/declarations';
 export type ScheduledEvent = PokedBotsRacing.ScheduledEvent;
 export type EventStatus = PokedBotsRacing.EventStatus;
 export type Race = PokedBotsRacing.Race;
+export type BotSegmentTimes = PokedBotsRacing.BotSegmentTimes;
+export type UserEventConfig = PokedBotsRacing.UserEventConfig;
+export type EventVisibility = PokedBotsRacing.EventVisibility;
+type IdentityOrAgent = Identity | any;
 /**
  * Fetches upcoming scheduled race events.
  * @param daysAhead Number of days ahead to look for events
@@ -38,6 +42,13 @@ export declare const getEventDetails: (eventId: number, identity?: Identity) => 
  * @returns The Race if found, null otherwise
  */
 export declare const getRaceById: (raceId: number, identity?: Identity) => Promise<Race | null>;
+/**
+ * Fetches per-bot segment times via deterministic replay of a completed race.
+ * @param raceId The ID of the race to replay
+ * @param identity Optional identity to use for the actor
+ * @returns Array of BotSegmentTimes (nftId + cumulative segment times)
+ */
+export declare const getRaceSegments: (raceId: number, identity?: Identity) => Promise<BotSegmentTimes[]>;
 /**
  * Fetches public profile details for a specific PokedBot.
  * @param tokenIndex The token index of the bot
@@ -200,4 +211,61 @@ export declare const unregisterFromEvent: (eventId: number, tokenIndex: number, 
 } | {
     err: string;
 }>;
+/**
+ * JS-friendly params for creating a user event.
+ * All bigint fields from the backend UserEventConfig accept number here and are converted internally.
+ */
+export interface CreateUserEventParams {
+    prizeContribution: number;
+    raceCreationMode: PokedBotsRacing.RaceCreationMode;
+    scheduledTime: number;
+    minEntries: number;
+    registrationWindowHours: number;
+    name: string;
+    description: string;
+    creatorName?: string;
+    invitedParticipants?: Array<import('@icp-sdk/core/principal').Principal>;
+    divisions: Array<PokedBotsRacing.RaceClass>;
+    maxRegistrationsPerClass: number;
+    entryFee: number;
+    visibility: PokedBotsRacing.EventVisibility;
+}
+/**
+ * Create a user-created event with custom config.
+ * Requires ICRC-2 approval for creation fee + prize contribution before calling.
+ * @param config JS-friendly event configuration
+ * @param identity Identity to use for the call (authenticated)
+ * @returns The created event ID and message, or an error
+ */
+export declare const createUserEvent: (config: CreateUserEventParams, identity: IdentityOrAgent) => Promise<{
+    ok: {
+        eventId: bigint;
+        message: string;
+    };
+} | {
+    err: string;
+}>;
+/**
+ * Cancel a user-created event. Only the creator can cancel, and only before registration closes.
+ * Refunds entry fees to registrants and prize contribution to creator (creation fee is NOT refunded).
+ * @param eventId The ID of the event to cancel
+ * @param identity Identity to use for the call (authenticated)
+ * @returns Refund info or error
+ */
+export declare const cancelUserEvent: (eventId: number, identity: IdentityOrAgent) => Promise<{
+    ok: {
+        refundedRegistrants: bigint;
+        message: string;
+        prizeRefunded: bigint;
+    };
+} | {
+    err: string;
+}>;
+/**
+ * Get events created by the calling user.
+ * @param identity Identity to use for the call (authenticated)
+ * @returns Array of ScheduledEvent objects created by the caller
+ */
+export declare const getMyEvents: (identity: IdentityOrAgent) => Promise<ScheduledEvent[]>;
+export {};
 //# sourceMappingURL=racing.api.d.ts.map

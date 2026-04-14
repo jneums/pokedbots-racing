@@ -13,6 +13,7 @@ import Buffer "mo:base/Buffer";
 import _Char "mo:base/Char";
 import Map "mo:map/Map";
 import { nhash } "mo:map/Map";
+import GearSystem "GearSystem";
 
 /// RacingSimulator - Collection-Agnostic Racing Engine
 /// This module provides generic racing functionality that can work with any NFT collection.
@@ -103,6 +104,8 @@ module {
     stats : RacingStats;
     faction : FactionType; // Faction for daily affinity
     baseAvgRating : ?Nat; // Optional: raw avg rating without terrain/faction bonuses (for MomentumShift)
+    passives : [GearSystem.PassiveEffect]; // Equipped gear passive effects
+    consumables : [GearSystem.ConsumableInstance]; // Consumables to be used during race
   };
 
   // ===== TERRAIN & DISTANCE TYPES =====
@@ -175,6 +178,9 @@ module {
     partType : Text; // Type of part ("SpeedChip", "PowerCoreFragment", etc.)
     stats : ?RacingStats; // Stats used in the race (for accurate replay)
     dnf : Bool; // Did Not Finish - bot was too slow (exceeded 3x median time cap)
+    faction : FactionType; // Faction snapshot for deterministic replay
+    passives : [GearSystem.PassiveEffect]; // Gear passives active during race
+    consumables : [GearSystem.ConsumableInstance]; // Consumables loaded for race
   };
 
   /// Race event types for announcer commentary and recaps
@@ -188,6 +194,12 @@ module {
     #SegmentComplete : { segmentIndex : Nat; leader : Text }; // Segment milestone
     #LuckProc : { bot : Text; procType : Text; boost : Float }; // Luck proc triggered (Minor/Major/Legendary)
     #BadLuck : { bot : Text; incidentType : Text; penalty : Float }; // Bad luck incident (low luck bots)
+    #ConsumableProc : {
+      bot : Text;
+      consumableName : Text;
+      trigger : Text;
+      effect : Text;
+    }; // Consumable activated
   };
 
   public type RaceEvent = {
@@ -195,6 +207,12 @@ module {
     timestamp : Float; // Elapsed race time in seconds
     segmentIndex : Nat; // Which segment this occurred in
     description : Text; // Human-readable description
+  };
+
+  /// Per-bot segment timing for race visualization
+  public type BotSegmentTimes = {
+    nftId : Text;
+    segmentTimes : [Float]; // Cumulative time at end of each segment
   };
 
   public type Sponsor = {
@@ -1425,7 +1443,7 @@ module {
     public func simulateRaceSegmented(
       race : Race,
       participants : [RacingParticipant],
-    ) : ?([RaceResult], [RaceEvent]) {
+    ) : ?([RaceResult], [RaceEvent], [BotSegmentTimes]) {
       if (participants.size() < 2) {
         return null;
       };
@@ -1448,6 +1466,12 @@ module {
       };
 
       // Track cumulative times for each participant across segments
+      // Active consumable effect tracker
+      type ActiveConsumable = {
+        effect : GearSystem.ConsumableEffect;
+        var remainingSegments : Nat;
+      };
+
       type RacerProgress = {
         participant : RacingParticipant;
         var cumulativeTime : Float;
@@ -1456,6 +1480,9 @@ module {
         var activeLuckBuff : ?ActiveLuckBuff; // Active luck buff (if any)
         var currentPosition : Nat; // Current position in race (1-indexed)
         dailyAffinity : Nat; // Pre-calculated at race start
+        var activeConsumables : [ActiveConsumable]; // Active consumable effects
+        var consumablesUsed : [Bool]; // Track which consumables were already fired (one-shot)
+        var shieldSegments : Nat; // Remaining segments of bad luck immunity
       };
 
       var racerProgress : [RacerProgress] = [];
@@ -1479,6 +1506,9 @@ module {
           var activeLuckBuff = null;
           var currentPosition = initialPosition;
           dailyAffinity = affinity;
+          var activeConsumables = [];
+          var consumablesUsed = Array.tabulate<Bool>(participant.consumables.size(), func(_ : Nat) : Bool { false });
+          var shieldSegments = 0;
         };
         racerProgress := Array.append(
           racerProgress,
@@ -1490,6 +1520,59 @@ module {
       // Track race events
       var events : [RaceEvent] = [];
       var previousLeader : ?Text = null;
+
+      // Helper: fire a consumable on a racer (mark used, activate effect, log event)
+      func fireConsumable(racer : RacerProgress, cIdx : Nat, segIdx : Nat, triggerName : Text) {
+        let consInst = racer.participant.consumables[cIdx];
+        let updated = Array.thaw<Bool>(racer.consumablesUsed);
+        updated[cIdx] := true;
+        racer.consumablesUsed := Array.freeze(updated);
+        let dur = switch (consInst.consumableType.effect) {
+          case (#NitroBoost({ boostPercent = _; durationSegments })) {
+            durationSegments;
+          };
+          case (#ShieldPlating({ badLuckImmunitySegments })) {
+            badLuckImmunitySegments;
+          };
+          case (#OverclockPulse({ statBoost = _; durationSegments })) {
+            durationSegments;
+          };
+          case (#TerrainAdapt({ durationSegments })) { durationSegments };
+          case (#LuckSurge(_)) { 0 };
+        };
+        if (dur > 0) {
+          racer.activeConsumables := Array.append(racer.activeConsumables, [{ effect = consInst.consumableType.effect; var remainingSegments = dur }]);
+        };
+        let effectName = switch (consInst.consumableType.effect) {
+          case (#NitroBoost(_)) { "Nitro Boost" };
+          case (#ShieldPlating(_)) { "Shield Plating" };
+          case (#OverclockPulse(_)) { "Overclock Pulse" };
+          case (#TerrainAdapt(_)) { "Terrain Adapt" };
+          case (#LuckSurge(_)) { "Luck Surge" };
+        };
+        events := Array.append(
+          events,
+          [{
+            eventType = #ConsumableProc {
+              bot = racer.participant.nftId;
+              consumableName = consInst.consumableType.name;
+              trigger = triggerName;
+              effect = effectName;
+            };
+            timestamp = racer.cumulativeTime;
+            segmentIndex = segIdx;
+            description = "⚡ Bot " # racer.participant.nftId # " activates " # consInst.consumableType.name # "! (" # effectName # " triggered by " # triggerName # ")";
+          }],
+        );
+      };
+
+      // Collect per-bot cumulative times at each segment
+      let segmentBuffers = Array.tabulate<Buffer.Buffer<Float>>(
+        participants.size(),
+        func(_ : Nat) : Buffer.Buffer<Float> {
+          Buffer.Buffer<Float>(allSegments.size());
+        },
+      );
 
       // Track performance streaks for commentary flavor
       var poorPerformanceStreaks = HashMap.HashMap<Text, Nat>(10, Text.equal, Text.hash);
@@ -1552,6 +1635,7 @@ module {
           // === SLIPSTREAM MECHANIC ===
           // Bots close behind another bot get a speed advantage
           var slipstreamBonus : Float = 1.0; // Multiplier on time (lower = faster)
+          var inSlipstream : Bool = false;
 
           // Check if this bot is within slipstream range of bot ahead (within 2 seconds at this point)
           let currentTime = racer.cumulativeTime;
@@ -1564,7 +1648,173 @@ module {
               if (timeDiff > 0.5 and timeDiff < 2.5) {
                 // 5% speed boost when in slipstream (reduces time by 5%)
                 slipstreamBonus := 0.95;
+                inSlipstream := true;
               };
+            };
+          };
+
+          // === GEAR PASSIVE EFFECTS ===
+          var passiveBoost : Float = 1.0; // Accumulated time multiplier (lower = faster)
+          var extraLuckChance : Float = 0.0; // LuckAmplifier bonus
+          var badLuckReduction : Float = 0.0; // Ironclad reduction
+          var rubberBandResist : Float = 0.0; // RubberBandResist
+          var steadyPaceReduction : Float = 0.0; // SteadyPace variance reduction
+
+          // Apply SlipstreamBoost passive
+          if (inSlipstream) {
+            for (p in racer.participant.passives.vals()) {
+              switch (p) {
+                case (#SlipstreamBoost({ extraPercent })) {
+                  slipstreamBonus := slipstreamBonus * (1.0 - extraPercent / 100.0);
+                };
+                case (_) {};
+              };
+            };
+          };
+
+          for (p in racer.participant.passives.vals()) {
+            switch (p) {
+              case (#FastStarter({ segmentCount; boostPercent })) {
+                if (segmentIdx < segmentCount) {
+                  passiveBoost *= (1.0 - boostPercent / 100.0);
+                };
+              };
+              case (#FinalSurge({ segmentCount; boostPercent })) {
+                if (segmentIdx >= allSegments.size() - segmentCount) {
+                  passiveBoost *= (1.0 - boostPercent / 100.0);
+                };
+              };
+              case (#TerrainMastery({ terrain; boostPercent })) {
+                let matches = switch (terrain, segment.terrain) {
+                  case (#ScrapHeaps, #ScrapHeaps) { true };
+                  case (#WastelandSand, #WastelandSand) { true };
+                  case (#MetalRoads, #MetalRoads) { true };
+                  case (_) { false };
+                };
+                if (matches) {
+                  passiveBoost *= (1.0 - boostPercent / 100.0);
+                };
+              };
+              case (#UphillGrinder({ boostPercent })) {
+                if (segment.angle > 5) {
+                  passiveBoost *= (1.0 - boostPercent / 100.0);
+                };
+              };
+              case (#DownhillDaredevil({ boostPercent })) {
+                if (segment.angle < -5) {
+                  passiveBoost *= (1.0 - boostPercent / 100.0);
+                };
+              };
+              case (#ComebackKid({ boostPercent })) {
+                if (racer.currentPosition == participants.size()) {
+                  passiveBoost *= (1.0 - boostPercent / 100.0);
+                };
+              };
+              case (#PackRunner({ boostPercent })) {
+                var nearbyCount : Nat = 0;
+                for (other in racerProgress.vals()) {
+                  if (other.participant.nftId != racer.participant.nftId) {
+                    let gap = Float.abs(racer.cumulativeTime - other.cumulativeTime);
+                    if (gap < 1.0) { nearbyCount += 1 };
+                  };
+                };
+                if (nearbyCount >= 2) {
+                  passiveBoost *= (1.0 - boostPercent / 100.0);
+                };
+              };
+              case (#SteadyPace({ varianceReduction })) {
+                steadyPaceReduction += varianceReduction / 100.0;
+              };
+              case (#LuckAmplifier({ procChanceBonus })) {
+                extraLuckChance += procChanceBonus / 100.0;
+              };
+              case (#Ironclad({ badLuckReduction = reduction })) {
+                badLuckReduction += reduction / 100.0;
+              };
+              case (#RubberBandResist({ resistPercent })) {
+                rubberBandResist += resistPercent / 100.0;
+              };
+              case (#SlipstreamBoost(_)) {}; // Already handled above
+            };
+          };
+
+          // === CONSUMABLE EFFECTS: Tick active consumables ===
+          var consumableBoost : Float = 1.0;
+          var newActiveConsumables = Buffer.Buffer<ActiveConsumable>(2);
+          for (ac in racer.activeConsumables.vals()) {
+            if (ac.remainingSegments > 0) {
+              switch (ac.effect) {
+                case (#NitroBoost({ boostPercent; durationSegments = _ })) {
+                  consumableBoost *= (1.0 - boostPercent / 100.0);
+                };
+                case (#OverclockPulse({ statBoost = _; durationSegments = _ })) {
+                  // Stat boost is applied at snapshot time, not here
+                  // (would need to modify stats, but we keep it simple as time boost)
+                  consumableBoost *= 0.97; // ~3% time reduction for stat boost
+                };
+                case (#ShieldPlating({ badLuckImmunitySegments = _ })) {
+                  racer.shieldSegments := ac.remainingSegments;
+                };
+                case (#TerrainAdapt(_)) {
+                  // Nullify terrain penalty — approximate as 3% time reduction
+                  consumableBoost *= 0.97;
+                };
+                case (#LuckSurge(_)) {}; // One-shot, handled at trigger time
+              };
+              ac.remainingSegments -= 1;
+              if (ac.remainingSegments > 0) {
+                newActiveConsumables.add(ac);
+              };
+            };
+          };
+          racer.activeConsumables := Buffer.toArray(newActiveConsumables);
+
+          // === CONSUMABLE TRIGGERS ===
+          // Fire consumable triggers based on race state
+          label consumableLoop for (cIdx in Iter.range(0, racer.participant.consumables.size() - 1)) {
+            if (racer.consumablesUsed[cIdx]) { continue consumableLoop };
+            let consInst = racer.participant.consumables[cIdx];
+            let trigger = consInst.consumableType.trigger;
+            var shouldFire = false;
+
+            switch (trigger) {
+              case (#OnRaceStart) {
+                if (segmentIdx == 0) { shouldFire := true };
+              };
+              case (#OnLastPlace) {
+                if (racer.currentPosition == participants.size()) {
+                  shouldFire := true;
+                };
+              };
+              case (#OnFinalLap) {
+                let lapSize = track.segments.size();
+                if (lapSize > 0 and track.laps > 1 and segmentIdx == (track.laps - 1) * lapSize) {
+                  shouldFire := true;
+                };
+              };
+              case (#OnLeadChange) {
+                if (racer.currentPosition == 1) { shouldFire := true };
+              };
+              case (#OnOvertaken) {}; // Checked after position update below
+              case (#OnLuckProc) {}; // Checked in luck section below
+              case (#OnBadLuck) {}; // Checked in bad luck section below
+            };
+
+            if (shouldFire) {
+              fireConsumable(
+                racer,
+                cIdx,
+                segmentIdx,
+                switch (trigger) {
+                  case (#OnRaceStart) { "Race Start" };
+                  case (#OnLastPlace) { "Last Place" };
+                  case (#OnFinalLap) { "Final Lap" };
+                  case (#OnLeadChange) { "Lead Change" };
+                  case (#OnOvertaken) { "Overtaken" };
+                  case (#OnLuckProc) { "Luck Proc" };
+                  case (#OnBadLuck) { "Bad Luck" };
+                },
+              );
             };
           };
 
@@ -1577,7 +1827,7 @@ module {
 
           // Stability reduces variance: 10 stability = ±25%, 50 stability = ±15%, 100 stability = ±5%
           let stabilityFactor = Float.fromInt(racer.participant.stats.stability) / 100.0; // 0.0 to 1.0
-          let varianceRange = 0.25 - (stabilityFactor * 0.20); // 0.25 down to 0.05 at max stability
+          let varianceRange = (0.25 - (stabilityFactor * 0.20)) * (1.0 - steadyPaceReduction); // SteadyPace passive further reduces
 
           // Luck shifts center point: 10 luck = 1.03 (3% slower), 50 luck = 1.0, 100 luck = 0.94 (6% faster)
           // Using 10 as baseline since that's minimum luck
@@ -1591,8 +1841,10 @@ module {
           // RUBBER BAND: Leaders can't get exceptional performance
           // If in 1st place and rolled better than 0.95 (fast), cap at 0.98 (slightly fast)
           // This prevents runaway leaders while still allowing decent performance
+          // RubberBandResist passive relaxes the cap (lower cap = faster allowed)
+          let rubberCap = 0.98 - (rubberBandResist * 0.05); // 0.98 down to ~0.93 at max resist
           if (racer.currentPosition == 1 and segmentPerformance < 0.95) {
-            segmentPerformance := 0.98;
+            segmentPerformance := rubberCap;
           };
 
           // === LUCK SYSTEM ===
@@ -1625,7 +1877,7 @@ module {
             case (null) {
               // No active buff - check for new proc using separate seed to avoid correlation
               let luckSeed = (segmentSeed * 7331 + i * 9973 + lap * 54321) % 10000;
-              let luckCheck = checkLuckProc(
+              var luckCheck = checkLuckProc(
                 racer.participant.stats.luck,
                 racer.participant.stats.acceleration,
                 racer.dailyAffinity,
@@ -1633,6 +1885,27 @@ module {
                 participants.size(),
                 luckSeed,
               );
+
+              // LuckAmplifier passive: extra chance if first check failed
+              switch (luckCheck) {
+                case (null) {
+                  if (extraLuckChance > 0.0) {
+                    let bonusSeed = (luckSeed * 5519 + 8831) % 10000;
+                    let bonusRoll = Float.fromInt(bonusSeed % 1000) / 1000.0;
+                    if (bonusRoll < extraLuckChance) {
+                      luckCheck := ?determineLuckProc(
+                        racer.participant.stats.luck,
+                        racer.participant.stats.acceleration,
+                        racer.dailyAffinity,
+                        racer.currentPosition,
+                        participants.size(),
+                        bonusSeed,
+                      );
+                    };
+                  };
+                };
+                case (_) {};
+              };
 
               switch (luckCheck) {
                 case (?procType) {
@@ -1675,6 +1948,14 @@ module {
                       description = "🍀 Bot " # racer.participant.nftId # ": " # description;
                     }],
                   );
+
+                  // Fire OnLuckProc consumable triggers
+                  label luckConsLoop for (cIdx in Iter.range(0, racer.participant.consumables.size() - 1)) {
+                    if (racer.consumablesUsed[cIdx]) { continue luckConsLoop };
+                    if (racer.participant.consumables[cIdx].consumableType.trigger == #OnLuckProc) {
+                      fireConsumable(racer, cIdx, segmentIdx, "Luck Proc");
+                    };
+                  };
                 };
                 case (null) {
                   // No luck proc - check for bad luck incident
@@ -1685,43 +1966,63 @@ module {
                   };
 
                   if (racer.currentPosition <= halfField) {
-                    // Leader is vulnerable to bad luck
-                    let badLuckSeed = (segmentSeed * 8887 + i * 3331 + lap * 77777) % 10000;
-                    let badLuckCheck = checkBadLuckIncident(
-                      racer.participant.stats.luck,
-                      badLuckSeed,
-                    );
+                    // Leader is vulnerable to bad luck (unless shielded by consumable)
+                    if (racer.shieldSegments > 0) {
+                      racer.shieldSegments -= 1;
+                      // Shield blocks bad luck entirely
+                    } else {
+                      let badLuckSeed = (segmentSeed * 8887 + i * 3331 + lap * 77777) % 10000;
+                      let badLuckCheck = checkBadLuckIncident(
+                        racer.participant.stats.luck,
+                        badLuckSeed,
+                      );
 
-                    switch (badLuckCheck) {
-                      case (?incident) {
-                        // Bad luck incident! Apply penalty
-                        luckBoost := incident.penalty;
+                      switch (badLuckCheck) {
+                        case (?incident) {
+                          // Bad luck incident! Apply penalty (reduced by Ironclad passive)
+                          let rawPenalty = incident.penalty;
+                          let reducedPenalty = if (badLuckReduction > 0.0) {
+                            // Reduce the penalty portion: e.g., 1.20 penalty with 50% reduction → 1.10
+                            1.0 + (rawPenalty - 1.0) * (1.0 - badLuckReduction);
+                          } else { rawPenalty };
+                          luckBoost := reducedPenalty;
 
-                        // Determine incident type for event
-                        let incidentType = if (incident.penalty <= 1.10) {
-                          "Minor";
-                        } else if (incident.penalty <= 1.15) {
-                          "Medium";
-                        } else {
-                          "Severe";
-                        };
+                          // Determine incident type for event
+                          let incidentType = if (incident.penalty <= 1.10) {
+                            "Minor";
+                          } else if (incident.penalty <= 1.15) {
+                            "Medium";
+                          } else {
+                            "Severe";
+                          };
 
-                        events := Array.append(
-                          events,
-                          [{
-                            eventType = #BadLuck {
-                              bot = racer.participant.nftId;
-                              incidentType = incidentType;
-                              penalty = incident.penalty;
+                          events := Array.append(
+                            events,
+                            [{
+                              eventType = #BadLuck {
+                                bot = racer.participant.nftId;
+                                incidentType = incidentType;
+                                penalty = incident.penalty;
+                              };
+                              timestamp = racer.cumulativeTime;
+                              segmentIndex = segmentIdx;
+                              description = "💥 Bot " # racer.participant.nftId # ": " # incident.description;
+                            }],
+                          );
+
+                          // Fire OnBadLuck consumable triggers
+                          label badLuckConsLoop for (cIdx in Iter.range(0, racer.participant.consumables.size() - 1)) {
+                            if (racer.consumablesUsed[cIdx]) {
+                              continue badLuckConsLoop;
                             };
-                            timestamp = racer.cumulativeTime;
-                            segmentIndex = segmentIdx;
-                            description = "💥 Bot " # racer.participant.nftId # ": " # incident.description;
-                          }],
-                        );
+                            if (racer.participant.consumables[cIdx].consumableType.trigger == #OnBadLuck) {
+                              fireConsumable(racer, cIdx, segmentIdx, "Bad Luck");
+                            };
+                          };
+                        };
+                        case (null) {};
                       };
-                      case (null) {};
-                    };
+                    }; // end shield check
                   };
                   // Underdogs (bottom half) are protected from bad luck
                 };
@@ -1729,7 +2030,7 @@ module {
             };
           };
 
-          let segmentTime = baseSegmentTime * segmentPerformance * slipstreamBonus * luckBoost;
+          let segmentTime = baseSegmentTime * segmentPerformance * slipstreamBonus * luckBoost * passiveBoost * consumableBoost;
 
           // Store first 3 segments data for all bots
           if (segmentIdx == 0) {
@@ -1744,6 +2045,9 @@ module {
 
           racer.cumulativeTime += segmentTime;
           racer.previousDifficulty := segment.difficulty;
+
+          // Record cumulative time for this segment
+          segmentBuffers[i].add(racer.cumulativeTime);
 
           // Check for exceptional/poor performance
           // segmentPerformance is a TIME MULTIPLIER: <1.0 = faster (good), >1.0 = slower (bad)
@@ -1811,9 +2115,32 @@ module {
           func(a, b) { Float.compare(a.cumulativeTime, b.cumulativeTime) },
         );
 
+        // Save previous positions before updating (for OnOvertaken detection)
+        let previousPositions = Array.map<RacerProgress, (Text, Nat)>(
+          racerProgress,
+          func(r) { (r.participant.nftId, r.currentPosition) },
+        );
+
         // Update current positions for all racers (for luck underdog calculation)
         for (standingIdx in currentStandings.keys()) {
           currentStandings[standingIdx].currentPosition := standingIdx + 1;
+        };
+
+        // Fire OnOvertaken consumable triggers for bots that dropped position
+        for (racer in racerProgress.vals()) {
+          let prevPos = switch (Array.find<(Text, Nat)>(previousPositions, func(p) { p.0 == racer.participant.nftId })) {
+            case (?(_, pos)) { pos };
+            case (null) { racer.currentPosition };
+          };
+          if (racer.currentPosition > prevPos) {
+            // This bot was overtaken (position number increased = fell back)
+            label overtakenConsLoop for (cIdx in Iter.range(0, racer.participant.consumables.size() - 1)) {
+              if (racer.consumablesUsed[cIdx]) { continue overtakenConsLoop };
+              if (racer.participant.consumables[cIdx].consumableType.trigger == #OnOvertaken) {
+                fireConsumable(racer, cIdx, segmentIdx, "Overtaken");
+              };
+            };
+          };
         };
 
         // Generate position-aware poor performance messages
@@ -2157,6 +2484,9 @@ module {
             partType = partType;
             stats = ?racer.participant.stats;
             dnf = false; // Will be updated by time cap logic in main.mo if needed
+            faction = racer.participant.faction;
+            passives = racer.participant.passives;
+            consumables = racer.participant.consumables;
           }],
         );
       };
@@ -2184,6 +2514,7 @@ module {
           case (#LargeGap(_)) { 6 }; // Large gaps
           case (#PoorPerformance(_)) { 7 }; // Poor performance - lowest priority
           case (#Overtake(_)) { 2 }; // Same as lead change
+          case (#ConsumableProc(_)) { 3 }; // Same as lap completion
         };
       };
 
@@ -2230,7 +2561,18 @@ module {
       Debug.print("=== SEGMENT 2 DEBUG DATA ===");
       Debug.print(segment2DebugData);
 
-      ?(results, Buffer.toArray(filteredEvents));
+      // Build segment breakdown
+      let botSegments = Array.tabulate<BotSegmentTimes>(
+        racerProgress.size(),
+        func(idx : Nat) : BotSegmentTimes {
+          {
+            nftId = racerProgress[idx].participant.nftId;
+            segmentTimes = Buffer.toArray(segmentBuffers[idx]);
+          };
+        },
+      );
+
+      ?(results, Buffer.toArray(filteredEvents), botSegments);
     };
   };
 

@@ -1777,6 +1777,22 @@ export function EventDetailsClient({ eventId }: { eventId: string }) {
             <div className="flex gap-4 items-center text-sm text-muted-foreground">
               <span>🕒 {formatDate(event.scheduledTime)}</span>
               {getStatusBadge()}
+              {(() => {
+                const et = event.eventType;
+                const isFree = Number(event.metadata.entryFee) === 0;
+                if (isFree) return null;
+                const tier = 'DailySprint' in et ? { label: 'Daily Loot', color: 'text-gray-400', detail: '40% miss · Common focus' }
+                  : 'WeeklyLeague' in et ? { label: 'Weekly Loot', color: 'text-blue-400', detail: '15% miss · Rare+' }
+                  : 'MonthlyCup' in et ? { label: 'Monthly Loot', color: 'text-purple-400', detail: 'Guaranteed drop · Rare+ minimum' }
+                  : 'SpecialEvent' in et ? { label: 'Special Loot', color: 'text-amber-400', detail: '15% miss · Legendary eligible' }
+                  : null;
+                if (!tier) return null;
+                return (
+                  <span className={tier.color} title={tier.detail}>
+                    🎁 {tier.label}
+                  </span>
+                );
+              })()}
             </div>
           </div>
 

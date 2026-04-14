@@ -12,17 +12,18 @@ import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
 import Json "mo:json";
 import ToolContext "ToolContext";
 import RaceCalendar "../RaceCalendar";
+import RaceClassUtils "../RaceClassUtils";
 import TimeUtils "../TimeUtils";
 
 module {
   public func config() : McpTypes.Tool = {
     name = "racing_list_events";
     title = ?"List Racing Events";
-    description = ?"View racing events. Returns 5 events per page. Filter by event type, status, or class eligibility. Use after_event_id for pagination.\n\n**TIMESTAMP FORMAT:** All timestamps are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z').\n\n**STATUS OPTIONS:** announced (scheduled, not open), registration_open (accepting entries), registration_closed (closed but not started), in_progress (currently running), completed (finished), cancelled";
+    description = ?"View racing events. Returns 5 events per page. Filter by event type, status, class eligibility, or bot-specific filters. Use after_event_id for pagination.\n\n**TIMESTAMP FORMAT:** All timestamps are in UTC ISO 8601 format (e.g., '2024-12-17T20:00:00Z').\n\n**STATUS OPTIONS:** announced (scheduled, not open), registration_open (accepting entries), registration_closed (closed but not started), in_progress (currently running), completed (finished), cancelled\n\n**BOT FILTERS:** Use only_eligible_for_token to show only events a specific bot can enter based on its race class. Use only_not_registered_for_token to hide events a bot is already registered for.";
     payment = null;
     inputSchema = Json.obj([
       ("type", Json.str("object")),
-      ("properties", Json.obj([("after_event_id", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Event ID to start after. Returns the next 5 events after this ID."))])), ("event_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("WeeklyLeague"), Json.str("DailySprint"), Json.str("MonthlyCup"), Json.str("SpecialEvent")])), ("description", Json.str("Optional: Filter by event type"))])), ("status", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("announced"), Json.str("registration_open"), Json.str("registration_closed"), Json.str("in_progress"), Json.str("completed"), Json.str("cancelled")])), ("description", Json.str("Optional: Filter by status - announced (not open yet), registration_open (accepting entries), registration_closed, in_progress, completed, cancelled"))])), ("race_class", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Scrap"), Json.str("Junker"), Json.str("Raider"), Json.str("Elite"), Json.str("SilentKlan")])), ("description", Json.str("Optional: Filter by race class eligibility"))])), ("days_ahead", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Number of days ahead to look for events (default: 30). Set to 0 to include all events."))])), ("include_past", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Include past/completed events (default: false). When true, shows all events including completed ones."))])), ("sort_by", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("scheduled_time"), Json.str("entry_fee"), Json.str("prize_pool"), Json.str("registrations")])), ("description", Json.str("Optional: Sort by scheduled_time (soonest first, default), entry_fee (lowest first), prize_pool (highest first), or registrations (most first)"))]))])),
+      ("properties", Json.obj([("after_event_id", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Event ID to start after. Returns the next 5 events after this ID."))])), ("event_type", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("WeeklyLeague"), Json.str("DailySprint"), Json.str("MonthlyCup"), Json.str("SpecialEvent")])), ("description", Json.str("Optional: Filter by event type"))])), ("status", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("announced"), Json.str("registration_open"), Json.str("registration_closed"), Json.str("in_progress"), Json.str("completed"), Json.str("cancelled")])), ("description", Json.str("Optional: Filter by status - announced (not open yet), registration_open (accepting entries), registration_closed, in_progress, completed, cancelled"))])), ("race_class", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("Scrap"), Json.str("Junker"), Json.str("Raider"), Json.str("Elite"), Json.str("SilentKlan")])), ("description", Json.str("Optional: Filter by race class eligibility"))])), ("days_ahead", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Number of days ahead to look for events (default: 30). Set to 0 to include all events."))])), ("include_past", Json.obj([("type", Json.str("boolean")), ("description", Json.str("Optional: Include past/completed events (default: false). When true, shows all events including completed ones."))])), ("sort_by", Json.obj([("type", Json.str("string")), ("enum", Json.arr([Json.str("scheduled_time"), Json.str("entry_fee"), Json.str("prize_pool"), Json.str("registrations")])), ("description", Json.str("Optional: Sort by scheduled_time (soonest first, default), entry_fee (lowest first), prize_pool (highest first), or registrations (most first)"))])), ("only_eligible_for_token", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Token index of a bot. Only show events whose divisions include this bot's race class (computed from the bot's rating at 100% condition)."))])), ("only_not_registered_for_token", Json.obj([("type", Json.str("number")), ("description", Json.str("Optional: Token index of a bot. Exclude events this bot is already registered for."))]))])),
     ]);
     outputSchema = null;
   };
@@ -50,6 +51,8 @@ module {
       let daysAheadOpt = Result.toOption(Json.getAsNat(_args, "days_ahead"));
       let includePastOpt = Result.toOption(Json.getAsBool(_args, "include_past"));
       let sortByOpt = Result.toOption(Json.getAsText(_args, "sort_by"));
+      let onlyEligibleForTokenOpt = Result.toOption(Json.getAsNat(_args, "only_eligible_for_token"));
+      let onlyNotRegisteredForTokenOpt = Result.toOption(Json.getAsNat(_args, "only_not_registered_for_token"));
 
       let pageSize = 5;
       let daysAhead = switch (daysAheadOpt) {
@@ -135,6 +138,55 @@ module {
                 e.metadata.divisions,
                 func(c) { c == targetClass },
               ) != null;
+            },
+          );
+        };
+        case (null) { filteredEvents };
+      };
+
+      // Filter by bot eligibility (only events this bot's race class can enter)
+      filteredEvents := switch (onlyEligibleForTokenOpt) {
+        case (?tokenIndex) {
+          switch (ctx.getStats(tokenIndex)) {
+            case (?stats) {
+              let baseStats = ctx.garageManager.getBaseStats(tokenIndex);
+              let statsAt100 = {
+                speed = baseStats.speed + stats.speedBonus;
+                powerCore = baseStats.powerCore + stats.powerCoreBonus;
+                acceleration = baseStats.acceleration + stats.accelerationBonus;
+                stability = baseStats.stability + stats.stabilityBonus;
+              };
+              let totalRatingAt100 = (statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability) / 4;
+              let botRaceClass = RaceClassUtils.getRaceClassFromRating(totalRatingAt100);
+              Array.filter<RaceCalendar.ScheduledEvent>(
+                filteredEvents,
+                func(e) {
+                  Array.find<RaceCalendar.RaceClass>(
+                    e.metadata.divisions,
+                    func(c) { c == botRaceClass },
+                  ) != null;
+                },
+              );
+            };
+            case (null) {
+              // Bot not found/not initialized - return no events
+              [];
+            };
+          };
+        };
+        case (null) { filteredEvents };
+      };
+
+      // Filter out events the bot is already registered for
+      filteredEvents := switch (onlyNotRegisteredForTokenOpt) {
+        case (?tokenIndex) {
+          Array.filter<RaceCalendar.ScheduledEvent>(
+            filteredEvents,
+            func(e) {
+              Array.find<RaceCalendar.EventRegistration>(
+                e.registrations,
+                func(r) { r.tokenIndex == tokenIndex },
+              ) == null; // Keep events where bot is NOT registered
             },
           );
         };
