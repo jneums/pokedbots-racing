@@ -62,18 +62,10 @@ module {
       // Get base stats - these are always available
       let baseStats = ctx.garageManager.getBaseStats(tokenIndex);
 
-      // If bot is initialized and has an active scavenging mission, lazily accumulate rewards
+      // If bot is initialized and has an active scavenging mission, project rewards read-only
+      // (NO state mutation — read tools must not change state)
       switch (racingStatsOpt) {
-        case (?stats) {
-          switch (stats.activeMission) {
-            case (?_mission) {
-              // Accumulate rewards on-demand (lazy evaluation)
-              let now = Time.now();
-              ignore ctx.garageManager.accumulateScavengingRewards(tokenIndex, now);
-            };
-            case (null) {};
-          };
-        };
+        case (?stats) {};
         case (null) {};
       };
 
@@ -105,7 +97,17 @@ module {
         };
         case (?stats) {
           // Continue with normal initialized bot logic
-          let racingStats = stats;
+          // Project scavenging rewards read-only for accurate display
+          let now = Time.now();
+          let racingStats = switch (stats.activeMission) {
+            case (?_mission) {
+              switch (ctx.garageManager.calculateScavengingRewardsReadOnly(tokenIndex, stats, now)) {
+                case (#ok(projected)) { projected };
+                case (#err(_)) { stats };
+              };
+            };
+            case (null) { stats };
+          };
 
           // Check ownership via registration - if bot is registered, the ownerPrincipal is the owner
           let isOwner = racingStats.ownerPrincipal == user;
@@ -163,7 +165,6 @@ module {
           let terrainBonusNote = "PREFERRED TERRAIN: +5% all stats when racing on " # terrainText # ". This stacks with faction bonuses!";
 
           // Check for active upgrade
-          let now = Time.now();
           let upgradeInfo = switch (ctx.garageManager.getActiveUpgrade(tokenIndex)) {
             case null { null };
             case (?session) {
@@ -311,7 +312,6 @@ module {
                     "world_buff",
                     switch (racingStats.worldBuff) {
                       case (?buff) {
-                        let now = Time.now();
                         let hoursRemaining = (buff.expiresAt - now) / (60 * 60 * 1_000_000_000);
                         var statsText = "";
                         for ((stat, value) in buff.stats.vals()) {

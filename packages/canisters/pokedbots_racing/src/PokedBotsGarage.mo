@@ -5034,7 +5034,7 @@ module {
         case (null) { #err("Bot not found") };
         case (?botStats) {
           switch (botStats.activeMission) {
-            case (null) { #err("No active mission") };
+            case (null) { #err("No active mission - bot is idle. Use garage_start_activity to send it to a zone first.") };
             case (?mission) {
               // Check if bot is dead (0 battery OR 0 condition)
               // EXCEPTION: Allow dead bots in maintenance zones (ChargingStation/RepairBay) to recover
@@ -5488,6 +5488,78 @@ module {
       };
     };
 
+    /// Canonical activity state for a bot — single source of truth.
+    /// Both list and bulk-detail tools MUST derive their activity display from this.
+    /// Returns the same shape regardless of which tool reads it, ensuring consistency.
+    public type CanonicalActivity = {
+      activityType : Text; // "idle" | "charging" | "repairing" | "scavenging"
+      zone : ?Text; // Zone name if active, null otherwise
+      zoneVariant : ?ScavengingZone; // Variant form for switching
+      startedAt : ?Int; // Mission start timestamp
+      canCollectNow : Bool; // True if garage_complete_scavenging would succeed RIGHT NOW
+      pendingParts : Nat; // Total pending parts (scavenging only, 0 otherwise)
+      pendingBatteryRestored : Nat; // Pending battery % (ChargingStation only)
+      pendingConditionRestored : Nat; // Pending condition % (RepairBay only)
+    };
+
+    /// Get the canonical activity state.
+    /// Reads `activeMission` ONCE from the authoritative map and derives ALL display fields.
+    /// `canCollectNow` = true means completeScavengingMissionV2 would succeed right now.
+    public func getCanonicalActivity(tokenIndex : Nat) : CanonicalActivity {
+      switch (getStats(tokenIndex)) {
+        case (null) {
+          {
+            activityType = "idle";
+            zone = null;
+            zoneVariant = null;
+            startedAt = null;
+            canCollectNow = false;
+            pendingParts = 0;
+            pendingBatteryRestored = 0;
+            pendingConditionRestored = 0;
+          };
+        };
+        case (?botStats) {
+          switch (botStats.activeMission) {
+            case (null) {
+              {
+                activityType = "idle";
+                zone = null;
+                zoneVariant = null;
+                startedAt = null;
+                canCollectNow = false;
+                pendingParts = 0;
+                pendingBatteryRestored = 0;
+                pendingConditionRestored = 0;
+              };
+            };
+            case (?mission) {
+              let (actType, zoneName) = switch (mission.zone) {
+                case (#ChargingStation) { ("charging", "ChargingStation") };
+                case (#RepairBay) { ("repairing", "RepairBay") };
+                case (#ScrapHeaps) { ("scavenging", "ScrapHeaps") };
+                case (#AbandonedSettlements) { ("scavenging", "AbandonedSettlements") };
+                case (#DeadMachineFields) { ("scavenging", "DeadMachineFields") };
+              };
+              let totalPending = mission.pendingParts.speedChips + mission.pendingParts.powerCoreFragments + mission.pendingParts.thrusterKits + mission.pendingParts.gyroModules + mission.pendingParts.universalParts;
+              {
+                activityType = actType;
+                zone = ?zoneName;
+                zoneVariant = ?mission.zone;
+                startedAt = ?mission.startTime;
+                // canCollectNow mirrors completeScavengingMissionV2 preconditions:
+                // has an active mission. (That function always accepts as long as mission exists.)
+                canCollectNow = true;
+                pendingParts = totalPending;
+                pendingBatteryRestored = mission.pendingBatteryRestored;
+                pendingConditionRestored = mission.pendingConditionRestored;
+              };
+            };
+          };
+        };
+      };
+    };
+
     /// Calculate scavenging rewards WITHOUT updating state (for query calls)
     /// Returns updated PokedBotRacingStats with current pending values calculated deterministically
     /// CRITICAL: This MUST match accumulateScavengingRewards exactly to avoid UI glitches
@@ -5731,8 +5803,20 @@ module {
         case (?botStats) {
           // Check if bot is already on a mission
           switch (botStats.activeMission) {
-            case (?_) {
-              return #err("Bot is already on a scavenging mission - collect rewards first");
+            case (?existingMission) {
+              // Idempotent: if already in the requested zone, return the existing mission as success
+              if (existingMission.zone == zone) {
+                return #ok(existingMission);
+              };
+              // Different zone: descriptive error with actual current zone
+              let currentZoneName = switch (existingMission.zone) {
+                case (#ScrapHeaps) { "ScrapHeaps" };
+                case (#AbandonedSettlements) { "AbandonedSettlements" };
+                case (#DeadMachineFields) { "DeadMachineFields" };
+                case (#RepairBay) { "RepairBay" };
+                case (#ChargingStation) { "ChargingStation" };
+              };
+              return #err("Bot is already in " # currentZoneName # " - collect rewards first");
             };
             case (null) {};
           };
@@ -5883,7 +5967,7 @@ module {
         case (null) { #err("Bot not found") };
         case (?botStats) {
           switch (botStats.activeMission) {
-            case (null) { #err("No active mission") };
+            case (null) { #err("No active mission - bot is idle. Use garage_start_activity to send it to a zone first.") };
             case (?mission) {
               // If leaving ChargingStation, snapshot other bots FIRST to lock in their gains
               // at the current efficiency before power grid changes

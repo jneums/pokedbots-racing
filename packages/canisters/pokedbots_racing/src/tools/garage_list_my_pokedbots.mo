@@ -12,6 +12,7 @@ import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
 import Json "mo:json";
 
 import ToolContext "./ToolContext";
+import PokedBotsGarage "../PokedBotsGarage";
 import ExtIntegration "../ExtIntegration";
 import RacingSimulator "../RacingSimulator";
 import RaceCalendar "../RaceCalendar";
@@ -167,16 +168,8 @@ module {
         };
         msg #= "\n";
 
-        // Lazily accumulate rewards for all bots with active scavenging missions BEFORE displaying
+        // Use current time for read-only reward projections (NO state mutation)
         let now = Time.now();
-        for (bot in ownerBots.vals()) {
-          switch (bot.activeMission) {
-            case (?_mission) {
-              ignore ctx.garageManager.accumulateScavengingRewards(bot.tokenIndex, now);
-            };
-            case (null) {};
-          };
-        };
 
         // Apply filters to bot list
         var filteredBots = ownerBots;
@@ -332,14 +325,22 @@ module {
         };
         msg #= "\n\n";
 
-        // Now display bots with updated stats (including accumulated rewards)
+        // Now display bots with read-only projected stats (no state mutation)
         for (bot in filteredBots.vals()) {
           let tokenIndex32 = Nat32.fromNat(bot.tokenIndex);
           let tokenId = ExtIntegration.encodeTokenIdentifier(tokenIndex32, ctx.extCanisterId);
           let thumbnailUrl = "https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=" # tokenId # "&type=thumbnail";
 
-          // Get fresh stats (may have been updated by scavenging accumulation above)
-          let robotStats = ctx.getStats(bot.tokenIndex);
+          // Get stats and project scavenging rewards read-only (no mutation)
+          let robotStats : ?PokedBotsGarage.PokedBotRacingStats = switch (ctx.getStats(bot.tokenIndex)) {
+            case (?stats) {
+              switch (ctx.garageManager.calculateScavengingRewardsReadOnly(bot.tokenIndex, stats, now)) {
+                case (#ok(projected)) { ?projected };
+                case (#err(_)) { ?stats };
+              };
+            };
+            case (null) { null };
+          };
 
           // Calculate synergies once for this user (for cooldown display)
           let synergies = ctx.garageManager.calculateFactionSynergies(userPrincipal);
@@ -461,17 +462,16 @@ module {
                 msg #= "   💡 Recommended: " # recommendedAction # "\n";
               };
 
-              // Activity status summary
-              let activityType = switch (stats.activeMission) {
-                case (?mission) {
-                  switch (mission.zone) {
-                    case (#ChargingStation) { "charging ⚡" };
-                    case (#RepairBay) { "repairing 🔧" };
-                    case (#ScrapHeaps) { "scavenging (ScrapHeaps) 🔍" };
-                    case (#AbandonedSettlements) { "scavenging (AbandonedSettlements) 🔍" };
-                    case (#DeadMachineFields) { "scavenging (DeadMachineFields) 🔍" };
-                  };
-                };
+              // Canonical activity state — same source of truth as garage_get_bulk_details
+              // and the preconditions of garage_complete_scavenging.
+              let canonical = ctx.garageManager.getCanonicalActivity(bot.tokenIndex);
+
+              let activityType = switch (canonical.zoneVariant) {
+                case (?#ChargingStation) { "charging ⚡" };
+                case (?#RepairBay) { "repairing 🔧" };
+                case (?#ScrapHeaps) { "scavenging (ScrapHeaps) 🔍" };
+                case (?#AbandonedSettlements) { "scavenging (AbandonedSettlements) 🔍" };
+                case (?#DeadMachineFields) { "scavenging (DeadMachineFields) 🔍" };
                 case (null) {
                   if (ctx.isInActiveRace(bot.tokenIndex)) { "racing 🏁" }
                   else {
@@ -484,22 +484,26 @@ module {
               };
               msg #= "   📋 Activity: " # activityType # "\n";
 
-              // Show scavenging status
-              switch (stats.activeMission) {
-                case (?mission) {
-                  let hoursElapsed = (now - mission.startTime) / (3600 * 1_000_000_000);
-                  let totalPending = mission.pendingParts.speedChips + mission.pendingParts.powerCoreFragments + mission.pendingParts.thrusterKits + mission.pendingParts.gyroModules + mission.pendingParts.universalParts;
+              // Show activity/mission status (only if canonical state says an activity is active)
+              if (canonical.canCollectNow) {
+                let zoneName = Option.get(canonical.zone, "unknown");
+                let startedAt = Option.get(canonical.startedAt, now);
+                let hoursElapsed = (now - startedAt) / (3600 * 1_000_000_000);
 
-                  let zoneName = switch (mission.zone) {
-                    case (#ScrapHeaps) { "ScrapHeaps" };
-                    case (#AbandonedSettlements) { "AbandonedSettlements" };
-                    case (#DeadMachineFields) { "DeadMachineFields" };
-                    case (#RepairBay) { "RepairBay" };
-                    case (#ChargingStation) { "ChargingStation" };
+                // Zone-appropriate activity label and pending info, from canonical state
+                let (activityLabel, pendingInfo) = switch (canonical.zoneVariant) {
+                  case (?#ChargingStation) {
+                    ("CHARGING", "Battery restored: +" # Nat.toText(canonical.pendingBatteryRestored) # "%");
                   };
-                  msg #= "   🔍 SCAVENGING: Active (" # Nat.toText(Int.abs(hoursElapsed)) # "h elapsed) in " # zoneName # " | Pending: " # Nat.toText(totalPending) # " parts ✅ Ready to collect!\n";
+                  case (?#RepairBay) {
+                    ("REPAIRING", "Condition restored: +" # Nat.toText(canonical.pendingConditionRestored) # "%");
+                  };
+                  case (_) {
+                    ("SCAVENGING", "Pending: " # Nat.toText(canonical.pendingParts) # " parts");
+                  };
                 };
-                case (null) {};
+
+                msg #= "   🔍 " # activityLabel # ": Active (" # Nat.toText(Int.abs(hoursElapsed)) # "h elapsed) in " # zoneName # " | " # pendingInfo # " ✅ Ready to collect!\n";
               };
 
               // Show next race/event if bot is entered

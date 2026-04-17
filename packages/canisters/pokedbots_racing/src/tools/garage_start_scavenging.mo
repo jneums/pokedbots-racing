@@ -102,15 +102,7 @@ module {
           return ToolContext.makeError("Bot not initialized for racing. Use garage_initialize_pokedbot first.", cb);
         };
         case (?botStats) {
-          // Check if already on a mission
-          switch (botStats.activeMission) {
-            case (?_) {
-              return ToolContext.makeStructuredError("BOT_BUSY", "Bot is already on a scavenging mission", false, [("token_index", Json.int(tokenIndex))], cb);
-            };
-            case (null) {};
-          };
-
-          // Start mission with optional duration
+          // Start mission with optional duration (Garage layer handles idempotency)
           let now = Time.now();
           switch (garage.startScavengingMission(tokenIndex, zone, now, durationMinutes)) {
             case (#err(e)) {

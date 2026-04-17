@@ -147,12 +147,15 @@ module {
                 ("message", Json.str("You do not own Bot #" # Nat.toText(tokenIndex) # ".")),
               ]));
             } else {
-              // Lazily accumulate scavenging rewards if applicable
-              switch (racingStats.activeMission) {
+            // Project scavenging rewards read-only (NO state mutation)
+              let projectedStats = switch (racingStats.activeMission) {
                 case (?_mission) {
-                  ignore ctx.garageManager.accumulateScavengingRewards(tokenIndex, now);
+                  switch (ctx.garageManager.calculateScavengingRewardsReadOnly(tokenIndex, racingStats, now)) {
+                    case (#ok(projected)) { projected };
+                    case (#err(_)) { racingStats };
+                  };
                 };
-                case (null) {};
+                case (null) { racingStats };
               };
 
               // Calculate rating and race class
@@ -160,48 +163,38 @@ module {
               let raceClassVariant = RaceClassUtils.getRaceClassFromRating(overallRating);
               let raceClass = RaceClassUtils.getClassDescription(raceClassVariant);
 
-              // Get current stats
-              let currentStats = ctx.garageManager.getCurrentStats(racingStats);
+              // Get current stats (using projected values for accurate battery/condition)
+              let currentStats = ctx.garageManager.getCurrentStats(projectedStats);
               let baseStats = ctx.garageManager.getBaseStats(tokenIndex);
 
-              // Maintenance recommendation
-              let repairReady = switch (racingStats.lastRepaired) {
+              // Maintenance recommendation (use projected battery/condition)
+              let repairReady = switch (projectedStats.lastRepaired) {
                 case (?lastTime) { now - lastTime >= REPAIR_COOLDOWN };
                 case (null) { true };
               };
-              let recommendedAction = if (racingStats.condition < 50 and repairReady) {
+              let recommendedAction = if (projectedStats.condition < 50 and repairReady) {
                 "RepairBay";
-              } else if (racingStats.battery < 30) {
+              } else if (projectedStats.battery < 30) {
                 "ChargingStation";
-              } else if (racingStats.condition < 80 and repairReady) {
+              } else if (projectedStats.condition < 80 and repairReady) {
                 "RepairBay";
-              } else if (racingStats.battery < 80) {
+              } else if (projectedStats.battery < 80) {
                 "ChargingStation";
-              } else if (racingStats.overcharge == 0) {
+              } else if (projectedStats.overcharge == 0) {
                 "Jolt";
               } else {
                 "None";
               };
 
-              // Can race check
-              let canRace = racingStats.battery >= 30 and racingStats.condition >= 50;
+              // Can race check (use projected values)
+              let canRace = projectedStats.battery >= 30 and projectedStats.condition >= 50;
 
-              // Activity status
-              let (actType, actZone, actStarted, actCanCollect) : (Text, ?Text, ?Int, ?Bool) = switch (racingStats.activeMission) {
-                case (?mission) {
-                  let zone = switch (mission.zone) {
-                    case (#ScrapHeaps) { "ScrapHeaps" };
-                    case (#AbandonedSettlements) { "AbandonedSettlements" };
-                    case (#DeadMachineFields) { "DeadMachineFields" };
-                    case (#RepairBay) { "RepairBay" };
-                    case (#ChargingStation) { "ChargingStation" };
-                  };
-                  let aType = switch (mission.zone) {
-                    case (#ChargingStation) { "charging" };
-                    case (#RepairBay) { "repairing" };
-                    case _ { "scavenging" };
-                  };
-                  (aType, ?zone, ?mission.startTime, ?true);
+              // Activity status — canonical source of truth (same as garage_list_my_pokedbots
+              // and garage_complete_scavenging preconditions)
+              let canonical = ctx.garageManager.getCanonicalActivity(tokenIndex);
+              let (actType, actZone, actStarted, actCanCollect) : (Text, ?Text, ?Int, ?Bool) = switch (canonical.zoneVariant) {
+                case (?_) {
+                  (canonical.activityType, canonical.zone, canonical.startedAt, ?canonical.canCollectNow);
                 };
                 case (null) {
                   if (ctx.isInActiveRace(tokenIndex)) {
@@ -245,11 +238,11 @@ module {
               fieldsBuffer.add(("name", Json.str(botName)));
               fieldsBuffer.add(("faction", Json.str(factionText)));
 
-              // Condition fields (battery, condition, overcharge)
+              // Condition fields (battery, condition, overcharge) — use projected values
               if (includeField("condition")) {
-                fieldsBuffer.add(("battery", Json.int(racingStats.battery)));
-                fieldsBuffer.add(("condition", Json.int(racingStats.condition)));
-                fieldsBuffer.add(("overcharge", Json.int(racingStats.overcharge)));
+                fieldsBuffer.add(("battery", Json.int(projectedStats.battery)));
+                fieldsBuffer.add(("condition", Json.int(projectedStats.condition)));
+                fieldsBuffer.add(("overcharge", Json.int(projectedStats.overcharge)));
               };
 
               // Activity status
