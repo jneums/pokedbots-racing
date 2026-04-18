@@ -1,18 +1,13 @@
 import Result "mo:base/Result";
 import Principal "mo:base/Principal";
 import Nat "mo:base/Nat";
-import Nat32 "mo:base/Nat32";
-import Int "mo:base/Int";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
-import Array "mo:base/Array";
 
 import McpTypes "mo:mcp-motoko-sdk/mcp/Types";
 import AuthTypes "mo:mcp-motoko-sdk/auth/Types";
 import Json "mo:json";
 import ToolContext "ToolContext";
-import PokedBotsGarage "../PokedBotsGarage";
-import ExtIntegration "../ExtIntegration";
 
 module {
   public func config() : McpTypes.Tool = {
@@ -37,7 +32,10 @@ module {
       // Authentication required
       let user = switch (_auth) {
         case (null) {
-          return ToolContext.makeError("Authentication required", cb);
+          return ToolContext.makeStructuredError(
+            "AUTH_REQUIRED", "Authentication required", false,
+            [], cb,
+          );
         };
         case (?auth) { auth.principal };
       };
@@ -45,7 +43,10 @@ module {
       // Parse arguments
       let tokenIndex = switch (Result.toOption(Json.getAsNat(_args, "token_index"))) {
         case (null) {
-          return ToolContext.makeError("Missing required argument: token_index", cb);
+          return ToolContext.makeStructuredError(
+            "MISSING_PARAM", "Missing required argument: token_index", false,
+            [], cb,
+          );
         };
         case (?idx) { idx };
       };
@@ -53,14 +54,26 @@ module {
       // Get bot stats and verify registration
       let racingStats = switch (ctx.garageManager.getStats(tokenIndex)) {
         case (null) {
-          return ToolContext.makeError("This PokedBot is not registered to your account. Use garage_initialize_pokedbot first to register it.", cb);
+          return ToolContext.makeStructuredError(
+            "BOT_NOT_REGISTERED",
+            "This PokedBot is not registered to your account. Use garage_initialize_pokedbot first to register it.",
+            false,
+            [("token_index", Json.int(tokenIndex))],
+            cb,
+          );
         };
         case (?stats) { stats };
       };
 
       // Verify caller is the registered owner
       if (not Principal.equal(racingStats.ownerPrincipal, user)) {
-        return ToolContext.makeError("You are not the registered owner of this PokedBot. If you recently purchased it, use garage_initialize_pokedbot to register it to your account.", cb);
+        return ToolContext.makeStructuredError(
+          "NOT_OWNER",
+          "You are not the registered owner of this PokedBot. If you recently purchased it, use garage_initialize_pokedbot to register it to your account.",
+          false,
+          [("token_index", Json.int(tokenIndex))],
+          cb,
+        );
       };
 
       // Complete mission (forces final accumulation)
@@ -69,7 +82,41 @@ module {
 
       switch (garage.completeScavengingMissionV2(tokenIndex, now)) {
         case (#err(e)) {
-          return ToolContext.makeError(e, cb);
+          // Determine the error code and whether the bot is simply idle
+          // (idempotent: if already idle, treat as a no-op success for automation)
+          let isIdleError = Text.contains(e, #text "idle") or Text.contains(e, #text "No active mission");
+          let isDead = Text.contains(e, #text "died") or Text.contains(e, #text "Bot died");
+          let missionCleared = Text.contains(e, #text "Mission was cleared");
+
+          if (isIdleError) {
+            // Idempotent: bot is already idle — automation can treat this as success
+            let response = Json.obj([
+              ("token_index", Json.int(tokenIndex)),
+              ("already_idle", Json.bool(true)),
+              ("total_parts", Json.int(0)),
+              ("message", Json.str("Bot #" # Nat.toText(tokenIndex) # " is already idle — no mission to complete.")),
+              ("current_activity_type", Json.str("idle")),
+            ]);
+            ToolContext.makeSuccess(response, cb);
+          } else {
+            // Real error — provide structured code
+            let code = if (isDead) { "BOT_DIED" }
+              else if (missionCleared) { "MISSION_CLEARED" }
+              else { "COMPLETION_FAILED" };
+            let retryable = missionCleared; // transient if mission was cleared mid-operation
+
+            // Include current canonical activity for debugging
+            let canonical = garage.getCanonicalActivity(tokenIndex);
+            return ToolContext.makeStructuredError(
+              code, e, retryable,
+              [
+                ("token_index", Json.int(tokenIndex)),
+                ("current_activity_type", Json.str(canonical.activityType)),
+                ("can_collect_now", Json.bool(canonical.canCollectNow)),
+              ],
+              cb,
+            );
+          };
         };
         case (#ok(result)) {
           // Record dedication activity DP for scavenging
@@ -93,6 +140,7 @@ module {
 
           let response = Json.obj([
             ("token_index", Json.int(tokenIndex)),
+            ("already_idle", Json.bool(false)),
             ("hours_elapsed", Json.int(result.hoursOut)),
             ("total_parts", Json.int(result.totalParts)),
             ("speed_chips", Json.int(result.speedChips)),

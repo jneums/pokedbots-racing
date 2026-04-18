@@ -96,68 +96,79 @@ module {
         return ToolContext.makeStructuredError("NOT_OWNER", "You are not the registered owner of this PokedBot. If you recently purchased it, use garage_initialize_pokedbot to register it to your account.", false, [("token_index", Json.int(tokenIndex))], cb);
       };
 
-      // Continue with existing logic
-      switch (garage.getStats(tokenIndex)) {
-        case (null) {
-          return ToolContext.makeError("Bot not initialized for racing. Use garage_initialize_pokedbot first.", cb);
+      // Start the mission
+      let now = Time.now();
+      switch (garage.startScavengingMission(tokenIndex, zone, now, durationMinutes)) {
+        case (#err(e)) {
+          // Classify the error for automation
+          let isAlreadyActive = Text.contains(e, #text "already") or Text.contains(e, #text "active mission");
+          let isDead = Text.contains(e, #text "dead") or Text.contains(e, #text "0 battery") or Text.contains(e, #text "0 condition");
+          let isCapacity = Text.contains(e, #text "capacity") or Text.contains(e, #text "no available") or Text.contains(e, #text "bay");
+
+          let code = if (isAlreadyActive) { "ALREADY_ACTIVE" }
+            else if (isDead) { "BOT_DEAD" }
+            else if (isCapacity) { "CAPACITY_UNAVAILABLE" }
+            else { "START_FAILED" };
+
+          let canonical = garage.getCanonicalActivity(tokenIndex);
+          return ToolContext.makeStructuredError(
+            code, e, false,
+            [
+              ("token_index", Json.int(tokenIndex)),
+              ("current_activity_type", Json.str(canonical.activityType)),
+              ("requested_zone", Json.str(zoneStr)),
+            ],
+            cb,
+          );
         };
-        case (?botStats) {
-          // Start mission with optional duration (Garage layer handles idempotency)
-          let now = Time.now();
-          switch (garage.startScavengingMission(tokenIndex, zone, now, durationMinutes)) {
-            case (#err(e)) {
-              return ToolContext.makeError(e, cb);
+        case (#ok(_)) {
+
+          let zoneDesc = switch (zone) {
+            case (#ScrapHeaps) { "Scrap Heaps (Safe)" };
+            case (#AbandonedSettlements) {
+              "Abandoned Settlements (Moderate)";
             };
-            case (#ok(_)) {
+            case (#DeadMachineFields) { "Dead Machine Fields (Dangerous)" };
+            case (#RepairBay) { "Repair Bay (Maintenance)" };
+            case (#ChargingStation) { "Charging Station (Free Charging)" };
+          };
 
-              let zoneDesc = switch (zone) {
-                case (#ScrapHeaps) { "Scrap Heaps (Safe)" };
-                case (#AbandonedSettlements) {
-                  "Abandoned Settlements (Moderate)";
-                };
-                case (#DeadMachineFields) { "Dead Machine Fields (Dangerous)" };
-                case (#RepairBay) { "Repair Bay (Maintenance)" };
-                case (#ChargingStation) { "Charging Station (Free Charging)" };
-              };
-
-              let (modeDesc, modeMsg) = switch (durationMinutes) {
-                case (null) {
-                  ("Continuous", "Retrieve bot anytime with garage_complete_scavenging.");
-                };
-                case (?duration) {
-                  ("Timed (" # Nat.toText(duration) # " minutes)", "Bot will auto-return after " # Nat.toText(duration) # " minutes.");
-                };
-              };
-
-              // Build base response fields
-              var responseFields = Buffer.Buffer<(Text, Json.Json)>(10);
-              responseFields.add(("token_index", Json.int(tokenIndex)));
-              responseFields.add(("zone", Json.str(zoneDesc)));
-              responseFields.add(("mode", Json.str(modeDesc)));
-              responseFields.add(("accumulation_interval", Json.str("15 minutes")));
-              responseFields.add(("base_rates", Json.str("5.0 parts (randomized distribution), 2.0 battery, 1.0 condition per 15min")));
-              responseFields.add(("stat_bonuses", Json.str("Speed: up to +10% parts | Power Core: up to -20% battery | Stability: up to -25% condition | Accel: up to +60% buff chance")));
-              responseFields.add(("world_buff_chance", Json.str("2%-3.2% per check (scales with Acceleration stat)")));
-
-              // Add power grid info for ChargingStation
-              var powerGridMsg = "";
-              if (zone == #ChargingStation) {
-                let powerStatus = garage.getGaragePowerStatus(botStats.ownerPrincipal);
-                responseFields.add(("power_grid", Json.obj([("total_capacity_watts", Json.int(powerStatus.totalCapacityWatts)), ("current_draw_watts", Json.int(powerStatus.currentDrawWatts)), ("bots_charging", Json.int(powerStatus.botsCharging)), ("efficiency_percent", Json.int(Int.abs(Float.toInt(powerStatus.efficiency * 100.0)))), ("watts_per_bot", Json.int(powerStatus.wattsPerBot))])));
-
-                if (powerStatus.efficiency < 1.0) {
-                  let effPct = Int.abs(Float.toInt(powerStatus.efficiency * 100.0));
-                  powerGridMsg := " ⚡ POWER GRID: " # Nat.toText(powerStatus.botsCharging) # " bots sharing " # Nat.toText(powerStatus.totalCapacityWatts) # "W = " # Nat.toText(effPct) # "% charge speed.";
-                };
-              };
-
-              responseFields.add(("message", Json.str("🔧 Bot sent out to scavenge in " # zoneDesc # ". Rewards accumulate continuously based on time elapsed. " # modeMsg # powerGridMsg # " WARNING: Bot dies at 0 battery OR condition = lose ALL pending rewards!")));
-
-              let response = Json.obj(Buffer.toArray(responseFields));
-
-              ToolContext.makeSuccess(response, cb);
+          let (modeDesc, modeMsg) = switch (durationMinutes) {
+            case (null) {
+              ("Continuous", "Retrieve bot anytime with garage_complete_scavenging.");
+            };
+            case (?duration) {
+              ("Timed (" # Nat.toText(duration) # " minutes)", "Bot will auto-return after " # Nat.toText(duration) # " minutes.");
             };
           };
+
+          // Build base response fields
+          var responseFields = Buffer.Buffer<(Text, Json.Json)>(10);
+          responseFields.add(("token_index", Json.int(tokenIndex)));
+          responseFields.add(("zone", Json.str(zoneDesc)));
+          responseFields.add(("mode", Json.str(modeDesc)));
+          responseFields.add(("accumulation_interval", Json.str("15 minutes")));
+          responseFields.add(("base_rates", Json.str("5.0 parts (randomized distribution), 2.0 battery, 1.0 condition per 15min")));
+          responseFields.add(("stat_bonuses", Json.str("Speed: up to +10% parts | Power Core: up to -20% battery | Stability: up to -25% condition | Accel: up to +60% buff chance")));
+          responseFields.add(("world_buff_chance", Json.str("2%-3.2% per check (scales with Acceleration stat)")));
+
+          // Add power grid info for ChargingStation
+          var powerGridMsg = "";
+          if (zone == #ChargingStation) {
+            let powerStatus = garage.getGaragePowerStatus(botStats.ownerPrincipal);
+            responseFields.add(("power_grid", Json.obj([("total_capacity_watts", Json.int(powerStatus.totalCapacityWatts)), ("current_draw_watts", Json.int(powerStatus.currentDrawWatts)), ("bots_charging", Json.int(powerStatus.botsCharging)), ("efficiency_percent", Json.int(Int.abs(Float.toInt(powerStatus.efficiency * 100.0)))), ("watts_per_bot", Json.int(powerStatus.wattsPerBot))])));
+
+            if (powerStatus.efficiency < 1.0) {
+              let effPct = Int.abs(Float.toInt(powerStatus.efficiency * 100.0));
+              powerGridMsg := " ⚡ POWER GRID: " # Nat.toText(powerStatus.botsCharging) # " bots sharing " # Nat.toText(powerStatus.totalCapacityWatts) # "W = " # Nat.toText(effPct) # "% charge speed.";
+            };
+          };
+
+          responseFields.add(("message", Json.str("🔧 Bot sent out to scavenge in " # zoneDesc # ". Rewards accumulate continuously based on time elapsed. " # modeMsg # powerGridMsg # " WARNING: Bot dies at 0 battery OR condition = lose ALL pending rewards!")));
+
+          let response = Json.obj(Buffer.toArray(responseFields));
+
+          ToolContext.makeSuccess(response, cb);
         };
       };
     };

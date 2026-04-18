@@ -71,47 +71,58 @@ module {
       for (bot in ownerBots.vals()) {
         let tokenIndex = bot.tokenIndex;
 
-        // Check if bot has an active mission
-        switch (bot.activeMission) {
+        // Re-read authoritative state for each bot — the snapshot from
+        // getBotsForOwner may be stale after prior iterations mutated state
+        // (e.g. snapshotChargingStationBots can modify other bots).
+        switch (garage.getStats(tokenIndex)) {
           case (null) {
-            // No active mission, skip
+            // Bot disappeared from stats (shouldn't happen normally)
             skippedCount += 1;
           };
-          case (?mission) {
-            // Cap completions per call
-            if (completedCount >= MAX_COMPLETIONS) {
-              stillActiveBuf.add(Json.obj([
-                ("token_index", Json.int(tokenIndex)),
-                ("zone", Json.str(zoneToText(mission.zone))),
-                ("reason", Json.str("max_completions_reached")),
-              ]));
-            } else {
-              // Try to complete the mission
-              switch (garage.completeScavengingMissionV2(tokenIndex, now)) {
-                case (#err(e)) {
-                  errorCount += 1;
-                  errorsBuf.add(Json.obj([
+          case (?stats) {
+            // Check if bot has an active mission using FRESH state
+            switch (stats.activeMission) {
+              case (null) {
+                // No active mission, skip
+                skippedCount += 1;
+              };
+              case (?mission) {
+                // Cap completions per call
+                if (completedCount >= MAX_COMPLETIONS) {
+                  stillActiveBuf.add(Json.obj([
                     ("token_index", Json.int(tokenIndex)),
                     ("zone", Json.str(zoneToText(mission.zone))),
-                    ("error", Json.str(e)),
+                    ("reason", Json.str("max_completions_reached")),
                   ]));
-                };
-                case (#ok(result)) {
-                  // Record dedication activity DP for scavenging
-                  ctx.dedicationManager.recordScavengingCompletion(tokenIndex, result.totalParts, now);
+                } else {
+                  // Try to complete the mission
+                  switch (garage.completeScavengingMissionV2(tokenIndex, now)) {
+                    case (#err(e)) {
+                      errorCount += 1;
+                      errorsBuf.add(Json.obj([
+                        ("token_index", Json.int(tokenIndex)),
+                        ("zone", Json.str(zoneToText(mission.zone))),
+                        ("error", Json.str(e)),
+                      ]));
+                    };
+                    case (#ok(result)) {
+                      // Record dedication activity DP for scavenging
+                      ctx.dedicationManager.recordScavengingCompletion(tokenIndex, result.totalParts, now);
 
-                  completedCount += 1;
-                  resultsBuf.add(Json.obj([
-                    ("token_index", Json.int(tokenIndex)),
-                    ("zone", Json.str(zoneToText(mission.zone))),
-                    ("parts_collected", Json.int(result.totalParts)),
-                    ("hours_elapsed", Json.int(result.hoursOut)),
-                    ("speed_chips", Json.int(result.speedChips)),
-                    ("power_core_fragments", Json.int(result.powerCoreFragments)),
-                    ("thruster_kits", Json.int(result.thrusterKits)),
-                    ("gyro_modules", Json.int(result.gyroModules)),
-                    ("universal_parts", Json.int(result.universalParts)),
-                  ]));
+                      completedCount += 1;
+                      resultsBuf.add(Json.obj([
+                        ("token_index", Json.int(tokenIndex)),
+                        ("zone", Json.str(zoneToText(mission.zone))),
+                        ("parts_collected", Json.int(result.totalParts)),
+                        ("hours_elapsed", Json.int(result.hoursOut)),
+                        ("speed_chips", Json.int(result.speedChips)),
+                        ("power_core_fragments", Json.int(result.powerCoreFragments)),
+                        ("thruster_kits", Json.int(result.thrusterKits)),
+                        ("gyro_modules", Json.int(result.gyroModules)),
+                        ("universal_parts", Json.int(result.universalParts)),
+                      ]));
+                    };
+                  };
                 };
               };
             };
