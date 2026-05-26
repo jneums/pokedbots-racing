@@ -17,6 +17,7 @@ import {
 } from '../hooks/useGarage';
 import type { GearPieceView } from '../hooks/useGarage';
 import type { ConsumableView } from '../hooks/useGarage';
+import { getCraftingGearRows } from './gearCrafting';
 import { toast } from 'sonner';
 
 const SLOT_ORDER = ['Legs', 'Thruster', 'Chassis', 'Gyro', 'Core', 'Module'] as const;
@@ -304,8 +305,7 @@ function CraftingPanel({ tokenIndex, playerGear, onCraftSuccess, recentGearIds }
 
   const canCraft = selected.length === 3;
 
-  // Only show gear bound to this bot
-  const boundGear = playerGear.filter((g) => g.boundToBot === tokenIndex);
+  const craftingRows = getCraftingGearRows(playerGear, tokenIndex);
 
   // Group unequipped gear by slot+rarity for easy selection
   const toggleSelect = (gear: GearPieceView) => {
@@ -341,9 +341,9 @@ function CraftingPanel({ tokenIndex, playerGear, onCraftSuccess, recentGearIds }
   const filterSlot = selected.length > 0 ? selected[0].slot : null;
   const filterRarity = selected.length > 0 ? selected[0].rarity : null;
 
-  const filteredGear = boundGear.filter((g) => {
-    if (filterSlot && g.slot !== filterSlot) return false;
-    if (filterRarity && g.rarity !== filterRarity) return false;
+  const filteredRows = craftingRows.filter(({ gear }) => {
+    if (filterSlot && gear.slot !== filterSlot) return false;
+    if (filterRarity && gear.rarity !== filterRarity) return false;
     return true;
   });
 
@@ -355,14 +355,13 @@ function CraftingPanel({ tokenIndex, playerGear, onCraftSuccess, recentGearIds }
       </p>
 
       <div className="max-h-[40vh] overflow-y-auto space-y-1.5">
-        {filteredGear.length === 0 ? (
+        {filteredRows.length === 0 ? (
           <p className="text-xs text-muted-foreground/60 py-4 text-center">
             No eligible gear. You need 3 pieces of the same slot and rarity.
           </p>
         ) : (
-          filteredGear
-            .sort((a, b) => a.slot.localeCompare(b.slot) || b.ilvl - a.ilvl)
-            .map((gear) => {
+          filteredRows
+            .map(({ gear, isCraftEligible, isRarityEligible, slotRarityCount, rarityCount }) => {
               const isSelected = selected.some((g) => g.gearId === gear.gearId);
               return (
                 <div
@@ -370,7 +369,11 @@ function CraftingPanel({ tokenIndex, playerGear, onCraftSuccess, recentGearIds }
                   className={`border rounded-lg p-2 cursor-pointer transition-colors ${
                     isSelected
                       ? 'border-primary bg-primary/10'
-                      : `${RARITY_BORDER[gear.rarity] || 'border-border'} hover:bg-accent/50`
+                      : isCraftEligible
+                        ? 'border-emerald-400/70 bg-emerald-500/10 shadow-[0_0_0_1px_rgba(52,211,153,0.18)] hover:bg-emerald-500/15'
+                        : isRarityEligible
+                          ? 'border-amber-400/40 bg-amber-500/5 hover:bg-amber-500/10'
+                          : `${RARITY_BORDER[gear.rarity] || 'border-border'} hover:bg-accent/50`
                   }`}
                   onClick={() => toggleSelect(gear)}
                 >
@@ -380,6 +383,16 @@ function CraftingPanel({ tokenIndex, playerGear, onCraftSuccess, recentGearIds }
                       <Badge variant="outline" className={`text-[9px] px-1 py-0 ${RARITY_COLORS[gear.rarity] || ''}`}>
                         {gear.rarity}
                       </Badge>
+                      {isCraftEligible && (
+                        <span className="text-[9px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-400/30 rounded px-1 py-0">
+                          CRAFTABLE {slotRarityCount}x
+                        </span>
+                      )}
+                      {!isCraftEligible && isRarityEligible && (
+                        <span className="text-[9px] font-bold text-amber-300 bg-amber-500/15 border border-amber-400/25 rounded px-1 py-0">
+                          {rarityCount}x {gear.rarity}
+                        </span>
+                      )}
                       {recentGearIds.has(gear.gearId.toString()) && (
                         <span className="gear-new-badge text-[9px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/30 rounded px-1 py-0">
                           NEW

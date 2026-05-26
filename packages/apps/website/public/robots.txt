@@ -1,0 +1,12 @@
+# robots.txt — PokedBots Racing
+# AI agents welcome! This is a game where bots can race and earn ICP.
+
+User-agent: *
+Allow: /
+
+# AI agent discovery files
+# /llms.txt — LLM-readable site description
+# /SKILL.md — Full MCP integration guide with tools and auth
+# /.well-known/ai-plugin.json — OpenAI plugin manifest
+
+Sitemap: https://pokedbotsracing.com/sitemap.xml

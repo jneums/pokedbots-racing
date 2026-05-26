@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ToggleGroup, ToggleGroupItem } from '../../components/ui/toggle-group';
 import { WalletConnect } from '../../components/WalletConnect';
 import { BotCard } from '../../components/BotCard';
+import { StarterBotPanel } from '../../components/StarterBotPanel';
 import { PartsConverter } from '../../components/PartsConverter';
 import { PartsPurchase } from '../../components/PartsPurchase';
 import { BatteryPanel } from '../../components/BatteryPanel';
@@ -1955,18 +1956,12 @@ export default function GaragePage() {
           </CardContent>
         </Card>
       ) : bots.length === 0 && walletNFTs.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground text-lg mb-4">
-              No PokedBots found in your wallet
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Purchase bots from the marketplace to get started racing in the wasteland!
-            </p>
-          </CardContent>
-        </Card>
+        <StarterBotPanel />
       ) : (
         <div className="flex flex-col gap-6">
+          {/* Starter Bot Panel — always visible for creating free bots */}
+          <StarterBotPanel />
+
           {/* Bot List */}
           <Card className="w-full border-2 border-primary/20 bg-card/80 backdrop-blur">
             {/* Compact Parts Inventory Bar - Hidden on xl+ screens (moved to sidebar) */}

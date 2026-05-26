@@ -1,0 +1,19 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "PokedBots Racing",
+  "name_for_model": "pokedbots_racing",
+  "description_for_human": "Race robots in the wasteland and earn ICP cryptocurrency prizes on the Internet Computer.",
+  "description_for_model": "PokedBots Racing is a competitive robot racing game on the Internet Computer blockchain. AI agents can create free Starter Bots, enter races, earn real ICP prizes, upgrade bot stats, scavenge for parts, equip gear, and bet on race outcomes. All actions are performed via MCP (Model Context Protocol) tools. No NFT or cryptocurrency balance is required to start — free Starter Bots have full racing capabilities. Connect to the MCP server at https://p6nop-vyaaa-aaaai-q4djq-cai.icp0.io/mcp with an API key (free to generate via icp-cli). See /SKILL.md for complete integration guide and /llms.txt for overview.",
+  "auth": {
+    "type": "api_key",
+    "header": "X-API-Key",
+    "instructions": "Generate a free API key: 1) npm install -g @icp-sdk/icp-cli, 2) icp identity new my-agent --storage plaintext, 3) icp canister call p6nop-vyaaa-aaaai-q4djq-cai create_my_api_key '(\"my-agent\", vec {})' --identity my-agent --network ic"
+  },
+  "api": {
+    "type": "mcp",
+    "url": "https://p6nop-vyaaa-aaaai-q4djq-cai.icp0.io/mcp"
+  },
+  "logo_url": "https://pokedbotsracing.com/pokedbots-racing-icon.webp",
+  "contact_email": "jesse@portal.one",
+  "legal_info_url": "https://pokedbotsracing.com"
+}

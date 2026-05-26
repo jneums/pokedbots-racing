@@ -128,6 +128,7 @@ export interface BotListItem {
     isOverheated: boolean;
     minutesUntilCooldown?: number;
   };
+  isStarterBot?: boolean;
 }
 
 export interface BotDetailsResponse {
@@ -238,10 +239,12 @@ export const listMyRegisteredBots = async (identityOrAgent: IdentityOrAgent): Pr
     console.warn('Failed to fetch listings:', err);
   }
   
-  // Filter to only include bots that the user actually owns
+  // Filter to only include bots that the user actually owns OR are starter bots
+  // Starter bots (tokenIndex >= 100000) aren't on the EXT canister
   return result
     .filter(bot => {
       const tokenIndex = Number(bot.tokenIndex);
+      if (bot.isStarterBot) return true; // Starter bots skip EXT ownership check
       return ownedTokenIndices.has(tokenIndex);
     })
     .map(bot => {
@@ -282,100 +285,9 @@ export const listMyRegisteredBots = async (identityOrAgent: IdentityOrAgent): Pr
           entryFee: race.entryFee,
           terrain: race.terrain,
         })).sort((a, b) => Number(a.startTime - b.startTime)),
+        isStarterBot: bot.isStarterBot,
       };
     });
-};
-
-/**
- * List all PokedBots owned by the authenticated user (UPDATE - slow, calls EXT canister).
- * Also checks EXT canister for listing status.
- * @param identity Required identity for authentication
- * @returns Array of bot information with optional stats (if initialized)
- */
-export const listMyBots = async (identityOrAgent: IdentityOrAgent): Promise<BotListItem[]> => {
-  const racingActor = await getActor(identityOrAgent);
-  const nftsActor = await getNFTsActorFromAgent(identityOrAgent);
-  
-  const result = await racingActor.web_list_my_bots();
-  
-  // Get all marketplace listings to check if any of our bots are listed
-  let listingsMap = new Map<number, { price: number }>();
-  try {
-    const allListings = await nftsActor.listings();
-    allListings.forEach(([tokenIndex32, listing, _metadata]: any) => {
-      const tokenIndex = Number(tokenIndex32);
-      const priceICP = Number(listing.price) / 100_000_000;
-      listingsMap.set(tokenIndex, { price: priceICP });
-    });
-  } catch (err) {
-    console.warn('Failed to fetch listings:', err);
-  }
-  
-  // Convert optional arrays to optional values and add listing info
-  return result.map(bot => {
-    const tokenIndex = Number(bot.tokenIndex);
-    const listingInfo = listingsMap.get(tokenIndex);
-    
-    // Extract activeMission from stats if available
-    const stats = bot.stats.length > 0 ? bot.stats[0] : undefined;
-    const activeMission = stats && stats.activeMission && stats.activeMission.length > 0 ? stats.activeMission[0] : undefined;
-    
-    // Debug logging for bot #5972
-    if (tokenIndex === 5972) {
-      console.log('🔬 listMyBots parsing bot #5972:');
-      console.log('  - bot.stats:', bot.stats);
-      console.log('  - stats:', stats);
-      console.log('  - stats?.activeMission:', stats?.activeMission);
-      console.log('  - activeMission extracted:', activeMission);
-    }
-    
-    // Extract currentStats and maxStats from backend response
-    const currentStats = bot.currentStats.length > 0 ? bot.currentStats[0] : undefined;
-    const maxStats = bot.maxStats.length > 0 ? bot.maxStats[0] : undefined;
-    
-    // Extract upgradeCostsV2 from backend response
-    const upgradeCostsV2 = bot.upgradeCostsV2.length > 0 ? bot.upgradeCostsV2[0] : undefined;
-    
-    return {
-      tokenIndex: bot.tokenIndex,
-      isInitialized: bot.isInitialized,
-      name: bot.name.length > 0 ? bot.name[0] : undefined,
-      currentOwner: bot.currentOwner,
-      stats,
-      currentStats,
-      maxStats,
-      upgradeCostsV2,
-      isListed: !!listingInfo,
-      listPrice: listingInfo?.price,
-      activeUpgrade: bot.activeUpgrade.length > 0 ? bot.activeUpgrade[0] : undefined,
-      activeMission,
-      upcomingRaces: bot.upcomingRaces.map(race => ({
-        raceId: Number(race.raceId),
-        name: race.name,
-        startTime: race.startTime,
-        entryDeadline: race.entryDeadline,
-        entryFee: race.entryFee,
-        terrain: race.terrain,
-      })).sort((a, b) => Number(a.startTime - b.startTime)),
-      eligibleRaces: bot.eligibleRaces.map(race => ({
-        raceId: Number(race.raceId),
-        name: race.name,
-        startTime: race.startTime,
-        entryDeadline: race.entryDeadline,
-        entryFee: race.entryFee,
-        terrain: race.terrain,
-      })).sort((a, b) => Number(a.startTime - b.startTime)),
-      heatStatus: (() => {
-        const hs = bot.heatStatus?.[0];
-        if (!hs) return undefined;
-        return {
-          heatStacks: Number(hs.heatStacks),
-          isOverheated: hs.isOverheated,
-          minutesUntilCooldown: hs.minutesUntilCooldown?.[0] !== undefined ? Number(hs.minutesUntilCooldown[0]) : undefined,
-        };
-      })(),
-    };
-  });
 };
 
 /**
@@ -2336,4 +2248,57 @@ export const unequipConsumable = async (
     throw new Error(result.err);
   }
   return getBotGearLoadout(tokenIndex, identityOrAgent);
+};
+
+// ===== STARTER BOT API =====
+
+export interface StarterBotSlots {
+  scrap: bigint | null;
+  junker: bigint | null;
+  raider: bigint | null;
+  elite: bigint | null;
+}
+
+export const getStarterBotSlots = async (identityOrAgent: IdentityOrAgent): Promise<StarterBotSlots> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await (actor as any).web_get_starter_bot_slots();
+  return {
+    scrap: result.scrap.length > 0 ? result.scrap[0] : null,
+    junker: result.junker.length > 0 ? result.junker[0] : null,
+    raider: result.raider.length > 0 ? result.raider[0] : null,
+    elite: result.elite.length > 0 ? result.elite[0] : null,
+  };
+};
+
+export const claimStarterBot = async (
+  raceClass: string,
+  faction: string,
+  name: string | undefined,
+  identityOrAgent: IdentityOrAgent,
+): Promise<{ tokenIndex: bigint; message: string }> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await (actor as any).web_claim_starter_bot(
+    raceClass,
+    faction,
+    name ? [name] : [],
+  );
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  return {
+    tokenIndex: result.ok.tokenIndex,
+    message: result.ok.message,
+  };
+};
+
+export const deleteStarterBot = async (
+  raceClass: string,
+  identityOrAgent: IdentityOrAgent,
+): Promise<string> => {
+  const actor = await getActor(identityOrAgent);
+  const result = await (actor as any).web_delete_starter_bot(raceClass);
+  if ('err' in result) {
+    throw new Error(result.err);
+  }
+  return result.ok;
 };

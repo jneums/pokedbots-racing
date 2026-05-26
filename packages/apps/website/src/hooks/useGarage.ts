@@ -91,6 +91,11 @@ import {
   type PurchaseRepairBaySlotResult,
   type UpgradeRepairBayResult,
   type CompleteRepairBayUpgradeResult,
+  // Starter Bot APIs
+  getStarterBotSlots,
+  claimStarterBot,
+  deleteStarterBot,
+  type StarterBotSlots,
 } from '@pokedbots-racing/ic-js';
 import { useAuth } from './useAuth';
 
@@ -1483,3 +1488,40 @@ export function useRecentGear(withinMs: number = 24 * 60 * 60 * 1000) {
 }
 
 export type { GearPieceView, BotLoadoutView, GearBonuses, ConsumableView };
+
+// ===== STARTER BOT HOOKS =====
+
+export function useStarterBotSlots() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['starter-bot-slots', user?.principal],
+    queryFn: () => getStarterBotSlots(user!.agent),
+    enabled: !!user?.agent,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useClaimStarterBot() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ raceClass, faction, name }: { raceClass: string; faction: string; name?: string }) =>
+      claimStarterBot(raceClass, faction, name, user!.agent),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['starter-bot-slots'] });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+    },
+  });
+}
+
+export function useDeleteStarterBot() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (raceClass: string) => deleteStarterBot(raceClass, user!.agent),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['starter-bot-slots'] });
+      queryClient.invalidateQueries({ queryKey: ['my-bots'] });
+    },
+  });
+}

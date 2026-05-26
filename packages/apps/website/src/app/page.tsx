@@ -79,11 +79,6 @@ export default function Home() {
                   View Schedule
                 </Button>
               </Link>
-              <Link to="/guides">
-                <Button size="lg" variant="outline" className="text-lg px-10 py-7 h-auto font-semibold border-2 hover:bg-accent/50">
-                  Read Guides
-                </Button>
-              </Link>
             </div>
           </div>
         </div>
@@ -233,76 +228,6 @@ export default function Home() {
           </div>
         </section>
       )}
-
-      {/* Guides Section */}
-      <section className="border-t bg-card/30">
-        <div className="container mx-auto px-4 py-20">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4">Getting Started</h2>
-              <p className="text-lg text-muted-foreground">Learn the basics and master the wasteland</p>
-            </div>
-            
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Link to="/guides/01-quick-start" className="group">
-                <div className="bg-card border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 rounded-lg p-6 h-full">
-                  <div className="text-3xl mb-3">🚀</div>
-                  <h3 className="font-semibold text-xl mb-2 group-hover:text-primary transition-colors">Quick Start Guide</h3>
-                  <p className="text-sm text-muted-foreground">Get your first bot and start racing in minutes</p>
-                </div>
-              </Link>
-              
-              <Link to="/guides/02-racing-guide" className="group">
-                <div className="bg-card border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 rounded-lg p-6 h-full">
-                  <div className="text-3xl mb-3">🏁</div>
-                  <h3 className="font-semibold text-xl mb-2 group-hover:text-primary transition-colors">Racing Mechanics</h3>
-                  <p className="text-sm text-muted-foreground">Understand stats, terrain bonuses, and winning strategies</p>
-                </div>
-              </Link>
-              
-              <Link to="/guides/04-upgrade-system" className="group">
-                <div className="bg-card border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 rounded-lg p-6 h-full">
-                  <div className="text-3xl mb-3">⚡</div>
-                  <h3 className="font-semibold text-xl mb-2 group-hover:text-primary transition-colors">Upgrade System</h3>
-                  <p className="text-sm text-muted-foreground">Boost your bot's stats with ICP or parts</p>
-                </div>
-              </Link>
-              
-              <Link to="/guides/03-scavenging-guide" className="group">
-                <div className="bg-card border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 rounded-lg p-6 h-full">
-                  <div className="text-3xl mb-3">🔧</div>
-                  <h3 className="font-semibold text-xl mb-2 group-hover:text-primary transition-colors">Scavenging Guide</h3>
-                  <p className="text-sm text-muted-foreground">Gather free parts while your bots are idle</p>
-                </div>
-              </Link>
-              
-              <Link to="/guides/06-marketplace-shopping" className="group">
-                <div className="bg-card border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 rounded-lg p-6 h-full">
-                  <div className="text-3xl mb-3">🛒</div>
-                  <h3 className="font-semibold text-xl mb-2 group-hover:text-primary transition-colors">Shopping Guide</h3>
-                  <p className="text-sm text-muted-foreground">Find the best bots to buy on the marketplace</p>
-                </div>
-              </Link>
-              
-              <Link to="/guides/05-costs-and-fees" className="group">
-                <div className="bg-card border-2 border-primary/20 hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 rounded-lg p-6 h-full">
-                  <div className="text-3xl mb-3">💰</div>
-                  <h3 className="font-semibold text-xl mb-2 group-hover:text-primary transition-colors">Costs & Fees</h3>
-                  <p className="text-sm text-muted-foreground">Understand all ICP costs and optimize expenses</p>
-                </div>
-              </Link>
-            </div>
-            
-            <div className="text-center mt-10">
-              <Link to="/guides">
-                <Button size="lg" variant="outline" className="text-lg px-8 py-6 h-auto font-semibold border-2">
-                  View All Guides →
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* CTA Section */}
       <section className="border-t bg-gradient-to-br from-primary/5 via-background to-accent/10">

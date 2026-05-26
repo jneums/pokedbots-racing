@@ -142,6 +142,13 @@ type StreamingCallbackResponse =
  };
 type StreamingCallback = func (StreamingToken) ->
                           (opt StreamingCallbackResponse) query;
+type StarterBotSlots = 
+ record {
+   elite: opt nat;
+   junker: opt nat;
+   raider: opt nat;
+   scrap: opt nat;
+ };
 type Sponsorship = 
  record {
    amount: nat;
@@ -292,7 +299,7 @@ type Result_3 =
    err: text;
    ok: BotLoadout;
  };
-type Result_26 = 
+type Result_27 = 
  variant {
    err: text;
    ok:
@@ -319,7 +326,7 @@ type Result_26 =
       tokenIndex: nat;
     };
  };
-type Result_25 = 
+type Result_26 = 
  variant {
    err: text;
    ok:
@@ -385,7 +392,7 @@ type Result_25 =
       tokenIndex: nat;
     };
  };
-type Result_24 = 
+type Result_25 = 
  variant {
    err: text;
    ok: record {
@@ -394,12 +401,12 @@ type Result_24 =
          refundedRegistrants: nat;
        };
  };
-type Result_23 = 
+type Result_24 = 
  variant {
    err: text;
    ok: nat;
  };
-type Result_22 = 
+type Result_23 = 
  variant {
    err: text;
    ok: record {
@@ -407,7 +414,7 @@ type Result_22 =
          message: text;
        };
  };
-type Result_21 = 
+type Result_22 = 
  variant {
    err: text;
    ok: record {
@@ -415,10 +422,15 @@ type Result_21 =
          time: nat;
        };
  };
-type Result_20 = 
+type Result_21 = 
  variant {
    err: text;
    ok: vec BotSegmentTimes;
+ };
+type Result_20 = 
+ variant {
+   err: TreasuryError;
+   ok;
  };
 type Result_2 = 
  variant {
@@ -427,29 +439,32 @@ type Result_2 =
  };
 type Result_19 = 
  variant {
-   err: TreasuryError;
-   ok;
- };
-type Result_18 = 
- variant {
    err: text;
    ok: record {
          penalty: nat;
          refundAmount: nat;
        };
  };
-type Result_17 = 
+type Result_18 = 
  variant {
    err: text;
    ok;
  };
-type Result_16 = 
+type Result_17 = 
  variant {
    err: text;
    ok: record {
          betId: nat;
          currentOdds: float64;
          potentialPayout: nat;
+       };
+ };
+type Result_16 = 
+ variant {
+   err: text;
+   ok: record {
+         message: text;
+         tokenIndex: nat;
        };
  };
 type Result_15 = 
@@ -859,9 +874,9 @@ type McpServer =
     vec nat) -> (text);
    admin_get_active_mission: (tokenIndex: nat) -> (text) query;
    /// Get resonance info for a bot (admin only) - for verifying the resonance system
-   admin_get_resonance: (tokenIndex: nat) -> (Result_26) query;
+   admin_get_resonance: (tokenIndex: nat) -> (Result_27) query;
    /// Get detailed stat breakdown for debugging (admin only)
-   admin_get_stat_breakdown: (tokenIndex: nat) -> (Result_25) query;
+   admin_get_stat_breakdown: (tokenIndex: nat) -> (Result_26) query;
    admin_grant_battery: (targetPrincipal: principal, batteryType: text) ->
     (text);
    admin_migrate_gear_soulbound: () -> (Result_2);
@@ -893,15 +908,15 @@ type McpServer =
                                                    });
    /// Cancel a user-created event. Only the creator can cancel, and only before registration closes.
    /// Refunds: entry fees to all registrants + prize contribution to creator (creation fee is NOT refunded)
-   cancel_user_event: (eventId: nat) -> (Result_24);
+   cancel_user_event: (eventId: nat) -> (Result_25);
    cleanup_duplicate_race_create_timers: () -> (text);
    clear_event_races: (eventIds: vec nat) -> (text);
    /// Clear HTTP update tracking stats (owner only)
-   clear_http_update_stats: () -> (Result_23);
+   clear_http_update_stats: () -> (Result_24);
    /// Clear method call tracking stats (owner only)
-   clear_method_call_stats: () -> (Result_23);
+   clear_method_call_stats: () -> (Result_24);
    /// Clear race_create timer diagnostic logs (owner only)
-   clear_race_create_diagnostics: () -> (Result_23);
+   clear_race_create_diagnostics: () -> (Result_24);
    clear_reconstitution_traces: () -> ();
    /// * Creates a new API key. This API key is linked to the caller's principal.
    ///    * @param name A human-readable name for the key.
@@ -910,7 +925,7 @@ type McpServer =
    /// Create a user-created event with custom config and optional bot whitelist
    /// Payment: creation fee (0.5 ICP non-refundable) + prize contribution (escrowed, refundable on cancel)
    /// Requires ICRC-2 approval for total amount (creation fee + prize contribution)
-   create_user_event: (config: UserEventConfig) -> (Result_22);
+   create_user_event: (config: UserEventConfig) -> (Result_23);
    /// Test/debug: Get all available tracks
    debug_get_all_tracks: () ->
     (vec
@@ -1109,7 +1124,7 @@ type McpServer =
    force_finish_race: (raceId: nat) -> (text);
    force_release_lock: () -> (opt Time);
    /// Manually trigger a race_create timer if none exist (owner only, emergency recovery)
-   force_schedule_race_create: () -> (Result_21);
+   force_schedule_race_create: () -> (Result_22);
    force_system_timer_cancel: () -> (bool);
    get_actions_by_filter: (filter: ActionFilter) -> (vec ActionDetail) query;
    get_all_scheduled_events: () -> (vec ScheduledEvent) query;
@@ -1436,7 +1451,7 @@ type McpServer =
                               time: nat;
                             };
      }) query;
-   get_race_segments: (raceId: nat) -> (Result_20) query;
+   get_race_segments: (raceId: nat) -> (Result_21) query;
    get_reconstitution_traces: () -> (vec ReconstitutionTrace) query;
    get_timer_diagnostics: () -> (TimerDiagnostics) query;
    /// Get total count of NFTs with metadata stored
@@ -1508,11 +1523,11 @@ type McpServer =
    ///    * @returns True if the key was found and revoked, false otherwise.
    revoke_my_api_key: (key_id: text) -> ();
    /// Set the EXT NFT canister ID. Only the current owner can call this.
-   set_ext_canister: (canister_id: principal) -> (Result_17);
+   set_ext_canister: (canister_id: principal) -> (Result_18);
    /// Set the ICP ledger canister ID. Only the current owner can call this.
-   set_icp_ledger: (ledger_id: principal) -> (Result_17);
+   set_icp_ledger: (ledger_id: principal) -> (Result_18);
    /// Set a new owner for the canister. Only the current owner can call this.
-   set_owner: (new_owner: principal) -> (Result_19);
+   set_owner: (new_owner: principal) -> (Result_20);
    transformJwksResponse:
     (record {
        context: blob;
@@ -1522,7 +1537,7 @@ type McpServer =
    trigger_race_finish: (raceId: nat) -> (text);
    trigger_race_start: (raceId: nat) -> (text);
    /// Unregister from an event and get a refund based on timing
-   unregister_from_event: (eventId: nat, tokenIndex: nat) -> (Result_18);
+   unregister_from_event: (eventId: nat, tokenIndex: nat) -> (Result_19);
    /// Upload a batch of pre-computed base stats
    upload_base_stats_batch: (batch:
     vec
@@ -1541,9 +1556,9 @@ type McpServer =
    upload_nft_stats_batch: (batch: vec record {
                                          nat;
                                          NFTStats;
-                                       }) -> (Result_17);
+                                       }) -> (Result_18);
    /// Upload trait schema (owner only, done once)
-   upload_trait_schema: (schemaData: TraitSchema) -> (Result_17);
+   upload_trait_schema: (schemaData: TraitSchema) -> (Result_18);
    validate_timer_state: () -> (vec text) query;
    /// Batch complete scavenging missions for multiple bots
    web_batch_complete_scavenging: (tokenIndices: vec nat) ->
@@ -1657,11 +1672,15 @@ type McpServer =
          };}) query;
    /// Place a bet for UI
    web_betting_place_bet: (raceId: nat, tokenIndex: nat, betType: BetType,
-    amountE8s: nat) -> (Result_16);
+    amountE8s: nat) -> (Result_17);
    /// Cancel an in-progress upgrade (DEPRECATED - upgrades are now instant)
    /// Settle a legacy upgrade that was in progress when we switched to instant upgrades
    /// This runs the RNG and completes the upgrade for users who were mid-upgrade
    web_cancel_upgrade: (tokenIndex: nat) -> (Result_2);
+   /// Claim a free starter bot. One per class (Scrap/Junker/Raider/Elite).
+   /// User picks faction from: Game, Animal, Industrial, Food.
+   web_claim_starter_bot: (raceClass: text, faction: text, name: opt text) ->
+    (Result_16);
    /// Combine parts to create Universal parts (1 of each type = 1 Universal)
    web_combine_parts_to_universal: (amount: nat) -> (Result_2);
    /// Complete a repair bay upgrade after build time has passed
@@ -1674,6 +1693,8 @@ type McpServer =
    /// Craft 5 gear pieces of the same slot and rarity into a higher rarity piece
    /// All pieces must be soulbound to the same bot (tokenIndex).
    web_craft_gear: (tokenIndex: nat, gearIds: vec nat) -> (Result_14);
+   /// Delete a starter bot to free the slot for a new faction choice.
+   web_delete_starter_bot: (raceClass: text) -> (Result_2);
    /// De-register a bot (removes control, preserves stats)
    web_deregister_bot: (tokenIndex: nat) -> (Result_2);
    /// Enter a race (with ICRC-2 payment for entry fee)
@@ -1904,6 +1925,8 @@ type McpServer =
    web_get_scavenger_bots: () -> (vec nat) query;
    /// Get user's starred bots
    web_get_starred_bots: () -> (vec nat) query;
+   /// Get starter bot slots for the caller
+   web_get_starter_bot_slots: () -> (StarterBotSlots) query;
    /// Get total gear count (admin/stats)
    web_get_total_gear_count: () -> (nat) query;
    /// Get user's parts inventory
@@ -2075,6 +2098,7 @@ type McpServer =
             startTime: int;
             terrain: Terrain;
           };
+        isStarterBot: bool;
         maxStats:
          record {
            acceleration: nat;

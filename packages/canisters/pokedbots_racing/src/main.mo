@@ -66,6 +66,8 @@ import GarageGetStationStatus "tools/garage_get_station_status";
 import GarageStartActivity "tools/garage_start_activity";
 import GarageGetBulkDetails "tools/garage_get_bulk_details";
 import GarageCompleteAllReadyScavenging "tools/garage_complete_all_ready_scavenging";
+import GarageClaimStarterBot "tools/garage_claim_starter_bot";
+import GarageDeleteStarterBot "tools/garage_delete_starter_bot";
 import RacingListRaces "tools/racing_list_races";
 import RacingListEvents "tools/racing_list_events";
 import RacingGetMyRegistrations "tools/racing_get_my_registrations";
@@ -675,6 +677,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   // Stable state for Repair Bay Infrastructure system
   let stable_user_repair_bays = Map.new<Principal, PokedBotsGarage.UserRepairBayStorage>(); // owner -> repair bay storage
+
+  // Stable state for Starter Bot slots (free bots, one per bracket per principal)
+  let stable_starter_bot_slots = Map.new<Principal, PokedBotsGarage.StarterBotSlots>(); // owner -> starter bot slots
 
   // --- DIAGNOSTIC DATA COLLECTION ---
   // Stable storage for timer diagnostic logs to debug disappearing race_create timers
@@ -3803,6 +3808,29 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       Option.get(Map.get(stable_user_scavenger_bots, Map.phash, principal), []);
     };
     trackMethodCall = trackMethodCall;
+    getStarterBotSlots = func(principal : Principal) : PokedBotsGarage.StarterBotSlots {
+      switch (Map.get(stable_starter_bot_slots, Map.phash, principal)) {
+        case (?s) { s };
+        case (null) { PokedBotsGarage.emptyStarterSlots };
+      };
+    };
+    setStarterBotSlot = func(principal : Principal, classOffset : Nat, tokenIndex : ?Nat) {
+      let slots = switch (Map.get(stable_starter_bot_slots, Map.phash, principal)) {
+        case (?s) { s };
+        case (null) { PokedBotsGarage.emptyStarterSlots };
+      };
+      let newSlots : PokedBotsGarage.StarterBotSlots = switch (classOffset) {
+        case (0) { { slots with scrap = tokenIndex } };
+        case (1) { { slots with junker = tokenIndex } };
+        case (2) { { slots with raider = tokenIndex } };
+        case _ { { slots with elite = tokenIndex } };
+      };
+      ignore Map.put(stable_starter_bot_slots, Map.phash, principal, newSlots);
+    };
+    awardStarterGear = func(principal : Principal, tokenIndex : Nat) {
+      let gearSeed = Nat32.toNat(Principal.hash(principal)) + tokenIndex * 31337;
+      ignore gearManager.generateStarterKit(principal, tokenIndex, gearSeed);
+    };
   };
 
   // Import tool configurations from separate modules
@@ -3852,6 +3880,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     BettingGetPoolInfo.config(),
     BettingGetMyBets.config(),
     RacingGetBotNames.config(),
+    GarageClaimStarterBot.config(),
+    GarageDeleteStarterBot.config(),
   ];
 
   // --- 2. CONFIGURE THE SDK ---
@@ -3914,6 +3944,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       ("betting_get_pool_info", BettingGetPoolInfo.handle(toolContext)),
       ("betting_get_my_bets", BettingGetMyBets.handle(toolContext)),
       ("racing_get_bot_names", RacingGetBotNames.handle(toolContext)),
+      ("garage_claim_starter_bot", GarageClaimStarterBot.handle(toolContext)),
+      ("garage_delete_starter_bot", GarageDeleteStarterBot.handle(toolContext)),
     ];
     beacon = beaconContext;
   };
@@ -9957,6 +9989,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       entryFee : Nat;
       terrain : RacingSimulator.Terrain;
     }];
+    isStarterBot : Bool;
   }] {
     let callerAccountId = ExtIntegration.principalToAccountIdentifier(caller, null);
 
@@ -9970,7 +10003,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     );
 
     // Iterate through all registered bots and filter by owner
-    let registeredBots = Buffer.Buffer<{ tokenIndex : Nat; name : ?Text; stats : PokedBotsGarage.PokedBotRacingStats; currentStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; maxStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; upgradeCostsV2 : { speed : { costE8s : Nat; successRate : Float }; powerCore : { costE8s : Nat; successRate : Float }; acceleration : { costE8s : Nat; successRate : Float }; stability : { costE8s : Nat; successRate : Float }; luck : { costE8s : Nat; successRate : Float }; pityCounter : Nat }; dedicationBonuses : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; activeUpgrade : ?PokedBotsGarage.UpgradeSession; upcomingRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }]; eligibleRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }] }>(10);
+    let registeredBots = Buffer.Buffer<{ tokenIndex : Nat; name : ?Text; stats : PokedBotsGarage.PokedBotRacingStats; currentStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; maxStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; upgradeCostsV2 : { speed : { costE8s : Nat; successRate : Float }; powerCore : { costE8s : Nat; successRate : Float }; acceleration : { costE8s : Nat; successRate : Float }; stability : { costE8s : Nat; successRate : Float }; luck : { costE8s : Nat; successRate : Float }; pityCounter : Nat }; dedicationBonuses : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; activeUpgrade : ?PokedBotsGarage.UpgradeSession; upcomingRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }]; eligibleRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }]; isStarterBot : Bool }>(10);
 
     for ((tokenIndex, botStats) in Map.entries(stable_racing_stats)) {
       // Only include bots owned by the caller (compare principals)
@@ -10108,6 +10141,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           activeUpgrade = activeUpgrade;
           upcomingRaces = enteredRaces;
           eligibleRaces = eligibleRaces;
+          isStarterBot = PokedBotsGarage.isStarterBot(tokenIndex);
         });
       };
     };
@@ -10932,6 +10966,159 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       drainMultipliers = {
         scavenging = synergies.drainMultipliers.scavengingDrain;
       };
+    };
+  };
+
+  // ===== STARTER BOT ENDPOINTS =====
+
+  /// Claim a free starter bot. One per class (Scrap/Junker/Raider/Elite).
+  /// User picks faction from: Game, Animal, Industrial, Food.
+  public shared ({ caller }) func web_claim_starter_bot(
+    raceClass : Text, // "Scrap", "Junker", "Raider", "Elite"
+    faction : Text, // "Game", "Animal", "Industrial", "Food"
+    name : ?Text,
+  ) : async Result.Result<{ tokenIndex : Nat; message : Text }, Text> {
+    trackMethodCall("web_claim_starter_bot", caller);
+
+    // Parse class → offset
+    let classOffset : Nat = if (raceClass == "Scrap") { 0 }
+      else if (raceClass == "Junker") { 1 }
+      else if (raceClass == "Raider") { 2 }
+      else if (raceClass == "Elite") { 3 }
+      else { return #err("Invalid class. Must be Scrap, Junker, Raider, or Elite.") };
+
+    // Parse faction
+    let factionType : PokedBotsGarage.FactionType = if (faction == "Game") { #Game }
+      else if (faction == "Animal") { #Animal }
+      else if (faction == "Industrial") { #Industrial }
+      else if (faction == "Food") { #Food }
+      else { return #err("Invalid faction. Must be Game, Animal, Industrial, or Food.") };
+
+    // Validate name
+    switch (name) {
+      case (?n) {
+        switch (UsernameValidator.validateUsername(n)) {
+          case (?error) { return #err(error) };
+          case (null) {};
+        };
+      };
+      case (null) {};
+    };
+
+    // Check if slot is already taken
+    let slots = switch (Map.get(stable_starter_bot_slots, Map.phash, caller)) {
+      case (?s) { s };
+      case (null) { PokedBotsGarage.emptyStarterSlots };
+    };
+
+    let existingSlot = switch (classOffset) {
+      case (0) { slots.scrap };
+      case (1) { slots.junker };
+      case (2) { slots.raider };
+      case _ { slots.elite };
+    };
+
+    switch (existingSlot) {
+      case (?existing) {
+        return #err("You already have a " # raceClass # " starter bot (#" # Nat.toText(existing) # "). Delete it first to create a new one.");
+      };
+      case (null) {};
+    };
+
+    // Generate synthetic token index
+    let tokenIndex = garageManager.generateStarterTokenIndex(caller, classOffset);
+
+    // Check collision (extremely unlikely but be safe)
+    switch (garageManager.getStats(tokenIndex)) {
+      case (?_) { return #err("Token index collision. Please try again.") };
+      case (null) {};
+    };
+
+    // Initialize the bot in the same stats map as real bots
+    ignore garageManager.initializeBot(tokenIndex, caller, ?factionType, name);
+
+    // Award starter gear kit (one Uncommon piece per slot)
+    let gearSeed = Nat32.toNat(Principal.hash(caller)) + tokenIndex * 31337;
+    ignore gearManager.generateStarterKit(caller, tokenIndex, gearSeed);
+
+    // Update slots
+    let newSlots : PokedBotsGarage.StarterBotSlots = switch (classOffset) {
+      case (0) { { slots with scrap = ?tokenIndex } };
+      case (1) { { slots with junker = ?tokenIndex } };
+      case (2) { { slots with raider = ?tokenIndex } };
+      case _ { { slots with elite = ?tokenIndex } };
+    };
+    ignore Map.put(stable_starter_bot_slots, Map.phash, caller, newSlots);
+
+    #ok({
+      tokenIndex = tokenIndex;
+      message = "Starter bot created! " # raceClass # " class, " # faction # " faction. Ready to race.";
+    });
+  };
+
+  /// Delete a starter bot to free the slot for a new faction choice.
+  public shared ({ caller }) func web_delete_starter_bot(
+    raceClass : Text, // "Scrap", "Junker", "Raider", "Elite"
+  ) : async Result.Result<Text, Text> {
+    trackMethodCall("web_delete_starter_bot", caller);
+
+    let classOffset : Nat = if (raceClass == "Scrap") { 0 }
+      else if (raceClass == "Junker") { 1 }
+      else if (raceClass == "Raider") { 2 }
+      else if (raceClass == "Elite") { 3 }
+      else { return #err("Invalid class. Must be Scrap, Junker, Raider, or Elite.") };
+
+    let slots = switch (Map.get(stable_starter_bot_slots, Map.phash, caller)) {
+      case (?s) { s };
+      case (null) { return #err("You have no starter bots.") };
+    };
+
+    let slotTokenIndex = switch (classOffset) {
+      case (0) { slots.scrap };
+      case (1) { slots.junker };
+      case (2) { slots.raider };
+      case _ { slots.elite };
+    };
+
+    switch (slotTokenIndex) {
+      case (null) { return #err("You don't have a " # raceClass # " starter bot.") };
+      case (?tokenIndex) {
+        // Check if bot is in an active mission or race
+        switch (garageManager.getStats(tokenIndex)) {
+          case (?botStats) {
+            switch (botStats.activeMission) {
+              case (?_) { return #err("Cannot delete — bot is on a scavenging mission. Complete it first.") };
+              case (null) {};
+            };
+          };
+          case (null) {};
+        };
+
+        // Delete from racing stats
+        ignore garageManager.deleteStarterBot(tokenIndex);
+
+        // Also clean up gear loadout and dedication profile
+        // (These use tokenIndex as key, same as NFT bots)
+
+        // Update slots
+        let newSlots : PokedBotsGarage.StarterBotSlots = switch (classOffset) {
+          case (0) { { slots with scrap = null } };
+          case (1) { { slots with junker = null } };
+          case (2) { { slots with raider = null } };
+          case _ { { slots with elite = null } };
+        };
+        ignore Map.put(stable_starter_bot_slots, Map.phash, caller, newSlots);
+
+        #ok("Starter bot #" # Nat.toText(tokenIndex) # " deleted. " # raceClass # " slot is now free.");
+      };
+    };
+  };
+
+  /// Get starter bot slots for the caller
+  public shared query ({ caller }) func web_get_starter_bot_slots() : async PokedBotsGarage.StarterBotSlots {
+    switch (Map.get(stable_starter_bot_slots, Map.phash, caller)) {
+      case (?s) { s };
+      case (null) { PokedBotsGarage.emptyStarterSlots };
     };
   };
 

@@ -69,6 +69,12 @@ module ToolContext {
     getUserScavengerBots : (Principal) -> [Nat];
     /// Track method call for diagnostics (method name, caller principal)
     trackMethodCall : (Text, Principal) -> ();
+    /// Get starter bot slots for a user
+    getStarterBotSlots : (Principal) -> PokedBotsGarage.StarterBotSlots;
+    /// Set a starter bot slot (classOffset: 0=Scrap,1=Junker,2=Raider,3=Elite)
+    setStarterBotSlot : (Principal, Nat, ?Nat) -> ();
+    /// Award starter gear kit (6 Uncommon pieces, one per slot) to a starter bot
+    awardStarterGear : (Principal, Nat) -> ();
   };
 
   /// Helper function to create an error response and invoke callback

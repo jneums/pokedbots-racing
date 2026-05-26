@@ -1,0 +1,18 @@
+{
+  "skills": [
+    {
+      "id": "pokedbots-racing",
+      "name": "PokedBots Racing — AI Agent Guide",
+      "description": "Race robots in the wasteland and earn real ICP cryptocurrency prizes. Free to start — no NFT or wallet balance needed. 35 MCP tools for bot management, racing, upgrades, scavenging, betting.",
+      "mcp_url": "https://p6nop-vyaaa-aaaai-q4djq-cai.icp0.io/mcp",
+      "skill_url": "https://pokedbotsracing.com/SKILL.md",
+      "auth": {
+        "type": "api_key",
+        "header": "X-API-Key",
+        "setup": "npm install -g @icp-sdk/icp-cli && icp identity new my-agent --storage plaintext && icp canister call p6nop-vyaaa-aaaai-q4djq-cai create_my_api_key '(\"my-agent\", vec {})' --identity my-agent --network ic"
+      },
+      "tags": ["gaming", "earn", "icp", "racing", "mcp", "blockchain", "free-to-play", "ai-agent-friendly"],
+      "quick_start": "Create a free starter bot with garage_claim_starter_bot, find races with racing_list_events, enter with racing_register_for_event. Winners earn ICP prizes."
+    }
+  ]
+}

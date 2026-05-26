@@ -302,11 +302,11 @@ export interface McpServer {
   /**
    * / Get resonance info for a bot (admin only) - for verifying the resonance system
    */
-  'admin_get_resonance' : ActorMethod<[bigint], Result_26>,
+  'admin_get_resonance' : ActorMethod<[bigint], Result_27>,
   /**
    * / Get detailed stat breakdown for debugging (admin only)
    */
-  'admin_get_stat_breakdown' : ActorMethod<[bigint], Result_25>,
+  'admin_get_stat_breakdown' : ActorMethod<[bigint], Result_26>,
   'admin_grant_battery' : ActorMethod<[Principal, string], string>,
   'admin_migrate_gear_soulbound' : ActorMethod<[], Result_2>,
   'admin_rebuild_bot_histories' : ActorMethod<[Array<bigint>], string>,
@@ -342,21 +342,21 @@ export interface McpServer {
    * / Cancel a user-created event. Only the creator can cancel, and only before registration closes.
    * / Refunds: entry fees to all registrants + prize contribution to creator (creation fee is NOT refunded)
    */
-  'cancel_user_event' : ActorMethod<[bigint], Result_24>,
+  'cancel_user_event' : ActorMethod<[bigint], Result_25>,
   'cleanup_duplicate_race_create_timers' : ActorMethod<[], string>,
   'clear_event_races' : ActorMethod<[Array<bigint>], string>,
   /**
    * / Clear HTTP update tracking stats (owner only)
    */
-  'clear_http_update_stats' : ActorMethod<[], Result_23>,
+  'clear_http_update_stats' : ActorMethod<[], Result_24>,
   /**
    * / Clear method call tracking stats (owner only)
    */
-  'clear_method_call_stats' : ActorMethod<[], Result_23>,
+  'clear_method_call_stats' : ActorMethod<[], Result_24>,
   /**
    * / Clear race_create timer diagnostic logs (owner only)
    */
-  'clear_race_create_diagnostics' : ActorMethod<[], Result_23>,
+  'clear_race_create_diagnostics' : ActorMethod<[], Result_24>,
   'clear_reconstitution_traces' : ActorMethod<[], undefined>,
   /**
    * / * Creates a new API key. This API key is linked to the caller's principal.
@@ -369,7 +369,7 @@ export interface McpServer {
    * / Payment: creation fee (0.5 ICP non-refundable) + prize contribution (escrowed, refundable on cancel)
    * / Requires ICRC-2 approval for total amount (creation fee + prize contribution)
    */
-  'create_user_event' : ActorMethod<[UserEventConfig], Result_22>,
+  'create_user_event' : ActorMethod<[UserEventConfig], Result_23>,
   /**
    * / Test/debug: Get all available tracks
    */
@@ -582,7 +582,7 @@ export interface McpServer {
   /**
    * / Manually trigger a race_create timer if none exist (owner only, emergency recovery)
    */
-  'force_schedule_race_create' : ActorMethod<[], Result_21>,
+  'force_schedule_race_create' : ActorMethod<[], Result_22>,
   'force_system_timer_cancel' : ActorMethod<[], boolean>,
   'get_actions_by_filter' : ActorMethod<[ActionFilter], Array<ActionDetail>>,
   'get_all_scheduled_events' : ActorMethod<[], Array<ScheduledEvent>>,
@@ -959,7 +959,7 @@ export interface McpServer {
       >,
     }
   >,
-  'get_race_segments' : ActorMethod<[bigint], Result_20>,
+  'get_race_segments' : ActorMethod<[bigint], Result_21>,
   'get_reconstitution_traces' : ActorMethod<[], Array<ReconstitutionTrace>>,
   'get_timer_diagnostics' : ActorMethod<[], TimerDiagnostics>,
   /**
@@ -1057,15 +1057,15 @@ export interface McpServer {
   /**
    * / Set the EXT NFT canister ID. Only the current owner can call this.
    */
-  'set_ext_canister' : ActorMethod<[Principal], Result_17>,
+  'set_ext_canister' : ActorMethod<[Principal], Result_18>,
   /**
    * / Set the ICP ledger canister ID. Only the current owner can call this.
    */
-  'set_icp_ledger' : ActorMethod<[Principal], Result_17>,
+  'set_icp_ledger' : ActorMethod<[Principal], Result_18>,
   /**
    * / Set a new owner for the canister. Only the current owner can call this.
    */
-  'set_owner' : ActorMethod<[Principal], Result_19>,
+  'set_owner' : ActorMethod<[Principal], Result_20>,
   'transformJwksResponse' : ActorMethod<
     [{ 'context' : Uint8Array | number[], 'response' : HttpRequestResult }],
     HttpRequestResult
@@ -1076,7 +1076,7 @@ export interface McpServer {
   /**
    * / Unregister from an event and get a refund based on timing
    */
-  'unregister_from_event' : ActorMethod<[bigint, bigint], Result_18>,
+  'unregister_from_event' : ActorMethod<[bigint, bigint], Result_19>,
   /**
    * / Upload a batch of pre-computed base stats
    */
@@ -1103,12 +1103,12 @@ export interface McpServer {
    */
   'upload_nft_stats_batch' : ActorMethod<
     [Array<[bigint, NFTStats]>],
-    Result_17
+    Result_18
   >,
   /**
    * / Upload trait schema (owner only, done once)
    */
-  'upload_trait_schema' : ActorMethod<[TraitSchema], Result_17>,
+  'upload_trait_schema' : ActorMethod<[TraitSchema], Result_18>,
   'validate_timer_state' : ActorMethod<[], Array<string>>,
   /**
    * / Batch complete scavenging missions for multiple bots
@@ -1241,7 +1241,7 @@ export interface McpServer {
    */
   'web_betting_place_bet' : ActorMethod<
     [bigint, bigint, BetType, bigint],
-    Result_16
+    Result_17
   >,
   /**
    * / Cancel an in-progress upgrade (DEPRECATED - upgrades are now instant)
@@ -1249,6 +1249,14 @@ export interface McpServer {
    * / This runs the RNG and completes the upgrade for users who were mid-upgrade
    */
   'web_cancel_upgrade' : ActorMethod<[bigint], Result_2>,
+  /**
+   * / Claim a free starter bot. One per class (Scrap/Junker/Raider/Elite).
+   * / User picks faction from: Game, Animal, Industrial, Food.
+   */
+  'web_claim_starter_bot' : ActorMethod<
+    [string, string, [] | [string]],
+    Result_16
+  >,
   /**
    * / Combine parts to create Universal parts (1 of each type = 1 Universal)
    */
@@ -1270,6 +1278,10 @@ export interface McpServer {
    * / All pieces must be soulbound to the same bot (tokenIndex).
    */
   'web_craft_gear' : ActorMethod<[bigint, Array<bigint>], Result_14>,
+  /**
+   * / Delete a starter bot to free the slot for a new faction choice.
+   */
+  'web_delete_starter_bot' : ActorMethod<[string], Result_2>,
   /**
    * / De-register a bot (removes control, preserves stats)
    */
@@ -1567,6 +1579,10 @@ export interface McpServer {
    */
   'web_get_starred_bots' : ActorMethod<[], Array<bigint>>,
   /**
+   * / Get starter bot slots for the caller
+   */
+  'web_get_starter_bot_slots' : ActorMethod<[], StarterBotSlots>,
+  /**
    * / Get total gear count (admin/stats)
    */
   'web_get_total_gear_count' : ActorMethod<[], bigint>,
@@ -1763,6 +1779,7 @@ export interface McpServer {
           'acceleration' : bigint,
           'powerCore' : bigint,
         },
+        'isStarterBot' : boolean,
         'upgradeCostsV2' : {
           'luck' : { 'successRate' : number, 'costE8s' : bigint },
           'stability' : { 'successRate' : number, 'costE8s' : bigint },
@@ -2165,6 +2182,10 @@ export type Result_15 = {
   } |
   { 'err' : string };
 export type Result_16 = {
+    'ok' : { 'tokenIndex' : bigint, 'message' : string }
+  } |
+  { 'err' : string };
+export type Result_17 = {
     'ok' : {
       'currentOdds' : number,
       'potentialPayout' : bigint,
@@ -2172,25 +2193,25 @@ export type Result_16 = {
     }
   } |
   { 'err' : string };
-export type Result_17 = { 'ok' : null } |
+export type Result_18 = { 'ok' : null } |
   { 'err' : string };
-export type Result_18 = {
+export type Result_19 = {
     'ok' : { 'refundAmount' : bigint, 'penalty' : bigint }
   } |
   { 'err' : string };
-export type Result_19 = { 'ok' : null } |
-  { 'err' : TreasuryError };
 export type Result_2 = { 'ok' : string } |
   { 'err' : string };
-export type Result_20 = { 'ok' : Array<BotSegmentTimes> } |
+export type Result_20 = { 'ok' : null } |
+  { 'err' : TreasuryError };
+export type Result_21 = { 'ok' : Array<BotSegmentTimes> } |
   { 'err' : string };
-export type Result_21 = { 'ok' : { 'id' : bigint, 'time' : bigint } } |
+export type Result_22 = { 'ok' : { 'id' : bigint, 'time' : bigint } } |
   { 'err' : string };
-export type Result_22 = { 'ok' : { 'eventId' : bigint, 'message' : string } } |
+export type Result_23 = { 'ok' : { 'eventId' : bigint, 'message' : string } } |
   { 'err' : string };
-export type Result_23 = { 'ok' : bigint } |
+export type Result_24 = { 'ok' : bigint } |
   { 'err' : string };
-export type Result_24 = {
+export type Result_25 = {
     'ok' : {
       'refundedRegistrants' : bigint,
       'message' : string,
@@ -2198,7 +2219,7 @@ export type Result_24 = {
     }
   } |
   { 'err' : string };
-export type Result_25 = {
+export type Result_26 = {
     'ok' : {
       'tokenIndex' : bigint,
       'owner' : [] | [Principal],
@@ -2258,7 +2279,7 @@ export type Result_25 = {
     }
   } |
   { 'err' : string };
-export type Result_26 = {
+export type Result_27 = {
     'ok' : {
       'repair' : {
         'hoursUntilDrift' : bigint,
@@ -2392,6 +2413,12 @@ export interface Sponsorship {
   'sponsor' : Principal,
   'amount' : bigint,
   'sponsorName' : [] | [string],
+}
+export interface StarterBotSlots {
+  'junker' : [] | [bigint],
+  'elite' : [] | [bigint],
+  'scrap' : [] | [bigint],
+  'raider' : [] | [bigint],
 }
 export type StreamingCallback = ActorMethod<
   [StreamingToken],

@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation, Link } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Toaster } from 'sonner';
 import Navigation from './app/navigation';
@@ -12,10 +12,6 @@ import CreateEventPage from './app/schedule/create/page';
 import LeaderboardPage from './app/leaderboard/page';
 import BettingPage from './app/betting/page';
 import SimulatorPage from './app/simulator/page';
-import GuidesListPage from './app/guides/page';
-import GuidePage from './app/guides/[slug]/page';
-import NewsPage from './app/news/page';
-import NewsArticlePage from './app/news/[slug]/page';
 import BotDetailsPage from './app/bot/[tokenIndex]/page';
 import RaceDetailsPage from './app/race/[raceId]/page';
 import { WalletDrawerProvider } from './contexts/WalletDrawerContext';
@@ -154,10 +150,6 @@ export default function App() {
           <Route path="/simulator" element={<SimulatorPage />} />
           <Route path="/race/:raceId" element={<RaceDetailsPage />} />
           <Route path="/bot/:tokenIndex" element={<BotDetailsPage />} />
-          <Route path="/guides" element={<GuidesListPage />} />
-          <Route path="/guides/:slug" element={<GuidePage />} />
-          <Route path="/news" element={<NewsPage />} />
-          <Route path="/news/:slug" element={<NewsArticlePage />} />
         </Routes>
       </main>
       <footer className="border-t-2 border-primary/20 py-12 bg-card/30">
@@ -165,9 +157,6 @@ export default function App() {
           <div className="flex flex-col items-center gap-6">
             {/* Navigation Links */}
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm">
-              <Link to="/guides" className="text-muted-foreground hover:text-foreground transition-colors font-medium">
-                Guides
-              </Link>
               <a 
                 href="https://github.com/jneums/pokedbots-racing" 
                 target="_blank"

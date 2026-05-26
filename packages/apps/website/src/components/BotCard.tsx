@@ -15,6 +15,7 @@ import {
   useStartScavenging,
   useCompleteScavenging,
   useRespecBot,
+  useDeleteStarterBot,
   useEnterRace,
   useDedicationInfo,
   useGearBonuses,
@@ -104,6 +105,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   const startScavengingMutation = useStartScavenging();
   const completeScavengingMutation = useCompleteScavenging();
   const respecMutation = useRespecBot();
+  const deleteStarterMutation = useDeleteStarterBot();
   const enterRaceMutation = useEnterRace();
   const registerForEventMutation = useRegisterForEvent();
   const unregisterFromEventMutation = useUnregisterFromEvent();
@@ -116,6 +118,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showScavenging, setShowScavenging] = useState(false);
   const [showRespec, setShowRespec] = useState(false);
+  const [showDeleteStarter, setShowDeleteStarter] = useState(false);
   const [upgradeType, setUpgradeType] = useState<'Velocity' | 'PowerCore' | 'Thruster' | 'Gyro'>('Velocity');
   const [paymentMethod, setPaymentMethod] = useState<'icp' | 'parts'>('parts');
   
@@ -513,8 +516,9 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   };
 
   // Generate proper token identifier for image URL
-  const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.tokenIndex));
-  const imageUrl = `https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=${tokenId}&type=thumbnail`;
+  const isStarter = bot.isStarterBot;
+  const tokenId = isStarter ? '' : generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.tokenIndex));
+  const imageUrl = isStarter ? '' : `https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=${tokenId}&type=thumbnail`;
 
   // Check if bot needs registration: either not initialized OR initialized but owned by someone else
   const needsRegistration = !bot.isInitialized || (bot.stats && bot.stats.ownerPrincipal && user?.principal && bot.stats.ownerPrincipal.toText() !== user.principal);
@@ -655,8 +659,8 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
               )}
               
               <Avatar className="h-16 w-16 relative z-10">
-                <AvatarImage src={imageUrl} alt={bot.name || `Bot #${bot.tokenIndex}`} />
-                <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
+                {!isStarter && <AvatarImage src={imageUrl} alt={bot.name || `Bot #${bot.tokenIndex}`} />}
+                <AvatarFallback>{isStarter ? '🤖' : `#${bot.tokenIndex.toString().slice(-2)}`}</AvatarFallback>
               </Avatar>
             </div>
             
@@ -682,6 +686,11 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
             <Badge variant={getFactionColor(stats.faction)} className="w-fit">
               {getFactionName(stats.faction)}
             </Badge>
+            {bot.isStarterBot && (
+              <Badge variant="outline" className="w-fit border-amber-500/50 text-amber-400">
+                STARTER
+              </Badge>
+            )}
           </div>
         </CardTitle>
         <CardDescription className="space-y-1">
@@ -1756,7 +1765,8 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           );
         })()}
 
-        {/* Marketplace Actions */}
+        {/* Marketplace Actions — hidden for starter bots (no NFT to trade) */}
+        {!bot.isStarterBot && (
         <div className="grid grid-cols-2 gap-2">
           {bot.isListed ? (
             <Button
@@ -1786,6 +1796,19 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
             Transfer
           </Button>
         </div>
+        )}
+
+        {/* Delete Starter Bot — replaces marketplace actions for starter bots */}
+        {bot.isStarterBot && (
+          <Button
+            onClick={() => setShowDeleteStarter(true)}
+            size="sm"
+            variant="destructive"
+            className="w-full"
+          >
+            🗑️ Delete Starter Bot
+          </Button>
+        )}
 
         {/* Rename Bot Button */}
         <Button
@@ -2599,6 +2622,40 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                 </AlertDialogAction>
               );
             })()}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Starter Bot Confirmation Dialog */}
+      <AlertDialog open={showDeleteStarter} onOpenChange={setShowDeleteStarter}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>🗑️ Delete Starter Bot?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>This will permanently delete your starter bot and all its stats, upgrades, and career history.</p>
+                <p>The class slot will be freed so you can create a new starter bot with a different faction.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const tokenIdx = Number(bot.tokenIndex);
+                const offset = Math.floor((tokenIdx - 100000) / 10000);
+                const raceClass = offset === 0 ? 'Scrap' : offset === 1 ? 'Junker' : offset === 2 ? 'Raider' : 'Elite';
+                try {
+                  const msg = await deleteStarterMutation.mutateAsync(raceClass);
+                  toast.success(msg);
+                } catch (err: any) {
+                  toast.error(err.message);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteStarterMutation.isPending ? 'Deleting...' : 'Delete Permanently'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

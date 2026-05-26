@@ -2,5 +2,41 @@
   {
     "match": ".well-known",
     "ignore": false
+  },
+  {
+    "match": ".well-known/ai-plugin.json",
+    "ignore": false,
+    "headers": {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*"
+    }
+  },
+  {
+    "match": ".well-known/skills/index.json",
+    "ignore": false,
+    "headers": {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*"
+    }
+  },
+  {
+    "match": "robots.txt",
+    "headers": {
+      "Content-Type": "text/plain"
+    }
+  },
+  {
+    "match": "llms.txt",
+    "headers": {
+      "Content-Type": "text/plain",
+      "Access-Control-Allow-Origin": "*"
+    }
+  },
+  {
+    "match": "SKILL.md",
+    "headers": {
+      "Content-Type": "text/markdown",
+      "Access-Control-Allow-Origin": "*"
+    }
   }
 ]

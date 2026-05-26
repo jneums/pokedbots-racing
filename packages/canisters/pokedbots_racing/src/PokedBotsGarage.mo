@@ -22,6 +22,63 @@ import ELO "./ELO";
 /// PokedBotsGarage - Collection-Specific Racing Logic
 /// Handles PokedBots NFT stats, factions, upgrades, and marketplace integration
 module {
+  // ===== STARTER BOT CONSTANTS =====
+  // Starter bots use synthetic token indices in the 100000+ range.
+  // Each bracket gets a 10000-index band:
+  //   Scrap:  100000 - 109999
+  //   Junker: 110000 - 119999
+  //   Raider: 120000 - 129999
+  //   Elite:  130000 - 139999
+  public let STARTER_BOT_BASE : Nat = 100000;
+  public let STARTER_BOT_BAND : Nat = 10000;
+
+  /// Per-class base stats for starter bots (all four stats are equal)
+  public let STARTER_SCRAP_STAT  : Nat = 19;
+  public let STARTER_JUNKER_STAT : Nat = 29;
+  public let STARTER_RAIDER_STAT : Nat = 39;
+  public let STARTER_ELITE_STAT  : Nat = 49;
+
+  public func isStarterBot(tokenIndex : Nat) : Bool {
+    tokenIndex >= STARTER_BOT_BASE and tokenIndex < STARTER_BOT_BASE + 4 * STARTER_BOT_BAND;
+  };
+
+  /// Which bracket (0=Scrap,1=Junker,2=Raider,3=Elite) for a starter index
+  public func starterBotClassOffset(tokenIndex : Nat) : Nat {
+    (tokenIndex - STARTER_BOT_BASE) / STARTER_BOT_BAND;
+  };
+
+  /// Get the flat stat value for a starter bot given its token index
+  public func starterBotBaseStat(tokenIndex : Nat) : Nat {
+    let offset = starterBotClassOffset(tokenIndex);
+    if (offset == 0) { STARTER_SCRAP_STAT }
+    else if (offset == 1) { STARTER_JUNKER_STAT }
+    else if (offset == 2) { STARTER_RAIDER_STAT }
+    else { STARTER_ELITE_STAT };
+  };
+
+  /// Allowed factions for starter bots
+  public func isStarterFaction(faction : FactionType) : Bool {
+    switch (faction) {
+      case (#Game or #Animal or #Industrial or #Food) { true };
+      case _ { false };
+    };
+  };
+
+  /// Slots tracking which starter bots a principal has claimed
+  public type StarterBotSlots = {
+    scrap : ?Nat;   // token index or null
+    junker : ?Nat;
+    raider : ?Nat;
+    elite : ?Nat;
+  };
+
+  public let emptyStarterSlots : StarterBotSlots = {
+    scrap = null;
+    junker = null;
+    raider = null;
+    elite = null;
+  };
+
   // ===== POKEDBOTS-SPECIFIC TYPES =====
 
   public type FactionType = {
@@ -1828,6 +1885,28 @@ module {
       );
     };
 
+    // ===== STARTER BOT FUNCTIONS =====
+
+    /// Generate a deterministic synthetic token index for a starter bot.
+    /// classOffset: 0=Scrap, 1=Junker, 2=Raider, 3=Elite
+    public func generateStarterTokenIndex(owner : Principal, classOffset : Nat) : Nat {
+      let h = hashNat(Nat32.toNat(Principal.hash(owner)));
+      STARTER_BOT_BASE + classOffset * STARTER_BOT_BAND + (h % STARTER_BOT_BAND);
+    };
+
+    /// Delete a starter bot — removes from racing stats and frees the slot.
+    /// Returns the token index that was deleted, or null if slot was empty.
+    public func deleteStarterBot(tokenIndex : Nat) : Bool {
+      switch (Map.remove(stats, nhash, tokenIndex)) {
+        case (null) { false };
+        case (?_) {
+          // Also clean up any active upgrade
+          ignore Map.remove(activeUpgrades, nhash, tokenIndex);
+          true;
+        };
+      };
+    };
+
     // ===== POWER GRID FUNCTIONS =====
 
     /// Count how many of an owner's bots are currently in ChargingStation zone
@@ -2548,6 +2627,12 @@ module {
       acceleration : Nat;
       stability : Nat;
     } {
+      // Starter bots have flat equal stats determined by their class bracket
+      if (isStarterBot(tokenIndex)) {
+        let s = starterBotBaseStat(tokenIndex);
+        return { speed = s; powerCore = s; acceleration = s; stability = s };
+      };
+
       switch (statsProvider.getPrecomputedStats(tokenIndex)) {
         case (?precomputed) {
           {

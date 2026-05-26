@@ -522,6 +522,65 @@ module {
       ?gear;
     };
 
+    /// Generate a full set of Uncommon starter gear (one per slot) for a new starter bot.
+    /// Returns the array of created gear pieces.
+    public func generateStarterKit(
+      owner : Principal,
+      tokenIndex : Nat,
+      seed : Nat,
+    ) : [GearPiece] {
+      let slots : [GearSlot] = [#Legs, #Thruster, #Chassis, #Gyro, #Core, #Module];
+      let terrains : [TerrainTag] = [#WastelandSand, #MetalRoads, #ScrapHeaps, #Universal, #ScrapHeaps, #MetalRoads];
+      let buf = Buffer.Buffer<GearPiece>(6);
+
+      var i = 0;
+      for (slot in slots.vals()) {
+        let terrain = terrains[i];
+        let pieceSeed = seed + i * 7919; // Unique seed per slot
+        let ilvl = 1;
+        let totalBudget = getStatBudget(#Uncommon, ilvl); // 5 stat points
+        let stats = distributeStats(pieceSeed / 17, slot, terrain, totalBudget);
+        let name = generateGearName(#Standard, #Uncommon, slot, terrain);
+
+        let gearId = nextGearId();
+        let gear : GearPiece = {
+          gearId = gearId;
+          name = name;
+          description = "Starter kit gear for new racers.";
+          slot = slot;
+          rarity = #Uncommon;
+          category = #Standard;
+          terrainTag = terrain;
+          ilvl = ilvl;
+          season = 1;
+          speedBonus = stats.speed;
+          powerCoreBonus = stats.powerCore;
+          accelerationBonus = stats.acceleration;
+          stabilityBonus = stats.stability;
+          luckBonus = stats.luck;
+          passive = null;
+          boundToBot = tokenIndex;
+          sourceRaceId = null;
+          sourceEventType = ?"starter_kit";
+          craftedFrom = null;
+          createdAt = Time.now();
+        };
+
+        // Store the gear
+        Map.set(gearMap, nhash, gearId, gear);
+
+        // Add to player inventory
+        let inv = getPlayerInventory(owner);
+        let newGearList = Array.append(inv.gear, [gearId]);
+        Map.set(playerInventoryMap, Map.phash, owner, { inv with gear = newGearList });
+
+        buf.add(gear);
+        i += 1;
+      };
+
+      Buffer.toArray(buf);
+    };
+
     // ===== CRAFTING =====
 
     /// Combine 3 gear pieces of the same slot into 1 gear of one rarity tier higher.

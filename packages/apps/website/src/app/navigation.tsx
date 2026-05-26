@@ -130,12 +130,6 @@ export default function Navigation() {
               )}
             </div>
 
-            <Link to="/guides" className={linkClass('/guides')}>
-              Guides
-            </Link>
-            <Link to="/news" className={linkClass('/news')}>
-              News
-            </Link>
             {newGearCount > 0 && (
               <button
                 onClick={() => setGearRevealOpen(true)}
@@ -257,21 +251,6 @@ export default function Navigation() {
 
                   <div className="h-px bg-border my-2" />
 
-                  {/* Other */}
-                  <Link 
-                    to="/guides" 
-                    className={mobileLinkClass('/guides')}
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Guides
-                  </Link>
-                  <Link 
-                    to="/news" 
-                    className={mobileLinkClass('/news')}
-                    onClick={() => setIsOpen(false)}
-                  >
-                    News
-                  </Link>
                   {isAuthenticated && (
                     <button
                       onClick={() => {
