@@ -361,7 +361,7 @@ function CraftingPanel({ tokenIndex, playerGear, onCraftSuccess, recentGearIds }
           </p>
         ) : (
           filteredRows
-            .map(({ gear, isCraftEligible, isRarityEligible, slotRarityCount, rarityCount }) => {
+            .map(({ gear, isCraftEligible }) => {
               const isSelected = selected.some((g) => g.gearId === gear.gearId);
               return (
                 <div
@@ -369,11 +369,7 @@ function CraftingPanel({ tokenIndex, playerGear, onCraftSuccess, recentGearIds }
                   className={`border rounded-lg p-2 cursor-pointer transition-colors ${
                     isSelected
                       ? 'border-primary bg-primary/10'
-                      : isCraftEligible
-                        ? 'border-emerald-400/70 bg-emerald-500/10 shadow-[0_0_0_1px_rgba(52,211,153,0.18)] hover:bg-emerald-500/15'
-                        : isRarityEligible
-                          ? 'border-amber-400/40 bg-amber-500/5 hover:bg-amber-500/10'
-                          : `${RARITY_BORDER[gear.rarity] || 'border-border'} hover:bg-accent/50`
+                      : `${RARITY_BORDER[gear.rarity] || 'border-border'} hover:bg-accent/50`
                   }`}
                   onClick={() => toggleSelect(gear)}
                 >
@@ -384,13 +380,8 @@ function CraftingPanel({ tokenIndex, playerGear, onCraftSuccess, recentGearIds }
                         {gear.rarity}
                       </Badge>
                       {isCraftEligible && (
-                        <span className="text-[9px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-400/30 rounded px-1 py-0">
-                          CRAFTABLE {slotRarityCount}x
-                        </span>
-                      )}
-                      {!isCraftEligible && isRarityEligible && (
-                        <span className="text-[9px] font-bold text-amber-300 bg-amber-500/15 border border-amber-400/25 rounded px-1 py-0">
-                          {rarityCount}x {gear.rarity}
+                        <span className="text-[9px] font-bold text-primary border border-primary/30 rounded px-1 py-0">
+                          CRAFTABLE
                         </span>
                       )}
                       {recentGearIds.has(gear.gearId.toString()) && (
