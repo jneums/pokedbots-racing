@@ -19,7 +19,7 @@ import {
   useCompleteScavenging
 } from '../hooks/useGarage';
 import type { RepairBayInfo, RepairBayUpgradeCost, UserRepairBayStorage, RepairBayTierConfig, BotListItem } from '@pokedbots-racing/ic-js';
-import { generatetokenIdentifier } from '@pokedbots-racing/ic-js';
+import { getBotAvatarUrl } from '../lib/botAvatar';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -360,8 +360,7 @@ export function RepairBayPanel({ bots = [] }: RepairBayPanelProps) {
     const map = new Map<number, { name: string; imageUrl: string; condition: number; tokenIndex: number }>();
     for (const bot of bots) {
       const tokenIndex = Number(bot.tokenIndex);
-      const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', tokenIndex);
-      const imageUrl = `https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=${tokenId}&type=thumbnail`;
+      const imageUrl = getBotAvatarUrl(bot);
       map.set(tokenIndex, {
         name: bot.name || `Bot #${tokenIndex}`,
         condition: bot.stats?.condition !== undefined ? Number(bot.stats.condition) : 100,
@@ -378,8 +377,7 @@ export function RepairBayPanel({ bots = [] }: RepairBayPanelProps) {
       .filter(bot => !bot.activeMission) // Only bots not on missions
       .map(bot => {
         const tokenIndex = Number(bot.tokenIndex);
-        const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', tokenIndex);
-        const imageUrl = `https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=${tokenId}&type=thumbnail`;
+        const imageUrl = getBotAvatarUrl(bot);
         return {
           tokenIndex,
           name: bot.name || `Bot #${tokenIndex}`,

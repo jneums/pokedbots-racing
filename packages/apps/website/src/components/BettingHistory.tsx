@@ -1,6 +1,6 @@
 import { useGetMyBets } from '../hooks/useBetting';
 import { useGetBotProfilesBatch } from '../hooks/useRacing';
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { getBotAvatarUrl } from '../lib/botAvatar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
@@ -25,8 +25,7 @@ function formatTimestamp(timestamp: number): string {
 
 
 function BotNameWithAvatarDisplay({ tokenIndex, botProfile }: { tokenIndex: number; botProfile: any }) {
-  const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', tokenIndex);
-  const imageUrl = generateExtThumbnailLink(tokenId);
+  const imageUrl = getBotAvatarUrl({ tokenIndex, isStarterBot: Boolean(botProfile?.isStarterBot) });
   
   const name = botProfile?.name && botProfile.name.length > 0 && botProfile.name[0]
     ? botProfile.name[0]

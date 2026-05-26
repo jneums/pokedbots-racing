@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BotListItem, generatetokenIdentifier } from '@pokedbots-racing/ic-js';
+import { BotListItem } from '@pokedbots-racing/ic-js';
 import { useAuth } from '../hooks/useAuth';
 import { 
   useInitializeBot,
@@ -34,6 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Checkbox } from './ui/checkbox';
 import { Slider } from './ui/slider';
 import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionBonus, getFactionSpecialTerrain } from '../lib/utils';
+import { getBotAvatarUrl } from '../lib/botAvatar';
 import { GearLoadoutPanel } from './GearLoadoutPanel';
 
 interface BotCardProps {
@@ -515,10 +516,8 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
     return `${minutes}m remaining`;
   };
 
-  // Generate proper token identifier for image URL
   const isStarter = bot.isStarterBot;
-  const tokenId = isStarter ? '' : generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.tokenIndex));
-  const imageUrl = isStarter ? '' : `https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io/?tokenid=${tokenId}&type=thumbnail`;
+  const imageUrl = getBotAvatarUrl(bot);
 
   // Check if bot needs registration: either not initialized OR initialized but owned by someone else
   const needsRegistration = !bot.isInitialized || (bot.stats && bot.stats.ownerPrincipal && user?.principal && bot.stats.ownerPrincipal.toText() !== user.principal);
@@ -659,8 +658,8 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
               )}
               
               <Avatar className="h-16 w-16 relative z-10">
-                {!isStarter && <AvatarImage src={imageUrl} alt={bot.name || `Bot #${bot.tokenIndex}`} />}
-                <AvatarFallback>{isStarter ? '🤖' : `#${bot.tokenIndex.toString().slice(-2)}`}</AvatarFallback>
+                <AvatarImage src={imageUrl} alt={bot.name || `Bot #${bot.tokenIndex}`} />
+                <AvatarFallback>#{bot.tokenIndex.toString().slice(-2)}</AvatarFallback>
               </Avatar>
             </div>
             

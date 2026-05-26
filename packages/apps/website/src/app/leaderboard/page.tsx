@@ -13,6 +13,7 @@ import {  useGetBotProfilesBatch } from "@/hooks/useRacing";
 import { generatetokenIdentifier, generateExtThumbnailLink, getPlatformStats } from "@pokedbots-racing/ic-js";
 import { PokedBotsRacing } from '@pokedbots-racing/declarations';
 import { useQuery } from '@tanstack/react-query';
+import { getStarterBotAvatarUrl } from '@/lib/botAvatar';
 
 type BracketType = 'All' | 'SilentKlan' | 'Elite' | 'Raider' | 'Junker' | 'Scrap';
 type RaceClass = PokedBotsRacing.RaceClass;
@@ -103,9 +104,8 @@ function LeaderboardTable({ entries, type, botProfiles }: { entries: Leaderboard
                       alt={`PokedBot #${entry.tokenIndex}`}
                       className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg border-4 border-primary/40 shadow-lg object-cover bg-background"
                       onError={(e) => {
-                        // Fallback to placeholder on error
                         const target = e.target as HTMLImageElement;
-                        target.src = `https://ui-avatars.com/api/?name=PB${entry.tokenIndex.toString()}&background=random&size=128`;
+                        target.src = getStarterBotAvatarUrl(entry.tokenIndex);
                       }}
                     />
                     {/* Rank Badge - Mobile only */}
