@@ -25,7 +25,7 @@ function gear(overrides: Partial<GearPieceView> & Pick<GearPieceView, 'gearId' |
 }
 
 describe('getCraftingGearRows', () => {
-  it('sorts bound gear by rarity, then craftable same-slot rarity groups first', () => {
+  it('sorts bound gear by slot, then rarity, with craftable same-slot rarity groups first inside a slot', () => {
     const rows = getCraftingGearRows([
       gear({ gearId: 1n, slot: 'Module', rarity: 'Rare', ilvl: 4 }),
       gear({ gearId: 2n, slot: 'Legs', rarity: 'Common', ilvl: 1 }),
@@ -35,7 +35,7 @@ describe('getCraftingGearRows', () => {
       gear({ gearId: 6n, slot: 'Core', rarity: 'Uncommon', ilvl: 5 }),
     ], 7);
 
-    expect(rows.map((row) => row.gear.gearId)).toEqual([4n, 5n, 2n, 3n, 6n, 1n]);
+    expect(rows.map((row) => row.gear.gearId)).toEqual([6n, 4n, 5n, 2n, 1n, 3n]);
   });
 
   it('marks only groups with at least three of the same slot and rarity as craft eligible', () => {

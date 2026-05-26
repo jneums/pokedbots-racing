@@ -44,14 +44,14 @@ export function getCraftingGearRows(playerGear: GearPieceView[], tokenIndex: num
       };
     })
     .sort((a, b) => {
+      const slotDiff = a.gear.slot.localeCompare(b.gear.slot);
+      if (slotDiff !== 0) return slotDiff;
+
       const rarityDiff = rarityRank(a.gear.rarity) - rarityRank(b.gear.rarity);
       if (rarityDiff !== 0) return rarityDiff;
 
       const craftableDiff = Number(b.isCraftEligible) - Number(a.isCraftEligible);
       if (craftableDiff !== 0) return craftableDiff;
-
-      const slotDiff = a.gear.slot.localeCompare(b.gear.slot);
-      if (slotDiff !== 0) return slotDiff;
 
       return b.gear.ilvl - a.gear.ilvl;
     });
