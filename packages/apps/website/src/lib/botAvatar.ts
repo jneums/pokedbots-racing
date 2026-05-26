@@ -2,6 +2,7 @@ import { generatetokenIdentifier } from '@pokedbots-racing/ic-js';
 
 const NFT_CANISTER_ID = 'bzsui-sqaaa-aaaah-qce2a-cai';
 const STARTER_BOT_AVATAR_BASE_URL = 'https://api.dicebear.com/9.x/bottts-neutral/svg';
+const STARTER_BOT_TOKEN_INDEX_MIN = 100_000;
 
 export interface BotAvatarInput {
   tokenIndex: number | bigint;
@@ -18,5 +19,7 @@ export function getNftBotAvatarUrl(tokenIndex: number | bigint): string {
 }
 
 export function getBotAvatarUrl(bot: BotAvatarInput): string {
-  return bot.isStarterBot ? getStarterBotAvatarUrl(bot.tokenIndex) : getNftBotAvatarUrl(bot.tokenIndex);
+  const tokenIndex = Number(bot.tokenIndex);
+  const isStarterBot = bot.isStarterBot || tokenIndex >= STARTER_BOT_TOKEN_INDEX_MIN;
+  return isStarterBot ? getStarterBotAvatarUrl(bot.tokenIndex) : getNftBotAvatarUrl(bot.tokenIndex);
 }
