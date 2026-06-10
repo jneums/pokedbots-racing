@@ -1902,6 +1902,8 @@ module {
         case (?_) {
           // Also clean up any active upgrade
           ignore Map.remove(activeUpgrades, nhash, tokenIndex);
+          // Clean up heat status so a recreated bot at the same index starts cold
+          ignore Map.remove(botHeat, nhash, tokenIndex);
           true;
         };
       };

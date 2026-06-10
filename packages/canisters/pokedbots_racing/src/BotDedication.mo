@@ -222,6 +222,15 @@ module {
       Map.get(dedicationMap, nhash, tokenIndex);
     };
 
+    /// Delete a bot's dedication profile (used when a starter bot is deleted,
+    /// so a recreated bot at the same token index starts fresh).
+    public func deleteProfile(tokenIndex : Nat) : Bool {
+      switch (Map.remove(dedicationMap, nhash, tokenIndex)) {
+        case (null) { false };
+        case (?_) { true };
+      };
+    };
+
     public func getOrCreateProfile(tokenIndex : Nat, now : Int) : BotDedicationProfile {
       switch (Map.get(dedicationMap, nhash, tokenIndex)) {
         case (?profile) { profile };

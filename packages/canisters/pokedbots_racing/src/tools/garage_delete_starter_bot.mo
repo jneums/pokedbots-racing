@@ -78,6 +78,9 @@ module {
 
           // Delete
           ignore ctx.garageManager.deleteStarterBot(tokenIndex);
+          // Purge gear + dedication so a recreated bot at the same token index starts fresh
+          ctx.purgeBotGear(user, tokenIndex);
+          ignore ctx.dedicationManager.deleteProfile(tokenIndex);
           ctx.setStarterBotSlot(user, classOffset, null);
 
           ToolContext.makeTextSuccess(

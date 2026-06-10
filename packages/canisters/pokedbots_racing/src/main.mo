@@ -3831,6 +3831,9 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       let gearSeed = Nat32.toNat(Principal.hash(principal)) + tokenIndex * 31337;
       ignore gearManager.generateStarterKit(principal, tokenIndex, gearSeed);
     };
+    purgeBotGear = func(principal : Principal, tokenIndex : Nat) {
+      ignore gearManager.purgeBotGear(principal, tokenIndex);
+    };
   };
 
   // Import tool configurations from separate modules
@@ -8687,6 +8690,38 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     "Created event " # Nat.toText(event.eventId) # " with " # Nat.toText(raceIds.size()) # " races attached and marked as Completed";
   };
 
+  // Admin function to purge all gear bound to a bot (exploit remediation).
+  // Removes every gear piece soulbound to the bot from the gear map, the
+  // owner's inventory, and deletes the bot's loadout. Optionally re-issues
+  // the legit 6-piece Uncommon starter kit (starter bots only).
+  public shared ({ caller }) func admin_purge_bot_gear(tokenIndex : Nat, reissueStarterKit : Bool) : async Text {
+    if (caller != owner) {
+      return "Unauthorized: only owner can purge bot gear";
+    };
+
+    switch (garageManager.getStats(tokenIndex)) {
+      case (null) { "Bot not found" };
+      case (?botStats) {
+        let botOwner = botStats.ownerPrincipal;
+        let purgedCount = gearManager.purgeBotGear(botOwner, tokenIndex);
+
+        var msg = "Purged " # Nat.toText(purgedCount) # " gear pieces from bot #" # Nat.toText(tokenIndex) # " (owner " # Principal.toText(botOwner) # ").";
+
+        if (reissueStarterKit) {
+          if (PokedBotsGarage.isStarterBot(tokenIndex)) {
+            let gearSeed = Nat32.toNat(Principal.hash(botOwner)) + tokenIndex * 31337;
+            let kit = gearManager.generateStarterKit(botOwner, tokenIndex, gearSeed);
+            msg #= " Re-issued starter kit (" # Nat.toText(kit.size()) # " Uncommon pieces).";
+          } else {
+            msg #= " Starter kit NOT re-issued (not a starter bot).";
+          };
+        };
+
+        msg;
+      };
+    };
+  };
+
   // Admin function to clear a bot's stuck active mission (useful after upgrades that change ScavengingZone type)
   public shared ({ caller }) func admin_clear_active_mission(tokenIndex : Nat) : async Text {
     if (caller != owner) {
@@ -11097,8 +11132,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         // Delete from racing stats
         ignore garageManager.deleteStarterBot(tokenIndex);
 
-        // Also clean up gear loadout and dedication profile
-        // (These use tokenIndex as key, same as NFT bots)
+        // Purge gear bound to this bot (pieces, inventory entries, loadout)
+        // and the dedication profile, so a recreated bot at the same token
+        // index starts completely fresh instead of inheriting old mods.
+        ignore gearManager.purgeBotGear(caller, tokenIndex);
+        ignore dedicationManager.deleteProfile(tokenIndex);
 
         // Update slots
         let newSlots : PokedBotsGarage.StarterBotSlots = switch (classOffset) {

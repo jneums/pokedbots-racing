@@ -581,6 +581,43 @@ module {
       Buffer.toArray(buf);
     };
 
+    /// Purge all gear state for a bot (used when a starter bot is deleted).
+    /// Deletes every gear piece bound to the bot, removes those pieces from the
+    /// owner's inventory, and deletes the bot's loadout. Equipped consumables are
+    /// not destroyed (they are not bot-bound and remain in the player inventory).
+    public func purgeBotGear(owner : Principal, tokenIndex : Nat) : Nat {
+      // Collect gear ids bound to this bot
+      let boundIds = Buffer.Buffer<Nat>(8);
+      for ((gearId, gear) in Map.entries(gearMap)) {
+        if (gear.boundToBot == tokenIndex) {
+          boundIds.add(gearId);
+        };
+      };
+
+      // Delete the gear pieces
+      for (gearId in boundIds.vals()) {
+        Map.delete(gearMap, nhash, gearId);
+      };
+
+      // Remove them from the owner's inventory
+      if (boundIds.size() > 0) {
+        let inv = getPlayerInventory(owner);
+        let removed = Buffer.toArray(boundIds);
+        let filtered = Array.filter<Nat>(
+          inv.gear,
+          func(id : Nat) : Bool {
+            Array.find<Nat>(removed, func(r : Nat) : Bool { r == id }) == null;
+          },
+        );
+        Map.set(playerInventoryMap, Map.phash, owner, { inv with gear = filtered });
+      };
+
+      // Delete the bot's loadout entirely
+      Map.delete(loadoutMap, nhash, tokenIndex);
+
+      boundIds.size();
+    };
+
     // ===== CRAFTING =====
 
     /// Combine 3 gear pieces of the same slot into 1 gear of one rarity tier higher.

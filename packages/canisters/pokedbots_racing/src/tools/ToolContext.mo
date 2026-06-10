@@ -75,6 +75,9 @@ module ToolContext {
     setStarterBotSlot : (Principal, Nat, ?Nat) -> ();
     /// Award starter gear kit (6 Uncommon pieces, one per slot) to a starter bot
     awardStarterGear : (Principal, Nat) -> ();
+    /// Purge all gear bound to a bot (pieces, inventory entries, loadout).
+    /// Used when deleting a starter bot so a recreated bot starts fresh.
+    purgeBotGear : (Principal, Nat) -> ();
   };
 
   /// Helper function to create an error response and invoke callback
