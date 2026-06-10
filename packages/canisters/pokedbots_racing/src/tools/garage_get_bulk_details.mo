@@ -158,8 +158,8 @@ module {
                 case (null) { racingStats };
               };
 
-              // Calculate rating and race class
-              let overallRating = ctx.garageManager.calculateRatingAt100(racingStats);
+              // Calculate rating and race class (includes equipped gear)
+              let overallRating = ctx.garageManager.calculateEligibilityRating(racingStats);
               let raceClassVariant = RaceClassUtils.getRaceClassFromRating(overallRating);
               let raceClass = RaceClassUtils.getClassDescription(raceClassVariant);
 

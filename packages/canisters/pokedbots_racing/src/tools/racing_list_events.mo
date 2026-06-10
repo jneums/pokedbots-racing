@@ -149,14 +149,8 @@ module {
         case (?tokenIndex) {
           switch (ctx.getStats(tokenIndex)) {
             case (?stats) {
-              let baseStats = ctx.garageManager.getBaseStats(tokenIndex);
-              let statsAt100 = {
-                speed = baseStats.speed + stats.speedBonus;
-                powerCore = baseStats.powerCore + stats.powerCoreBonus;
-                acceleration = baseStats.acceleration + stats.accelerationBonus;
-                stability = baseStats.stability + stats.stabilityBonus;
-              };
-              let totalRatingAt100 = (statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability) / 4;
+              // Eligibility rating includes equipped gear (matches registration enforcement)
+              let totalRatingAt100 = ctx.garageManager.calculateEligibilityRating(stats);
               let botRaceClass = RaceClassUtils.getRaceClassFromRating(totalRatingAt100);
               Array.filter<RaceCalendar.ScheduledEvent>(
                 filteredEvents,

@@ -713,8 +713,9 @@ module {
                 msg #= "   🏁 Record: No races yet\n";
               };
 
-              // Show race class bracket (rating-based)
-              let raceClassVariant = RaceClassUtils.getRaceClassFromRating(totalRatingAt100);
+              // Show race class bracket (rating-based, includes equipped gear)
+              let eligibilityRating = ctx.garageManager.calculateEligibilityRating(stats);
+              let raceClassVariant = RaceClassUtils.getRaceClassFromRating(eligibilityRating);
               let raceClassText = switch (raceClassVariant) {
                 case (#Scrap) { "🗑️ Scrap (0-19 rating)" };
                 case (#Junker) { "🥉 Junker (20-29 rating)" };

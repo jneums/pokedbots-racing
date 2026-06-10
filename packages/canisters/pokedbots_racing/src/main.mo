@@ -681,6 +681,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   // Stable state for Starter Bot slots (free bots, one per bracket per principal)
   let stable_starter_bot_slots = Map.new<Principal, PokedBotsGarage.StarterBotSlots>(); // owner -> starter bot slots
 
+  // Stable state for rookie drop boost (new-player onramp):
+  // counts completed races per principal+classOffset for starter bots.
+  // Keyed by principal+class (NOT tokenIndex) so delete/remake of a starter
+  // bot can never reset the counter and re-farm boosted drops.
+  let stable_rookie_race_counts = Map.new<Text, Nat>(); // "principal#classOffset" -> races completed
+
   // --- DIAGNOSTIC DATA COLLECTION ---
   // Stable storage for timer diagnostic logs to debug disappearing race_create timers
   type TimerDiagnosticEntry = {
@@ -986,13 +992,64 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
   /// Calculate overall rating from max stats (for race class determination)
   /// This should be used for determining race eligibility, not current degraded stats
+  /// Includes EQUIPPED GEAR so gear-stacked bots are classed into higher divisions
   func calculateMaxRating(botStats : PokedBotsGarage.PokedBotRacingStats) : Nat {
-    let baseStats = garageManager.getBaseStats(botStats.tokenIndex);
-    let maxSpeed = baseStats.speed + botStats.speedBonus;
-    let maxPowerCore = baseStats.powerCore + botStats.powerCoreBonus;
-    let maxAcceleration = baseStats.acceleration + botStats.accelerationBonus;
-    let maxStability = baseStats.stability + botStats.stabilityBonus;
-    (maxSpeed + maxPowerCore + maxAcceleration + maxStability) / 4;
+    garageManager.calculateEligibilityRating(botStats);
+  };
+
+  /// Check if a bot is entered in any Upcoming or InProgress race.
+  /// Used to lock gear loadouts while entered, so players can't unequip
+  /// to qualify for a low bracket and re-equip before the race runs.
+  func isBotInActiveRace(tokenIndex : Nat) : Bool {
+    let nftId = Nat.toText(tokenIndex);
+    let allRaces = raceManager.getAllRaces();
+    let activeRace = Array.find<RacingSimulator.Race>(
+      allRaces,
+      func(r) {
+        let isActive = switch (r.status) {
+          case (#Upcoming) { true };
+          case (#InProgress) { true };
+          case (_) { false };
+        };
+        if (not isActive) { return false };
+        Option.isSome(
+          Array.find<RacingSimulator.RaceEntry>(
+            r.entries,
+            func(e) { e.nftId == nftId },
+          )
+        );
+      },
+    );
+    Option.isSome(activeRace);
+  };
+
+  // ===== ROOKIE DROP BOOST (new-player onramp) =====
+  // First ROOKIE_BOOST_RACES completed races per principal+class on a starter
+  // bot get boosted gear drops (Uncommon floor, 25% Rare). The counter lives
+  // on principal+class so deleting/remaking the starter bot can't reset it.
+  let ROOKIE_BOOST_RACES : Nat = 20;
+
+  func rookieKey(owner : Principal, classOffset : Nat) : Text {
+    Principal.toText(owner) # "#" # Nat.toText(classOffset);
+  };
+
+  /// True if this bot's next drop should be rookie-boosted. Starter bots only.
+  func isRookieBoostActive(owner : Principal, tokenIndex : Nat) : Bool {
+    if (not PokedBotsGarage.isStarterBot(tokenIndex)) { return false };
+    let key = rookieKey(owner, PokedBotsGarage.starterBotClassOffset(tokenIndex));
+    let count = Option.get(Map.get(stable_rookie_race_counts, Map.thash, key), 0);
+    count < ROOKIE_BOOST_RACES;
+  };
+
+  /// Record a completed race against the rookie counter (starter bots only).
+  func recordRookieRace(owner : Principal, tokenIndex : Nat) {
+    if (not PokedBotsGarage.isStarterBot(tokenIndex)) { return };
+    let key = rookieKey(owner, PokedBotsGarage.starterBotClassOffset(tokenIndex));
+    let count = Option.get(Map.get(stable_rookie_race_counts, Map.thash, key), 0);
+    // Cap to avoid unbounded growth; value beyond the threshold is meaningless
+    if (count < ROOKIE_BOOST_RACES) {
+      Map.set(stable_rookie_race_counts, Map.thash, key, count + 1);
+    };
   };
 
   // Leaderboard manager
@@ -1002,15 +1059,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     stable_alltime_board,
     stable_faction_boards,
     func(tokenIndex : Nat) : RacingSimulator.RaceClass {
-      // Calculate race class from current stats (inlined to avoid forward reference issues)
+      // Calculate race class from eligibility rating (base + upgrades + equipped gear)
       switch (garageManager.getStats(tokenIndex)) {
         case (?botStats) {
-          let baseStats = garageManager.getBaseStats(botStats.tokenIndex);
-          let maxSpeed = baseStats.speed + botStats.speedBonus;
-          let maxPowerCore = baseStats.powerCore + botStats.powerCoreBonus;
-          let maxAcceleration = baseStats.acceleration + botStats.accelerationBonus;
-          let maxStability = baseStats.stability + botStats.stabilityBonus;
-          let overallRating = (maxSpeed + maxPowerCore + maxAcceleration + maxStability) / 4;
+          let overallRating = garageManager.calculateEligibilityRating(botStats);
 
           // Determine race class based on rating
           if (overallRating >= 50) {
@@ -2125,14 +2177,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       },
     );
 
-    // Schedule Free Sprints to ensure at least 4 in next 48 hours (every 12 hours at 09:00 & 21:00 UTC)
-    if (freeSprintsIn48h.size() < 4) {
+    // Schedule Free Sprints to ensure at least 12 in next 48 hours (every 4 hours)
+    if (freeSprintsIn48h.size() < 12) {
       var scheduleTime = now;
       var createdCount : Nat = 0;
-      let targetCount : Nat = 4 - freeSprintsIn48h.size();
+      let targetCount : Nat = 12 - freeSprintsIn48h.size();
 
       var iterations : Nat = 0;
-      let maxIterations : Nat = 8;
+      let maxIterations : Nat = 24;
 
       label freeScheduling while (createdCount < targetCount and iterations < maxIterations) {
         iterations += 1;
@@ -3083,6 +3135,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                   let currentSeason : Nat = Leaderboard.getSeasonIdFromTime(Time.now());
                   let currentIlvl : Nat = GearSystem.ilvlFromSeason(currentSeason);
 
+                  // Rookie drop boost: starter bots get elevated drops for their
+                  // first N completed races (per principal+class, survives delete/remake)
+                  let rookieBoost = isRookieBoostActive(result.owner, tokenIdx2);
+
                   let droppedGear = gearManager.generateLootDrop(
                     result.owner,
                     tokenIdx2,
@@ -3092,7 +3148,11 @@ shared ({ caller = deployer }) persistent actor class McpServer(
                     currentSeason,
                     currentIlvl,
                     ?raceId,
+                    rookieBoost,
                   );
+
+                  // Count this race against the rookie boost window
+                  recordRookieRace(result.owner, tokenIdx2);
                   switch (droppedGear) {
                     case (?gear) {
                       Debug.print("Gear drop: " # gear.name # " (" # gearManager.rarityToText(gear.rarity) # ") to " # Principal.toText(result.owner));
@@ -5654,7 +5714,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
         // Calculate rating based on stats at 100% (luck not included in rating)
         let totalStats = statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability;
         let rating = totalStats / 4;
-        let raceClass = getRaceClassFromRating(rating);
+        // Race class uses eligibility rating (includes equipped gear)
+        let raceClass = getRaceClassFromRating(garageManager.calculateEligibilityRating(botStats));
 
         ?{
           tokenIndex = tokenIndex;
@@ -5764,7 +5825,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           // Calculate rating based on stats at 100% (luck not included in rating)
           let totalStats = statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability;
           let rating = totalStats / 4;
-          let raceClass = getRaceClassFromRating(rating);
+          // Race class uses eligibility rating (includes equipped gear)
+          let raceClass = getRaceClassFromRating(garageManager.calculateEligibilityRating(botStats));
 
           buffer.add({
             tokenIndex = tokenIndex;
@@ -12629,7 +12691,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     };
 
     // Check if bot meets rating requirements for race class
-    let rating = garageManager.calculateRatingAt100(botStats);
+    // Eligibility rating includes equipped gear so gear-stacked bots race in higher divisions
+    let rating = garageManager.calculateEligibilityRating(botStats);
     let meetsClass = switch (race.raceClass) {
       case (#Scrap) { rating < 20 };
       case (#Junker) {
@@ -14585,6 +14648,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       };
     };
 
+    // Loadout is locked while entered in a race — gear counts toward race
+    // class, so changing it mid-entry would dodge the bracket system
+    if (isBotInActiveRace(tokenIndex)) {
+      return #err("Cannot change gear while this bot is entered in a race. Wait for the race to finish.");
+    };
+
     gearManager.equipGear(caller, tokenIndex, gearId);
   };
 
@@ -14603,6 +14672,12 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           return #err("You are not the owner of this bot");
         };
       };
+    };
+
+    // Loadout is locked while entered in a race — gear counts toward race
+    // class, so unequipping mid-entry would dodge the bracket system
+    if (isBotInActiveRace(tokenIndex)) {
+      return #err("Cannot change gear while this bot is entered in a race. Wait for the race to finish.");
     };
 
     gearManager.unequipSlot(caller, tokenIndex, slot);

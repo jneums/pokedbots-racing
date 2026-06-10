@@ -256,30 +256,33 @@ module {
     (currentSeconds + secondsUntilNext) * NANOS_PER_SECOND;
   };
 
-  // Calculate next Free Sprint time (every 12 hours at 09:00 UTC and 21:00 UTC)
+  // Calculate next Free Sprint time (every 4 hours starting 01:00 UTC:
+  // 01:00, 05:00, 09:00, 13:00, 17:00, 21:00 UTC)
   public func getNextFreeSprintTime(fromTime : Int) : Int {
     let NANOS_PER_SECOND : Int = 1_000_000_000;
     let SECONDS_PER_HOUR : Int = 3600;
     let SECONDS_PER_DAY : Int = 86400;
-    let SLOT_A : Int = 9;  // 09:00 UTC = 03:00 MST
-    let SLOT_B : Int = 21; // 21:00 UTC = 15:00 MST
+    let SLOT_INTERVAL : Int = 4 * SECONDS_PER_HOUR; // every 4 hours
+    let SLOT_OFFSET : Int = 1 * SECONDS_PER_HOUR; // first slot 01:00 UTC
 
     let currentSeconds = fromTime / NANOS_PER_SECOND;
     let secondsIntoDay = Int.abs(currentSeconds % SECONDS_PER_DAY);
 
-    let slotASeconds = SLOT_A * SECONDS_PER_HOUR;
-    let slotBSeconds = SLOT_B * SECONDS_PER_HOUR;
-
-    // Pick the nearest upcoming slot (09:00 or 21:00 UTC)
-    let secondsUntilNext = if (secondsIntoDay < slotASeconds) {
-      // Before 09:00 — next slot is 09:00 today
-      slotASeconds - secondsIntoDay;
-    } else if (secondsIntoDay < slotBSeconds) {
-      // Between 09:00 and 21:00 — next slot is 21:00 today
-      slotBSeconds - secondsIntoDay;
+    // Find next slot boundary at offset + k*interval
+    let sinceOffset : Int = secondsIntoDay - SLOT_OFFSET;
+    let secondsUntilNext = if (sinceOffset < 0) {
+      // Before today's first slot
+      -sinceOffset;
     } else {
-      // After 21:00 — next slot is 09:00 tomorrow
-      SECONDS_PER_DAY - secondsIntoDay + slotASeconds;
+      let intoSlot = sinceOffset % SLOT_INTERVAL;
+      let untilNext = SLOT_INTERVAL - intoSlot;
+      let candidate = secondsIntoDay + untilNext;
+      if (candidate >= SECONDS_PER_DAY) {
+        // Wraps past midnight — next slot is tomorrow's first slot
+        SECONDS_PER_DAY - secondsIntoDay + SLOT_OFFSET;
+      } else {
+        untilNext;
+      };
     };
 
     (currentSeconds + secondsUntilNext) * NANOS_PER_SECOND;
@@ -1158,7 +1161,7 @@ module {
     public func createFreeSprintEvent(scheduledTime : Int, now : Int) : ScheduledEvent {
       let metadata : EventMetadata = {
         name = "Free Sprint";
-        description = "Free racing for all! No entry fee, just pure wasteland fun. Runs twice daily. Winners earn common gear!";
+        description = "Free racing for all! No entry fee, just pure wasteland fun. Runs every 4 hours. Winners earn gear!";
         entryFee = 0; // FREE!
         maxEntries = 100; // No practical cap - heats handle overflow
         minEntries = 2;

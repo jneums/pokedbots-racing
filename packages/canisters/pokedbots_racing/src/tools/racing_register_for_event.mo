@@ -123,9 +123,10 @@ module {
         };
       };
 
-      // Calculate overall rating using unbuffed stats (base + upgrades only)
-      // This ensures race class is determined by permanent stats, not temporary buffs like garage auras
-      let overallRating = ctx.garageManager.calculateRatingAt100(botStats);
+      // Calculate overall rating using eligibility stats (base + upgrades + equipped gear)
+      // Gear counts toward class so gear-stacked bots can't camp low brackets;
+      // temporary buffs like garage auras still don't count
+      let overallRating = ctx.garageManager.calculateEligibilityRating(botStats);
 
       // Determine race class from overall rating (bracket system)
       // Rating brackets: Scrap <20, Junker 20-29, Raider 30-39, Elite 40-49, SilentKlan 50+

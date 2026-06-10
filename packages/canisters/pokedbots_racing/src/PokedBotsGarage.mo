@@ -32,11 +32,15 @@ module {
   public let STARTER_BOT_BASE : Nat = 100000;
   public let STARTER_BOT_BAND : Nat = 10000;
 
-  /// Per-class base stats for starter bots (all four stats are equal)
-  public let STARTER_SCRAP_STAT  : Nat = 19;
-  public let STARTER_JUNKER_STAT : Nat = 29;
-  public let STARTER_RAIDER_STAT : Nat = 39;
-  public let STARTER_ELITE_STAT  : Nat = 49;
+  /// Per-class base stats for starter bots (all four stats are equal).
+  /// Set ~6 below the bracket ceiling so that base + equipped starter kit
+  /// (6 Uncommon pieces ≈ +6 eligibility rating) lands at the top of the
+  /// intended bracket. Gear counts toward race class (eligibility rating),
+  /// so the old top-of-bracket values would push fresh starters up a class.
+  public let STARTER_SCRAP_STAT  : Nat = 13;
+  public let STARTER_JUNKER_STAT : Nat = 23;
+  public let STARTER_RAIDER_STAT : Nat = 33;
+  public let STARTER_ELITE_STAT  : Nat = 43;
 
   public func isStarterBot(tokenIndex : Nat) : Bool {
     tokenIndex >= STARTER_BOT_BASE and tokenIndex < STARTER_BOT_BASE + 4 * STARTER_BOT_BAND;
@@ -3049,6 +3053,20 @@ module {
       let powerCore = base.powerCore + botStats.powerCoreBonus;
       let acceleration = base.acceleration + botStats.accelerationBonus;
       let stability = base.stability + botStats.stabilityBonus;
+      (speed + powerCore + acceleration + stability) / 4;
+    };
+
+    /// Calculate eligibility rating: base + upgrades + EQUIPPED GEAR.
+    /// Used for race class brackets and leaderboard class so gear-stacked bots
+    /// are promoted to higher divisions instead of dominating low brackets.
+    /// NOT used for upgrade pricing (that stays on calculateRatingAt100).
+    public func calculateEligibilityRating(botStats : PokedBotRacingStats) : Nat {
+      let base = getBaseStats(botStats.tokenIndex);
+      let gear = statsProvider.getGearBonuses(botStats.tokenIndex);
+      let speed = base.speed + botStats.speedBonus + gear.speed;
+      let powerCore = base.powerCore + botStats.powerCoreBonus + gear.powerCore;
+      let acceleration = base.acceleration + botStats.accelerationBonus + gear.acceleration;
+      let stability = base.stability + botStats.stabilityBonus + gear.stability;
       (speed + powerCore + acceleration + stability) / 4;
     };
 

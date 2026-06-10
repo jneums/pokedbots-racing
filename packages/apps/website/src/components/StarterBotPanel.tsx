@@ -8,10 +8,10 @@ import { useClaimStarterBot, useStarterBotSlots, useDeleteStarterBot, useMyBots 
 import { toast } from 'sonner';
 
 const CLASSES = [
-  { id: 'Scrap', stat: 19 },
-  { id: 'Junker', stat: 29 },
-  { id: 'Raider', stat: 39 },
-  { id: 'Elite', stat: 49 },
+  { id: 'Scrap', stat: 13 },
+  { id: 'Junker', stat: 23 },
+  { id: 'Raider', stat: 33 },
+  { id: 'Elite', stat: 43 },
 ] as const;
 
 const FACTIONS = [

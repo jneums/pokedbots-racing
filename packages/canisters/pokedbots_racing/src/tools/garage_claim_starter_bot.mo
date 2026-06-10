@@ -24,7 +24,7 @@ module {
         ("race_class", Json.obj([
           ("type", Json.str("string")),
           ("enum", Json.arr([Json.str("Scrap"), Json.str("Junker"), Json.str("Raider"), Json.str("Elite")])),
-          ("description", Json.str("Which bracket to create a starter bot for. Base stats: Scrap=19, Junker=29, Raider=39, Elite=49 (all four stats equal)."))
+          ("description", Json.str("Which bracket to create a starter bot for. Base stats: Scrap=13, Junker=23, Raider=33, Elite=43 (all four stats equal; equipped starter gear lifts the race-class rating to the top of the bracket)."))
         ])),
         ("faction", Json.obj([
           ("type", Json.str("string")),

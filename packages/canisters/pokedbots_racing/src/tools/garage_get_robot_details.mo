@@ -112,13 +112,13 @@ module {
           // Check ownership via registration - if bot is registered, the ownerPrincipal is the owner
           let isOwner = racingStats.ownerPrincipal == user;
 
-          // Calculate overall rating at 100% (base + upgrades only, no gear/buffs/penalties)
-          // This is the "true" rating used for race class and display
-          let overallRating = ctx.garageManager.calculateRatingAt100(racingStats);
+          // Calculate eligibility rating (base + upgrades + equipped gear, no buffs/penalties)
+          // This is the rating used for race class brackets and display
+          let overallRating = ctx.garageManager.calculateEligibilityRating(racingStats);
           let status = ctx.garageManager.getBotStatus(racingStats);
           let canRace = ctx.garageManager.canRace(Nat.toText(tokenIndex));
 
-          // Determine race class bracket (rating-based, uses at-100 rating)
+          // Determine race class bracket (rating-based, includes equipped gear)
           let raceClassVariant = RaceClassUtils.getRaceClassFromRating(overallRating);
           let raceClass = RaceClassUtils.getClassDescription(raceClassVariant);
 

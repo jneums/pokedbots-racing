@@ -446,6 +446,7 @@ module {
       season : Nat,
       ilvl : Nat,
       raceId : ?Nat,
+      rookieBoost : Bool,
     ) : ?GearPiece {
       // Miss chance: some races drop nothing
       // Now guaranteed drops for all tiers (gear is soulbound)
@@ -462,7 +463,19 @@ module {
       };
 
       // Step 1: Determine rarity
-      let rarity = rollRarity(seed, eventTier);
+      // Rookie boost (new-player onramp): guaranteed Uncommon minimum with a
+      // 25% Rare chance. Never downgrades — takes the better of the boosted
+      // and the normal roll.
+      let rolledRarity = rollRarity(seed, eventTier);
+      let rarity = if (rookieBoost) {
+        let boostRoll = pseudoRandom(seed, 11); // 0-9999
+        let boostedRarity : GearRarity = if (boostRoll < 2500) { #Rare } else {
+          #Uncommon;
+        };
+        if (rarityRank(rolledRarity) >= rarityRank(boostedRarity)) {
+          rolledRarity;
+        } else { boostedRarity };
+      } else { rolledRarity };
 
       // Step 2: Determine category (Standard 70%, Unique 25%, Named 5% — Named only from Special)
       let category = rollCategory(seed / 7, eventTier);
@@ -967,6 +980,17 @@ module {
       Nat64.toNat(h) % 10000; // Returns 0-9999
     };
 
+    /// Numeric rank for rarity comparison (higher = rarer)
+    func rarityRank(rarity : GearRarity) : Nat {
+      switch (rarity) {
+        case (#Common) { 0 };
+        case (#Uncommon) { 1 };
+        case (#Rare) { 2 };
+        case (#Epic) { 3 };
+        case (#Legendary) { 4 };
+      };
+    };
+
     func rollRarity(seed : Nat, eventTier : EventTier) : GearRarity {
       let roll = pseudoRandom(seed, 1); // 0-9999
 
@@ -1318,6 +1342,7 @@ module {
                   season,
                   ilvl,
                   ?race.raceId,
+                  false, // no rookie boost when replaying history
                 );
                 switch (_dropped) {
                   case (?_) { gearsGenerated += 1 };
