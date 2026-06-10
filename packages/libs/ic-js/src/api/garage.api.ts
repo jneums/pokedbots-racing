@@ -68,6 +68,8 @@ export interface BotListItem {
     acceleration: bigint;
     stability: bigint;
   };
+  /** base + upgrades + equipped gear — determines race class bracket */
+  eligibilityRating?: bigint;
   upgradeCostsV2?: {
     speed: { costE8s: bigint; successRate: number };
     powerCore: { costE8s: bigint; successRate: number };
@@ -264,6 +266,7 @@ export const listMyRegisteredBots = async (identityOrAgent: IdentityOrAgent): Pr
         stats: bot.stats,
         currentStats: bot.currentStats,
         maxStats: bot.maxStats,
+        eligibilityRating: bot.eligibilityRating,
         upgradeCostsV2: bot.upgradeCostsV2,
         isListed: !!listingInfo,
         listPrice: listingInfo?.price,

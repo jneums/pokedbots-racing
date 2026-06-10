@@ -442,12 +442,20 @@ export default function GaragePage() {
   }, [bots, walletNFTs, favorites, customOrder]);
 
   // Helper: Get bracket from bot rating
+  // Prefers backend eligibilityRating (base + upgrades + equipped gear — what
+  // race entry actually enforces); falls back to maxStats for older data.
   const getBotBracket = (bot: BotListItem): string => {
-    if (!bot.maxStats) return 'Unregistered';
-    const rating = Math.floor((
-      Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + 
-      Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)
-    ) / 4);
+    let rating: number;
+    if (bot.eligibilityRating !== undefined) {
+      rating = Number(bot.eligibilityRating);
+    } else if (bot.maxStats) {
+      rating = Math.floor((
+        Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + 
+        Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)
+      ) / 4);
+    } else {
+      return 'Unregistered';
+    }
     
     return rating >= 50 ? 'SilentKlan' :
            rating >= 40 ? 'Elite' :

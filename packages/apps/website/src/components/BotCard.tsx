@@ -1417,11 +1417,19 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
           };
 
           const isBotEligibleForClass = (raceClass: any): boolean => {
-            if (!bot.maxStats) return false;
-            const rating = Math.floor(
-              (Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + 
-               Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4
-            );
+            // Prefer backend eligibilityRating (base + upgrades + equipped gear —
+            // what race entry actually enforces); fall back to maxStats
+            let rating: number;
+            if (bot.eligibilityRating !== undefined) {
+              rating = Number(bot.eligibilityRating);
+            } else if (bot.maxStats) {
+              rating = Math.floor(
+                (Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + 
+                 Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4
+              );
+            } else {
+              return false;
+            }
             
             if ('Scrap' in raceClass) return rating < 20;
             if ('Junker' in raceClass) return rating >= 20 && rating < 30;

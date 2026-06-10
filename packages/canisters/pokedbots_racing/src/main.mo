@@ -10055,6 +10055,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       acceleration : Nat;
       stability : Nat;
     };
+    eligibilityRating : Nat; // base + upgrades + equipped gear — determines race class
     upgradeCostsV2 : {
       speed : { costE8s : Nat; successRate : Float };
       powerCore : { costE8s : Nat; successRate : Float };
@@ -10100,7 +10101,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
     );
 
     // Iterate through all registered bots and filter by owner
-    let registeredBots = Buffer.Buffer<{ tokenIndex : Nat; name : ?Text; stats : PokedBotsGarage.PokedBotRacingStats; currentStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; maxStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; upgradeCostsV2 : { speed : { costE8s : Nat; successRate : Float }; powerCore : { costE8s : Nat; successRate : Float }; acceleration : { costE8s : Nat; successRate : Float }; stability : { costE8s : Nat; successRate : Float }; luck : { costE8s : Nat; successRate : Float }; pityCounter : Nat }; dedicationBonuses : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; activeUpgrade : ?PokedBotsGarage.UpgradeSession; upcomingRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }]; eligibleRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }]; isStarterBot : Bool }>(10);
+    let registeredBots = Buffer.Buffer<{ tokenIndex : Nat; name : ?Text; stats : PokedBotsGarage.PokedBotRacingStats; currentStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; maxStats : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; eligibilityRating : Nat; upgradeCostsV2 : { speed : { costE8s : Nat; successRate : Float }; powerCore : { costE8s : Nat; successRate : Float }; acceleration : { costE8s : Nat; successRate : Float }; stability : { costE8s : Nat; successRate : Float }; luck : { costE8s : Nat; successRate : Float }; pityCounter : Nat }; dedicationBonuses : { speed : Nat; powerCore : Nat; acceleration : Nat; stability : Nat }; activeUpgrade : ?PokedBotsGarage.UpgradeSession; upcomingRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }]; eligibleRaces : [{ raceId : Nat; name : Text; startTime : Int; entryDeadline : Int; entryFee : Nat; terrain : RacingSimulator.Terrain }]; isStarterBot : Bool }>(10);
 
     for ((tokenIndex, botStats) in Map.entries(stable_racing_stats)) {
       // Only include bots owned by the caller (compare principals)
@@ -10218,6 +10219,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           stats = botStatsWithCurrentRewards;
           currentStats = currentStats;
           maxStats = maxStats;
+          eligibilityRating = rating;
           upgradeCostsV2 = {
             speed = { costE8s = speedCost; successRate = speedRate };
             powerCore = { costE8s = powerCoreCost; successRate = powerCoreRate };

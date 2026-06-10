@@ -880,6 +880,7 @@ type McpServer =
    admin_grant_battery: (targetPrincipal: principal, batteryType: text) ->
     (text);
    admin_migrate_gear_soulbound: () -> (Result_2);
+   admin_purge_bot_gear: (tokenIndex: nat, reissueStarterKit: bool) -> (text);
    admin_rebuild_bot_histories: (tokenIndices: vec nat) -> (text);
    admin_remove_battery: (targetPrincipal: principal, batteryId: nat) ->
     (text);
@@ -2088,6 +2089,7 @@ type McpServer =
            speed: nat;
            stability: nat;
          };
+        eligibilityRating: nat;
         eligibleRaces:
          vec
           record {

@@ -1043,6 +1043,7 @@ export const idlFactory = ({ IDL }) => {
     'admin_get_stat_breakdown' : IDL.Func([IDL.Nat], [Result_26], ['query']),
     'admin_grant_battery' : IDL.Func([IDL.Principal, IDL.Text], [IDL.Text], []),
     'admin_migrate_gear_soulbound' : IDL.Func([], [Result_2], []),
+    'admin_purge_bot_gear' : IDL.Func([IDL.Nat, IDL.Bool], [IDL.Text], []),
     'admin_rebuild_bot_histories' : IDL.Func(
         [IDL.Vec(IDL.Nat)],
         [IDL.Text],
@@ -2472,6 +2473,7 @@ export const idlFactory = ({ IDL }) => {
                 'powerCore' : IDL.Nat,
               }),
               'isStarterBot' : IDL.Bool,
+              'eligibilityRating' : IDL.Nat,
               'upgradeCostsV2' : IDL.Record({
                 'luck' : IDL.Record({
                   'successRate' : IDL.Float64,
