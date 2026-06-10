@@ -694,7 +694,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
         </CardTitle>
         <CardDescription className="space-y-1">
           <div>
-            ELO: {formatBigInt(stats.eloRating)} | Rating: {bot.currentStats ? ((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4).toFixed(2) : '?'}/{bot.maxStats ? ((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4).toFixed(2) : '100'} | Rep: {formatBigInt(stats.factionReputation)}
+            ELO: {formatBigInt(stats.eloRating)} | Rating: {bot.currentStats ? ((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4).toFixed(2) : '?'}/{bot.eligibilityRating !== undefined ? Number(bot.eligibilityRating) : (bot.maxStats ? ((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4).toFixed(2) : '100')} | Rep: {formatBigInt(stats.factionReputation)}
           </div>
           <div className="flex items-center gap-1 text-xs flex-wrap">
             <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400 px-2 py-0">

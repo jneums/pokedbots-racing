@@ -463,6 +463,21 @@ export default function GaragePage() {
            rating >= 20 ? 'Junker' : 'Scrap';
   };
 
+  // Helper: rating that determines race class (base + upgrades + equipped gear).
+  // Prefers backend eligibilityRating; falls back to maxStats avg for older data.
+  const getEligibilityRating = (bot: BotListItem): number | null => {
+    if (bot.eligibilityRating !== undefined) {
+      return Number(bot.eligibilityRating);
+    }
+    if (bot.maxStats) {
+      return Math.floor((
+        Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) +
+        Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)
+      ) / 4);
+    }
+    return null;
+  };
+
   // Apply filters to sorted bots
   const filteredBots = useMemo(() => {
     let filtered = [...sortedBots];
@@ -1120,13 +1135,9 @@ export default function GaragePage() {
       return [...bots].sort((a, b) => {
         switch (orderBy) {
           case 'rating': {
-            // Calculate base rating from maxStats (base + upgrades, determines race class)
-            const aRating = a.maxStats 
-              ? (Number(a.maxStats.speed) + Number(a.maxStats.powerCore) + Number(a.maxStats.acceleration) + Number(a.maxStats.stability)) / 4
-              : 0;
-            const bRating = b.maxStats 
-              ? (Number(b.maxStats.speed) + Number(b.maxStats.powerCore) + Number(b.maxStats.acceleration) + Number(b.maxStats.stability)) / 4
-              : 0;
+            // Sort by eligibility rating (base + upgrades + equipped gear — matches class grouping)
+            const aRating = getEligibilityRating(a) ?? 0;
+            const bRating = getEligibilityRating(b) ?? 0;
             return bRating - aRating;
           }
           case 'tokenIndex':
@@ -2342,10 +2353,10 @@ export default function GaragePage() {
                                         </div>
                                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1 min-w-0">
                                           <span className="truncate">{factionName}</span>
-                                          {bot.currentStats && bot.maxStats && (
+                                          {bot.currentStats && getEligibilityRating(bot) !== null && (
                                             <>
                                               <span className="flex-shrink-0">|</span>
-                                              <span className="font-mono flex-shrink-0">{Math.floor((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4)}/{Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4)}</span>
+                                              <span className="font-mono flex-shrink-0" title="current rating / class rating (incl. gear)">{Math.floor((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4)}/{getEligibilityRating(bot)}</span>
                                             </>
                                           )}
                                         </div>
@@ -2550,10 +2561,10 @@ export default function GaragePage() {
                                       </div>
                                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
                                         <span className="truncate">{factionName}</span>
-                                        {bot.currentStats && bot.maxStats && (
+                                        {bot.currentStats && getEligibilityRating(bot) !== null && (
                                           <>
                                             <span className="flex-shrink-0">|</span>
-                                            <span className="font-mono flex-shrink-0">{Math.floor((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4)}/{Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4)}</span>
+                                            <span className="font-mono flex-shrink-0" title="current rating / class rating (incl. gear)">{Math.floor((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4)}/{getEligibilityRating(bot)}</span>
                                           </>
                                         )}
                                       </div>
