@@ -1106,7 +1106,7 @@ module {
         minEntries = 2;
         prizePoolBonus = 0; // No platform contribution for daily sprints
         pointsMultiplier = 1.0; // Standard points
-        divisions = [#Scrap, #Junker, #Raider, #Elite]; // Scrap through Elite (no Silent Klan)
+        divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan]; // All divisions
         scoringMode = #Individual;
         eventBonusPrize = 0;
       };
@@ -1167,7 +1167,7 @@ module {
         minEntries = 2;
         prizePoolBonus = 0; // No prize pool - free races are for practice only
         pointsMultiplier = 0.5; // Half points (encourages paid events for serious competition)
-        divisions = [#Scrap, #Junker, #Raider, #Elite];
+        divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan];
         scoringMode = #Individual;
         eventBonusPrize = 0;
       };
@@ -1300,7 +1300,7 @@ module {
         minEntries = 8;
         prizePoolBonus = 300_000_000; // 3 ICP bonus
         pointsMultiplier = 2.5;
-        divisions = [#Scrap, #Junker, #Raider, #Elite];
+        divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan];
         scoringMode = #Cumulative; // Sum points across all 3 stages
         eventBonusPrize = 100_000_000; // 1 ICP bonus for cumulative winner
       };
@@ -1341,6 +1341,14 @@ module {
             trackId = null;
             startOffset = 0;
           },
+          {
+            stageName = ?"Friday Sprint";
+            raceClass = #SilentKlan;
+            terrain = #MetalRoads;
+            distance = 15;
+            trackId = null;
+            startOffset = 0;
+          },
           // === SATURDAY ENDURANCE (Day 2: +24h) ===
           {
             stageName = ?"Saturday Endurance";
@@ -1369,6 +1377,14 @@ module {
           {
             stageName = ?"Saturday Endurance";
             raceClass = #Elite;
+            terrain = #WastelandSand;
+            distance = 30;
+            trackId = null;
+            startOffset = 86_400_000_000_000;
+          },
+          {
+            stageName = ?"Saturday Endurance";
+            raceClass = #SilentKlan;
             terrain = #WastelandSand;
             distance = 30;
             trackId = null;
@@ -1407,6 +1423,14 @@ module {
             trackId = null;
             startOffset = 172_800_000_000_000;
           },
+          {
+            stageName = ?"Sunday Championship";
+            raceClass = #SilentKlan;
+            terrain = #ScrapHeaps;
+            distance = 25;
+            trackId = null;
+            startOffset = 172_800_000_000_000;
+          },
         ];
         heatAllocation = #SnakeDraft;
       });
@@ -1439,7 +1463,7 @@ module {
         minEntries = 8;
         prizePoolBonus = 200_000_000; // 2 ICP bonus
         pointsMultiplier = 1.5;
-        divisions = [#Scrap, #Junker, #Raider, #Elite];
+        divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan];
         scoringMode = #Cumulative; // Sum points across all 3 stages
         eventBonusPrize = 50_000_000; // 0.5 ICP bonus for cumulative winner
       };
@@ -1490,6 +1514,14 @@ module {
             trackId = null;
             startOffset = 0;
           },
+          {
+            stageName = ?"Dust Trial";
+            raceClass = #SilentKlan;
+            terrain = terrainType;
+            distance = 10;
+            trackId = null;
+            startOffset = 0;
+          },
           // === STAGE 2: THE GAUNTLET (+1 hour) ===
           {
             stageName = ?"The Gauntlet";
@@ -1523,6 +1555,14 @@ module {
             trackId = null;
             startOffset = 3_600_000_000_000;
           },
+          {
+            stageName = ?"The Gauntlet";
+            raceClass = #SilentKlan;
+            terrain = terrainType;
+            distance = 15;
+            trackId = null;
+            startOffset = 3_600_000_000_000;
+          },
           // === STAGE 3: DEATH CHARGE (+2 hours) ===
           {
             stageName = ?"Death Charge";
@@ -1551,6 +1591,14 @@ module {
           {
             stageName = ?"Death Charge";
             raceClass = #Elite;
+            terrain = terrainType;
+            distance = 20;
+            trackId = null;
+            startOffset = 7_200_000_000_000;
+          },
+          {
+            stageName = ?"Death Charge";
+            raceClass = #SilentKlan;
             terrain = terrainType;
             distance = 20;
             trackId = null;
@@ -1679,7 +1727,7 @@ module {
         minEntries = 10;
         prizePoolBonus = 200_000_000; // 2 ICP bonus
         pointsMultiplier = 1.5;
-        divisions = [#Junker, #Raider, #Elite];
+        divisions = [#Junker, #Raider, #Elite, #SilentKlan];
         scoringMode = #TeamAggregate; // Aggregate points by faction!
         eventBonusPrize = 200_000_000; // 2 ICP split among winning faction members
       };
@@ -1713,6 +1761,14 @@ module {
             trackId = null;
             startOffset = 0;
           },
+          {
+            stageName = ?"Stage 1: Scrap Heaps";
+            raceClass = #SilentKlan;
+            terrain = #ScrapHeaps;
+            distance = 12;
+            trackId = null;
+            startOffset = 0;
+          },
           // Stage 2: Wasteland Sand (30 min after stage 1)
           {
             stageName = ?"Stage 2: Desert Storm";
@@ -1738,6 +1794,14 @@ module {
             trackId = null;
             startOffset = 30 * 60 * 1_000_000_000;
           },
+          {
+            stageName = ?"Stage 2: Desert Storm";
+            raceClass = #SilentKlan;
+            terrain = #WastelandSand;
+            distance = 15;
+            trackId = null;
+            startOffset = 30 * 60 * 1_000_000_000;
+          },
           // Stage 3: Metal Roads Finals (60 min after stage 1)
           {
             stageName = ?"Stage 3: Metal Road Finals";
@@ -1758,6 +1822,14 @@ module {
           {
             stageName = ?"Stage 3: Metal Road Finals";
             raceClass = #Elite;
+            terrain = #MetalRoads;
+            distance = 10;
+            trackId = null;
+            startOffset = 60 * 60 * 1_000_000_000;
+          },
+          {
+            stageName = ?"Stage 3: Metal Road Finals";
+            raceClass = #SilentKlan;
             terrain = #MetalRoads;
             distance = 10;
             trackId = null;
@@ -1795,7 +1867,7 @@ module {
         minEntries = 8;
         prizePoolBonus = 250_000_000; // 2.5 ICP bonus
         pointsMultiplier = 2.0;
-        divisions = [#Raider, #Elite];
+        divisions = [#Raider, #Elite, #SilentKlan];
         scoringMode = #Cumulative; // Sum points across all stages
         eventBonusPrize = 100_000_000; // 1 ICP bonus for cumulative winner
       };
@@ -1820,6 +1892,14 @@ module {
             trackId = null;
             startOffset = 0;
           },
+          {
+            stageName = ?"Stage 1: Sprint";
+            raceClass = #SilentKlan;
+            terrain = #MetalRoads;
+            distance = 7;
+            trackId = null;
+            startOffset = 0;
+          },
           // Stage 2: Endurance (17km on Wasteland Sand - 90 min after stage 1)
           {
             stageName = ?"Stage 2: Endurance";
@@ -1837,6 +1917,14 @@ module {
             trackId = null;
             startOffset = 90 * 60 * 1_000_000_000; // +90 minutes
           },
+          {
+            stageName = ?"Stage 2: Endurance";
+            raceClass = #SilentKlan;
+            terrain = #WastelandSand;
+            distance = 17;
+            trackId = null;
+            startOffset = 90 * 60 * 1_000_000_000; // +90 minutes
+          },
           // Stage 3: Ultra Marathon (29km on Mixed Terrain - 3 hours after stage 1, the ultimate test)
           {
             stageName = ?"Stage 3: Ultra Marathon";
@@ -1849,6 +1937,14 @@ module {
           {
             stageName = ?"Stage 3: Ultra Marathon";
             raceClass = #Elite;
+            terrain = #MetalRoads;
+            distance = 29;
+            trackId = null;
+            startOffset = 3 * 3600 * 1_000_000_000; // +3 hours
+          },
+          {
+            stageName = ?"Stage 3: Ultra Marathon";
+            raceClass = #SilentKlan;
             terrain = #MetalRoads;
             distance = 29;
             trackId = null;
@@ -1886,7 +1982,7 @@ module {
         minEntries = 4;
         prizePoolBonus = 100_000_000; // 1 ICP bonus
         pointsMultiplier = 1.2;
-        divisions = [#Scrap, #Junker, #Raider, #Elite];
+        divisions = [#Scrap, #Junker, #Raider, #Elite, #SilentKlan];
         scoringMode = #Cumulative; // Sum points across all 5 races
         eventBonusPrize = 50_000_000; // 0.5 ICP bonus for cumulative winner
       };
@@ -2056,6 +2152,48 @@ module {
           {
             stageName = ?"Race 5 Finals";
             raceClass = #Elite;
+            terrain = #ScrapHeaps;
+            distance = 20;
+            trackId = null;
+            startOffset = 5_400_000_000_000;
+          }, // +90min
+
+          // Silent Klan Division - 5 races
+          {
+            stageName = ?"Race 1";
+            raceClass = #SilentKlan;
+            terrain = #MetalRoads;
+            distance = 10;
+            trackId = null;
+            startOffset = 0;
+          },
+          {
+            stageName = ?"Race 2";
+            raceClass = #SilentKlan;
+            terrain = #ScrapHeaps;
+            distance = 8;
+            trackId = null;
+            startOffset = 1_200_000_000_000;
+          }, // +20min
+          {
+            stageName = ?"Race 3";
+            raceClass = #SilentKlan;
+            terrain = #WastelandSand;
+            distance = 12;
+            trackId = null;
+            startOffset = 2_400_000_000_000;
+          }, // +40min
+          {
+            stageName = ?"Race 4";
+            raceClass = #SilentKlan;
+            terrain = #MetalRoads;
+            distance = 15;
+            trackId = null;
+            startOffset = 3_600_000_000_000;
+          }, // +60min
+          {
+            stageName = ?"Race 5 Finals";
+            raceClass = #SilentKlan;
             terrain = #ScrapHeaps;
             distance = 20;
             trackId = null;
