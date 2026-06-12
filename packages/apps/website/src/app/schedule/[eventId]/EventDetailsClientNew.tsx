@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetEventDetails, useGetRacesByIds, useGetBotProfilesBatch, useRegisterForEvent, useUnregisterFromEvent, useGetEventResults } from "@/hooks/useRacing";
 import { useMyBots } from "@/hooks/useGarage";
 import { useAuth } from "@/hooks/useAuth";
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { getBotAvatarUrl } from '@/lib/botAvatar';
 import { toast } from 'sonner';
 
 import { EventHeroHeader, LiveRacesPanel, StandingsPanel, SchedulePanel, StickyLiveBanner, IndividualResultsPanel } from '@/components/event';
@@ -429,8 +429,7 @@ function RegistrationPanel({ event }: { event: any }) {
           </CardHeader>
           <CardContent className="space-y-2">
             {userRegistrations.map((reg: any) => {
-              const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(reg.tokenIndex));
-              const imageUrl = generateExtThumbnailLink(tokenId);
+              const imageUrl = getBotAvatarUrl({ tokenIndex: Number(reg.tokenIndex) });
               const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === Number(reg.tokenIndex));
               return (
                 <div key={reg.tokenIndex.toString()} className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">

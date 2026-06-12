@@ -3045,8 +3045,8 @@ module {
       (current.speed + current.powerCore + current.acceleration + current.stability) / 4;
     };
 
-    /// Calculate rating at 100% condition (for race class eligibility)
-    /// This ensures bots don't drop out of their class due to temporary condition
+    /// Calculate rating at 100% condition, excluding gear/buffs/penalties.
+    /// Use this for upgrade pricing and other base-progress calculations.
     public func calculateRatingAt100(botStats : PokedBotRacingStats) : Nat {
       let base = getBaseStats(botStats.tokenIndex);
       let speed = base.speed + botStats.speedBonus;

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { getBotAvatarUrl } from '@/lib/botAvatar';
 import { useGetBotProfilesBatch } from "@/hooks/useRacing";
 
 interface IndividualResultsPanelProps {
@@ -176,7 +176,7 @@ export function IndividualResultsPanel({ races, event }: IndividualResultsPanelP
                         const tokenIndex = Number(result.nftId || result.tokenIndex);
                         const profile = profilesMap.get(tokenIndex);
                         const botName = profile?.name?.[0] || `Bot #${tokenIndex}`;
-                        const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', tokenIndex);
+                        const imageUrl = getBotAvatarUrl({ tokenIndex, isStarterBot: Boolean(profile?.isStarterBot) });
                         
                         return (
                           <div 
@@ -189,7 +189,7 @@ export function IndividualResultsPanel({ races, event }: IndividualResultsPanelP
                           >
                             <span className="text-lg">{MEDAL_EMOJIS[idx]}</span>
                             <img 
-                              src={generateExtThumbnailLink(tokenId)} 
+                              src={imageUrl} 
                               alt={botName}
                               className="w-10 h-10 rounded-full"
                               loading="lazy"

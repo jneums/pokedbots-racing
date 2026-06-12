@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause, RotateCcw, FastForward, SkipForward, Radio, PlayCircle, Zap, Trophy, TrendingUp, TrendingDown, Users, AlertTriangle, Sparkles } from 'lucide-react';
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
 import {  useGetBotProfilesBatch, useGetRaceSegments } from '@/hooks/useRacing';
+import { getBotAvatarUrl } from '@/lib/botAvatar';
 import type { BotSegmentTimes } from '@/hooks/useRacing';
 
 
@@ -2390,8 +2390,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
               const totalBots = stablePositions.length;
               
               return stablePositions.map((bot, laneIndex) => {
-                const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.nftId));
-                const imageUrl = generateExtThumbnailLink(tokenId);
+                const imageUrl = getBotAvatarUrl({ tokenIndex: Number(bot.nftId) });
                 const isFinished = bot.progress >= 99.9 || currentTime >= bot.finalTime;
                 const result = results.find(r => r.nftId === bot.nftId);
                 const isDNF = result?.dnf === true || bot.finalTime > 100000;
@@ -2542,8 +2541,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
             <div className="space-y-1.5">
               {/* Sort by current race position (live standings) */}
               {sortedPositions.map((bot) => {
-                const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(bot.nftId));
-                const imageUrl = generateExtThumbnailLink(tokenId);
+                const imageUrl = getBotAvatarUrl({ tokenIndex: Number(bot.nftId) });
                 const isFinished = bot.progress >= 99.9 || currentTime >= bot.finalTime;
                 const result = results.find(r => r.nftId === bot.nftId);
                 const isDNF = result?.dnf === true || bot.finalTime > 100000;
@@ -2795,8 +2793,7 @@ export function RaceVisualizer({ results, trackSeed, trackId, distance, terrain,
                 .sort((a, b) => a.position - b.position)
                 .slice(0, 3)
                 .map((result, idx) => {
-                const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(result.nftId));
-                const imageUrl = generateExtThumbnailLink(tokenId);
+                const imageUrl = getBotAvatarUrl({ tokenIndex: Number(result.nftId) });
                 const localTime = result.finalTime;
                 const botName = botNames.get(result.nftId) || `Bot #${result.nftId}`;
                 

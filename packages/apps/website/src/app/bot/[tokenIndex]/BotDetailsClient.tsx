@@ -7,7 +7,7 @@ import { useGetBotProfile, useGetBotRaceHistory } from '@/hooks/useRacing';
 import { useDedicationInfo } from '@/hooks/useGarage';
 import { useBackgrounds } from '@/hooks/useBackgrounds';
 import { useBotBaseStats } from '@/hooks/usePrecomputedStats';
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { getBotAvatarUrl } from '@/lib/botAvatar';
 import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionBonus, getFactionSpecialTerrain } from '@/lib/utils';
 
 function formatICP(amount: bigint): string {
@@ -105,9 +105,8 @@ export function BotDetailsClient({ tokenIndex }: { tokenIndex: string }) {
     );
   }
 
-  const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(tokenIndex));
-  const imageUrl = generateExtThumbnailLink(tokenId);
-  const thumbnailUrl = generateExtThumbnailLink(tokenId);
+  const imageUrl = getBotAvatarUrl({ tokenIndex: Number(tokenIndex), isStarterBot: Boolean(profile.isStarterBot) });
+  const thumbnailUrl = imageUrl;
 
   const isInitialized = profile.isInitialized;
   

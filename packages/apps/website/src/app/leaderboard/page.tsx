@@ -10,10 +10,10 @@ import {
   type LeaderboardEntry,
 } from "@/hooks/useLeaderboard";
 import {  useGetBotProfilesBatch } from "@/hooks/useRacing";
-import { generatetokenIdentifier, generateExtThumbnailLink, getPlatformStats } from "@pokedbots-racing/ic-js";
+import { getPlatformStats } from "@pokedbots-racing/ic-js";
 import { PokedBotsRacing } from '@pokedbots-racing/declarations';
 import { useQuery } from '@tanstack/react-query';
-import { getStarterBotAvatarUrl } from '@/lib/botAvatar';
+import { getBotAvatarUrl } from '@/lib/botAvatar';
 
 type BracketType = 'All' | 'SilentKlan' | 'Elite' | 'Raider' | 'Junker' | 'Scrap';
 type RaceClass = PokedBotsRacing.RaceClass;
@@ -97,15 +97,12 @@ function LeaderboardTable({ entries, type, botProfiles }: { entries: Leaderboard
                 <Link to={`/bot/${entry.tokenIndex.toString()}`} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity">
                   <div className="relative flex-shrink-0">
                     <img
-                      src={(() => {
-                        const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(entry.tokenIndex));
-                        return generateExtThumbnailLink(tokenId);
-                      })()}
+                      src={getBotAvatarUrl({ tokenIndex: entry.tokenIndex, isStarterBot: Boolean(botProfile?.isStarterBot) })}
                       alt={`PokedBot #${entry.tokenIndex}`}
                       className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg border-4 border-primary/40 shadow-lg object-cover bg-background"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
-                        target.src = getStarterBotAvatarUrl(entry.tokenIndex);
+                        target.src = getBotAvatarUrl({ tokenIndex: entry.tokenIndex, isStarterBot: true });
                       }}
                     />
                     {/* Rank Badge - Mobile only */}

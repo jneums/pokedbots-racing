@@ -112,14 +112,17 @@ module {
           // Check ownership via registration - if bot is registered, the ownerPrincipal is the owner
           let isOwner = racingStats.ownerPrincipal == user;
 
-          // Calculate eligibility rating (base + upgrades + equipped gear, no buffs/penalties)
-          // This is the rating used for race class brackets and display
-          let overallRating = ctx.garageManager.calculateEligibilityRating(racingStats);
+          // Eligibility rating is base + upgrades + equipped gear (no buffs/penalties).
+          // It determines race class brackets and the displayed class rating.
+          let eligibilityRating = ctx.garageManager.calculateEligibilityRating(racingStats);
+          // Upgrade pricing intentionally stays on base + upgrades only; gear must not
+          // make upgrades more expensive just because it changes the race bracket.
+          let upgradePricingRating = ctx.garageManager.calculateRatingAt100(racingStats);
           let status = ctx.garageManager.getBotStatus(racingStats);
           let canRace = ctx.garageManager.canRace(Nat.toText(tokenIndex));
 
           // Determine race class bracket (rating-based, includes equipped gear)
-          let raceClassVariant = RaceClassUtils.getRaceClassFromRating(overallRating);
+          let raceClassVariant = RaceClassUtils.getRaceClassFromRating(eligibilityRating);
           let raceClass = RaceClassUtils.getClassDescription(raceClassVariant);
 
           // Get wasteland flavor text
@@ -219,25 +222,25 @@ module {
           let speedUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
             speedBaseForCost,
             currentStats.speed,
-            overallRating,
+            upgradePricingRating,
             synergies.costMultipliers.upgradeCost,
           );
           let powerCoreUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
             powerCoreBaseForCost,
             currentStats.powerCore,
-            overallRating,
+            upgradePricingRating,
             synergies.costMultipliers.upgradeCost,
           );
           let accelerationUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
             accelerationBaseForCost,
             currentStats.acceleration,
-            overallRating,
+            upgradePricingRating,
             synergies.costMultipliers.upgradeCost,
           );
           let stabilityUpgradeCostE8s = ctx.garageManager.calculateUpgradeCostV2(
             stabilityBaseForCost,
             currentStats.stability,
-            overallRating,
+            upgradePricingRating,
             synergies.costMultipliers.upgradeCost,
           );
 
@@ -333,7 +336,7 @@ module {
                 ]),
               ),
               ("career", Json.obj([("races_entered", Json.int(racingStats.racesEntered)), ("wins", Json.int(racingStats.wins)), ("places", Json.int(racingStats.places)), ("shows", Json.int(racingStats.shows)), ("total_scrap_earned", Json.int(racingStats.totalScrapEarned)), ("faction_reputation", Json.int(racingStats.factionReputation)), ("reputation_tier", Json.str(reputationTier))])),
-              ("overall_rating", Json.int(overallRating)),
+              ("overall_rating", Json.int(eligibilityRating)),
               ("can_race", Json.bool(canRace)),
               ("preferred_distance", Json.str(distanceText)),
               ("preferred_terrain", Json.str(terrainText)),

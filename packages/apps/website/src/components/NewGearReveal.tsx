@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from './ui/dialog';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { X, ChevronRight, Sparkles } from 'lucide-react';
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { getBotAvatarUrl } from '../lib/botAvatar';
 import { useGetBotProfilesBatch } from '../hooks/useRacing';
 import type { GearPieceView } from '../hooks/useGarage';
 
@@ -241,8 +241,7 @@ interface RevealCard {
 }
 
 function getBotImageUrl(tokenIndex: number): string {
-  const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', tokenIndex);
-  return generateExtThumbnailLink(tokenId);
+  return getBotAvatarUrl({ tokenIndex });
 }
 
 export function NewGearReveal({ gear, open, onOpenChange, onComplete }: NewGearRevealProps) {

@@ -2,8 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { Group, Vector3, Sprite as ThreeSprite, SpriteMaterial, CanvasTexture, Texture } from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
-import { getStarterBotAvatarUrl } from '../../lib/botAvatar';
+import { getBotAvatarUrl } from '../../lib/botAvatar';
 
 interface BotRendererProps {
   position: [number, number, number];
@@ -33,10 +32,8 @@ export function BotRenderer({
   const { camera } = useThree();
   const [texture, setTexture] = useState<Texture | null>(null);
   
-  // Generate avatar URL using proper token identifier
-  const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', nftId);
-  const avatarUrl = generateExtThumbnailLink(tokenId);
-  const fallbackUrl = getStarterBotAvatarUrl(nftId);
+  const avatarUrl = getBotAvatarUrl({ tokenIndex: nftId });
+  const fallbackUrl = avatarUrl;
   
   // Load texture from image
   useEffect(() => {

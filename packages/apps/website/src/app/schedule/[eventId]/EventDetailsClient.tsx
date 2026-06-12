@@ -10,6 +10,7 @@ import { useGetEventDetails, useGetRaceById, useGetBotProfilesBatch, useRegister
 import { useMyBots, useEnterRace } from "@/hooks/useGarage";
 import { useAuth } from "@/hooks/useAuth";
 import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { getBotAvatarUrl } from '@/lib/botAvatar';
 import { RaceVisualizer } from '@/components/RaceVisualizer';
 import { toast } from 'sonner';
 
@@ -293,8 +294,7 @@ function EventStandings({ eventId, isInProgress = false }: { eventId: number; is
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                   {winningFaction.members.map((member: any) => {
-                    const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(member.tokenIndex));
-                    const imageUrl = generateExtThumbnailLink(tokenId);
+                    const imageUrl = getBotAvatarUrl({ tokenIndex: Number(member.tokenIndex) });
                     const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === Number(member.tokenIndex));
                     
                     return (
@@ -335,8 +335,7 @@ function EventStandings({ eventId, isInProgress = false }: { eventId: number; is
             </h3>
             <div className="space-y-2">
               {results.cumulativeStandings.map((standing: any) => {
-                const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(standing.tokenIndex));
-                const imageUrl = generateExtThumbnailLink(tokenId);
+                const imageUrl = getBotAvatarUrl({ tokenIndex: Number(standing.tokenIndex) });
                 const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === Number(standing.tokenIndex));
                 const position = Number(standing.position);
                 const hasPrize = standing.prizeAmount > 0n;
@@ -793,8 +792,7 @@ function EventRegistrationSection({ event }: { event: any }) {
             <p className="text-sm font-semibold">Your Registrations ({userRegistrations.length})</p>
             <div className="space-y-2">
               {userRegistrations.map((reg: any) => {
-                const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(reg.tokenIndex));
-                const imageUrl = generateExtThumbnailLink(tokenId);
+                const imageUrl = getBotAvatarUrl({ tokenIndex: Number(reg.tokenIndex) });
                 const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === Number(reg.tokenIndex));
                 
                 return (
@@ -1442,8 +1440,7 @@ function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolea
                 // entry.nftId could be either a token index (string number) or EXT token identifier
                 // If it's already an EXT token identifier, use it directly; otherwise generate it
                 const isExtIdentifier = entry.nftId.length > 10; // EXT identifiers are long
-                const tokenId = isExtIdentifier ? entry.nftId : generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(entry.nftId));
-                const imageUrl = generateExtThumbnailLink(tokenId);
+                const imageUrl = isExtIdentifier ? generateExtThumbnailLink(entry.nftId) : getBotAvatarUrl({ tokenIndex: Number(entry.nftId) });
                 
                 // Extract token index: if it's a number string, use it; otherwise it's an EXT ID
                 const tokenIndex = isExtIdentifier ? entry.nftId : Number(entry.nftId);
@@ -1554,8 +1551,7 @@ function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolea
                 <p className="text-sm font-semibold">🏁 Race Results:</p>
                 <div className="space-y-2">
                   {allFinishers.map((result: any, idx: number) => {
-                  const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(result.nftId));
-                  const imageUrl = generateExtThumbnailLink(tokenId);
+                  const imageUrl = getBotAvatarUrl({ tokenIndex: Number(result.nftId) });
                   const position = finalResults.findIndex((r: any) => r.nftId === result.nftId) + 1;
                   const hasPrize = result.prizeAmount && result.prizeAmount > 0n;
                 

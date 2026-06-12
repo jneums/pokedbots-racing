@@ -984,14 +984,14 @@ shared ({ caller = deployer }) persistent actor class McpServer(
   // Event calendar manager
   transient let eventCalendar = RaceCalendar.EventCalendar(stable_events);
 
-  /// Get race class based on overall rating (average of max stats)
+  /// Get race class based on the canonical class/eligibility rating.
   func getRaceClassFromRating(overallRating : Nat) : RacingSimulator.RaceClass {
     // Delegate to centralized utility to ensure consistency
     RaceClassUtils.getRaceClassFromRating(overallRating);
   };
 
-  /// Calculate overall rating from max stats (for race class determination)
-  /// This should be used for determining race eligibility, not current degraded stats
+  /// Calculate the canonical race eligibility rating.
+  /// This should be used for determining race eligibility, not current degraded stats.
   /// Includes EQUIPPED GEAR so gear-stacked bots are classed into higher divisions
   func calculateMaxRating(botStats : PokedBotsGarage.PokedBotRacingStats) : Nat {
     garageManager.calculateEligibilityRating(botStats);
@@ -1021,6 +1021,38 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       },
     );
     Option.isSome(activeRace);
+  };
+
+  /// Check if a bot has a pending event registration whose races have not yet
+  /// completed. Event registrations are created before races exist, so checking
+  /// race entries alone leaves a window where the bot can change gear after its
+  /// gear-inclusive race class has been recorded.
+  func isBotRegisteredForActiveEvent(tokenIndex : Nat) : Bool {
+    let now = Time.now();
+    let activeRegistration = Array.find<RaceCalendar.ScheduledEvent>(
+      eventCalendar.getAllEvents(),
+      func(event) {
+        let eventActive = switch (event.status) {
+          case (#Cancelled) { false };
+          case (#Completed) { false };
+          case (_) { now <= event.scheduledTime };
+        };
+        if (not eventActive) { return false };
+
+        Option.isSome(
+          Array.find<RaceCalendar.EventRegistration>(
+            event.registrations,
+            func(reg) { reg.tokenIndex == tokenIndex },
+          )
+        );
+      },
+    );
+
+    Option.isSome(activeRegistration);
+  };
+
+  func isBotLoadoutLocked(tokenIndex : Nat) : Bool {
+    isBotInActiveRace(tokenIndex) or isBotRegisteredForActiveEvent(tokenIndex);
   };
 
   // ===== ROOKIE DROP BOOST (new-player onramp) =====
@@ -5711,11 +5743,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
           acceleration = baseStats.acceleration + botStats.accelerationBonus;
           stability = baseStats.stability + botStats.stabilityBonus;
         };
-        // Calculate rating based on stats at 100% (luck not included in rating)
-        let totalStats = statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability;
-        let rating = totalStats / 4;
-        // Race class uses eligibility rating (includes equipped gear)
-        let raceClass = getRaceClassFromRating(garageManager.calculateEligibilityRating(botStats));
+        // Rating shown with race class is the gear-inclusive eligibility rating.
+        // statsAt100 remains base + upgrades for stat breakdown display.
+        let rating = garageManager.calculateEligibilityRating(botStats);
+        let raceClass = getRaceClassFromRating(rating);
 
         ?{
           tokenIndex = tokenIndex;
@@ -5822,11 +5853,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             acceleration = baseStats.acceleration + botStats.accelerationBonus;
             stability = baseStats.stability + botStats.stabilityBonus;
           };
-          // Calculate rating based on stats at 100% (luck not included in rating)
-          let totalStats = statsAt100.speed + statsAt100.powerCore + statsAt100.acceleration + statsAt100.stability;
-          let rating = totalStats / 4;
-          // Race class uses eligibility rating (includes equipped gear)
-          let raceClass = getRaceClassFromRating(garageManager.calculateEligibilityRating(botStats));
+          // Rating shown with race class is the gear-inclusive eligibility rating.
+          // statsAt100 remains base + upgrades for stat breakdown display.
+          let rating = garageManager.calculateEligibilityRating(botStats);
+          let raceClass = getRaceClassFromRating(rating);
 
           buffer.add({
             tokenIndex = tokenIndex;
@@ -8180,8 +8210,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             var hasEligibleBot = false;
 
             for (bot in callerBots.vals()) {
-              // Check if bot's rating (max stats) matches race class
-              let rating = calculateMaxRating(bot); // Use max stats, not current degraded stats
+              // Check if bot's eligibility rating matches race class
+              let rating = calculateMaxRating(bot); // base + upgrades + equipped gear; no current degradation
               let isEligible = RaceClassUtils.isEligibleForClass(rating, race.raceClass);
 
               // Check if this bot is not already entered
@@ -9913,7 +9943,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
             let nftId = Nat.toText(tokenIndex);
             let botEloClass = switch (stats) {
               case (?s) {
-                let rating = calculateMaxRating(s); // Use max stats, not current degraded stats
+                let rating = calculateMaxRating(s); // base + upgrades + equipped gear; no current degradation
                 getRaceClassFromRating(rating);
               };
               case (null) { #Scrap };
@@ -10153,7 +10183,7 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
         // Find races this bot is entered in and races eligible to enter
         let nftId = Nat.toText(tokenIndex);
-        let rating = calculateMaxRating(botStatsWithCurrentRewards); // Use max stats, not current degraded stats
+        let rating = calculateMaxRating(botStatsWithCurrentRewards); // base + upgrades + equipped gear; no current degradation
         let botEloClass = getRaceClassFromRating(rating);
 
         var enteredRaces : [{
@@ -12888,17 +12918,10 @@ shared ({ caller = deployer }) persistent actor class McpServer(
       };
     };
 
-    // Calculate overall rating and determine race class
-    // Use MAX stats (base + upgrades) NOT current stats (which have battery/condition penalties)
-    // This ensures bots are always placed in their proper tier regardless of current condition
-    let baseStats = garageManager.getBaseStats(tokenIndex);
-    let maxStats = {
-      speed = baseStats.speed + botStats.speedBonus;
-      powerCore = baseStats.powerCore + botStats.powerCoreBonus;
-      acceleration = baseStats.acceleration + botStats.accelerationBonus;
-      stability = baseStats.stability + botStats.stabilityBonus;
-    };
-    let overallRating = (maxStats.speed + maxStats.powerCore + maxStats.acceleration + maxStats.stability) / 4;
+    // Calculate overall rating and determine race class.
+    // Gear counts toward class; battery/condition/temporary buffs do not.
+    // This must match racing_register_for_event and the displayed eligibility rating.
+    let overallRating = garageManager.calculateEligibilityRating(botStats);
 
     let raceClass : RaceCalendar.RaceClass = if (overallRating < 20) {
       #Scrap;
@@ -14652,8 +14675,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     // Loadout is locked while entered in a race — gear counts toward race
     // class, so changing it mid-entry would dodge the bracket system
-    if (isBotInActiveRace(tokenIndex)) {
-      return #err("Cannot change gear while this bot is entered in a race. Wait for the race to finish.");
+    if (isBotLoadoutLocked(tokenIndex)) {
+      return #err("Cannot change gear while this bot is registered for an active event or entered in a race. Wait for the event to finish or unregister first.");
     };
 
     gearManager.equipGear(caller, tokenIndex, gearId);
@@ -14678,8 +14701,8 @@ shared ({ caller = deployer }) persistent actor class McpServer(
 
     // Loadout is locked while entered in a race — gear counts toward race
     // class, so unequipping mid-entry would dodge the bracket system
-    if (isBotInActiveRace(tokenIndex)) {
-      return #err("Cannot change gear while this bot is entered in a race. Wait for the race to finish.");
+    if (isBotLoadoutLocked(tokenIndex)) {
+      return #err("Cannot change gear while this bot is registered for an active event or entered in a race. Wait for the event to finish or unregister first.");
     };
 
     gearManager.unequipSlot(caller, tokenIndex, slot);

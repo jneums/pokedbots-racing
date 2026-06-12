@@ -309,6 +309,7 @@ export interface McpServer {
   'admin_get_stat_breakdown' : ActorMethod<[bigint], Result_26>,
   'admin_grant_battery' : ActorMethod<[Principal, string], string>,
   'admin_migrate_gear_soulbound' : ActorMethod<[], Result_2>,
+  'admin_purge_bot_gear' : ActorMethod<[bigint, boolean], string>,
   'admin_rebuild_bot_histories' : ActorMethod<[Array<bigint>], string>,
   'admin_remove_battery' : ActorMethod<[Principal, bigint], string>,
   /**
@@ -1780,6 +1781,7 @@ export interface McpServer {
           'powerCore' : bigint,
         },
         'isStarterBot' : boolean,
+        'eligibilityRating' : bigint,
         'upgradeCostsV2' : {
           'luck' : { 'successRate' : number, 'costE8s' : bigint },
           'stability' : { 'successRate' : number, 'costE8s' : bigint },

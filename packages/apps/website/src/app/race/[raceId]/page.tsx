@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useNewGearFromRace } from '@/hooks/useGarage';
 import { RaceVisualizer } from '@/components/RaceVisualizer';
 import { NewGearReveal } from '@/components/NewGearReveal';
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { getBotAvatarUrl } from '@/lib/botAvatar';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -434,8 +434,7 @@ export default function RaceDetailsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {race.entries.map((entry: any, idx: number) => {
                     const tokenIndex = Number(entry.nftId);
-                    const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', tokenIndex);
-                    const imageUrl = generateExtThumbnailLink(tokenId);
+                    const imageUrl = getBotAvatarUrl({ tokenIndex });
                     const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === tokenIndex);
                     
                     return (
@@ -477,8 +476,7 @@ export default function RaceDetailsPage() {
                 <div className="space-y-2">
                   {race.results[0].map((result: any, idx: number) => {
                     const tokenIndex = Number(result.nftId);
-                    const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', tokenIndex);
-                    const imageUrl = generateExtThumbnailLink(tokenId);
+                    const imageUrl = getBotAvatarUrl({ tokenIndex });
                     const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === tokenIndex);
                     const isDnf = result.dnf === true || result.finalTime > 99999;
                     const hasPrize = result.prizeAmount > 0n;

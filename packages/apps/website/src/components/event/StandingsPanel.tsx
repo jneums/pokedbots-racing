@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { getBotAvatarUrl } from '@/lib/botAvatar';
 import { useGetBotProfilesBatch, useGetEventResults } from "@/hooks/useRacing";
 
 interface StandingsPanelProps {
@@ -184,8 +184,7 @@ export function StandingsPanel({ eventId, isInProgress }: StandingsPanelProps) {
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                     {winningFaction.members.map((member: any) => {
-                      const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(member.tokenIndex));
-                      const imageUrl = generateExtThumbnailLink(tokenId);
+                      const imageUrl = getBotAvatarUrl({ tokenIndex: Number(member.tokenIndex) });
                       const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === Number(member.tokenIndex));
                       return (
                         <Link 
@@ -222,8 +221,7 @@ export function StandingsPanel({ eventId, isInProgress }: StandingsPanelProps) {
           <CardContent>
             <div className="space-y-2">
               {results.cumulativeStandings.map((standing: any) => {
-                const tokenId = generatetokenIdentifier('bzsui-sqaaa-aaaah-qce2a-cai', Number(standing.tokenIndex));
-                const imageUrl = generateExtThumbnailLink(tokenId);
+                const imageUrl = getBotAvatarUrl({ tokenIndex: Number(standing.tokenIndex) });
                 const profile = botProfiles.find((p: any) => p && Number(p.tokenIndex) === Number(standing.tokenIndex));
                 const position = Number(standing.position);
                 const hasPrize = standing.prizeAmount > 0n;
