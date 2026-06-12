@@ -550,10 +550,14 @@ function RegistrationPanel({ event }: { event: any }) {
                     <SelectTrigger><SelectValue placeholder="Choose a bot..." /></SelectTrigger>
                     <SelectContent>
                       {eligibleBots.map((bot) => {
-                        const rating = bot.maxStats ? Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4) : 0;
+                        const rating = bot.eligibilityRating !== undefined
+                          ? Number(bot.eligibilityRating).toFixed(2)
+                          : bot.maxStats
+                            ? ((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4).toFixed(2)
+                            : '—';
                         return (
                           <SelectItem key={bot.tokenIndex.toString()} value={bot.tokenIndex.toString()}>
-                            Bot #{bot.tokenIndex.toString()} {bot.name && `- ${bot.name}`} (Rating: {rating})
+                            Bot #{bot.tokenIndex.toString()} {bot.name && `- ${bot.name}`} (Class rating: {rating})
                           </SelectItem>
                         );
                       })}

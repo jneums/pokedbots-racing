@@ -570,6 +570,32 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
   const stats = bot.stats!;
   const dedicationBadge = dedicationInfo ? getDedicationBadge(dedicationInfo.tier) : null;
 
+  const averageRating = (values?: { speed: bigint; powerCore: bigint; acceleration: bigint; stability: bigint }): number | null => {
+    if (!values) return null;
+    return (Number(values.speed) + Number(values.powerCore) + Number(values.acceleration) + Number(values.stability)) / 4;
+  };
+
+  const formatRating = (value: number | null | undefined): string => {
+    if (value === null || value === undefined || Number.isNaN(value)) return '—';
+    return value.toFixed(2);
+  };
+
+  const basePlusUpgradesRating = averageRating(bot.maxStats);
+  const currentConditionRating = averageRating(bot.currentStats);
+  const upgradeRatingBonus = (
+    Number(stats.speedUpgrades || stats.speed_upgrades || 0n) +
+    Number(stats.powerCoreUpgrades || stats.power_core_upgrades || 0n) +
+    Number(stats.accelerationUpgrades || stats.acceleration_upgrades || 0n) +
+    Number(stats.stabilityUpgrades || stats.stability_upgrades || 0n)
+  ) / 4;
+  const originalRating = basePlusUpgradesRating === null ? null : basePlusUpgradesRating - upgradeRatingBonus;
+  const gearRatingBonus = gearBonuses.data
+    ? (gearBonuses.data.speed + gearBonuses.data.powerCore + gearBonuses.data.acceleration + gearBonuses.data.stability) / 4
+    : null;
+  const classRating = basePlusUpgradesRating === null
+    ? (bot.eligibilityRating !== undefined ? Number(bot.eligibilityRating) : null)
+    : basePlusUpgradesRating + (gearRatingBonus ?? 0);
+
   // Check for active world buff (full circle when active)
   const hasWorldBuff = stats?.worldBuff && stats.worldBuff.length > 0;
   
@@ -692,9 +718,32 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
             )}
           </div>
         </CardTitle>
-        <CardDescription className="space-y-1">
-          <div>
-            ELO: {formatBigInt(stats.eloRating)} | Rating: {bot.currentStats ? ((Number(bot.currentStats.speed) + Number(bot.currentStats.powerCore) + Number(bot.currentStats.acceleration) + Number(bot.currentStats.stability)) / 4).toFixed(2) : '?'}/{bot.eligibilityRating !== undefined ? Number(bot.eligibilityRating) : (bot.maxStats ? ((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4).toFixed(2) : '100')} | Rep: {formatBigInt(stats.factionReputation)}
+        <CardDescription className="space-y-2">
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            <span>ELO: <span className="font-semibold">{formatBigInt(stats.eloRating)}</span></span>
+            <span>Rep: <span className="font-semibold">{formatBigInt(stats.factionReputation)}</span></span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-[11px]">
+            <div className="rounded-md border border-muted bg-muted/30 px-2 py-1" title="Average of original bot stats before upgrades or gear.">
+              <div className="text-muted-foreground">Original</div>
+              <div className="font-mono font-semibold">{formatRating(originalRating)}</div>
+            </div>
+            <div className="rounded-md border border-muted bg-muted/30 px-2 py-1" title="Rating points added by permanent stat upgrades.">
+              <div className="text-muted-foreground">Upgrades</div>
+              <div className="font-mono font-semibold">+{formatRating(upgradeRatingBonus)}</div>
+            </div>
+            <div className="rounded-md border border-muted bg-muted/30 px-2 py-1" title="Rating points added by currently equipped gear.">
+              <div className="text-muted-foreground">Gear</div>
+              <div className="font-mono font-semibold">{gearRatingBonus === null ? '—' : `+${formatRating(gearRatingBonus)}`}</div>
+            </div>
+            <div className="rounded-md border border-primary/30 bg-primary/5 px-2 py-1" title="Original + upgrades + equipped gear. This decimal rating determines the bot's race bracket.">
+              <div className="text-muted-foreground">Class</div>
+              <div className="font-mono font-bold text-primary">{formatRating(classRating)}</div>
+            </div>
+            <div className="rounded-md border border-muted bg-muted/30 px-2 py-1" title="Current condition/battery-adjusted track rating. This can differ from class rating.">
+              <div className="text-muted-foreground">Current</div>
+              <div className="font-mono font-semibold">{formatRating(currentConditionRating)}</div>
+            </div>
           </div>
           <div className="flex items-center gap-1 text-xs flex-wrap">
             <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400 px-2 py-0">
@@ -2331,9 +2380,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
 
             {/* Bracket Bump Warning */}
             {(() => {
-              if (!bot.maxStats) return null;
-              const currentRating = (Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + 
-                Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4;
+              if (classRating === null) return null;
               
               // Class boundaries: 20 (Scrap→Junker), 30 (Junker→Raider), 40 (Raider→Elite), 50 (Elite→SilentKlan)
               const boundaries = [
@@ -2345,11 +2392,11 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
               
               // Find if we're close to any boundary (within 1.0 rating points)
               // A successful upgrade adds +1 to one stat = +0.25 rating, double upgrade = +0.5 rating
-              const nearBoundary = boundaries.find(b => currentRating < b.threshold && currentRating >= b.threshold - 1.0);
+              const nearBoundary = boundaries.find(b => classRating < b.threshold && classRating >= b.threshold - 1.0);
               
               if (!nearBoundary) return null;
               
-              const pointsUntilBump = nearBoundary.threshold - currentRating;
+              const pointsUntilBump = nearBoundary.threshold - classRating;
               const willBumpOnNormal = pointsUntilBump <= 0.25;
               const willBumpOnDouble = pointsUntilBump <= 0.5;
               
@@ -2368,7 +2415,7 @@ export function BotCard({ bot, onUpdate, enteringRaces, setEnteringRaces, rechar
                         {willBumpOnNormal ? 'BRACKET BUMP IMMINENT!' : 'Near Bracket Boundary'}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Current rating: <span className="font-mono font-bold">{currentRating.toFixed(2)}</span> → 
+                        Class rating: <span className="font-mono font-bold">{classRating.toFixed(2)}</span> →
                         {nearBoundary.from} class
                       </p>
                       <p className="text-xs text-muted-foreground">

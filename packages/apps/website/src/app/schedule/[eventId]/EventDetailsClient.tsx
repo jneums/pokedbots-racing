@@ -948,17 +948,19 @@ function EventRegistrationSection({ event }: { event: any }) {
                       </SelectTrigger>
                       <SelectContent>
                         {eligibleBots.map((bot) => {
-                          const rating = bot.maxStats ? Math.floor(
-                            (Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + 
-                             Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4
-                          ) : 0;
+                          const rating = bot.eligibilityRating !== undefined
+                            ? Number(bot.eligibilityRating).toFixed(2)
+                            : bot.maxStats
+                              ? ((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) +
+                                 Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4).toFixed(2)
+                              : '—';
                           
                           return (
                             <SelectItem key={bot.tokenIndex.toString()} value={bot.tokenIndex.toString()}>
                               <div className="flex items-center gap-2">
                                 <span>Bot #{bot.tokenIndex.toString()}</span>
                                 {bot.name && <span className="text-muted-foreground">- {bot.name}</span>}
-                                <span className="text-xs text-muted-foreground">(Rating: {rating})</span>
+                                <span className="text-xs text-muted-foreground">(Class rating: {rating})</span>
                               </div>
                             </SelectItem>
                           );
@@ -1653,7 +1655,7 @@ function RaceCard({ raceId, isFirstRace }: { raceId: bigint; isFirstRace: boolea
                         {bot.name && <span className="text-muted-foreground">- {bot.name}</span>}
                         {bot.stats && (
                           <span className="text-xs text-red-500">
-                            (Rating: {bot.maxStats ? Math.floor((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4) : '?'} - Not eligible)
+                            (Class rating: {bot.eligibilityRating !== undefined ? Number(bot.eligibilityRating).toFixed(2) : bot.maxStats ? ((Number(bot.maxStats.speed) + Number(bot.maxStats.powerCore) + Number(bot.maxStats.acceleration) + Number(bot.maxStats.stability)) / 4).toFixed(2) : '—'} - Not eligible)
                           </span>
                         )}
                       </div>
