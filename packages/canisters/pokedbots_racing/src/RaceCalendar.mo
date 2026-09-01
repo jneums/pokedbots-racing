@@ -1078,7 +1078,7 @@ module {
         heatAllocation = #SnakeDraft;
       });
 
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #WeeklyLeague,
@@ -1139,7 +1139,7 @@ module {
         heatAllocation = #TopBottom; // Separate high ELO vs low ELO heats
       });
 
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #DailySprint,
@@ -1198,7 +1198,7 @@ module {
         heatAllocation = #TopBottom;
       });
 
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #SpecialEvent("Free Sprint"),
@@ -1238,7 +1238,7 @@ module {
         heatAllocation = #SkillTiered;
       });
 
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #MonthlyCup,
@@ -1265,7 +1265,7 @@ module {
       now : Int,
     ) : ScheduledEvent {
       let regOpens = scheduledTime - (72 * 3600 * 1_000_000_000); // Opens 72h before
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // Closes 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #SpecialEvent(theme),
@@ -1435,7 +1435,7 @@ module {
         heatAllocation = #SnakeDraft;
       });
 
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // Closes 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #SpecialEvent("Weekend Warrior"),
@@ -1608,7 +1608,7 @@ module {
         heatAllocation = #SnakeDraft;
       });
 
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // Closes 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #SpecialEvent(terrain # " Master"),
@@ -1648,7 +1648,7 @@ module {
         heatAllocation = #SkillTiered;
       });
 
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // Closes 1 hour before (betting window between close and start)
 
       // Elite Showcase requires 1500+ ELO to enter
       let visibility : EventVisibility = #Restricted({
@@ -1699,7 +1699,7 @@ module {
         heatAllocation = #TopBottom; // Separate skill levels
       });
 
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // Closes 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #SpecialEvent("Beginner Bootcamp"),
@@ -1839,7 +1839,7 @@ module {
         heatAllocation = #Random; // Mixed faction matchups
       });
 
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // Closes 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #SpecialEvent("Faction Wars"),
@@ -1954,7 +1954,7 @@ module {
         heatAllocation = #SnakeDraft;
       });
 
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // Closes 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #SpecialEvent("Distance Challenge"),
@@ -2203,7 +2203,7 @@ module {
         heatAllocation = #Random; // Maximum chaos!
       });
 
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // Closes 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #SpecialEvent("Rush Hour"),
@@ -2244,7 +2244,7 @@ module {
       });
 
       let regOpens = scheduledTime - (120 * 3600 * 1_000_000_000); // Opens Monday (5 days)
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // Closes 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #SpecialEvent("Ultra Marathon"),
@@ -2284,7 +2284,7 @@ module {
         heatAllocation = #Random; // Chaos!
       });
 
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // Closes 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #SpecialEvent("Midnight Madness"),
@@ -2324,7 +2324,7 @@ module {
         heatAllocation = #SkillTiered; // Best vs best
       });
 
-      let regCloses = scheduledTime - (15 * 60 * 1_000_000_000); // Closes 15min before
+      let regCloses = scheduledTime - (60 * 60 * 1_000_000_000); // Closes 1 hour before (betting window between close and start)
 
       scheduleEvent(
         #SpecialEvent("Champions Cup"),

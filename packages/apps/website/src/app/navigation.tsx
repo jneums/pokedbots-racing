@@ -39,7 +39,7 @@ export default function Navigation() {
     return `${base} text-muted-foreground hover:text-foreground hover:bg-primary/5 border-transparent`;
   };
 
-  const isRaceActive = ['/schedule', '/leaderboard', '/simulator'].some(p => isActive(p));
+  const isRaceActive = ['/schedule', '/leaderboard', '/betting', '/simulator'].some(p => isActive(p));
   const isMyBotsActive = ['/garage', '/marketplace'].some(p => isActive(p));
   
   // Prevent body scroll when mobile drawer is open
@@ -90,6 +90,10 @@ export default function Navigation() {
                   <Link to="/leaderboard" className="block px-4 py-2 text-sm hover:bg-muted transition-colors">
                     <div className="font-medium">Leaderboard</div>
                     <div className="text-xs text-muted-foreground">Top racers & stats</div>
+                  </Link>
+                  <Link to="/betting" className="block px-4 py-2 text-sm hover:bg-muted transition-colors">
+                    <div className="font-medium">Betting</div>
+                    <div className="text-xs text-muted-foreground">Place bets on races</div>
                   </Link>
                   <Link to="/simulator" className="block px-4 py-2 text-sm hover:bg-muted transition-colors">
                     <div className="font-medium">Simulator</div>
@@ -199,8 +203,16 @@ export default function Navigation() {
                     <div className="font-medium">Leaderboard</div>
                     <div className="text-xs text-muted-foreground">Top racers & stats</div>
                   </Link>
-                  <Link 
-                    to="/simulator" 
+                  <Link
+                    to="/betting"
+                    className={mobileLinkClass('/betting')}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className="font-medium">Betting</div>
+                    <div className="text-xs text-muted-foreground">Place bets on races</div>
+                  </Link>
+                  <Link
+                    to="/simulator"
                     className={mobileLinkClass('/simulator')}
                     onClick={() => setIsOpen(false)}
                   >

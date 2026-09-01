@@ -7,6 +7,7 @@ import { useGetRaceById, useGetBotProfilesBatch } from "@/hooks/useRacing";
 import { useAuth } from '@/hooks/useAuth';
 import { useNewGearFromRace } from '@/hooks/useGarage';
 import { RaceVisualizer } from '@/components/RaceVisualizer';
+import { BettingInterface } from '@/components/BettingInterface';
 import { NewGearReveal } from '@/components/NewGearReveal';
 import { getBotAvatarUrl } from '@/lib/botAvatar';
 
@@ -420,6 +421,17 @@ export default function RaceDetailsPage() {
               </CardContent>
             </Card>
           ) : null}
+
+          {/* Betting Interface - for upcoming races */}
+          {isUpcoming && (
+            <div className="mb-6">
+              <BettingInterface
+                raceId={Number(raceId)}
+                entryDeadline={race?.entryDeadline}
+                raceStatus={race?.status}
+              />
+            </div>
+          )}
 
           {/* Entrants List - for upcoming races */}
           {isUpcoming && race.entries?.length > 0 && (
