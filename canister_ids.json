@@ -2,16 +2,13 @@
   "icp_ledger": {
     "ic": "ryjl3-tyaaa-aaaab-qaa6a-cai"
   },
+  "pokedbots_brawl": {
+    "ic": "ohthu-kqaaa-aaaai-q4i4q-cai"
+  },
   "pokedbots_nfts": {
     "ic": "bzsui-sqaaa-aaaah-qce2a-cai"
   },
-  "pokedbots_racing": {
-    "ic": "p6nop-vyaaa-aaaai-q4djq-cai"
-  },
-  "pokedbots_racing_dev": {
-    "ic": "3od6b-qiaaa-aaaai-q37ma-cai"
-  },
   "website": {
-    "ic": "32qki-jaaaa-aaaai-q4a7a-cai"
+    "ic": "oasba-hiaaa-aaaai-q4i4a-cai"
   }
 }

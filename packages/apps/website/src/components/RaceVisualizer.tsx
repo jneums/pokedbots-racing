@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause, RotateCcw, FastForward, SkipForward } from 'lucide-react';
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-brawl/ic-js';
 
 interface RaceResult {
   nftId: string;

@@ -1,14 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAllowance, setAllowance } from '@pokedbots-racing/ic-js';
+import { getAllowance, setAllowance } from '@pokedbots-brawl/ic-js';
 import { useAuth } from './useAuth';
-import { getCanisterId } from '@pokedbots-racing/ic-js';
+import { getCanisterId } from '@pokedbots-brawl/ic-js';
 
 /**
  * Hook to get current allowance for racing canister
  */
 export function useAllowance() {
   const { user } = useAuth();
-  const racingCanisterId = getCanisterId('POKEDBOTS_RACING');
+  const racingCanisterId = getCanisterId('pokedbots_brawl');
 
   return useQuery({
     queryKey: ['allowance', user?.principal, racingCanisterId],
@@ -33,7 +33,7 @@ export function useAllowance() {
 export function useSetAllowance() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const racingCanisterId = getCanisterId('POKEDBOTS_RACING');
+  const racingCanisterId = getCanisterId('pokedbots_brawl');
 
   return useMutation({
     mutationFn: async (amountICP: number) => {

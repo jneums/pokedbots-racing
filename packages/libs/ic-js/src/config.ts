@@ -40,7 +40,7 @@ export function configure(config: {
 export const getCanisterId = (name: string): string => {
   if (!_isConfigured) {
     throw new Error(
-      'The @pokedbots-racing/ic-js package has not been configured. Please call the configure() function at application startup.',
+      'The @pokedbots-brawl/ic-js package has not been configured. Please call the configure() function at application startup.',
     );
   }
 

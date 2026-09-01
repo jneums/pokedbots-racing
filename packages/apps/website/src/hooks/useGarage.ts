@@ -18,7 +18,7 @@ import {
   type PaymentMethod,
   type ApiKeyMetadata,
   type UnregisteredNFT,
-} from '@pokedbots-racing/ic-js';
+} from '@pokedbots-brawl/ic-js';
 import { useAuth } from './useAuth';
 
 /**

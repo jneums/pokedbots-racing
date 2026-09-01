@@ -1,6 +1,6 @@
 import { type Identity, Actor, HttpAgent } from '@icp-sdk/core/agent';
 import { getRacingActor, getNFTsActor, getLedgerActor } from '../actors.js';
-import { PokedBotsRacing, PokedBotsNFTs, Ledger } from '@pokedbots-racing/declarations';
+import { PokedBotsRacing, PokedBotsNFTs, Ledger } from '@pokedbots-brawl/declarations';
 import { Principal } from '@icp-sdk/core/principal';
 import { getCanisterId, getHost } from '../config.js';
 import { sha224 } from 'js-sha256';
@@ -67,7 +67,7 @@ function isPlugAgent(identityOrAgent: any): boolean {
 async function getRacingActorFromIdentity(identityOrAgent: IdentityOrAgent): Promise<PokedBotsRacing._SERVICE> {
   // Check if it's a Plug agent - use window.ic.plug.createActor
   if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
-    const canisterId = getCanisterId('POKEDBOTS_RACING');
+    const canisterId = getCanisterId('pokedbots_brawl');
     return await (globalThis as any).window.ic.plug.createActor({
       canisterId,
       interfaceFactory: PokedBotsRacing.idlFactory,

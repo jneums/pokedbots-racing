@@ -2,7 +2,7 @@
 
 import { type Identity, Actor, HttpAgent } from '@icp-sdk/core/agent';
 import { getRacingActor } from '../actors.js';
-import { PokedBotsRacing } from '@pokedbots-racing/declarations';
+import { PokedBotsRacing } from '@pokedbots-brawl/declarations';
 import { getCanisterId, getHost } from '../config.js';
 
 export type ScheduledEvent = PokedBotsRacing.ScheduledEvent;
@@ -28,7 +28,7 @@ function isPlugAgent(identityOrAgent: any): boolean {
 async function getActor(identityOrAgent: IdentityOrAgent): Promise<PokedBotsRacing._SERVICE> {
   // Check if it's a Plug agent - use window.ic.plug.createActor
   if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
-    const canisterId = getCanisterId('POKEDBOTS_RACING');
+    const canisterId = getCanisterId('pokedbots_brawl');
     return await (globalThis as any).window.ic.plug.createActor({
       canisterId,
       interfaceFactory: PokedBotsRacing.idlFactory,

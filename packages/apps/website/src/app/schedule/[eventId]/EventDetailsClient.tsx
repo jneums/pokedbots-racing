@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useGetEventDetails, useGetRaceById, useGetBotProfile } from "@/hooks/useRacing";
 import { useMyBots, useEnterRace } from "@/hooks/useGarage";
 import { useAuth } from "@/hooks/useAuth";
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-brawl/ic-js';
 import { RaceVisualizer } from '@/components/RaceVisualizer';
 import { BettingInterface } from '@/components/BettingInterface';
 import { toast } from 'sonner';

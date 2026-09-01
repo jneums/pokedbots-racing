@@ -1,0 +1,249 @@
+{
+  "win_rates_by_size": {
+    "Win Rate (%)": {
+      "2": 50.0,
+      "3": 50.0,
+      "5": 50.0
+    }
+  },
+  "durations": {
+    "Mean Ticks": {
+      "2": 4.12,
+      "3": 5.37,
+      "5": 6.0
+    },
+    "Std Dev": {
+      "2": 1.88,
+      "3": 4.15,
+      "5": 2.99
+    }
+  },
+  "class_performance": {
+    "win_rate": {
+      "Bulwark": 54.47,
+      "Fixer": 45.35,
+      "Striker": 47.1,
+      "Tactician": 55.38
+    },
+    "games": {
+      "Bulwark": 727,
+      "Fixer": 1184,
+      "Striker": 1085,
+      "Tactician": 1004
+    },
+    "damage_dealt": {
+      "Bulwark": 691.58,
+      "Fixer": 338.55,
+      "Striker": 1036.18,
+      "Tactician": 1026.1
+    },
+    "healing_done": {
+      "Bulwark": 0.0,
+      "Fixer": 290.01,
+      "Striker": 0.0,
+      "Tactician": 0.0
+    },
+    "survival_rate": {
+      "Bulwark": 37.55,
+      "Fixer": 32.26,
+      "Striker": 37.24,
+      "Tactician": 36.85
+    }
+  },
+  "faction_performance": {
+    "win_rate": {
+      "Ultimate-master": 93.02,
+      "Wild": 88.0,
+      "Ultimate": 76.61,
+      "Blackhole": 73.44,
+      "Golden": 59.43,
+      "Dead": 58.61,
+      "Master": 51.97,
+      "Box": 42.91,
+      "Bee": 34.03,
+      "Industrial": 32.8,
+      "Game": 31.97,
+      "Murder": 30.23,
+      "Animal": 26.6,
+      "Food": 25.0
+    },
+    "games": {
+      "Ultimate-master": 43,
+      "Wild": 50,
+      "Ultimate": 295,
+      "Blackhole": 546,
+      "Golden": 387,
+      "Dead": 476,
+      "Master": 356,
+      "Box": 247,
+      "Bee": 144,
+      "Industrial": 503,
+      "Game": 294,
+      "Murder": 215,
+      "Animal": 312,
+      "Food": 132
+    },
+    "damage_dealt": {
+      "Ultimate-master": 1203.74,
+      "Wild": 817.41,
+      "Ultimate": 763.31,
+      "Blackhole": 964.97,
+      "Golden": 1766.8,
+      "Dead": 828.87,
+      "Master": 724.6,
+      "Box": 570.25,
+      "Bee": 466.97,
+      "Industrial": 530.68,
+      "Game": 432.06,
+      "Murder": 407.63,
+      "Animal": 453.09,
+      "Food": 349.22
+    }
+  },
+  "top_10_bot_types": {
+    "win_rate": {
+      "Ultimate-master_Striker": 93.02,
+      "Wild_Fixer": 93.02,
+      "Blackhole_Tactician": 85.85,
+      "Blackhole_Bulwark": 82.69,
+      "Ultimate_Bulwark": 80.29,
+      "Ultimate_Fixer": 73.88,
+      "Ultimate_Tactician": 70.83,
+      "Dead_Bulwark": 70.15,
+      "Dead_Tactician": 67.2,
+      "Master_Tactician": 61.76
+    },
+    "games": {
+      "Ultimate-master_Striker": 43,
+      "Wild_Fixer": 43,
+      "Blackhole_Tactician": 205,
+      "Blackhole_Bulwark": 104,
+      "Ultimate_Bulwark": 137,
+      "Ultimate_Fixer": 134,
+      "Ultimate_Tactician": 24,
+      "Dead_Bulwark": 67,
+      "Dead_Tactician": 125,
+      "Master_Tactician": 68
+    },
+    "damage_dealt": {
+      "Ultimate-master_Striker": 1203.74,
+      "Wild_Fixer": 782.57,
+      "Blackhole_Tactician": 1548.93,
+      "Blackhole_Bulwark": 985.4,
+      "Ultimate_Bulwark": 1020.17,
+      "Ultimate_Fixer": 475.34,
+      "Ultimate_Tactician": 904.93,
+      "Dead_Bulwark": 886.66,
+      "Dead_Tactician": 1521.09,
+      "Master_Tactician": 864.69
+    },
+    "avg_rating": {
+      "Ultimate-master_Striker": 69.0,
+      "Wild_Fixer": 65.0,
+      "Blackhole_Tactician": 37.49,
+      "Blackhole_Bulwark": 39.06,
+      "Ultimate_Bulwark": 39.65,
+      "Ultimate_Fixer": 43.66,
+      "Ultimate_Tactician": 41.38,
+      "Dead_Bulwark": 35.57,
+      "Dead_Tactician": 32.98,
+      "Master_Tactician": 28.18
+    },
+    "survival_rate": {
+      "Ultimate-master_Striker": 90.7,
+      "Wild_Fixer": 67.44,
+      "Blackhole_Tactician": 57.07,
+      "Blackhole_Bulwark": 61.54,
+      "Ultimate_Bulwark": 59.12,
+      "Ultimate_Fixer": 43.28,
+      "Ultimate_Tactician": 66.67,
+      "Dead_Bulwark": 49.25,
+      "Dead_Tactician": 40.0,
+      "Master_Tactician": 42.65
+    }
+  },
+  "bottom_10_bot_types": {
+    "win_rate": {
+      "Food_Fixer": 5.88,
+      "Food_Tactician": 7.69,
+      "Animal_Fixer": 11.59,
+      "Bee_Fixer": 16.67,
+      "Animal_Bulwark": 19.15,
+      "Murder_Fixer": 23.61,
+      "Animal_Striker": 23.71,
+      "Industrial_Fixer": 24.39,
+      "Game_Fixer": 26.0,
+      "Bee_Bulwark": 26.32
+    },
+    "games": {
+      "Food_Fixer": 17,
+      "Food_Tactician": 13,
+      "Animal_Fixer": 69,
+      "Bee_Fixer": 12,
+      "Animal_Bulwark": 47,
+      "Murder_Fixer": 72,
+      "Animal_Striker": 97,
+      "Industrial_Fixer": 164,
+      "Game_Fixer": 100,
+      "Bee_Bulwark": 19
+    },
+    "damage_dealt": {
+      "Food_Fixer": 196.13,
+      "Food_Tactician": 243.36,
+      "Animal_Fixer": 136.21,
+      "Bee_Fixer": 106.77,
+      "Animal_Bulwark": 312.92,
+      "Murder_Fixer": 230.97,
+      "Animal_Striker": 392.65,
+      "Industrial_Fixer": 206.52,
+      "Game_Fixer": 214.06,
+      "Bee_Bulwark": 469.23
+    },
+    "avg_rating": {
+      "Food_Fixer": 19.76,
+      "Food_Tactician": 15.92,
+      "Animal_Fixer": 17.19,
+      "Bee_Fixer": 17.08,
+      "Animal_Bulwark": 17.45,
+      "Murder_Fixer": 21.04,
+      "Animal_Striker": 19.65,
+      "Industrial_Fixer": 19.27,
+      "Game_Fixer": 20.94,
+      "Bee_Bulwark": 21.53
+    },
+    "survival_rate": {
+      "Food_Fixer": 5.88,
+      "Food_Tactician": 7.69,
+      "Animal_Fixer": 7.25,
+      "Bee_Fixer": 16.67,
+      "Animal_Bulwark": 8.51,
+      "Murder_Fixer": 20.83,
+      "Animal_Striker": 20.62,
+      "Industrial_Fixer": 19.51,
+      "Game_Fixer": 21.0,
+      "Bee_Bulwark": 5.26
+    }
+  },
+  "issues": [
+    "\u26a0\ufe0f  Animal_Bulwark: TOO WEAK (19.1% win rate, 47 games)",
+    "\u26a0\ufe0f  Animal_Fixer: TOO WEAK (11.6% win rate, 69 games)",
+    "\u26a0\ufe0f  Animal_Striker: TOO WEAK (23.7% win rate, 97 games)",
+    "\u26a0\ufe0f  Bee_Bulwark: TOO WEAK (26.3% win rate, 19 games)",
+    "\u26a0\ufe0f  Bee_Fixer: TOO WEAK (16.7% win rate, 12 games)",
+    "\u26a0\ufe0f  Blackhole_Bulwark: TOO STRONG (82.7% win rate, 104 games)",
+    "\u26a0\ufe0f  Blackhole_Tactician: TOO STRONG (85.8% win rate, 205 games)",
+    "\u26a0\ufe0f  Dead_Bulwark: TOO STRONG (70.2% win rate, 67 games)",
+    "\u26a0\ufe0f  Food_Fixer: TOO WEAK (5.9% win rate, 17 games)",
+    "\u26a0\ufe0f  Food_Striker: TOO WEAK (28.6% win rate, 70 games)",
+    "\u26a0\ufe0f  Food_Tactician: TOO WEAK (7.7% win rate, 13 games)",
+    "\u26a0\ufe0f  Game_Fixer: TOO WEAK (26.0% win rate, 100 games)",
+    "\u26a0\ufe0f  Game_Striker: TOO WEAK (27.5% win rate, 69 games)",
+    "\u26a0\ufe0f  Industrial_Bulwark: TOO WEAK (26.9% win rate, 52 games)",
+    "\u26a0\ufe0f  Industrial_Fixer: TOO WEAK (24.4% win rate, 164 games)",
+    "\u26a0\ufe0f  Industrial_Striker: TOO WEAK (29.6% win rate, 27 games)",
+    "\u26a0\ufe0f  Murder_Bulwark: TOO WEAK (28.9% win rate, 38 games)",
+    "\u26a0\ufe0f  Murder_Fixer: TOO WEAK (23.6% win rate, 72 games)",
+    "\u26a0\ufe0f  Murder_Striker: TOO WEAK (28.6% win rate, 63 games)",
+    "\u26a0\ufe0f  Ultimate-master_Striker: TOO STRONG (93.0% win rate, 43 games)"
+  ]
+}

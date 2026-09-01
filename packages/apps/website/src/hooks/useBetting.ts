@@ -5,7 +5,7 @@ import {
   bettingPlaceBet,
   bettingListPools,
   type BetType,
-} from '@pokedbots-racing/ic-js';
+} from '@pokedbots-brawl/ic-js';
 import { useAuth } from './useAuth';
 
 // Hook to get betting pool info for a race

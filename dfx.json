@@ -1,11 +1,11 @@
 {
   "canisters": {
-    "pokedbots_racing": {
-      "main": "packages/canisters/pokedbots_racing/src/main.mo",
+    "pokedbots_brawl": {
+      "main": "packages/canisters/pokedbots_brawl/src/main.mo",
       "type": "motoko",
       "gzip": true,
       "declarations": {
-        "output": "packages/libs/declarations/src/generated/pokedbots_racing",
+        "output": "packages/libs/declarations/src/generated/pokedbots_brawl",
         "node_compatibility": true
       }
     },

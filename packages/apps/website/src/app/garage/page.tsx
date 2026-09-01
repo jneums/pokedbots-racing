@@ -9,10 +9,10 @@ import { WalletConnect } from '../../components/WalletConnect';
 import { BotCard } from '../../components/BotCard';
 import { Battery, Wrench, Clock, Zap, Hammer, Star, GripVertical, Plus } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { BotListItem } from '@pokedbots-racing/ic-js';
+import type { BotListItem } from '@pokedbots-brawl/ic-js';
 import { Progress } from '../../components/ui/progress';
 import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
-import { generatetokenIdentifier, completeScavenging } from '@pokedbots-racing/ic-js';
+import { generatetokenIdentifier, completeScavenging } from '@pokedbots-brawl/ic-js';
 import { toast } from 'sonner';
 
 // Helper to format time remaining

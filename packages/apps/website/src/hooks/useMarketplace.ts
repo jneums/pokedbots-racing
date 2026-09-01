@@ -1,5 +1,5 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { browseMarketplace, purchaseBot, type BrowseMarketplaceParams } from '@pokedbots-racing/ic-js';
+import { browseMarketplace, purchaseBot, type BrowseMarketplaceParams } from '@pokedbots-brawl/ic-js';
 import { useAuth } from './useAuth';
 import { AnonymousIdentity } from '@dfinity/agent';
 

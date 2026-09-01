@@ -1,6 +1,6 @@
 import { type Identity } from '@icp-sdk/core/agent';
 import { getRacingActor } from '../actors.js';
-import { PokedBotsRacing } from '@pokedbots-racing/declarations';
+import { PokedBotsRacing } from '@pokedbots-brawl/declarations';
 import { getCanisterId } from '../config.js';
 
 export type BetType = 'Win' | 'Place' | 'Show';
@@ -20,7 +20,7 @@ function isPlugAgent(identityOrAgent: any): boolean {
 // Helper to get racing actor
 async function getActor(identityOrAgent?: IdentityOrAgent): Promise<PokedBotsRacing._SERVICE> {
   if (isPlugAgent(identityOrAgent) && typeof globalThis !== 'undefined' && (globalThis as any).window?.ic?.plug?.createActor) {
-    const canisterId = getCanisterId('POKEDBOTS_RACING');
+    const canisterId = getCanisterId('pokedbots_brawl');
     return await (globalThis as any).window.ic.plug.createActor({
       canisterId,
       interfaceFactory: PokedBotsRacing.idlFactory,

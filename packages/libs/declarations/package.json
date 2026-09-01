@@ -1,5 +1,5 @@
 {
-  "name": "@pokedbots-racing/declarations",
+  "name": "@pokedbots-brawl/declarations",
   "version": "0.0.0-development",
   "type": "module",
   "main": "./dist/index.js",

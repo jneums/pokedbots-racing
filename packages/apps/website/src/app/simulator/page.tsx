@@ -10,7 +10,7 @@ import { Shuffle, Play, Loader2 } from "lucide-react";
 import { RaceVisualizer } from "@/components/RaceVisualizer";
 import { useGetAllTimeLeaderboard } from "@/hooks/useLeaderboard";
 import { useDebugTestSimulation } from "@/hooks/useRacing";
-import { getBotProfile } from "@pokedbots-racing/ic-js";
+import { getBotProfile } from "@pokedbots-brawl/ic-js";
 
 interface Bot {
   tokenIndex: number;

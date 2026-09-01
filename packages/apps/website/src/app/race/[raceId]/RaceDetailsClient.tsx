@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetRaceById, useGetBotProfile } from "@/hooks/useRacing";
 import { useMyBots, useEnterRace } from "@/hooks/useGarage";
 import { useAuth } from "@/hooks/useAuth";
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-brawl/ic-js';
 import { RaceVisualizer } from '@/components/RaceVisualizer';
 import { RacePlayback } from '@/components/Track3D';
 import { getTrackTemplate } from '@/components/Track3D/trackData';

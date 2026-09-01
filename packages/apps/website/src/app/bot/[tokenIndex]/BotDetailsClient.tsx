@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useGetBotProfile, useGetBotRaceHistory } from '@/hooks/useRacing';
 import { useBackgrounds } from '@/hooks/useBackgrounds';
-import { generatetokenIdentifier, generateExtThumbnailLink, generateExtAssetLink } from '@pokedbots-racing/ic-js';
+import { generatetokenIdentifier, generateExtThumbnailLink, generateExtAssetLink } from '@pokedbots-brawl/ic-js';
 import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus } from '@/lib/utils';
 
 function formatICP(amount: bigint): string {

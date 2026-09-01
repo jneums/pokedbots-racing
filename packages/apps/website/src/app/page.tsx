@@ -10,7 +10,7 @@ export default function Home() {
           <div className="max-w-5xl mx-auto text-center space-y-10">
             <div className="flex justify-center">
               <img 
-                src="/pokedbots-racing-logo.webp" 
+                src="/pokedbots-brawl-logo.webp" 
                 alt="PokedBots Racing" 
                 className="w-full max-w-3xl h-auto"
               />

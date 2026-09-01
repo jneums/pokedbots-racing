@@ -2,7 +2,7 @@
 
 import { Identity } from '@icp-sdk/core/agent';
 import { getRacingActor } from '../actors.js';
-import { PokedBotsRacing } from '@pokedbots-racing/declarations';
+import { PokedBotsRacing } from '@pokedbots-brawl/declarations';
 
 export type LeaderboardEntry = PokedBotsRacing.LeaderboardEntry;
 export type LeaderboardType = PokedBotsRacing.LeaderboardType;

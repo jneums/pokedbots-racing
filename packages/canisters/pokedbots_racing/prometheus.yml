@@ -1,4 +1,4 @@
-namespace: io.github.jneums.pokedbots-racing
+namespace: io.github.jneums.pokedbots-brawl
 submission:
   name: PokedBots Racing
   description: >-
@@ -11,7 +11,7 @@ submission:
   publisher: PokedBots
   category: Gaming
   deployment_type: global
-  repo_url: https://github.com/jneums/pokedbots-racing
+  repo_url: https://github.com/jneums/pokedbots-brawl
   mcp_path: /mcp
   why_this_app: >-
     PokedBots Racing brings competitive NFT racing to the Internet Computer with
@@ -50,11 +50,11 @@ submission:
     - marketplace
   visuals:
     icon_url: >-
-      https://github.com/jneums/pokedbots-racing/releases/download/v1.0.2-assets/icon-pokedbots-racing.webp
+      https://github.com/jneums/pokedbots-brawl/releases/download/v1.0.2-assets/icon-pokedbots-brawl.webp
     banner_url: >-
-      https://github.com/jneums/pokedbots-racing/releases/download/v1.0.2-assets/banner-pokedbots-racing.webp
+      https://github.com/jneums/pokedbots-brawl/releases/download/v1.0.2-assets/banner-pokedbots-brawl.webp
     gallery_images:
       - >-
-        https://github.com/jneums/pokedbots-racing/releases/download/v1.0.2-assets/banner-pokedbots-racing.webp
+        https://github.com/jneums/pokedbots-brawl/releases/download/v1.0.2-assets/banner-pokedbots-brawl.webp
   git_commit: e881e417d855b6ba71d411951a46560f7603efb9
   wasm_path: ./out/out_Linux_x86_64.wasm

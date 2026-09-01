@@ -10,9 +10,9 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlaceBet, useGetBettingPool } from '@/hooks/useBetting';
 import { useGetBotProfile } from '@/hooks/useRacing';
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-brawl/ic-js';
 import { Link } from 'react-router-dom';
-import type { BetType } from '@pokedbots-racing/ic-js';
+import type { BetType } from '@pokedbots-brawl/ic-js';
 
 interface BettingInterfaceProps {
   raceId: number;

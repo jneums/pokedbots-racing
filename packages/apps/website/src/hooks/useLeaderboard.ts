@@ -10,8 +10,8 @@ import {
   getFactionLeaderboard,
   type LeaderboardEntry,
   type LeaderboardType,
-} from '@pokedbots-racing/ic-js';
-import { PokedBotsRacing } from '@pokedbots-racing/declarations';
+} from '@pokedbots-brawl/ic-js';
+import { PokedBotsRacing } from '@pokedbots-brawl/declarations';
 
 export type { LeaderboardEntry, LeaderboardType };
 export type FactionType = PokedBotsRacing.FactionType;

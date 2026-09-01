@@ -16,17 +16,18 @@ import GuidesListPage from './app/guides/page';
 import GuidePage from './app/guides/[slug]/page';
 import BotDetailsPage from './app/bot/[tokenIndex]/page';
 import Track3DTestPage from './app/track3d-test/page';
+import CombatPOCPage from './app/combat-poc/page';
 import { WalletDrawerProvider } from './contexts/WalletDrawerContext';
 import { WalletDrawer } from './components/WalletDrawer';
 import { useAuth } from './hooks/useAuth';
 
-import { configure as configureIcJs } from '@pokedbots-racing/ic-js';
+import { configure as configureIcJs } from '@pokedbots-brawl/ic-js';
 
 // --- CONFIGURE THE SHARED PACKAGE ---
 // This object is created at BUILD TIME. Vite replaces each `process.env`
 // access with a static string.
 const canisterIds = {
-  POKEDBOTS_RACING: process.env.CANISTER_ID_POKEDBOTS_RACING!,
+  pokedbots_brawl: process.env.CANISTER_ID_pokedbots_brawl!,
   POKEDBOTS_NFTS: process.env.CANISTER_ID_POKEDBOTS_NFTS!,
   ICP_LEDGER: process.env.CANISTER_ID_ICP_LEDGER!,
   // ... add all other canister IDs your app needs
@@ -158,6 +159,7 @@ export default function App() {
           <Route path="/guides" element={<GuidesListPage />} />
           <Route path="/guides/:slug" element={<GuidePage />} />
           <Route path="/track3d-test" element={<Track3DTestPage />} />
+          <Route path="/combat-poc" element={<CombatPOCPage />} />
         </Routes>
       </main>
       <footer className="border-t-2 border-primary/20 py-12 bg-card/30">
@@ -172,7 +174,7 @@ export default function App() {
                 Docs
               </Link>
               <a 
-                href="https://github.com/jneums/pokedbots-racing" 
+                href="https://github.com/jneums/pokedbots-brawl" 
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors font-medium inline-flex items-center gap-1"
@@ -189,7 +191,7 @@ export default function App() {
               <div className="flex items-center gap-1">
                 <span>Live on</span>
                 <a 
-                  href="https://prometheusprotocol.org/app/io.github.jneums.pokedbots-racing" 
+                  href="https://prometheusprotocol.org/app/io.github.jneums.pokedbots-brawl" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-primary hover:text-primary/80 transition-colors inline-flex items-center gap-1"

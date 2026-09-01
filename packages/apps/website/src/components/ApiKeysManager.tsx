@@ -151,12 +151,12 @@ export function ApiKeysManager() {
                 <Label className="text-xs font-medium text-muted-foreground mb-2 block">MCP Server URL</Label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 px-3 py-2 bg-background rounded-md border text-sm font-mono break-all">
-                    https://{process.env.CANISTER_ID_POKEDBOTS_RACING}.icp0.io/mcp
+                    https://{process.env.CANISTER_ID_pokedbots_brawl}.icp0.io/mcp
                   </code>
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => copyToClipboard(`https://${process.env.CANISTER_ID_POKEDBOTS_RACING}.icp0.io/mcp`, 'MCP URL')}
+                    onClick={() => copyToClipboard(`https://${process.env.CANISTER_ID_pokedbots_brawl}.icp0.io/mcp`, 'MCP URL')}
                     className="shrink-0"
                   >
                     <Copy className="h-4 w-4" />
@@ -327,7 +327,7 @@ export function ApiKeysManager() {
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">MCP Server URL:</p>
                 <code className="block p-2 bg-background rounded border text-xs font-mono break-all">
-                  https://{process.env.CANISTER_ID_POKEDBOTS_RACING}.icp0.io/mcp
+                  https://{process.env.CANISTER_ID_pokedbots_brawl}.icp0.io/mcp
                 </code>
               </div>
             </div>

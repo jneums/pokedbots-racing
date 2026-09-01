@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { BotListItem, initializeBot, rechargeBot, repairBot, respecBot, generatetokenIdentifier, listBotForSale, unlistBot, transferBot, startScavenging, completeScavenging, enterRace } from '@pokedbots-racing/ic-js';
+import { BotListItem, initializeBot, rechargeBot, repairBot, respecBot, generatetokenIdentifier, listBotForSale, unlistBot, transferBot, startScavenging, completeScavenging, enterRace } from '@pokedbots-brawl/ic-js';
 import { useAuth } from '../hooks/useAuth';
 import { useUpgradeBot, useCancelUpgrade } from '../hooks/useGarage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';

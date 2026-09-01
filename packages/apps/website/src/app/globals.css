@@ -245,3 +245,18 @@
     --tw-prose-td-borders: oklch(0.28 0.03 40) !important;
   }
 }
+
+@keyframes floatFade {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -15px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -30px);
+  }
+}

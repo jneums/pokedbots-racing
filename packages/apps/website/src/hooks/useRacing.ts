@@ -13,7 +13,7 @@ import {
   queryRaces,
   type ScheduledEvent,
   type Race,
-} from '@pokedbots-racing/ic-js';
+} from '@pokedbots-brawl/ic-js';
 
 export type { ScheduledEvent, Race };
 

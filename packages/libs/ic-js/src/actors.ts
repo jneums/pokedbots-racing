@@ -4,7 +4,7 @@ import {
   PokedBotsRacing,
   PokedBotsNFTs,
   Ledger,
-} from '@pokedbots-racing/declarations';
+} from '@pokedbots-brawl/declarations';
 import { getCanisterId, getHost } from './config.js';
 
 /**
@@ -53,7 +53,7 @@ const createActor = async <T>(
 export const getRacingActor = async (identity?: Identity) => {
   return createActor<PokedBotsRacing._SERVICE>(
     PokedBotsRacing.idlFactory,
-    getCanisterId('POKEDBOTS_RACING'),
+    getCanisterId('pokedbots_brawl'),
     identity,
   );
 };

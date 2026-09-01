@@ -18,15 +18,15 @@ import { PocketIc, createIdentity } from '@dfinity/pic';
 import { IDL } from '@icp-sdk/core/candid';
 import { AnonymousIdentity } from '@icp-sdk/core/agent';
 import { Principal } from '@icp-sdk/core/principal';
-import { idlFactory as mcpServerIdlFactory } from '../../../../.dfx/local/canisters/pokedbots_racing/service.did.js';
-import type { _SERVICE as McpServerService } from '../../../../.dfx/local/canisters/pokedbots_racing/service.did';
+import { idlFactory as mcpServerIdlFactory } from '../../../../.dfx/local/canisters/pokedbots_brawl/service.did.js';
+import type { _SERVICE as McpServerService } from '../../../../.dfx/local/canisters/pokedbots_brawl/service.did';
 import type { Actor } from '@dfinity/pic';
 import path from 'node:path';
 
 // Configure the path to your MCP server WASM
 const MCP_SERVER_WASM_PATH = path.resolve(
   __dirname,
-  '../../../../.dfx/local/canisters/pokedbots_racing/pokedbots_racing.wasm.gz',
+  '../../../../.dfx/local/canisters/pokedbots_brawl/pokedbots_brawl.wasm.gz',
 );
 
 describe('MCP Server Requirements', () => {

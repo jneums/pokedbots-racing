@@ -13,7 +13,7 @@ from statistics import mean, stdev
 
 def run_dfx_command(method, args):
     """Run a dfx canister call command and return the result."""
-    cmd = ["dfx", "canister", "call", "pokedbots_racing", method, args, "--ic"]
+    cmd = ["dfx", "canister", "call", "pokedbots_brawl", method, args, "--ic"]
 
     try:
         result = subprocess.run(
@@ -21,7 +21,7 @@ def run_dfx_command(method, args):
             capture_output=True,
             text=True,
             check=True,
-            cwd="/home/jesse/pokedbots-racing",
+            cwd="/home/jesse/pokedbots-brawl",
         )
         return result.stdout
     except subprocess.CalledProcessError as e:

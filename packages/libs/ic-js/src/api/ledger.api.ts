@@ -4,7 +4,7 @@ import { type Identity, HttpAgent, Actor } from '@icp-sdk/core/agent';
 import { Principal } from '@icp-sdk/core/principal';
 import { getHost } from '../config.js';
 import { AccountIdentifier } from '@icp-sdk/canisters/ledger/icp';
-import { Ledger } from '@pokedbots-racing/declarations';
+import { Ledger } from '@pokedbots-brawl/declarations';
 
 // ICP Ledger canister ID (mainnet)
 const ICP_LEDGER_CANISTER_ID = 'ryjl3-tyaaa-aaaaa-aaaba-cai';

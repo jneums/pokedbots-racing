@@ -11,7 +11,7 @@ import {
   type LeaderboardEntry,
 } from "@/hooks/useLeaderboard";
 import { useGetBotProfile } from "@/hooks/useRacing";
-import { generatetokenIdentifier, generateExtThumbnailLink } from "@pokedbots-racing/ic-js";
+import { generatetokenIdentifier, generateExtThumbnailLink } from "@pokedbots-brawl/ic-js";
 
 function formatICP(amount: bigint): string {
   // ICP has 8 decimals (e8s)

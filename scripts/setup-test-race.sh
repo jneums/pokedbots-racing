@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 LEDGER_CANISTER="icp_ledger"
-RACING_CANISTER="pokedbots_racing"
+RACING_CANISTER="pokedbots_brawl"
 POKEDBOTS_CANISTER="pokedbots_nfts"
 ICP_AMOUNT="10" # ICP to give each bot
 ADMIN_IDENTITY="pp_owner"

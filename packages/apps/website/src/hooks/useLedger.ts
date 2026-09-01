@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getICPBalance, transferICP } from '@pokedbots-racing/ic-js';
+import { getICPBalance, transferICP } from '@pokedbots-brawl/ic-js';
 import { useAuth } from './useAuth';
 
 /**

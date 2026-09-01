@@ -35,7 +35,7 @@ export default function Navigation() {
       <div className="container mx-auto px-6">
         <div className="flex h-20 items-center justify-between">
           <Link to="/" className="flex items-center gap-3 font-semibold text-foreground hover:text-primary transition-colors">
-            <img src="/pokedbots-racing-icon.webp" alt="PokedBots Racing" className="h-9 w-auto translate-y-1" />
+            <img src="/pokedbots-brawl-icon.webp" alt="PokedBots Racing" className="h-9 w-auto translate-y-1" />
           </Link>
           
           {/* Desktop Navigation */}
@@ -151,7 +151,7 @@ export default function Navigation() {
                     Docs
                   </Link>
                   <a 
-                    href="https://github.com/jneums/pokedbots-racing" 
+                    href="https://github.com/jneums/pokedbots-brawl" 
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block px-4 py-3 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-primary/5 transition-all border-l-4 border-transparent"

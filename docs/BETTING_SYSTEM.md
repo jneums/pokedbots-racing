@@ -19,7 +19,7 @@ Pari-mutuel betting system for PokedBots races, allowing users to bet ICP on rac
 
 ### Technology Stack
 
-- **Canister**: Integrated into pokedbots_racing canister (p6nop-vyaaa-aaaai-q4djq-cai)
+- **Canister**: Integrated into pokedbots_brawl canister (p6nop-vyaaa-aaaai-q4djq-cai)
 - **Currency**: ICP (ryjl3-tyaaa-aaaab-qaa6a-cai)
 - **Payment Method**: ICRC-2 approval + transfer_from (same approval as race entry fees)
 - **Payout Method**: ICRC-1 transfer
@@ -756,7 +756,7 @@ All in one atomic flow, no coordination complexity.
 ### Code Organization
 Despite integration, code remains modular:
 ```
-packages/canisters/pokedbots_racing/src/
+packages/canisters/pokedbots_brawl/src/
 ├── main.mo (orchestrates racing + betting)
 ├── PokedBotsGarage.mo (existing garage logic)
 ├── RacingSimulator.mo (existing race simulation)

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { PurchaseDialog } from '../../components/PurchaseDialog';
 import { useAuth } from '../../hooks/useAuth';
 import { useInfiniteMarketplace, usePurchaseBot } from '../../hooks/useMarketplace';
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-brawl/ic-js';
 import { getTerrainPreference, getTerrainIcon, getTerrainName, getFactionTerrainBonus, getFactionBonus } from '../../lib/utils';
 import { AlertCircle, ChevronDown } from 'lucide-react';
 

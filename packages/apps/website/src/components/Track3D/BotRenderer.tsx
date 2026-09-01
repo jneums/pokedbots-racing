@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { Group, Vector3, Sprite as ThreeSprite, SpriteMaterial, CanvasTexture, Texture } from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
-import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-racing/ic-js';
+import { generatetokenIdentifier, generateExtThumbnailLink } from '@pokedbots-brawl/ic-js';
 
 interface BotRendererProps {
   position: [number, number, number];

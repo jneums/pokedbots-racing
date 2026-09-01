@@ -28,8 +28,8 @@ PokedBots Racing is a fully on-chain racing simulation built on the Internet Com
 
 ```bash
 # Clone the repository
-git clone https://github.com/jneums/pokedbots-racing
-cd pokedbots-racing
+git clone https://github.com/jneums/pokedbots-brawl
+cd pokedbots-brawl
 
 # Install dependencies
 npm install
@@ -45,7 +45,7 @@ npm run deploy
 ## 🏗️ Project Structure
 
 ```
-pokedbots-racing/
+pokedbots-brawl/
 ├── src/                    # Motoko canister code
 │   ├── main.mo            # Main entry point and MCP server
 │   ├── Racing.mo          # Racing simulation engine
@@ -113,7 +113,7 @@ Manage your racing garage through AI agents using these MCP tools:
 
 Visit the [documentation site](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/docs) for:
 
-- [Racing Design](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/docs/POKEDBOTS_RACING_DESIGN) - Complete system architecture
+- [Racing Design](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/docs/pokedbots_brawl_DESIGN) - Complete system architecture
 - [Racing Calendar](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/docs/RACING_CALENDAR_DESIGN) - Scheduled events system
 - [Comprehensive Stats](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/docs/COMPREHENSIVE_STATS) - Bot statistics analysis
 - [Implementation Guide](https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io/docs/IMPLEMENTATION_GUIDE) - Development guide
@@ -180,7 +180,7 @@ MIT
 
 - **Website**: https://32qki-jaaaa-aaaai-q4a7a-cai.icp0.io
 - **PokedBots Collection**: https://bzsui-sqaaa-aaaah-qce2a-cai.raw.icp0.io
-- **GitHub**: https://github.com/jneums/pokedbots-racing
+- **GitHub**: https://github.com/jneums/pokedbots-brawl
 
 ## Prerequisites
 

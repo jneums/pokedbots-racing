@@ -1,0 +1,169 @@
+{
+  "factions": {
+    "Murder": {
+      "Striker": {
+        "hp": 700,
+        "startingResource": 50,
+        "maxResource": 100,
+        "abilities": {
+          "basic": {
+            "damage": 30,
+            "cost": 0,
+            "resourceGeneration": 10,
+            "cooldown": 3
+          },
+          "spender": {
+            "damage": 80,
+            "cost": 50,
+            "resourceGeneration": 0,
+            "cooldown": 0
+          }
+        }
+      }
+    },
+    "Industrial": {
+      "Bulwark": {
+        "hp": 1000,
+        "startingResource": 50,
+        "maxResource": 100,
+        "abilities": {
+          "basic": {
+            "damage": 20,
+            "cost": 0,
+            "resourceGeneration": 10,
+            "cooldown": 3,
+            "threat": 20
+          },
+          "spender": {
+            "damage": 0,
+            "cost": 60,
+            "resourceGeneration": 0,
+            "cooldown": 0,
+            "threat": 100,
+            "selfShield": 200
+          }
+        }
+      }
+    },
+    "Bee": {
+      "Fixer": {
+        "hp": 600,
+        "startingResource": 100,
+        "maxResource": 100,
+        "abilities": {
+          "basic": {
+            "damage": 15,
+            "cost": 0,
+            "resourceGeneration": 0,
+            "cooldown": 3
+          },
+          "spender": {
+            "healing": 100,
+            "cost": 30,
+            "resourceGeneration": 0,
+            "cooldown": 0
+          }
+        },
+        "resourceRegen": {
+          "tickInterval": 2,
+          "amount": 5
+        }
+      }
+    },
+    "Golden": {
+      "Tactician": {
+        "hp": 650,
+        "startingResource": 50,
+        "maxResource": 100,
+        "abilities": {
+          "basic": {
+            "damage": 35,
+            "cost": 0,
+            "resourceGeneration": 0,
+            "cooldown": 3
+          },
+          "buff": {
+            "cost": 60,
+            "resourceGeneration": 0,
+            "cooldown": 30,
+            "resourceGrant": 30,
+            "target": "all-allies"
+          }
+        }
+      }
+    },
+    "Dead": {
+      "Bulwark": {
+        "hp": 1000,
+        "startingResource": 50,
+        "maxResource": 100,
+        "abilities": {
+          "basic": {
+            "damage": 20,
+            "cost": 0,
+            "resourceGeneration": 10,
+            "cooldown": 3,
+            "threat": 20
+          },
+          "spender": {
+            "damage": 0,
+            "cost": 60,
+            "resourceGeneration": 0,
+            "cooldown": 0,
+            "threat": 100,
+            "selfShield": 200
+          }
+        }
+      }
+    }
+  },
+  "tuningKnobs": {
+    "global": {
+      "damageMultiplier": 1.0,
+      "healingMultiplier": 1.0,
+      "threatMultiplier": 1.0,
+      "resourceGenerationMultiplier": 1.0
+    },
+    "role": {
+      "tank": {
+        "damageMultiplier": 0.8,
+        "threatMultiplier": 1.5,
+        "hpMultiplier": 1.0
+      },
+      "healer": {
+        "healingMultiplier": 1.0,
+        "resourceRegenMultiplier": 1.0,
+        "hpMultiplier": 0.85
+      },
+      "dps": {
+        "damageMultiplier": 1.0,
+        "hpMultiplier": 0.9
+      },
+      "support": {
+        "damageMultiplier": 0.9,
+        "buffEffectivenessMultiplier": 1.0,
+        "hpMultiplier": 0.88
+      }
+    }
+  },
+  "balanceTargets": {
+    "winRate": {
+      "min": 60,
+      "max": 95,
+      "description": "Acceptable win rate range for standard composition"
+    },
+    "fightDuration": {
+      "min": 100,
+      "max": 300,
+      "description": "Target fight duration in ticks"
+    },
+    "tankSurvival": {
+      "min": 80,
+      "description": "Tank should survive at least 80% of winning fights"
+    },
+    "healerMana": {
+      "min": 15,
+      "description": "Healer should finish with at least 15 mana on average"
+    }
+  }
+}

@@ -81,19 +81,19 @@ function getCanisterInfo() {
     const rootCanisterIdsPath = path.join(__dirname, '../canister_ids.json');
     if (!isLocal && fs.existsSync(rootCanisterIdsPath)) {
       const canisterIds = JSON.parse(fs.readFileSync(rootCanisterIdsPath, 'utf8'));
-      canisterId = canisterIds.pokedbots_racing.ic;
+      canisterId = canisterIds.pokedbots_brawl.ic;
     } else {
       // Fall back to .dfx/local/canister_ids.json for local
       const localCanisterIdsPath = path.join(__dirname, '../.dfx/local/canister_ids.json');
       const canisterIds = JSON.parse(fs.readFileSync(localCanisterIdsPath, 'utf8'));
-      canisterId = canisterIds.pokedbots_racing.local;
+      canisterId = canisterIds.pokedbots_brawl.local;
     }
   }
   
   // Import the idlFactory from the generated service file
   const didPath = isLocal 
-    ? '../.dfx/local/canisters/pokedbots_racing/service.did.js'
-    : '../.dfx/ic/canisters/pokedbots_racing/service.did.js';
+    ? '../.dfx/local/canisters/pokedbots_brawl/service.did.js'
+    : '../.dfx/ic/canisters/pokedbots_brawl/service.did.js';
   const { idlFactory } = require(didPath);
   
   return { canisterId, idlFactory };
